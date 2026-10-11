@@ -9,11 +9,12 @@
     "node": ">=22"
   },
   "scripts": {
-    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build && npm run worker:dry-run && npm run deploy:guards && npm run secrets && npm run secret-usage && npm run placeholders && npm run attribution",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build && npm run worker:dry-run && npm run worker:dry-run:generated && npm run deploy:guards && npm run secrets && npm run secret-usage && npm run placeholders && npm run attribution",
     "dev": "next dev --turbopack",
     "next:build": "next build",
     "build": "opennextjs-cloudflare build",
     "worker:dry-run": "wrangler deploy --dry-run",
+    "worker:dry-run:generated": "node scripts/dry-run-generated-config.mjs",
     "deploy:guards": "node scripts/check-deploy-guards.mjs --target preview --config wrangler.jsonc && node scripts/check-deploy-guards.mjs --target production --config wrangler.jsonc",
     "db:migrate": "node scripts/apply-migrations.mjs --local",
     "db:migrate:remote": "node scripts/apply-migrations.mjs --remote we-met-db-nonprod",

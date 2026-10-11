@@ -8,15 +8,16 @@
  *
  * --local uses the WE_MET_DB binding from wrangler.jsonc (default).
  * --remote allowlists exactly one database name: we-met-db-nonprod (any other
- * name, binding, or ID is rejected). Production migrations run only in the
- * approved deploy workflow ([DIDI-572]).
+ * name, binding, or ID is rejected). Writes wrangler.d1-nonprod.ci.jsonc at
+ * repo root for the Wrangler invocation, then deletes it.
  */
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { rmSync } from "node:fs";
+import { resolve } from "node:path";
+import { WRANGLER_D1_NONPROD_CI_CONFIG } from "./lib/wrangler-placeholders.mjs";
 
 const REMOTE_ALLOWED_DATABASE = "we-met-db-nonprod";
+const D1_CI_CONFIG = resolve(WRANGLER_D1_NONPROD_CI_CONFIG);
 const args = process.argv.slice(2);
 
 let mode = "local";
@@ -58,44 +59,58 @@ if (mode === "remote") {
 }
 
 let configFlag = [];
-let cleanupDir = null;
 
 if (mode === "remote") {
-  cleanupDir = mkdtempSync(join(tmpdir(), "we-met-wrangler-"));
-  const preparedConfig = join(cleanupDir, "wrangler-d1-nonprod.jsonc");
-  const prep = spawnSync(
-    "node",
-    [
-      "scripts/prepare-wrangler-config.mjs",
-      "--target",
-      "d1-migrate-nonprod",
-      "--output",
-      preparedConfig,
-    ],
-    { encoding: "utf8" },
-  );
-  if (prep.status !== 0) {
-    if (prep.stderr) process.stderr.write(prep.stderr);
-    process.exit(prep.status ?? 1);
+  try {
+    const prep = spawnSync(
+      "node",
+      [
+        "scripts/prepare-wrangler-config.mjs",
+        "--target",
+        "d1-migrate-nonprod",
+        "--output",
+        D1_CI_CONFIG,
+      ],
+      { encoding: "utf8" },
+    );
+    if (prep.status !== 0) {
+      if (prep.stderr) process.stderr.write(prep.stderr);
+      process.exit(prep.status ?? 1);
+    }
+    configFlag = ["-c", D1_CI_CONFIG];
+  } catch (error) {
+    console.error(error);
+    process.exit(1);
   }
-  configFlag = ["-c", preparedConfig];
 }
 
 const wranglerTarget = mode === "remote" ? "--remote" : "--local";
 const applyTarget = mode === "remote" ? databaseName : "WE_MET_DB";
 
-const result = spawnSync(
-  "npx",
-  ["wrangler", ...configFlag, "d1", "migrations", "apply", applyTarget, wranglerTarget],
-  { stdio: "inherit", shell: true },
-);
-
-if (cleanupDir) {
-  try {
-    rmSync(cleanupDir, { recursive: true, force: true });
-  } catch {
-    // ignore temp cleanup errors
+let exitCode = 1;
+try {
+  const result = spawnSync(
+    "npx",
+    [
+      "wrangler",
+      ...configFlag,
+      "d1",
+      "migrations",
+      "apply",
+      applyTarget,
+      wranglerTarget,
+    ],
+    { stdio: "inherit", shell: true },
+  );
+  exitCode = result.status ?? 1;
+} finally {
+  if (mode === "remote") {
+    try {
+      rmSync(D1_CI_CONFIG, { force: true });
+    } catch {
+      // ignore cleanup errors
+    }
   }
 }
 
-process.exit(result.status ?? 1);
+process.exit(exitCode);

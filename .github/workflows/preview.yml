@@ -33,9 +33,9 @@ jobs:
           set -euo pipefail
           node scripts/prepare-wrangler-config.mjs \
             --target preview \
-            --output .wrangler/ci/wrangler.jsonc
+            --output wrangler.ci.jsonc
       - name: Deploy-time guards (preview)
-        run: node scripts/check-deploy-guards.mjs --target preview --config .wrangler/ci/wrangler.jsonc
+        run: node scripts/check-deploy-guards.mjs --target preview --config wrangler.ci.jsonc
       - name: Build OpenNext (non-prod Turnstile site key)
         env:
           NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.WE_MET_TURNSTILE_SITE_KEY_NONPROD }}
@@ -48,7 +48,7 @@ jobs:
         run: |
           set -euo pipefail
           output="$(npx wrangler preview \
-            --config .wrangler/ci/wrangler.jsonc \
+            --config wrangler.ci.jsonc \
             --name "pr-${{ github.event.pull_request.number }}" \
             --json)"
           printf '%s\n' "$output"

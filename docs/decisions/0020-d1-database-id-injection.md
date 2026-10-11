@@ -9,7 +9,7 @@
 
 ## Decision
 
-- **`scripts/prepare-wrangler-config.mjs`** writes a temporary config (under `.wrangler/ci/`, gitignored) by substituting placeholders before `wrangler deploy`, `wrangler preview`, or production D1 migrations.
+- **`scripts/prepare-wrangler-config.mjs`** writes a gitignored config at the **repository root** (`wrangler.ci.jsonc` for deploy/preview, `wrangler.d1-nonprod.ci.jsonc` for remote non-prod migrations) by substituting placeholders before `wrangler deploy`, `wrangler preview`, or production D1 migrations. Output must be a direct child of the repo root so Wrangler resolves `main`, `assets.directory`, and `migrations_dir` correctly.
 - **GitHub repository variable** `WE_MET_D1_DATABASE_ID_NONPROD` — used by preview workflow and `npm run db:migrate:remote`.
 - **GitHub `production` environment variable** `WE_MET_D1_DATABASE_ID_PRODUCTION` — used only by the production deploy workflow.
 - Deploy-time guards run against the **substituted** config in CI before deploy.

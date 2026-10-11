@@ -1,3 +1,7 @@
+/** Generated CI configs (gitignored); must live in repo root for Wrangler relative paths. */
+export const WRANGLER_CI_CONFIG = "wrangler.ci.jsonc";
+export const WRANGLER_D1_NONPROD_CI_CONFIG = "wrangler.d1-nonprod.ci.jsonc";
+
 /** Placeholder D1 IDs in committed wrangler.jsonc (real IDs injected at deploy). */
 export const D1_PLACEHOLDER_PRODUCTION = "00000000-0000-0000-0000-000000000001";
 export const D1_PLACEHOLDER_NONPROD = "00000000-0000-0000-0000-000000000002";

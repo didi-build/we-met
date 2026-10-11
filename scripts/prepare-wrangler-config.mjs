@@ -3,16 +3,19 @@
  * Substitute D1 database_id placeholders and write a deploy-ready Wrangler config.
  *
  * Usage:
- *   node scripts/prepare-wrangler-config.mjs --target production --output .wrangler/ci/wrangler.jsonc
- *   node scripts/prepare-wrangler-config.mjs --target preview --output .wrangler/ci/wrangler.jsonc
- *   node scripts/prepare-wrangler-config.mjs --target d1-migrate-nonprod --output .wrangler/ci/wrangler-d1-nonprod.jsonc
+ *   node scripts/prepare-wrangler-config.mjs --target production --output wrangler.ci.jsonc
+ *   node scripts/prepare-wrangler-config.mjs --target preview --output wrangler.ci.jsonc
+ *   node scripts/prepare-wrangler-config.mjs --target d1-migrate-nonprod --output wrangler.d1-nonprod.ci.jsonc
+ *
+ * Output must be a file in the repository root (see assertOutputInRepoRoot).
  *
  * Environment:
  *   WE_MET_D1_DATABASE_ID_PRODUCTION — required for --target production
  *   WE_MET_D1_DATABASE_ID_NONPROD — required for --target preview and d1-migrate-nonprod
  */
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { readFileSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { assertOutputInRepoRoot } from "./lib/assert-repo-root-output.mjs";
 import { parseJsonc } from "./lib/parse-jsonc.mjs";
 import {
   D1_PLACEHOLDER_NONPROD,
@@ -82,15 +85,16 @@ function buildD1MigrateNonprodConfig(config, nonprodId) {
     console.error("wrangler.jsonc previews.d1_databases[0] is required.");
     process.exit(1);
   }
+  const migrationsDir = previewD1.migrations_dir ?? "migrations";
   return {
     $schema: config.$schema,
-    migrations_dir: previewD1.migrations_dir ?? "migrations",
+    migrations_dir: migrationsDir,
     d1_databases: [
       {
         binding: previewD1.binding,
         database_name: previewD1.database_name,
         database_id: nonprodId,
-        migrations_dir: previewD1.migrations_dir ?? "migrations",
+        migrations_dir: migrationsDir,
       },
     ],
   };
@@ -98,6 +102,7 @@ function buildD1MigrateNonprodConfig(config, nonprodId) {
 
 function main() {
   const { target, output } = parseArgs(process.argv.slice(2));
+  assertOutputInRepoRoot(output);
   const sourceText = readFileSync(SOURCE, "utf8");
   const config = parseJsonc(sourceText);
 
@@ -106,7 +111,6 @@ function main() {
     const nonprodId = requireEnv("WE_MET_D1_DATABASE_ID_NONPROD");
     const text = replaceD1Ids(sourceText, { productionId, nonprodId });
     assertNoPlaceholders(text);
-    mkdirSync(dirname(output), { recursive: true });
     writeFileSync(output, text, "utf8");
     return;
   }
@@ -127,7 +131,6 @@ function main() {
       console.error("Failed to substitute non-prod D1 database_id.");
       process.exit(1);
     }
-    mkdirSync(dirname(output), { recursive: true });
     writeFileSync(output, text, "utf8");
     return;
   }
@@ -135,7 +138,6 @@ function main() {
   if (target === "d1-migrate-nonprod") {
     const nonprodId = requireEnv("WE_MET_D1_DATABASE_ID_NONPROD");
     const minimal = buildD1MigrateNonprodConfig(config, nonprodId);
-    mkdirSync(dirname(output), { recursive: true });
     writeFileSync(output, `${JSON.stringify(minimal, null, 2)}\n`, "utf8");
     return;
   }
