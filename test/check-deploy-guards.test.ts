@@ -288,4 +288,43 @@ describe("check-deploy-guards (unit)", () => {
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("fail closed");
   });
+
+  const previewHostSuffixCases = [
+    {
+      label: "previews.vars.WE_MET_PREVIEW_HOST_SUFFIX is empty",
+      message: "previews.vars.WE_MET_PREVIEW_HOST_SUFFIX must be non-empty",
+      mutate: (config: Record<string, unknown>) => {
+        const previews = config.previews as Record<string, unknown>;
+        const vars = previews.vars as Record<string, string>;
+        vars.WE_MET_PREVIEW_HOST_SUFFIX = "";
+      },
+    },
+    {
+      label: "previews.vars.WE_MET_PREVIEW_HOST_SUFFIX lacks -we-met. prefix",
+      message: 'previews.vars.WE_MET_PREVIEW_HOST_SUFFIX must start with "-we-met."',
+      mutate: (config: Record<string, unknown>) => {
+        const previews = config.previews as Record<string, unknown>;
+        const vars = previews.vars as Record<string, string>;
+        vars.WE_MET_PREVIEW_HOST_SUFFIX = ".wrong.workers.dev";
+      },
+    },
+    {
+      label: "top-level vars.WE_MET_PREVIEW_HOST_SUFFIX is non-empty",
+      message: 'top-level vars.WE_MET_PREVIEW_HOST_SUFFIX must be ""',
+      mutate: (config: Record<string, unknown>) => {
+        const vars = config.vars as Record<string, string>;
+        vars.WE_MET_PREVIEW_HOST_SUFFIX = "-we-met.preview.workers.dev";
+      },
+    },
+  ] as const;
+
+  for (const { label, message, mutate } of previewHostSuffixCases) {
+    it(`fails when ${label}`, () => {
+      const { path } = writeTempConfig(mutate);
+      const target = message.includes("top-level") ? "production" : "preview";
+      const result = runGuards(target, path);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain(message);
+    });
+  }
 });

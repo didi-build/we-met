@@ -69,7 +69,7 @@
     "vars": {
       "WE_MET_BASE_URL": "https://we-met.link",
       "WE_MET_ENV": "preview",
-      "WE_MET_PREVIEW_HOST_SUFFIX": "",
+      "WE_MET_PREVIEW_HOST_SUFFIX": "-we-met.diademshoukralla.workers.dev",
     },
     "d1_databases": [
       {

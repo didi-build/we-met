@@ -105,7 +105,7 @@ npx wrangler versions view <version-id> --name we-met
 - [x] How does `WORKER_SELF_REFERENCE` behave on a preview? **Answer:** Preview deployments do **not** include a `WORKER_SELF_REFERENCE` binding; production does. The placeholder app served `/` without it; impact on the real card flow is **unknown until the card ships** ([0019](../decisions/0019-pr-preview-github-action.md#proof-deploy-findings)).
 - [x] Does `opennextjs-cloudflare deploy --config wrangler.ci.jsonc` use the generated config end to end? **Answer:** Yes — deploy succeeds; incremental/tag cache steps report no population needed for this config.
 
-If the account’s **workers.dev** subdomain is ever renamed, update the **we-met nonprod** Turnstile widget hostname and re-check **Preview URLs** (`preview_urls: true`).
+If the account’s **workers.dev** subdomain is ever renamed, update the **we-met nonprod** Turnstile widget hostname, set `previews.vars.WE_MET_PREVIEW_HOST_SUFFIX` in `wrangler.jsonc` to match (`-<worker-name>.<subdomain>.workers.dev`), and re-check **Preview URLs** (`preview_urls: true`).
 
 ## 2. Cloudflare API tokens for CI
 
