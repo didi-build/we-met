@@ -7,8 +7,30 @@
       "email": "demo@example.com",
       "photoKey": null,
       "footerLink": { "label": "Example", "url": "https://example.com" },
-      "pageCopy": { "headline": "Say hi" },
-      "leadSinks": []
+      "pageCopy": {
+        "pageTitle": "Hi, I'm Demo",
+        "emailFromName": "Demo at Example",
+        "headshotAlt": "Demo User",
+        "greetingName": "I'm Demo",
+        "exchangeButton": "Exchange contact",
+        "bookLink": "or book a time directly"
+      },
+      "contact": {
+        "name": {
+          "full": "Demo User",
+          "family": "User",
+          "given": "Demo",
+          "nickname": "Demo"
+        },
+        "org": "Example Co",
+        "title": "Example role",
+        "email": "demo@example.com",
+        "phone": "+1-555-555-0100",
+        "vcardNote": "Met at an event."
+      },
+      "exchangeCopy": {
+        "thanksMessage": "Thanks, {firstName}. Talk soon."
+      }
     }
   ],
   "hostnames": []
