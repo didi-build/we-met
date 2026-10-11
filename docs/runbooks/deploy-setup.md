@@ -94,10 +94,10 @@ After changing **`preview_urls`** or **`workers_dev`** in `wrangler.jsonc`, rede
 Deploy logs may label a queue binding **“(inherited)”** on redeploy; that is cosmetic. Confirm the real binding with:
 
 ```bash
-npx wrangler versions view <deployment-id> --name we-met
+npx wrangler versions view <version-id> --name we-met
 ```
 
-(use the deployment id from deploy or preview JSON output).
+(use the Current Version ID printed at the end of the production deploy output).
 
 ### Questions the proof deploy must answer
 
