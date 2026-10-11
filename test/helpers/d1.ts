@@ -1,3 +1,4 @@
+import { splitSqlStatements } from "@/card-data/sql-statements";
 import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
@@ -10,12 +11,7 @@ function migrationStatements(): string[] {
   const statements: string[] = [];
   for (const file of files) {
     const sql = readFileSync(resolve(dir, file), "utf8");
-    for (const chunk of sql.split(";")) {
-      const statement = chunk.trim();
-      if (statement) {
-        statements.push(statement);
-      }
-    }
+    statements.push(...splitSqlStatements(sql));
   }
   return statements;
 }

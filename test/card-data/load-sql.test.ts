@@ -5,6 +5,7 @@ import {
   escapeSqlStringLiteral,
   newCardIdsForLoad,
 } from "@/card-data/load-sql";
+import { splitSqlStatements } from "@/card-data/sql-statements";
 import type { CardLoadInput, CardsLoadFile } from "@/card-data/types";
 import { withIsolatedLocalD1 } from "../helpers/d1";
 
@@ -50,8 +51,13 @@ describe("load SQL (unit)", () => {
     expect(escapeSqlStringLiteral("Didi's")).toBe("'Didi''s'");
   });
 
-  it("matches D1CardRepository round-trip for unicode and apostrophes", async () => {
-    const card = sampleCard();
+  it("matches D1CardRepository round-trip for unicode, apostrophes, and semicolons in text", async () => {
+    const card = sampleCard({
+      contact: {
+        ...sampleCard().contact,
+        vcardNote: "Met at X; follow up on Didi's intro",
+      },
+    });
     const loadFile: CardsLoadFile = { cards: [card], hostnames: [] };
     const updatedAt = "2026-10-11T12:00:00.000Z";
     const newCardIds = newCardIdsForLoad(loadFile);
@@ -59,11 +65,8 @@ describe("load SQL (unit)", () => {
 
     await withIsolatedLocalD1(async (db) => {
       const repo = new D1CardRepository(db);
-      for (const chunk of sql.split(";")) {
-        const statement = chunk.trim();
-        if (statement) {
-          await db.prepare(statement).run();
-        }
+      for (const statement of splitSqlStatements(sql)) {
+        await db.prepare(statement).run();
       }
 
       const fromSql = await repo.getBySlug(card.slug);
@@ -71,6 +74,7 @@ describe("load SQL (unit)", () => {
       expect(fromSql?.footerLink).toEqual(card.footerLink);
       expect(fromSql?.contact.name.full).toBe(card.contact.name.full);
       expect(fromSql?.exchangeCopy).toEqual(card.exchangeCopy);
+      expect(fromSql?.contact.vcardNote).toBe(card.contact.vcardNote);
     });
   });
 });
