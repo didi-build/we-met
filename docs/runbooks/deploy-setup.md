@@ -111,18 +111,29 @@ If the account’s **workers.dev** subdomain is ever renamed, update the **we-me
 
 Create these **after** the proof deploy (the `we-met` Worker and `we-met.link` route already exist). Store values in GitHub as [documented below](#3-github-secrets-and-variables) and in [deploy.md](./deploy.md).
 
-Cloudflare supports **resource-scoped Workers roles** ([Workers granular authorization](https://blog.cloudflare.com/workers-granular-authorization), September 2026): **Editor** on a single Worker can deploy without creating or deleting resources. Changing routes or custom domains needs Editor on the Worker plus zone **Workers Routes**; once a route exists, deploys that do not change it need no zone access. Legacy **Workers Scripts Edit** maps to **Editor** in Cloudflare’s migration table (no published deprecation date). **D1 / R2 / KV resource-level token scoping is not available yet** — those permissions remain account-level.
+Cloudflare supports **resource-scoped Workers roles** ([Workers granular authorization](https://blog.cloudflare.com/workers-granular-authorization), September 2026): **Editor** on a single Worker can deploy without creating or deleting resources. Because `wrangler.jsonc` attaches **`we-met.link` as a custom domain**, every production CI deploy re-sends that route — the production token needs a **zone** policy on `we-met.link` (see table and [0017](../decisions/0017-cloudflare-api-credentials.md)). Legacy **Workers Scripts Edit** maps to **Editor** in Cloudflare’s migration table (no published deprecation date). **D1 / R2 / KV resource-level token scoping is not available yet** — those permissions remain account-level.
 
-| Token name (dashboard) | GitHub secret                     | Scopes (initial)                                                                                                                                        |
-| ---------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `we-met-ci-nonprod`    | `CLOUDFLARE_API_TOKEN_NONPROD`    | **Workers Editor**, scoped to Worker **`we-met`** only. No zone permissions (route already attached). No R2 or Queues permissions initially.            |
-| `we-met-ci-production` | `CLOUDFLARE_API_TOKEN_PRODUCTION` | **Workers Editor** on **`we-met`**, plus **D1 Edit** (for `wrangler d1 migrations apply` in the production workflow). No zone, R2, or Queues initially. |
+| Token name (dashboard) | GitHub secret                     | Scopes (verified **2026-10-11** where noted)                                                                                                                                                                                                                               |
+| ---------------------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `we-met-ci-nonprod`    | `CLOUDFLARE_API_TOKEN_NONPROD`    | **Workers Editor**, scoped to Worker **`we-met`** only. No zone policy (previews do not touch `we-met.link`). No R2 or Queues permissions initially.                                                                                                                       |
+| `we-met-ci-production` | `CLOUDFLARE_API_TOKEN_PRODUCTION` | **Workers Editor** on **`we-met`**, plus account-level **D1 Edit** (dashboard **D1 Write**) for `wrangler d1 migrations apply`, plus a **third policy**: **Specified Domains** → `we-met.link` with **Workers Routes Write** and **Zone Read**. No R2 or Queues initially. |
 
 Add further permissions **only** when a **403** names them (Cloudflare 403 responses link to the required permission). **Never use Admin as the fix.**
 
 The **consumer Worker** ([DIDI-577](https://linear.app/didi-build/issue/DIDI-577)) is a separate script: the maintainer must create that Worker first (outside this runbook’s proof deploy). CI will need either a dedicated scoped token for that Worker or additional scopes on a token — decide when the consumer ships.
 
 Details and caveats: [0017](../decisions/0017-cloudflare-api-credentials.md).
+
+### First CI run results
+
+After PR #3 merged (**2026-10-11**), the first GitHub Actions runs (Wrangler **4.149.0**) confirmed:
+
+1. **Preview create:** `preview` workflow with **Workers Editor** on `we-met` created preview `pr-3`; its workers.dev URL served the placeholder page, the PR got the preview comment and “View deployment”, and the `preview` check passed in ~52s.
+2. **Preview delete:** closing/merging the PR ran `cleanup`; log reported preview `pr-3` deleted successfully and the URL showed Cloudflare’s empty Workers page — **Editor** on `we-met` can create and delete previews (Wrangler’s open-beta warning on `preview delete` is harmless).
+3. **Approval gate:** **Deploy production** stopped at “production waiting for review” with no steps until a maintainer approved.
+4. **Production migrations + build:** with **D1 Write** on the production token, `wrangler d1 migrations apply` reported no migrations to apply; the Ubuntu build with the production Turnstile key passed in ~47s.
+5. **Production deploy (first attempt failed):** `opennextjs-cloudflare deploy` failed on custom domains with `The zone "we-met.link" does not exist on your account [code: 10084]` — the token had no zone access; Wrangler re-sends the route each deploy. The live site kept the previous version.
+6. **Production deploy (re-run succeeded):** after adding the zone policy (**Workers Routes Write** + **Zone Read** on `we-met.link` only), re-running the failed job completed; `https://we-met.link` returned HTTP **200**. Editing token policies did not require updating the GitHub secret.
 
 ## 3. GitHub secrets and variables
 
