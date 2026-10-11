@@ -73,6 +73,8 @@ npx wrangler preview base-config secret put WE_MET_TOKEN_SECRET
 npx wrangler preview base-config secret put TURNSTILE_SECRET_KEY
 ```
 
+**UNVERIFIED:** Whether preview base-config secrets (`WE_MET_TOKEN_SECRET`, `TURNSTILE_SECRET_KEY`, set with `wrangler preview base-config secret put`) are inherited and readable by a preview. The placeholder app does not read them. The first real test is the exchange API smoke test after [DIDI-575](https://linear.app/didi-build/issue/DIDI-575/exchange-api-exchange-and-details-endpoints-turnstile-rate-limit-lead) and [DIDI-577](https://linear.app/didi-build/issue/DIDI-577/email-consumer-own-queue-consumer-gmail-sender-behind-an-interface) ship.
+
 Confirm names only (values are never printed):
 
 ```bash

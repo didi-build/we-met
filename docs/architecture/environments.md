@@ -33,7 +33,7 @@ Whether previews are triggered by Cloudflare Git integration or a GitHub Action 
 
 **`WE_MET_BASE_URL` in the `previews` block is `https://we-met.link`**, so links in test emails, the vCard URL field, and canonical/OG URLs from a preview point at production card pages, not the preview hostname. The preview hostname still serves the card via lookup configuration.
 
-**UNVERIFIED:** The `previews` block in `wrangler.jsonc` lists D1, R2, queues, rate limits, and vars only — not `ASSETS`, `IMAGES`, or `WORKER_SELF_REFERENCE`. Docs say previews do not inherit production settings; for an OpenNext Worker it is **unknown** which bindings a preview instance actually receives. [DIDI-572](https://linear.app/didi-build/issue/DIDI-572)’s first proof must confirm effective preview bindings, including **ASSETS**, **IMAGES**, and the self-reference service.
+Preview deployments receive **ASSETS**, **IMAGES** (when `previews.images` is set), **WE_MET_ASSETS**, **WE_MET_BASE_URL**, **WE_MET_DB** (non-prod D1), **WE_MET_ENV** = `preview`, **WE_MET_EXCHANGE_RATE_LIMITER** (namespace **2001**), and **WE_MET_FOLLOWUP_EMAIL_QUEUE** (non-prod queue); they do **not** receive **WORKER_SELF_REFERENCE** (production does). Details: [0019 § Proof deploy findings](../decisions/0019-pr-preview-github-action.md#proof-deploy-findings) (verified **2026-10-11**).
 
 **D1 `database_id` values** in `wrangler.jsonc` are **placeholders** (real IDs stay out of the public repo). [DIDI-572](https://linear.app/didi-build/issue/DIDI-572) decides how CI injects the real IDs at deploy time.
 
