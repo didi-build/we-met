@@ -4,14 +4,16 @@
  *
  * Usage:
  *   node scripts/apply-migrations.mjs [--local]
- *   node scripts/apply-migrations.mjs --remote <database-name>
+ *   node scripts/apply-migrations.mjs --remote we-met-db-nonprod
  *
  * --local uses the WE_MET_DB binding from wrangler.jsonc (default).
- * --remote requires an explicit database name and refuses production (we-met-db).
+ * --remote allowlists exactly one database name: we-met-db-nonprod (any other
+ * name, binding, or ID is rejected). Production migrations run only in the
+ * approved deploy workflow ([DIDI-572]).
  */
 import { spawnSync } from "node:child_process";
 
-const PRODUCTION_DATABASE = "we-met-db";
+const REMOTE_ALLOWED_DATABASE = "we-met-db-nonprod";
 const args = process.argv.slice(2);
 
 let mode = "local";
@@ -36,16 +38,17 @@ for (const arg of args) {
 if (mode === "remote") {
   if (!databaseName) {
     console.error(
-      "Usage: apply-migrations.mjs --remote <database-name>\n" +
-        "Example: apply-migrations.mjs --remote we-met-db-nonprod\n" +
+      `Usage: apply-migrations.mjs --remote ${REMOTE_ALLOWED_DATABASE}\n` +
+        `Remote migrations are allowlisted to "${REMOTE_ALLOWED_DATABASE}" only.\n` +
         "Production migrations run only in the approved deploy workflow ([DIDI-572]).",
     );
     process.exit(1);
   }
-  if (databaseName === PRODUCTION_DATABASE) {
+  if (databaseName !== REMOTE_ALLOWED_DATABASE) {
     console.error(
-      `Refusing to apply migrations to production database "${PRODUCTION_DATABASE}".\n` +
-        "Use the production deploy workflow ([DIDI-572]) as the first step of an approved production deploy.",
+      `Remote migrations are allowlisted to "${REMOTE_ALLOWED_DATABASE}" only.\n` +
+        `Refusing target "${databaseName}".\n` +
+        "Production migrations run only in the approved deploy workflow ([DIDI-572]).",
     );
     process.exit(1);
   }
