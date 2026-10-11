@@ -1,0 +1,54 @@
+#!/usr/bin/env node
+/**
+ * Prepare wrangler.ci.jsonc with dummy D1 IDs and run wrangler deploy --dry-run.
+ * Proves generated config paths resolve from the repository root.
+ */
+import { rmSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { resolve } from "node:path";
+import { WRANGLER_CI_CONFIG } from "./lib/wrangler-placeholders.mjs";
+
+// Relative path for Wrangler CLI (shell:true breaks on absolute paths with spaces).
+const configRel = WRANGLER_CI_CONFIG;
+const configAbs = resolve(configRel);
+
+const prep = spawnSync(
+  "node",
+  [
+    "scripts/prepare-wrangler-config.mjs",
+    "--target",
+    "production",
+    "--output",
+    configRel,
+  ],
+  {
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      WE_MET_D1_DATABASE_ID_PRODUCTION: "11111111-1111-1111-1111-111111111111",
+    },
+  },
+);
+
+if (prep.status !== 0) {
+  if (prep.stderr) process.stderr.write(prep.stderr);
+  process.exit(prep.status ?? 1);
+}
+
+let exitCode = 1;
+try {
+  const dry = spawnSync(
+    "npx",
+    ["wrangler", "deploy", "--dry-run", "--config", configRel],
+    { stdio: "inherit", shell: true },
+  );
+  exitCode = dry.status ?? 1;
+} finally {
+  try {
+    rmSync(configAbs, { force: true });
+  } catch {
+    // ignore
+  }
+}
+
+process.exit(exitCode);

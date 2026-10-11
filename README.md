@@ -50,12 +50,10 @@ npm run db:migrate:remote   # allowlisted to we-met-db-nonprod only
 
 ## Deploy
 
-Deploy workflows and Cloudflare resources are set up in [DIDI-572](https://linear.app/didi-build/issue/DIDI-572). Until then:
+- **Preview:** each PR from this repo runs [`.github/workflows/preview.yml`](./.github/workflows/preview.yml). Look for the **Cloudflare Preview** URL in the PR comment (`pr-<number>` on Worker `we-met`, non-prod bindings).
+- **Production:** pushes to `main` (docs-only changes are skipped) or manual **workflow_dispatch** run [`.github/workflows/deploy-production.yml`](./.github/workflows/deploy-production.yml). The job waits on the GitHub **`production`** environment until a reviewer approves, then runs migrations and deploys to `https://we-met.link`.
 
-- **Preview:** each PR gets a Cloudflare Preview on Worker `we-met` (non-prod bindings).
-- **Production:** merge to `main` starts the deploy job; a reviewer must approve the GitHub `production` environment.
-
-See [docs/runbooks/deploy.md](./docs/runbooks/deploy.md).
+Details, secrets, and operator steps: [docs/runbooks/deploy.md](./docs/runbooks/deploy.md).
 
 ## Documentation
 

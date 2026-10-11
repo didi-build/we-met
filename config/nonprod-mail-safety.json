@@ -1,0 +1,6 @@
+{
+  "consumerWorkerName": "we-met-followup-email-consumer-nonprod",
+  "redirectEnvVar": "WE_MET_TEST_MAIL_TO",
+  "failClosedIfUnset": true,
+  "description": "Non-prod consumer must redirect all outbound mail to WE_MET_TEST_MAIL_TO (see docs/decisions/0006-non-prod-safety.md). Enforced by deploy-time guards until the consumer Worker ships in DIDI-577."
+}

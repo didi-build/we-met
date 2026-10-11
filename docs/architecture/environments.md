@@ -39,12 +39,15 @@ Whether previews are triggered by Cloudflare Git integration or a GitHub Action 
 
 ## Deploy-time guards
 
-CI/deploy ([DIDI-572](https://linear.app/didi-build/issue/DIDI-572)) **must fail** if:
+`scripts/check-deploy-guards.mjs` (CI and `npm run deploy:guards`) **must fail** if:
 
-- **Any binding in the `previews` block** uses a **production** resource name (queue, consumer, rate limiter namespace, D1, or R2).
-- A preview binds the **production** queue, consumer, rate limiter namespace, database, or bucket (including live preview binding checks against config).
-- The non-prod email **redirect is disabled** or misconfigured (consumer would send to real addresses).
-- `WE_MET_ENV` is `production` without the GitHub **`production`** environment.
+- **Any entry** in `previews` `d1_databases`, `r2_buckets`, `queues.producers`, or `ratelimits` uses a **production** resource name or marker string.
+- `previews.vars.WE_MET_ENV` is not `preview`, or top-level `WE_MET_ENV` is not `production` when checking production.
+- Top-level production bindings (D1, R2, queue, rate limiter) do not match production resource names.
+- Preview and top-level `database_id` values are identical (including after CI substitution).
+- `config/nonprod-mail-safety.json` is missing, invalid, or does not **fail closed** when `WE_MET_TEST_MAIL_TO` is unset (spec file only until the consumer Worker ships in [DIDI-577](https://linear.app/didi-build/issue/DIDI-577)).
+
+Production deploys use the GitHub **`production`** environment (required reviewers); that gate is enforced by workflow structure tests, not by this script.
 
 ## Config and secret names
 
@@ -76,14 +79,19 @@ Lead sink destinations (Linear project IDs, owner email addresses, etc.) live in
 
 The consumer Worker registers on the queue in **its own** Wrangler config; it is not an app Worker binding. Consumer binds read-only **`WE_MET_ASSETS`** only ([0016](../decisions/0016-queue-message-snapshot.md)).
 
-**GitHub Actions secrets**
+**GitHub Actions secrets and variables**
 
-| Name                           | Scope                                                                                                         |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------- |
-| `CLOUDFLARE_API_TOKEN`         | Repository secret — **non-prod** token for previews ([0017](../decisions/0017-cloudflare-api-credentials.md)) |
-| `CLOUDFLARE_ACCOUNT_ID`        | Repository secret                                                                                             |
-| `CLOUDFLARE_API_TOKEN` (prod)  | **`production` environment** secret only — production-scoped token                                            |
-| `CLOUDFLARE_ACCOUNT_ID` (prod) | **`production` environment** secret (if distinct from repo)                                                   |
+| Name                                   | Scope                                                                                                                                                                                |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `CLOUDFLARE_ACCOUNT_ID`                | Repository secret — used by preview and production workflows                                                                                                                         |
+| `CLOUDFLARE_API_TOKEN_NONPROD`         | **`preview` environment** secret — dashboard token **`we-met-ci-nonprod`**: Workers **Editor** on Worker **`we-met`** only ([0017](../decisions/0017-cloudflare-api-credentials.md)) |
+| `WE_MET_D1_DATABASE_ID_NONPROD`        | **`preview` environment** variable — preview workflow; operators export locally for `db:migrate:remote`                                                                              |
+| `WE_MET_TURNSTILE_SITE_KEY_NONPROD`    | **`preview` environment** variable — non-prod Turnstile site key at preview build time                                                                                               |
+| `CLOUDFLARE_API_TOKEN_PRODUCTION`      | **`production` environment** secret — **`we-met-ci-production`**: Workers **Editor** on **`we-met`** plus **D1 Edit** for migrations                                                 |
+| `WE_MET_D1_DATABASE_ID_PRODUCTION`     | **`production` environment** variable — production deploy `prepare` step                                                                                                             |
+| `WE_MET_TURNSTILE_SITE_KEY_PRODUCTION` | **`production` environment** variable — production Turnstile site key at build time                                                                                                  |
+
+Create tokens after the maintainer proof deploy ([deploy-setup.md](../runbooks/deploy-setup.md)). D1/R2/Queues API permissions are account-level until Cloudflare offers resource scopes; add R2/Queues only if CI returns a named 403. Never use **Admin** to fix permission errors.
 
 Never use org-wide **`BOOTSTRAP_TOKEN`** for We Met deploys.
 
