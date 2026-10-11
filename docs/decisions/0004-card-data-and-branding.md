@@ -2,16 +2,18 @@
 
 - **Status:** accepted
 - **Date:** 2026-10-11
+- **Updates:** [0010](./0010-card-data-d1-and-load-script.md), [0012](./0012-r2-images-single-ingestion.md)
 
 ## Context
 
-Step 1 is one card; multi-user needs per-card fields and visual variants without forked layouts or one-off CSS.
+Step 1 is one card; multi-user needs per-card fields and visual variants without forked layouts or one-off CSS. Card values and photos are not committed to git.
 
 ## Decision
 
-- **Card data seam** supplies all per-card fields (contact info, slug, variant, footer link, etc.).
+- **Card data seam** supplies all per-card fields (contact info, slug, variant, footer link, page copy, photo key, etc.) from **D1** ([0010](./0010-card-data-d1-and-load-script.md)).
 - **Brand variants** are a **closed set:** `green` and `mono`, stored on the card record. The variant is applied **server-side** from that record; **light/dark** mode is a **browser** preference.
 - **Colors** exist only under **`src/theme/tokens/`** (e.g. `green.light.css`, `green.dark.css`; `mono.*` later). UI uses tokens, not raw color literals. A **`theme-colors`** check (to be added) will fail `npm run check` if color literals appear outside that folder.
+- **Photos** are served from R2 via keys on the card record; ingestion only through the single image function ([0012](./0012-r2-images-single-ingestion.md)).
 - **Email content is fixed** (no user customization). User fields in email are **short plain text**, escaped, with **no user-supplied links**.
 - User-editable text in the UI is **plain text**, escaped at output boundaries.
 
@@ -24,4 +26,5 @@ Step 1 is one card; multi-user needs per-card fields and visual variants without
 ## Consequences
 
 - Agents must not add hex/rgb in components or inline styles for branding.
+- Agents must not commit personal card data or image files.
 - New variants require a decision record and token file update, not a one-off prop.

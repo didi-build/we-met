@@ -1,6 +1,6 @@
 # 0005. Keep `/api/hi/*` route names for step 1
 
-- **Status:** accepted
+- **Status:** superseded by [0008](./0008-api-routes-exchange-and-details.md)
 - **Date:** 2026-10-11
 
 ## Context

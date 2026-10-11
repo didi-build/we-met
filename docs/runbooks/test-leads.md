@@ -10,7 +10,7 @@ Every non-prod exchange should create an issue with **all** of:
 | ---------------- | ---------------------------------------------------------------------------------------------------------- |
 | **Label**        | `we-met-test-lead`                                                                                         |
 | **Title prefix** | `[we-met-test]` at the start of the title                                                                  |
-| **Environment**  | `WE_MET_ENV` value (`local`, `preview`, or `staging`) recorded in the issue description (not `production`) |
+| **Environment**  | `WE_MET_ENV` value (`local` or `preview`) recorded in the issue description (not `production`) |
 
 If any signal is missing on an issue you believe came from non-prod, treat it as suspicious and check deploy bindings ([environments.md](../architecture/environments.md)).
 
@@ -24,14 +24,12 @@ If any signal is missing on an issue you believe came from non-prod, treat it as
 
 Use this after changing the mail or consumer path:
 
-1. Deploy to **staging** or open a **PR preview** (non-prod bindings only).
-2. Submit the exchange form with obvious fake contact details.
-   - **Preview or local:** Turnstile uses Cloudflare’s always-pass **test key pair** (widget auto-passes).
-   - **Staging:** complete the **real** Turnstile challenge (real keys for `we-met.didi.build`).
+1. Open a **PR preview** (non-prod bindings only). Local dev with remote queue is acceptable for narrower checks.
+2. Submit the exchange form with obvious fake contact details. **Preview or local:** Turnstile uses Cloudflare’s always-pass **test key pair** (widget auto-passes).
 3. Confirm exchange returns **200** and a non-empty signed token; optional details step returns **200**.
 4. Confirm jobs on **`we-met-followup-email-nonprod`**.
 5. Check **`WE_MET_TEST_MAIL_TO`** for redirected visitor and owner mail.
 6. Confirm a new Linear issue in the **test project** with label `we-met-test-lead`, title prefix `[we-met-test]`, and `WE_MET_ENV` in the description.
 7. Run [cleanup](#cleanup) when done.
 
-Routine testing does not send mail to production inboxes; use non-prod environments and `WE_MET_TEST_MAIL_TO` only.
+Routine testing does not send mail to production inboxes; use preview (or local with redirect) and `WE_MET_TEST_MAIL_TO` only. One real production check is part of [DIDI-578](https://linear.app/didi-build/issue/DIDI-578).
