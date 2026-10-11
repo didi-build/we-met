@@ -22,5 +22,5 @@
 
 ## Consequences
 
-- Local proof deploys use a gitignored `wrangler.local.jsonc` or env vars documented in [deploy.md](../runbooks/deploy.md).
+- Maintainer proof deploys use `prepare-wrangler-config.mjs` → gitignored `wrangler.ci.jsonc` with D1 IDs in env vars ([deploy-setup.md](../runbooks/deploy-setup.md)).
 - `npm run db:migrate:remote` uses a minimal generated config (`--target d1-migrate-nonprod`) because `wrangler d1 migrations apply` does not read the `previews` block for remote applies.

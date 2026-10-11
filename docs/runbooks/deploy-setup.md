@@ -4,55 +4,104 @@ Complete these steps **before** relying on CI previews or production deploys. Ho
 
 ## 1. Proof deploy (maintainer, `wrangler login`)
 
-Run this **first** as the maintainer. Use **`wrangler login`** (OAuth) for all Cloudflare commands in this section — **no** `CLOUDFLARE_API_TOKEN` environment variables.
+Run this **first** as the maintainer. Use **`npx wrangler login`** (OAuth) for all Cloudflare commands in this section — **no** `CLOUDFLARE_API_TOKEN` environment variables.
 
-Use a **gitignored** config with real D1 IDs (copy `wrangler.jsonc` → `wrangler.local.jsonc`, replace placeholder UUIDs from [DIDI-570](https://linear.app/didi-build/issue/DIDI-570)).
+Use the same **generated config** as CI: `node scripts/prepare-wrangler-config.mjs` → gitignored **`wrangler.ci.jsonc`** at the repo root, with real D1 IDs from environment variables (not a hand-copied `wrangler.local.jsonc`).
+
+`NEXT_PUBLIC_TURNSTILE_SITE_KEY` is inlined at **build time**, so **production and preview each need their own `npm run build`** with the matching widget site key before deploy or preview.
+
+### a. Login and D1 IDs
 
 ```bash
-wrangler login
-npm ci
-npm run build
-
-# Creates the we-met Worker and attaches the we-met.link custom domain from wrangler.local.jsonc
-npx wrangler deploy --config wrangler.local.jsonc
-
-# Preview (Wrangler 4.135+)
-npx wrangler preview --config wrangler.local.jsonc --name deploy-proof --json
+npx wrangler login
+npx wrangler whoami
+npx wrangler d1 list
 ```
 
-Set **Worker secrets** while still authenticated via `wrangler login` (use different values per environment):
+Export both database UUIDs (for example `WE_MET_D1_DATABASE_ID_PRODUCTION` and `WE_MET_D1_DATABASE_ID_NONPROD`) from the `d1 list` output.
 
 ```bash
-# Non-prod (preview base)
-npx wrangler preview base-config secret put WE_MET_TOKEN_SECRET
-npx wrangler preview base-config secret put TURNSTILE_SECRET_KEY
+npm ci
+```
 
-# Production Worker
+### b. Production deploy
+
+```bash
+export WE_MET_D1_DATABASE_ID_PRODUCTION='<production-db-uuid>'
+export WE_MET_D1_DATABASE_ID_NONPROD='<nonprod-db-uuid>'
+export NEXT_PUBLIC_TURNSTILE_SITE_KEY='<production-widget-site-key>'
+
+npm run build
+node scripts/prepare-wrangler-config.mjs --target production --output wrangler.ci.jsonc
+node scripts/check-deploy-guards.mjs --target production --config wrangler.ci.jsonc
+npx opennextjs-cloudflare deploy --config wrangler.ci.jsonc
+curl -sI https://we-met.link
+```
+
+### c. Preview deploy
+
+```bash
+export NEXT_PUBLIC_TURNSTILE_SITE_KEY='<nonprod-widget-site-key>'
+
+npm run build
+node scripts/prepare-wrangler-config.mjs --target preview --output wrangler.ci.jsonc
+node scripts/check-deploy-guards.mjs --target preview --config wrangler.ci.jsonc
+npx wrangler preview --config wrangler.ci.jsonc --name deploy-proof --json
+```
+
+From the JSON, read `.preview.urls[0]`, then `curl -sI` that URL. When finished:
+
+```bash
+npx wrangler preview delete --name deploy-proof --skip-confirmation
+```
+
+(Verified **2026-10-11:** delete is safe to run twice; the second run on a missing preview is fine.)
+
+### d. Do not mix production and preview builds
+
+**Never** run production deploy (`opennextjs-cloudflare deploy`) from a shell that still has the **non-prod** Turnstile site key exported, or a `wrangler.ci.jsonc` generated with `--target preview`. Re-run **`npm run build`** with the production site key and **`prepare-wrangler-config.mjs --target production`** before any production deploy.
+
+### Worker secrets
+
+After the production Worker exists, set secrets while still on `wrangler login` (use different values per environment):
+
+```bash
 npx wrangler secret put WE_MET_TOKEN_SECRET
 npx wrangler secret put TURNSTILE_SECRET_KEY
+
+npx wrangler preview base-config secret put WE_MET_TOKEN_SECRET
+npx wrangler preview base-config secret put TURNSTILE_SECRET_KEY
+```
+
+Confirm names only (values are never printed):
+
+```bash
+npx wrangler secret list --name we-met
 ```
 
 Paste command output (no secrets) on the Linear hosting ticket when asked.
 
 ### Effective preview bindings
 
-After preview is live, confirm bindings (dashboard: Worker **we-met** → Previews → `deploy-proof` → Bindings), or:
+Bindings appear in the **`wrangler preview --json`** output under **`deployment.env`** (verified **2026-10-11**), and in the dashboard (Worker **we-met** → Previews → `deploy-proof` → Bindings). **UNVERIFIED:** `npx wrangler preview secret list --name <preview>` was not exercised in the proof deploy.
+
+Expect non-prod queue `we-met-followup-email-nonprod`, D1 `we-met-db-nonprod`, R2 `we-met-assets-nonprod`, rate limiter namespace **2001**, plus **ASSETS** and **IMAGES** (`previews.images`). Preview deployments do **not** get **`WORKER_SELF_REFERENCE`** (production does).
+
+### Redeploy check
+
+After changing **`preview_urls`** or **`workers_dev`** in `wrangler.jsonc`, redeploy and confirm in the dashboard (Worker **we-met** → **Domains**): **Preview URLs** on, production **workers.dev** off. Verified **2026-10-11:** redeploy with `preview_urls: true` and `workers_dev: false` turned the Preview toggle **on** after it had been switched off manually; production workers.dev stayed off. Production Worker **secrets survive** a redeploy.
+
+Deploy logs may label a queue binding **“(inherited)”** on redeploy; that is cosmetic. Confirm the real binding with:
 
 ```bash
-npx wrangler preview secret list --name deploy-proof
+npx wrangler versions view <deployment-id> --name we-met
 ```
 
-Expect non-prod queue `we-met-followup-email-nonprod`, D1 `we-met-db-nonprod`, R2 `we-met-assets-nonprod`, rate limiter namespace **2001**, plus **ASSETS** (top-level assets upload), **IMAGES** (`previews.images`), and note **WORKER_SELF_REFERENCE** still targets production per Cloudflare limitation.
-
-Delete proof preview:
-
-```bash
-npx wrangler preview delete --name deploy-proof --skip-confirmation
-```
+(use the deployment id from deploy or preview JSON output).
 
 ### Questions the proof deploy must answer
 
-- [x] Does the live preview URL serve the OpenNext app (not just a static stub)? **Answer (2026-10-11):** Yes — HTTP 200 on `/` with the OpenNext-built placeholder page; Worker logs show requests.
+- [x] Does the live preview URL serve the OpenNext app (not just a static stub)? **Answer (2026-10-11):** Yes — HTTP **200** on `/` with the OpenNext-built placeholder page.
 - [x] How does `WORKER_SELF_REFERENCE` behave on a preview? **Answer:** Preview deployments do **not** include a `WORKER_SELF_REFERENCE` binding; production does. The placeholder app served `/` without it; impact on the real card flow is **unknown until the card ships** ([0019](../decisions/0019-pr-preview-github-action.md#proof-deploy-findings)).
 - [x] Does `opennextjs-cloudflare deploy --config wrangler.ci.jsonc` use the generated config end to end? **Answer:** Yes — deploy succeeds; incremental/tag cache steps report no population needed for this config.
 
