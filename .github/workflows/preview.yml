@@ -75,8 +75,13 @@ jobs:
         run: |
           set -euo pipefail
           MARKER='<!-- we-met-preview -->'
-          body="${MARKER}
-          Cloudflare Preview: ${PREVIEW_URL}"
+          filenames="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files" --paginate --jq '.[].filename')"
+          migration_count="$(printf '%s\n' "${filenames}" | grep -c '^migrations/' || true)"
+          if [ "${migration_count}" -gt 0 ]; then
+            body="$(node scripts/preview-comment-body.mjs "${PREVIEW_URL}" --migrations)"
+          else
+            body="$(node scripts/preview-comment-body.mjs "${PREVIEW_URL}")"
+          fi
           comment_ids="$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" --paginate \
             --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | contains(\"${MARKER}\"))) | .id")"
           comment_id="${comment_ids%%$'\n'*}"

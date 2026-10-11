@@ -25,6 +25,11 @@ describe("Preview workflow structure (unit)", () => {
     expect(preview).not.toContain("head -n 1");
   });
 
+  it("comment step detects migration files via pulls API and builds body with preview-comment-body.mjs", () => {
+    expect(preview).toContain("pulls/${PR_NUMBER}/files");
+    expect(preview).toContain("preview-comment-body.mjs");
+  });
+
   it("parses wrangler preview JSON via parse-wrangler-preview-json.mjs", () => {
     expect(preview).toContain("parse-wrangler-preview-json.mjs");
     expect(preview).not.toMatch(/\|\s*jq\b/);
