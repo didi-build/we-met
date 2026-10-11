@@ -27,6 +27,10 @@ test-results/
 
 # Card load data (never commit real card values)
 data/cards.local.json
+data/*.local.json
+
+# Wrangler local overrides (WE_MET_ENV=local for `next dev`)
+.dev.vars
 
 # Logs
 logs/
