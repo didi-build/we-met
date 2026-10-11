@@ -24,4 +24,9 @@ describe("Preview workflow structure (unit)", () => {
   it("comment lookup does not pipe gh api output through head", () => {
     expect(preview).not.toContain("head -n 1");
   });
+
+  it("parses wrangler preview JSON via parse-wrangler-preview-json.mjs", () => {
+    expect(preview).toContain("parse-wrangler-preview-json.mjs");
+    expect(preview).not.toMatch(/\|\s*jq\b/);
+  });
 });
