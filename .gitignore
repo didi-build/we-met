@@ -8,6 +8,7 @@ build/
 .open-next/
 .wrangler/
 wrangler*.ci.jsonc
+load-*.sql
 wrangler.local.jsonc
 out/
 .turbo/
