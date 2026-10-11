@@ -39,12 +39,30 @@ describe("card shape round-trip (integration)", () => {
     });
   });
 
-  it("preserves special characters in nested strings", async () => {
-    expect(card.contact.vcardNote).toContain(";");
-    expect(card.contact.vcardNote).toContain("'");
-    expect(card.contact.vcardNote).toContain("🎉");
-    expect(card.copy.exchangeSheet.exchangeNotSavedPrefix).toBe("Could not save ");
-    expect(card.copy.exchangeSheet.exchangeNotSavedSuffix).toBe(" please try again");
+  it("preserves special characters in nested strings after D1 round-trip", async () => {
+    const slug = "special-chars";
+    const input = { ...card, slug };
+    const loadFile = { cards: [input], hostnames: [] };
+    const sql = buildCardsLoadSql(loadFile, {
+      updatedAt: "2026-10-11T12:00:00.000Z",
+      newCardIds: newCardIdsForLoad(loadFile),
+    });
+
+    await withIsolatedLocalD1(async (db) => {
+      const repo = new D1CardRepository(db);
+      for (const statement of splitSqlStatements(sql)) {
+        await db.prepare(statement).run();
+      }
+      const loaded = await repo.getBySlug(slug);
+      expect(loaded?.contact.vcardNote).toContain(";");
+      expect(loaded?.contact.vcardNote).toContain("'");
+      expect(loaded?.contact.vcardNote).toContain("🎉");
+      expect(loaded?.copy.about.expandedParagraphs[0]).toContain("…");
+      expect(loaded?.copy.exchangeSheet.exchangeNotSavedPrefix).toBe("Could not save ");
+      expect(loaded?.copy.exchangeSheet.exchangeNotSavedSuffix).toBe(
+        " please try again",
+      );
+    });
   });
 
   it("keeps https://example.com exactly in booking and urls", () => {

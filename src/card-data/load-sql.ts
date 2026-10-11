@@ -1,21 +1,5 @@
 import type { CardsLoadFile, CardLoadInput } from "@/card-data/types";
 
-/** Max lengths for load-file string fields (see load-file.ts). */
-export const LOAD_STRING_LIMITS = {
-  displayName: 200,
-  email: 254,
-  photoKey: 256,
-  url: 2048,
-  pageCopyField: 500,
-  contactField: 500,
-  contactEmail: 254,
-  contactPhone: 64,
-  copyLeaf: 1000,
-  footerLabel: 60,
-  chipLabel: 60,
-  chipExplanation: 500,
-} as const;
-
 const CONTROL_OR_NUL = /[\u0000-\u001F\u007F]/;
 
 export function assertNoControlCharacters(value: string, field: string): void {

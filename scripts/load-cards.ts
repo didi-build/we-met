@@ -12,7 +12,8 @@ import { createInterface } from "node:readline/promises";
 import { spawnSync } from "node:child_process";
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { stdin as input, stdout as output } from "node:process";
+import { execPath, stdin as input, stdout as output } from "node:process";
+import { buildWranglerArgs } from "./lib/build-wrangler-args.ts";
 import { buildCardsLoadSql, newCardIdsForLoad } from "../src/card-data/load-sql.ts";
 import { parseCardsLoadFile } from "../src/card-data/load-file.ts";
 
@@ -152,21 +153,15 @@ async function main(): Promise<void> {
       throw new Error("WE_MET_LOAD_CARDS_TEST_FAIL_AFTER_CONFIG");
     }
 
-    const configFlag = configRel ? ["-c", configRel] : [];
-    const wranglerTarget = mode === "remote" ? "--remote" : "--local";
     const execute = spawnSync(
-      "npx",
-      [
-        "wrangler",
-        ...configFlag,
-        "d1",
-        "execute",
-        "WE_MET_DB",
-        wranglerTarget,
-        "--file",
+      execPath,
+      buildWranglerArgs({
+        kind: "execute-file",
+        configRel,
+        remote: mode === "remote",
         sqlRel,
-      ],
-      { stdio: "inherit", shell: true },
+      }),
+      { stdio: "inherit" },
     );
     if (execute.status !== 0) {
       process.exitCode = execute.status ?? 1;
@@ -182,18 +177,9 @@ async function main(): Promise<void> {
 
     if (mode === "remote") {
       const readBack = spawnSync(
-        "npx",
-        [
-          "wrangler",
-          ...configFlag,
-          "d1",
-          "execute",
-          "WE_MET_DB",
-          "--remote",
-          "--command",
-          "SELECT slug, updated_at FROM cards ORDER BY slug",
-        ],
-        { encoding: "utf8", shell: true },
+        execPath,
+        buildWranglerArgs({ kind: "read-back", configRel }),
+        { encoding: "utf8" },
       );
       if (readBack.stdout) process.stdout.write(readBack.stdout);
       if (readBack.stderr) process.stderr.write(readBack.stderr);

@@ -100,6 +100,12 @@ function assertOnlyFirstNamePlaceholder(value: string, field: string): void {
 
 function requireHttpsUrl(raw: string, field: string): string {
   assertNoControlCharacters(raw, field);
+  if (!raw.startsWith("https://")) {
+    throw new Error(`${field} must start with https://`);
+  }
+  if (/\s/.test(raw)) {
+    throw new Error(`${field} must not contain whitespace`);
+  }
   if (raw.length > LIMITS.url) {
     throw new Error(`${field} exceeds max length ${LIMITS.url}`);
   }
@@ -305,12 +311,16 @@ function parsePageCopy(raw: unknown): CardLoadInput["pageCopy"] {
 function parseStringArray(
   raw: unknown,
   field: string,
+  minItems: number,
   maxItems: number,
   maxItemLength: number,
   copyStrings: boolean,
 ): string[] {
   if (!Array.isArray(raw)) {
     throw new Error(`${field} must be an array`);
+  }
+  if (raw.length < minItems) {
+    throw new Error(`${field} must have at least ${minItems} item(s)`);
   }
   if (raw.length > maxItems) {
     throw new Error(`${field} exceeds max length ${maxItems}`);
@@ -344,6 +354,9 @@ function parseAbout(raw: unknown): CardCopy["about"] {
   if (!Array.isArray(chipsRaw)) {
     throw new Error("copy.about.chips must be an array");
   }
+  if (chipsRaw.length < 1) {
+    throw new Error("copy.about.chips must have at least 1 item(s)");
+  }
   if (chipsRaw.length > LIMITS.chips) {
     throw new Error(`copy.about.chips exceeds max length ${LIMITS.chips}`);
   }
@@ -371,6 +384,7 @@ function parseAbout(raw: unknown): CardCopy["about"] {
     expandedParagraphs: parseStringArray(
       raw.expandedParagraphs,
       "copy.about.expandedParagraphs",
+      1,
       LIMITS.expandedParagraphs,
       LIMITS.copyLeaf,
       true,
@@ -564,6 +578,7 @@ function parseFollowUpEmail(raw: unknown): CardCopy["followUpEmail"] {
     bodyParagraphs: parseStringArray(
       raw.bodyParagraphs,
       "copy.followUpEmail.bodyParagraphs",
+      1,
       LIMITS.bodyParagraphs,
       LIMITS.copyLeaf,
       true,

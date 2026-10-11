@@ -43,6 +43,22 @@ describe("parseCardsLoadFile validation (unit)", () => {
       pattern: /https/,
     },
     {
+      label: "https: without slashes bookingUrl",
+      mutate: (raw) => {
+        const card = (raw.cards as Record<string, unknown>[])[0];
+        (card.links as Record<string, unknown>).bookingUrl = "https:example.com";
+      },
+      pattern: /must start with https:\/\//,
+    },
+    {
+      label: "whitespace in bookingUrl",
+      mutate: (raw) => {
+        const card = (raw.cards as Record<string, unknown>[])[0];
+        (card.links as Record<string, unknown>).bookingUrl = "https://exa mple.com";
+      },
+      pattern: /whitespace/,
+    },
+    {
       label: "javascript footer url",
       mutate: (raw) => {
         const card = (raw.cards as Record<string, unknown>[])[0];
@@ -171,6 +187,34 @@ describe("parseCardsLoadFile validation (unit)", () => {
         (card.copy as Record<string, unknown>).thanksMessage = "   ";
       },
       pattern: /non-whitespace/,
+    },
+    {
+      label: "empty expandedParagraphs",
+      mutate: (raw) => {
+        const card = (raw.cards as Record<string, unknown>[])[0];
+        const about = (card.copy as { about: Record<string, unknown> }).about;
+        about.expandedParagraphs = [];
+      },
+      pattern: /expandedParagraphs must have at least/,
+    },
+    {
+      label: "empty chips",
+      mutate: (raw) => {
+        const card = (raw.cards as Record<string, unknown>[])[0];
+        const about = (card.copy as { about: Record<string, unknown> }).about;
+        about.chips = [];
+      },
+      pattern: /chips must have at least/,
+    },
+    {
+      label: "empty bodyParagraphs",
+      mutate: (raw) => {
+        const card = (raw.cards as Record<string, unknown>[])[0];
+        const followUp = (card.copy as { followUpEmail: Record<string, unknown> })
+          .followUpEmail;
+        followUp.bodyParagraphs = [];
+      },
+      pattern: /bodyParagraphs must have at least/,
     },
   ];
 

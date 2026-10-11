@@ -55,7 +55,7 @@
         "about": {
           "title": "About Demo",
           "intro": "Demo intro with emoji 🎉 and semicolon; still one field.",
-          "expandedParagraphs": ["Paragraph one.", "Paragraph two."],
+          "expandedParagraphs": ["Paragraph one… with ellipsis.", "Paragraph two."],
           "consultationHighlight": "Book a consult",
           "showMore": "Show more",
           "showLess": "Show less",
