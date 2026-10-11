@@ -29,7 +29,7 @@ Preview and local (remote) share **one** non-prod queue and consumer. The redire
 
 PR previews are served on **workers.dev** (`<preview-name>-we-met.<subdomain>.workers.dev`) and via Cloudflare **Previews**. **Version URLs** reuse the Worker’s own resources; Cloudflare advises against them for PR testing. **Previews isolate per PR.**
 
-PR previews deploy via a **GitHub Actions** workflow that runs `wrangler preview` ([0019](../decisions/0019-pr-preview-github-action.md)). **Forks never get deploy access.** Secrets are set once in the **Previews base configuration** and apply to every new preview. A preview is **deleted when its PR closes**. Previews may **produce** to queues but **cannot consume** them; the non-prod consumer is a **separate Worker**. Requires **Wrangler 4.135.0+**.
+PR previews deploy via a **GitHub Actions** workflow that runs `wrangler preview` ([0019](../decisions/0019-pr-preview-github-action.md)). **Forks never get deploy access.** Secrets are set once in the **Previews base configuration** and apply to every new preview (per Cloudflare docs; not yet verified here, see [deploy-setup.md](../runbooks/deploy-setup.md#worker-secrets)). A preview is **deleted when its PR closes**. Previews may **produce** to queues but **cannot consume** them; the non-prod consumer is a **separate Worker**. Requires **Wrangler 4.135.0+**.
 
 **`WE_MET_BASE_URL` in the `previews` block is `https://we-met.link`**, so links in test emails, the vCard URL field, and canonical/OG URLs from a preview point at production card pages, not the preview hostname. The preview hostname still serves the card via lookup configuration.
 
