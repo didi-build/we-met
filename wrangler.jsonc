@@ -1,0 +1,94 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "main": ".open-next/worker.js",
+  "name": "we-met",
+  "compatibility_date": "2026-09-24",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS",
+  },
+  "services": [
+    {
+      "binding": "WORKER_SELF_REFERENCE",
+      "service": "we-met",
+    },
+  ],
+  "images": {
+    "binding": "IMAGES",
+  },
+  "d1_databases": [
+    {
+      "binding": "WE_MET_DB",
+      "database_name": "we-met-db",
+      "database_id": "00000000-0000-0000-0000-000000000001",
+      "migrations_dir": "migrations",
+    },
+  ],
+  "r2_buckets": [
+    {
+      "binding": "WE_MET_ASSETS",
+      "bucket_name": "we-met-assets",
+    },
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "WE_MET_FOLLOWUP_EMAIL_QUEUE",
+        "queue": "we-met-followup-email",
+      },
+    ],
+  },
+  "ratelimits": [
+    {
+      "name": "WE_MET_EXCHANGE_RATE_LIMITER",
+      "namespace_id": "2002",
+      "simple": {
+        "limit": 10,
+        "period": 60,
+      },
+    },
+  ],
+  "vars": {
+    "WE_MET_BASE_URL": "https://we-met.link",
+    "WE_MET_ENV": "production",
+  },
+  "previews": {
+    "vars": {
+      "WE_MET_BASE_URL": "https://we-met.link",
+      "WE_MET_ENV": "preview",
+    },
+    "d1_databases": [
+      {
+        "binding": "WE_MET_DB",
+        "database_name": "we-met-db-nonprod",
+        "database_id": "00000000-0000-0000-0000-000000000002",
+        "migrations_dir": "migrations",
+      },
+    ],
+    "r2_buckets": [
+      {
+        "binding": "WE_MET_ASSETS",
+        "bucket_name": "we-met-assets-nonprod",
+      },
+    ],
+    "queues": {
+      "producers": [
+        {
+          "binding": "WE_MET_FOLLOWUP_EMAIL_QUEUE",
+          "queue": "we-met-followup-email-nonprod",
+        },
+      ],
+    },
+    "ratelimits": [
+      {
+        "name": "WE_MET_EXCHANGE_RATE_LIMITER",
+        "namespace_id": "2001",
+        "simple": {
+          "limit": 10,
+          "period": 60,
+        },
+      },
+    ],
+  },
+}

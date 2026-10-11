@@ -1,28 +1,45 @@
 {
   "compilerOptions": {
-    "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "lib": ["ES2022"],
-    "strict": true,
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
     "skipLibCheck": true,
+    "strict": true,
     "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
     "isolatedModules": true,
-    "verbatimModuleSyntax": true,
+    "jsx": "preserve",
+    "incremental": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "types": ["node"],
-    "allowJs": true
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./src/*"]
+    }
   },
   "include": [
-    "src/**/*.ts",
-    "test/**/*.ts",
-    "scripts/lib/repo-settings-target.mjs",
-    "scripts/lib/launchpad-attribution.mjs",
-    "scripts/lib/gh-api-errors.mjs",
+    "eslint.config.js",
+    "next-env.d.ts",
+    "next.config.ts",
+    "open-next.config.ts",
     "scripts/lib/bootstrap.mjs",
+    "scripts/lib/parse-jsonc.mjs",
+    "scripts/lib/gh-api-errors.mjs",
+    "scripts/lib/launchpad-attribution.mjs",
+    "scripts/lib/repo-settings-target.mjs",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "test/**/*.ts",
     "vitest.config.ts",
-    "eslint.config.js"
-  ]
+    ".next/types/**/*.ts"
+  ],
+  "exclude": ["node_modules"]
 }

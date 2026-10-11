@@ -2,6 +2,7 @@
 
 - **Status:** accepted
 - **Date:** 2026-10-11
+- **Updates:** [0014](./0014-reserved-hostnames-and-paths.md)
 
 ## Context
 
@@ -9,16 +10,16 @@ Cards need stable shareable links, support for a default host now and custom dom
 
 ## Decision
 
-- Public routes: `/` (placeholder landing), `/p/<slug>`, `/p/<slug>/contact.vcf` (inline vCard), `POST /api/hi/exchange`, `POST /api/hi/details`.
+- Public routes: `/` (placeholder landing), `/hi/<slug>`, `/hi/<slug>/contact.vcf` (inline vCard), `POST /api/exchange`, `POST /api/details` ([0008](./0008-api-routes-exchange-and-details.md)).
 - **Slug rules:** lowercase letters, numbers, and hyphens only; no leading or trailing hyphen; length 1–48.
-- Default card path: **`/p/<slug>`** on the configured host (planned production host: `we-met.link`).
-- **Step 1 legacy mapping in this app:** `/hi` → `/p/didi`; `/hi/contact.vcf` → `/p/didi/contact.vcf`; `/api/hi/*` unchanged. **`didi.build` is not redirected in step 1.**
-- **Lookup order:** hostname → path (`/p/<slug>`) → card record. Step 1 has **one** card (`didi`). Preview and staging hosts resolve to that card through **configuration**, never hardcoded hostnames.
-- **`WE_MET_BASE_URL`** (one value per environment) is the canonical origin for links in code and email. It is **never** derived from the incoming request host (that would let a caller choose links in outgoing email); it is always a configured value.
+- **Default card path:** **`/hi/<slug>`** on the configured host (production host: `we-met.link`).
+- **Step 1 legacy mapping in this app:** `didi.build/hi` → `/hi/didi` (and vCard equivalent). **`didi.build` is not redirected in step 1.**
+- **Lookup order:** hostname → path (`/hi/<slug>`) → card record. Reserved hostnames and paths: [0014](./0014-reserved-hostnames-and-paths.md).
+- **`WE_MET_BASE_URL`** (one value per environment) is the canonical origin for links in code and email. It is **never** derived from the incoming request host. On **previews**, `WE_MET_BASE_URL` is **`https://we-met.link`** (set in the `previews` block) so links in test emails point at production card pages.
 
 ## Reasons
 
-- `/p/<slug>` is short, cache-friendly, and distinct from legacy `/hi`.
+- `/hi/<slug>` matches the legacy mental model and the live `didi.build/hi` path shape.
 - Hostname-first lookup matches future `card.customer.com` without changing the path model.
 - A single base URL prevents drift between email links, OG tags, and redirects.
 

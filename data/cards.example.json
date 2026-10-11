@@ -1,0 +1,15 @@
+{
+  "cards": [
+    {
+      "slug": "demo",
+      "variant": "green",
+      "displayName": "Demo User",
+      "email": "demo@example.com",
+      "photoKey": null,
+      "footerLink": { "label": "Example", "url": "https://example.com" },
+      "pageCopy": { "headline": "Say hi" },
+      "leadSinks": []
+    }
+  ],
+  "hostnames": []
+}

@@ -16,9 +16,13 @@ Do not break these; each links to the canonical doc.
 - **Theme colors** only under `src/theme/tokens/` (`theme-colors` check to be added to `npm run check`): [0004](docs/decisions/0004-card-data-and-branding.md), [overview](docs/architecture/overview.md#theming).
 - **No hardcoded hostnames:** use `WE_MET_BASE_URL` ([0003](docs/decisions/0003-urls-and-lookup.md)).
 - **No runtime dependency on `didi-build/web`:** [0002](docs/decisions/0002-hosting-workers-opennext.md).
-- **Non-prod builds never bind production** queue, consumer, or Linear: [0006](docs/decisions/0006-non-prod-safety.md), [environments](docs/architecture/environments.md).
-- **Production deploys are manual** with GitHub Environment approval: [0007](docs/decisions/0007-production-deploy-manual.md), [deploy](docs/runbooks/deploy.md).
+- **Non-prod builds never bind production** queue, consumer, D1, or R2: [0006](docs/decisions/0006-non-prod-safety.md), [environments](docs/architecture/environments.md).
+- **Lead delivery** uses **`lead_sinks`** rows and per-sink queue dispatch; step 1 has **no sink implementations**: [0018](docs/decisions/0018-lead-sink.md).
+- **Production deploys** require GitHub **`production`** environment approval (merge to `main` starts the job): [0007](docs/decisions/0007-production-deploy-manual.md), [deploy](docs/runbooks/deploy.md).
 - **Email templates are fixed**; user-supplied fields are escaped plain text: [0004](docs/decisions/0004-card-data-and-branding.md).
+- **Card images** enter only through the single image ingestion function; nothing else writes to R2: [0012](docs/decisions/0012-r2-images-single-ingestion.md).
+- **No public write endpoints** in step 1 (no API to create or update cards): [0010](docs/decisions/0010-card-data-d1-and-load-script.md).
+- **No personal card data or card images** in git; load from gitignored files per environment: [0010](docs/decisions/0010-card-data-d1-and-load-script.md).
 
 ## Engineering standards
 
@@ -59,16 +63,22 @@ Do not break these; each links to the canonical doc.
 
 ## Commands
 
-| Script                       | Purpose                                                                |
-| ---------------------------- | ---------------------------------------------------------------------- |
-| `npm run check`              | Format, lint, typecheck, test, secret scan, placeholders, attribution  |
-| `npm run lint`               | ESLint                                                                 |
-| `npm run format`             | Prettier write                                                         |
-| `npm run format:check`       | Prettier check                                                         |
-| `npm run typecheck`          | `tsc --noEmit`                                                         |
-| `npm run test`               | Vitest (CI uses JUnit output)                                          |
-| `npm run secrets`            | Secretlint                                                             |
-| `npm run secret-usage`       | Fail if `BOOTSTRAP_TOKEN` appears outside `bootstrap.yml` workflows    |
-| `npm run init-project`       | Replace `{{…}}` placeholders after creating a repo from Launchpad      |
-| `npm run repo-settings`      | Dry-run, `--apply`, or `--verify` recommended GitHub repo settings     |
-| `npm run verify-action-pins` | Verify each pinned action SHA matches its version comment (`# vX.Y.Z`) |
+| Script                       | Purpose                                                                                  |
+| ---------------------------- | ---------------------------------------------------------------------------------------- |
+| `npm run check`              | Format, lint, typecheck, test, build, worker dry-run, secrets, placeholders, attribution |
+| `npm run dev`                | Next.js dev server (Turbopack)                                                           |
+| `npm run next:build`         | Next.js production build (used by OpenNext)                                              |
+| `npm run build`              | OpenNext build for Cloudflare Workers                                                    |
+| `npm run worker:dry-run`     | Validate Wrangler deploy without uploading (`wrangler deploy --dry-run`)                 |
+| `npm run db:migrate`         | Apply D1 migrations locally                                                              |
+| `npm run db:migrate:remote`  | Apply D1 migrations to remote `we-met-db-nonprod` only (never production)                |
+| `npm run lint`               | ESLint                                                                                   |
+| `npm run format`             | Prettier write                                                                           |
+| `npm run format:check`       | Prettier check                                                                           |
+| `npm run typecheck`          | `tsc --noEmit`                                                                           |
+| `npm run test`               | Vitest (CI uses JUnit output)                                                            |
+| `npm run secrets`            | Secretlint                                                                               |
+| `npm run secret-usage`       | Fail if `BOOTSTRAP_TOKEN` appears outside `bootstrap.yml` workflows                      |
+| `npm run init-project`       | Replace `{{…}}` placeholders after creating a repo from Launchpad                        |
+| `npm run repo-settings`      | Dry-run, `--apply`, or `--verify` recommended GitHub repo settings                       |
+| `npm run verify-action-pins` | Verify each pinned action SHA matches its version comment (`# vX.Y.Z`)                   |

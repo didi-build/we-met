@@ -11,46 +11,55 @@ Created from [Launchpad](https://github.com/didi-build/launchpad) by Didi Build 
 
 <!-- launchpad-attribution:end -->
 
-## Layout
+## Prerequisites
 
-| Path                                                                             | Why it exists                                                                             |
-| -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `LICENSE`                                                                        | Project license (from `LICENSE.project` at init)                                          |
-| `LICENSES/launchpad-MIT.txt`                                                     | Preserved MIT notice for Launchpad template (required by `npm run check`)                 |
-| `src/`                                                                           | Application source (example: `greet.ts`)                                                  |
-| `test/`                                                                          | Tests mirror `src/`; one example unit test                                                |
-| `docs/`                                                                          | Architecture, decisions, runbooks — see [docs/README.md](./docs/README.md)                |
-| `AGENTS.md`                                                                      | Single source of truth for agent rules                                                    |
-| `scripts/`                                                                       | `init-project`, placeholder and attribution checks, `repo-settings`, `verify-action-pins` |
-| `.github/workflows/ci.yml`, `dependabot-automerge.yml`, `.github/dependabot.yml` | CI (`npm run check`), Dependabot config, and green Dependabot auto-merge                  |
-| `.husky/`                                                                        | Fast pre-commit checks + secret scan                                                      |
+- Node.js 22+ (see `.nvmrc`)
+- npm
 
-## Commands
+## Run locally
 
 ```bash
-npm install          # install deps and git hooks (prepare)
-npm run check        # format, lint, typecheck, test, secrets, placeholders, attribution
-npm run test         # vitest
-npm run test:watch   # vitest watch mode
-npm run repo-settings   # dry-run / --apply / --verify GitHub repo settings
-npm run verify-action-pins   # verify each pinned action SHA matches its # vX.Y.Z comment
+npm install
+cp .env.example .env   # fill names from docs/architecture/environments.md
+npm run dev
 ```
 
-## Git hooks
+Open [http://localhost:3000](http://localhost:3000) for the placeholder landing page.
 
-On every commit, the pre-commit hook runs **lint-staged** (format + ESLint on staged files), then **typecheck**, the full **test** suite, and **secretlint**. That keeps local commits aligned with CI while the project is small.
+## Test and quality gates
 
-As tests grow, consider moving `npm run test` to a **pre-push** hook (or running only affected tests on commit) so commits stay fast. CI should always run the full `npm run check`.
+```bash
+npm run check
+```
 
-## Environment variables
+`check` runs format, lint, typecheck, unit tests, the OpenNext production build, and `wrangler deploy --dry-run` (Worker config validation without deploying).
 
-Copy [`.env.example`](./.env.example) to `.env` for local use. Document each name in README or `docs/architecture/`; document names only in `.env.example`; never commit values.
+```bash
+npm run test         # Vitest
+npm run test:watch   # Vitest watch mode
+```
 
-## Adding checks or tools
+## D1 migrations
 
-- Extend `package.json` scripts and add them to `check`.
-- Mirror the same command in `.husky/pre-commit` only if it stays fast (seconds).
-- Update [AGENTS.md](./AGENTS.md) command table when scripts change.
+Migrations live in `migrations/`. Apply locally (no tables in the scaffold yet):
+
+```bash
+npm run db:migrate
+npm run db:migrate:remote   # allowlisted to we-met-db-nonprod only
+```
+
+## Deploy
+
+Deploy workflows and Cloudflare resources are set up in [DIDI-572](https://linear.app/didi-build/issue/DIDI-572). Until then:
+
+- **Preview:** each PR gets a Cloudflare Preview on Worker `we-met` (non-prod bindings).
+- **Production:** merge to `main` starts the deploy job; a reviewer must approve the GitHub `production` environment.
+
+See [docs/runbooks/deploy.md](./docs/runbooks/deploy.md).
+
+## Documentation
+
+Architecture, decisions, and runbooks: [docs/README.md](./docs/README.md). Agent rules: [AGENTS.md](./AGENTS.md).
 
 ## License
 

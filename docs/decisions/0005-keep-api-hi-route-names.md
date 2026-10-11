@@ -1,22 +1,16 @@
-# 0005. Keep `/api/hi/*` route names for step 1
+# 0005. Keep monolith API route names for step 1
 
-- **Status:** accepted
+- **Status:** superseded by [0008](./0008-api-routes-exchange-and-details.md)
 - **Date:** 2026-10-11
 
 ## Context
 
-The exchange-contact flow today lives under `/hi` in `didi-build/web`, including API paths under `/api/hi/*`. Step 1 must behave identically while the UI moves to `/p/<slug>`.
+An early draft kept `didi-build/web` API path names when public URLs moved off `/hi`. That approach was dropped before implementation.
 
 ## Decision
 
-For step 1, **retain `/api/hi/*`** for the exchange-contact API (submit, validation, enqueue). Public pages use `/p/<slug>`; API paths are not renamed to `/api/we-met/*` yet.
-
-## Reasons
-
-- Reduces risk during extraction: clients, tests, and behavior stay aligned with the inventoried card.
-- Renaming can happen later behind a single routing change once step 1 is stable.
+Superseded. This repo uses `POST /api/exchange` and `POST /api/details` per [0008](./0008-api-routes-exchange-and-details.md).
 
 ## Consequences
 
-- Documentation and agents refer to `/api/hi/*` for the pipeline entrypoint in step 1.
-- A future rename, if any, should be a deliberate decision with redirect or compatibility window.
+- See [0008](./0008-api-routes-exchange-and-details.md).
