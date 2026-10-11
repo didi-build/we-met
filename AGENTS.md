@@ -71,7 +71,7 @@ Do not break these; each links to the canonical doc.
 | `npm run build`              | OpenNext build for Cloudflare Workers                                                    |
 | `npm run worker:dry-run`     | Validate Wrangler deploy without uploading (`wrangler deploy --dry-run`)                 |
 | `npm run db:migrate`         | Apply D1 migrations locally                                                              |
-| `npm run db:migrate:remote`  | Apply D1 migrations to remote non-prod DB                                                |
+| `npm run db:migrate:remote`  | Apply D1 migrations to remote `we-met-db-nonprod` only (never production)                |
 | `npm run lint`               | ESLint                                                                                   |
 | `npm run format`             | Prettier write                                                                           |
 | `npm run format:check`       | Prettier check                                                                           |

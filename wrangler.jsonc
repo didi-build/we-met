@@ -42,7 +42,7 @@
   "ratelimits": [
     {
       "name": "WE_MET_EXCHANGE_RATE_LIMITER",
-      "namespace_id": "2001",
+      "namespace_id": "2002",
       "simple": {
         "limit": 10,
         "period": 60,
@@ -51,10 +51,12 @@
   ],
   "vars": {
     "WE_MET_BASE_URL": "https://we-met.link",
+    "WE_MET_ENV": "production",
   },
   "previews": {
     "vars": {
       "WE_MET_BASE_URL": "https://we-met.link",
+      "WE_MET_ENV": "preview",
     },
     "d1_databases": [
       {
@@ -81,7 +83,7 @@
     "ratelimits": [
       {
         "name": "WE_MET_EXCHANGE_RATE_LIMITER",
-        "namespace_id": "2002",
+        "namespace_id": "2001",
         "simple": {
           "limit": 10,
           "period": 60,

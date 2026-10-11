@@ -25,10 +25,12 @@ If any signal is missing on an issue you believe came from non-prod, treat it as
 Use this after changing the mail or consumer path:
 
 1. Open a **PR preview** (non-prod bindings only). Local dev with remote queue is acceptable for narrower checks.
-2. Submit the exchange form with obvious fake contact details. **Preview or local:** Turnstile uses Cloudflare’s always-pass **test key pair** (widget auto-passes).
+2. Submit the exchange form with obvious fake contact details.
+   - **Local:** Turnstile uses Cloudflare’s always-pass **test key pair** (widget auto-passes).
+   - **Preview:** complete the **real** Turnstile challenge (widget **we-met nonprod**).
 3. Confirm exchange returns **200** and a non-empty signed token; optional details step returns **200**.
 4. Confirm jobs on **`we-met-followup-email-nonprod`**.
-5. Check **`WE_MET_TEST_MAIL_TO`** for redirected visitor and owner mail.
+5. Check **`WE_MET_TEST_MAIL_TO`** for redirected **visitor** follow-up mail.
 6. No Linear verification in step 1.
 
 ## Deliberate end-to-end test (with Linear sink, step 2+)

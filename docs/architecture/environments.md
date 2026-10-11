@@ -12,12 +12,12 @@ Three environments share one codebase. Worker name is always **`we-met`**: produ
 | **R2**              | `we-met-assets-nonprod`                                                                      | `we-met-assets-nonprod`                                                              | `we-met-assets`                                                                                     |
 | **Follow-up queue** | Optional / mock                                                                              | `we-met-followup-email-nonprod`                                                      | `we-met-followup-email`                                                                             |
 | **Consumer Worker** | Local stub or skipped                                                                        | `we-met-followup-email-consumer-nonprod`                                             | `we-met-followup-email-consumer`                                                                    |
-| **Rate limiter**    | Non-prod namespace                                                                           | Non-prod namespace (`WE_MET_EXCHANGE_RATE_LIMITER` in preview block)                 | Production namespace                                                                                |
-| **Mail delivery**   | Redirect via `WE_MET_TEST_MAIL_TO`                                                           | Same                                                                                 | Real visitor/owner addresses via Gmail API (no `LEAD_NOTIFY_TO` env)                                |
+| **Rate limiter**    | Namespace **2001** (`WE_MET_EXCHANGE_RATE_LIMITER`)                                          | Namespace **2001** in preview block                                                  | Namespace **2002**                                                                                  |
+| **Mail delivery**   | Redirect via `WE_MET_TEST_MAIL_TO`                                                           | Same                                                                                 | Real **visitor** addresses via Gmail API (step 1)                                                   |
 | **Lead sinks**      | `lead_sinks` rows; **no implementations** in step 1 ([0018](../decisions/0018-lead-sink.md)) | Same                                                                                 | Same until step 2 sink kinds ship                                                                   |
-| **Turnstile**       | Cloudflare **always-pass test key pair** (site + secret)                                     | Same test pair                                                                       | Real keys for `we-met.link` (covers `app.we-met.link`)                                              |
+| **Turnstile**       | Cloudflare **always-pass test** site + secret keys                                           | Widget **we-met nonprod** (hostname = account `workers.dev` subdomain only)          | Widget **we-met production** (`we-met.link`, covers `app.we-met.link`)                              |
 
-Use the test site key and test secret together on local and preview: a production secret rejects the dummy token from the test widget.
+**Turnstile keys (three sets):** use the always-pass pair only on **local**. **Preview** and **production** each use a real widget’s site key and secret. `NEXT_PUBLIC_TURNSTILE_SITE_KEY` is inlined at **build time**, so the preview build and the production build need **different** site keys; `TURNSTILE_SECRET_KEY` is a Worker secret per environment. [DIDI-572](https://linear.app/didi-build/issue/DIDI-572) wires preview vs production values. A production secret rejects the dummy token from the local test widget.
 
 Production infrastructure may exist before public cutover; nothing links to it until [DIDI-566](https://linear.app/didi-build/issue/DIDI-566).
 
@@ -32,6 +32,10 @@ PR previews are served on **workers.dev** (`<preview-name>-we-met.<subdomain>.wo
 Whether previews are triggered by Cloudflare Git integration or a GitHub Action is decided in [DIDI-572](https://linear.app/didi-build/issue/DIDI-572). **Forks never get deploy access.** Secrets are set once in the **Previews base configuration** and apply to every new preview. A preview is **deleted when its PR closes**. Previews may **produce** to queues but **cannot consume** them; the non-prod consumer is a **separate Worker**. Requires **Wrangler 4.135.0+**.
 
 **`WE_MET_BASE_URL` in the `previews` block is `https://we-met.link`**, so links in test emails, the vCard URL field, and canonical/OG URLs from a preview point at production card pages, not the preview hostname. The preview hostname still serves the card via lookup configuration.
+
+**UNVERIFIED:** The `previews` block in `wrangler.jsonc` lists D1, R2, queues, rate limits, and vars only — not `ASSETS`, `IMAGES`, or `WORKER_SELF_REFERENCE`. Docs say previews do not inherit production settings; for an OpenNext Worker it is **unknown** which bindings a preview instance actually receives. [DIDI-572](https://linear.app/didi-build/issue/DIDI-572)’s first proof must confirm effective preview bindings, including **ASSETS**, **IMAGES**, and the self-reference service.
+
+**D1 `database_id` values** in `wrangler.jsonc` are **placeholders** (real IDs stay out of the public repo). [DIDI-572](https://linear.app/didi-build/issue/DIDI-572) decides how CI injects the real IDs at deploy time.
 
 ## Deploy-time guards
 
@@ -62,13 +66,13 @@ Lead sink destinations (Linear project IDs, owner email addresses, etc.) live in
 
 **Wrangler bindings (app Worker `we-met`)**
 
-| Binding                        | Production resource               | Non-prod (previews / local remote) |
-| ------------------------------ | --------------------------------- | ---------------------------------- |
-| `WE_MET_DB`                    | `we-met-db`                       | `we-met-db-nonprod`                |
-| `WE_MET_ASSETS`                | `we-met-assets`                   | `we-met-assets-nonprod`            |
-| `WE_MET_FOLLOWUP_EMAIL_QUEUE`  | `we-met-followup-email`           | `we-met-followup-email-nonprod`    |
-| `WE_MET_EXCHANGE_RATE_LIMITER` | Production rate limiter namespace | Non-prod rate limiter namespace    |
-| `IMAGES`                       | Cloudflare Images binding         | Same (image ingestion)             |
+| Binding                        | Production resource       | Non-prod (previews / local remote) |
+| ------------------------------ | ------------------------- | ---------------------------------- |
+| `WE_MET_DB`                    | `we-met-db`               | `we-met-db-nonprod`                |
+| `WE_MET_ASSETS`                | `we-met-assets`           | `we-met-assets-nonprod`            |
+| `WE_MET_FOLLOWUP_EMAIL_QUEUE`  | `we-met-followup-email`   | `we-met-followup-email-nonprod`    |
+| `WE_MET_EXCHANGE_RATE_LIMITER` | Namespace id **2002**     | Namespace id **2001**              |
+| `IMAGES`                       | Cloudflare Images binding | Same (image ingestion)             |
 
 The consumer Worker registers on the queue in **its own** Wrangler config; it is not an app Worker binding. Consumer binds read-only **`WE_MET_ASSETS`** only ([0016](../decisions/0016-queue-message-snapshot.md)).
 

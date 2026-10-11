@@ -10,7 +10,7 @@
 
 - The Next.js app (UI, `/api/exchange` and `/api/details` handlers, card rendering).
 - Cloudflare Workers deployment (OpenNext), `we-met-*` queues, consumers, D1, R2, and env-specific bindings.
-- Card presentation, theming tokens, and the contact-exchange pipeline through to follow-up email and **lead sink dispatch** ([0018](../decisions/0018-lead-sink.md)).
+- Card presentation, theming tokens, and the contact-exchange pipeline through to **visitor** follow-up email and **lead sink dispatch** ([0018](../decisions/0018-lead-sink.md)).
 
 **Out of scope**
 
@@ -22,13 +22,13 @@
 
 Agents should extend behavior only through these interfaces, not ad hoc fetches or hardcoded hosts.
 
-| Seam             | Responsibility                                                                        | Shape                                                                                                                                                                             |
-| ---------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Card data**    | Load the card record and its **lead sinks** for the current request.                  | Async adapter: lookup context → typed card + validated **`lead_sinks`** rows ([0010](../decisions/0010-card-data-d1-and-load-script.md), [0018](../decisions/0018-lead-sink.md)). |
-| **Lead sink**    | Deliver a lead to one destination (`kind` implementation).                            | **`LeadSink`**: record lead, append details, note delivery failure. One implementation per **`kind`**; step 1 defines the interface and dispatcher only.                          |
-| **Email sender** | Send the fixed-template exchange emails (visitor ↔ card owner).                       | Adapter that accepts rendered plain-text bodies and metadata; production uses the bound queue + consumer; local may noop or log.                                                  |
-| **Base URL**     | One canonical origin for absolute links in email and metadata (`https://…`, no path). | Single config value per environment (see [environments](./environments.md)); never scatter hostnames in code.                                                                     |
-| **Lookup**       | Resolve which card serves a request.                                                  | Order: **hostname** (custom domain later) → **path** (`/hi/<slug>`) → **card record**. Reserved names: [0014](../decisions/0014-reserved-hostnames-and-paths.md).                 |
+| Seam             | Responsibility                                                                        | Shape                                                                                                                                                                                                                                            |
+| ---------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Card data**    | Load the card record and its **lead sinks** for the current request.                  | Async adapter: lookup context → typed card + validated **`lead_sinks`** rows ([0010](../decisions/0010-card-data-d1-and-load-script.md), [0018](../decisions/0018-lead-sink.md)).                                                                |
+| **Lead sink**    | Deliver a lead to one destination (`kind` implementation).                            | **`LeadSink`**: record lead, append details, note delivery failure. One implementation per **`kind`**; step 1 defines the interface and dispatcher only.                                                                                         |
+| **Email sender** | Send the fixed-template **visitor** follow-up email (step 1).                         | Adapter that accepts rendered plain-text bodies and metadata; production uses the bound queue + consumer; local may noop or log. Owner notification moves to an email sink in step 2 ([DIDI-586](https://linear.app/didi-build/issue/DIDI-586)). |
+| **Base URL**     | One canonical origin for absolute links in email and metadata (`https://…`, no path). | Single config value per environment (see [environments](./environments.md)); never scatter hostnames in code.                                                                                                                                    |
+| **Lookup**       | Resolve which card serves a request.                                                  | Order: **hostname** (custom domain later) → **path** (`/hi/<slug>`) → **card record**. Reserved names: [0014](../decisions/0014-reserved-hostnames-and-paths.md).                                                                                |
 
 ## Routes
 
@@ -65,19 +65,17 @@ sequenceDiagram
   M->>D: Dispatch enabled lead sinks
   D->>Q: One message per enabled sink
   M->>Q: Enqueue visitor_followup (independent)
-  M->>Q: Enqueue owner_lead (independent)
   M-->>V: 200 + signed token (2h TTL)
 
   V->>M: POST /api/details (token + fields)
   M->>D: Dispatch append per enabled sink
-  M->>Q: Enqueue owner_details (best effort)
   M-->>V: 200
 
   Q->>C: Deliver jobs (per-message retries)
-  C->>C: Follow-up email via Gmail; sink delivery per kind (step 2+)
+  C->>C: Visitor follow-up email via Gmail (step 1); sink delivery per kind (step 2+)
 ```
 
-The **follow-up email** consumer (`we-met-followup-email-consumer` or `-nonprod`) registers on the email queue in its own Wrangler config. **Lead sink delivery** uses **one queue message per sink** so retries and failures are independent ([0018](../decisions/0018-lead-sink.md)). Queue payloads for email carry a card field snapshot ([0016](../decisions/0016-queue-message-snapshot.md)). **Step 1:** dispatcher and `lead_sinks` table only — **no sink implementations**; zero enabled sinks means no lead delivery messages.
+In **step 1**, the **follow-up email consumer** (`we-met-followup-email-consumer` or `-nonprod`) sends only the **visitor** follow-up message. **Lead sink delivery** uses **one queue message per sink** so retries and failures are independent ([0018](../decisions/0018-lead-sink.md)). Queue payloads for email carry a card field snapshot ([0016](../decisions/0016-queue-message-snapshot.md)). **Step 1:** dispatcher and `lead_sinks` table only — **no sink implementations**; zero enabled sinks means no lead delivery messages.
 
 **Failure handling**
 
@@ -87,11 +85,9 @@ The **follow-up email** consumer (`we-met-followup-email-consumer` or `-nonprod`
 | Turnstile fails                               | **403**                                                                  |
 | Rate limited                                  | **429**                                                                  |
 | Visitor follow-up enqueue fails               | **500**, generic message to client                                       |
-| Owner lead / details email enqueue fails      | **500** on exchange; details step may still **200** for optional enqueue |
 | Lead sink dispatch enqueue fails (one sink)   | **Does not** fail other sinks or the HTTP response; that message retries |
-| Lead sink delivery fails (consumer, one sink) | Retries for **that message only**; other sinks and email unaffected      |
+| Lead sink delivery fails (consumer, one sink) | Retries for **that message only**; visitor email unaffected              |
 | Visitor email fails after max attempts        | Acknowledged; **note delivery failure** on sinks when implemented        |
-| Owner email fails                             | Retry with backoff; acknowledge after max attempts                       |
 | Zero enabled lead sinks                       | Exchange **200**; leads go nowhere until sinks are added (step 2+)       |
 
 Non-production mail is redirected on the consumer; see [0006](../decisions/0006-non-prod-safety.md) and [environments](./environments.md).
@@ -107,3 +103,4 @@ See [environments.md](./environments.md) for queues, secrets names, previews, an
 - **Pricing and packaging** ([DIDI-579](https://linear.app/didi-build/issue/DIDI-579)).
 - **`didi.build/hi` and `/hi/contact.vcf` at cutover:** whether those URLs redirect (decide before [DIDI-566](https://linear.app/didi-build/issue/DIDI-566)).
 - **Square-crop upload UI** arrives with the future editor ([DIDI-581](https://linear.app/didi-build/issue/DIDI-581)); step 1 defines image ingestion only ([0012](../decisions/0012-r2-images-single-ingestion.md)).
+- **Details-step token:** must carry **per-sink** record references (e.g. Linear issue id) so append-details can target each sink; encoding is undecided.

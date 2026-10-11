@@ -9,7 +9,7 @@ The follow-up email consumer runs as a separate Worker. It should not need datab
 
 ## Decision
 
-- Each queue message includes a **snapshot** of the card text fields the emails need, plus the **photo key**.
+- Each **visitor follow-up email** queue message includes a **snapshot** of the card text fields that email needs, plus the **photo key** (step 1 sends only visitor follow-up mail from this consumer).
 - The **consumer Worker has no D1 binding**; it reads the photo from R2 via a **read-only** `WE_MET_ASSETS` bucket binding.
 
 ## Reasons

@@ -45,7 +45,7 @@ Migrations live in `migrations/`. Apply locally (no tables in the scaffold yet):
 
 ```bash
 npm run db:migrate
-npm run db:migrate:remote   # non-prod remote DB — same-repo CI only
+npm run db:migrate:remote   # we-met-db-nonprod only (refuses we-met-db)
 ```
 
 ## Deploy

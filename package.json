@@ -15,7 +15,7 @@
     "build": "opennextjs-cloudflare build",
     "worker:dry-run": "wrangler deploy --dry-run",
     "db:migrate": "node scripts/apply-migrations.mjs --local",
-    "db:migrate:remote": "node scripts/apply-migrations.mjs --remote",
+    "db:migrate:remote": "node scripts/apply-migrations.mjs --remote we-met-db-nonprod",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
@@ -42,7 +42,7 @@
   },
   "dependencies": {
     "@opennextjs/cloudflare": "^1.20.6",
-    "next": "^15.5.24",
+    "next": "^15.5.27",
     "react": "19.1.0",
     "react-dom": "19.1.0"
   },
@@ -66,6 +66,6 @@
     "typescript": "5.9.3",
     "typescript-eslint": "8.71.1",
     "vitest": "3.2.7",
-    "wrangler": "^4.139.0"
+    "wrangler": "^4.149.0"
   }
 }

@@ -31,6 +31,7 @@
     "next.config.ts",
     "open-next.config.ts",
     "scripts/lib/bootstrap.mjs",
+    "scripts/lib/parse-jsonc.mjs",
     "scripts/lib/gh-api-errors.mjs",
     "scripts/lib/launchpad-attribution.mjs",
     "scripts/lib/repo-settings-target.mjs",
