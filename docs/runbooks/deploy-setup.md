@@ -1,6 +1,6 @@
-# DIDI-572 — account-side steps (operator)
+# Deploy setup (one-time account and GitHub steps)
 
-Repo-side workflows and guards land in [DIDI-572](https://linear.app/didi-build/issue/DIDI-572). Complete these **before** relying on CI previews/production. **Do not paste secrets or tokens into chat.**
+Complete these steps **before** relying on CI previews or production deploys. Hosting and preview behavior are documented in [deploy.md](./deploy.md), [0019](../decisions/0019-pr-preview-github-action.md), and [0020](../decisions/0020-d1-database-id-injection.md) (original rollout: [DIDI-572](https://linear.app/didi-build/issue/DIDI-572)). **Do not paste secrets or tokens into chat.**
 
 ## 1. GitHub secrets and variables
 
@@ -47,7 +47,7 @@ npx wrangler deploy --config wrangler.local.jsonc
 npx wrangler preview --config wrangler.local.jsonc --name didi-572-proof --json
 ```
 
-Paste command output (no secrets) back on **DIDI-572**.
+Paste command output (no secrets) on the Linear hosting ticket when asked.
 
 ### Effective preview bindings
 

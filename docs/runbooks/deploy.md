@@ -43,7 +43,7 @@ npm run worker:dry-run
 npm run worker:dry-run:generated
 ```
 
-Proof deploys before first CI run: [didi-572-account-steps.md](./didi-572-account-steps.md).
+Proof deploys before first CI run: [deploy-setup.md](./deploy-setup.md).
 
 ## GitHub configuration
 

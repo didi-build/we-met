@@ -37,15 +37,15 @@ Project docs live here so humans and agents share the same map.
 
 ## Runbooks
 
-| Path                                                                       | Purpose                                      |
-| -------------------------------------------------------------------------- | -------------------------------------------- |
-| [runbooks/deploy.md](./runbooks/deploy.md)                                 | Preview and production deploy                |
-| [runbooks/didi-572-account-steps.md](./runbooks/didi-572-account-steps.md) | DIDI-572 operator / proof steps              |
-| [runbooks/rollback.md](./runbooks/rollback.md)                             | Production rollback                          |
-| [runbooks/test-leads.md](./runbooks/test-leads.md)                         | Test leads when Linear sink exists; E2E mail |
-| [runbooks/bootstrap.md](./runbooks/bootstrap.md)                           | Launchpad bootstrap workflow                 |
-| [runbooks/incident.md](./runbooks/incident.md)                             | Incident notes                               |
-| [runbooks/action-pins.md](./runbooks/action-pins.md)                       | Pinned GitHub Actions                        |
+| Path                                                   | Purpose                                           |
+| ------------------------------------------------------ | ------------------------------------------------- |
+| [runbooks/deploy.md](./runbooks/deploy.md)             | Preview and production deploy                     |
+| [runbooks/deploy-setup.md](./runbooks/deploy-setup.md) | One-time Cloudflare/GitHub setup and proof deploy |
+| [runbooks/rollback.md](./runbooks/rollback.md)         | Production rollback                               |
+| [runbooks/test-leads.md](./runbooks/test-leads.md)     | Test leads when Linear sink exists; E2E mail      |
+| [runbooks/bootstrap.md](./runbooks/bootstrap.md)       | Launchpad bootstrap workflow                      |
+| [runbooks/incident.md](./runbooks/incident.md)         | Incident notes                                    |
+| [runbooks/action-pins.md](./runbooks/action-pins.md)   | Pinned GitHub Actions                             |
 
 ## Other
 
