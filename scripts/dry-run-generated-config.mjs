@@ -8,11 +8,19 @@ import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { WRANGLER_CI_CONFIG } from "./lib/wrangler-placeholders.mjs";
 
-const output = resolve(WRANGLER_CI_CONFIG);
+// Relative path for Wrangler CLI (shell:true breaks on absolute paths with spaces).
+const configRel = WRANGLER_CI_CONFIG;
+const configAbs = resolve(configRel);
 
 const prep = spawnSync(
   "node",
-  ["scripts/prepare-wrangler-config.mjs", "--target", "production", "--output", output],
+  [
+    "scripts/prepare-wrangler-config.mjs",
+    "--target",
+    "production",
+    "--output",
+    configRel,
+  ],
   {
     encoding: "utf8",
     env: {
@@ -32,13 +40,13 @@ let exitCode = 1;
 try {
   const dry = spawnSync(
     "npx",
-    ["wrangler", "deploy", "--dry-run", "--config", output],
+    ["wrangler", "deploy", "--dry-run", "--config", configRel],
     { stdio: "inherit", shell: true },
   );
   exitCode = dry.status ?? 1;
 } finally {
   try {
-    rmSync(output, { force: true });
+    rmSync(configAbs, { force: true });
   } catch {
     // ignore
   }

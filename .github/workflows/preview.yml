@@ -67,12 +67,21 @@ jobs:
       - name: Comment preview URL
         env:
           GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
           PREVIEW_URL: ${{ steps.preview.outputs.preview_url }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
-          body="Cloudflare Preview: ${PREVIEW_URL}"
-          gh pr comment "${PR_NUMBER}" --body "${body}" --edit-last --create-if-none
+          MARKER='<!-- we-met-preview -->'
+          body="${MARKER}
+          Cloudflare Preview: ${PREVIEW_URL}"
+          comment_id="$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" --paginate \
+            --jq ".[] | select(.body | contains(\"${MARKER}\")) | .id" | head -n 1)"
+          if [ -n "${comment_id}" ]; then
+            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${comment_id}" -f body="${body}"
+          else
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" -f body="${body}"
+          fi
 
   cleanup:
     if: >-

@@ -1,5 +1,8 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+
+const WORKFLOWS_DIR = ".github/workflows";
 
 describe("Deploy production workflow structure (unit)", () => {
   const workflow = readFileSync(".github/workflows/deploy-production.yml", "utf8");
@@ -13,6 +16,10 @@ describe("Deploy production workflow structure (unit)", () => {
     expect(workflow).toContain("workflow_dispatch");
   });
 
+  it("deploy job runs only on refs/heads/main", () => {
+    expect(workflow).toMatch(/if:\s*github\.ref == 'refs\/heads\/main'/);
+  });
+
   it("does not reference non-prod Cloudflare token or preview Turnstile variable", () => {
     expect(workflow).not.toContain("CLOUDFLARE_API_TOKEN_NONPROD");
     expect(workflow).not.toContain("WE_MET_TURNSTILE_SITE_KEY_NONPROD");
@@ -20,11 +27,10 @@ describe("Deploy production workflow structure (unit)", () => {
 });
 
 describe("Other workflows production isolation (unit)", () => {
-  const workflowPaths = [
-    ".github/workflows/ci.yml",
-    ".github/workflows/bootstrap.yml",
-    ".github/workflows/dependabot-automerge.yml",
-  ];
+  const workflowPaths = readdirSync(WORKFLOWS_DIR)
+    .filter((name) => name.endsWith(".yml"))
+    .filter((name) => name !== "deploy-production.yml" && name !== "preview.yml")
+    .map((name) => join(WORKFLOWS_DIR, name));
 
   for (const path of workflowPaths) {
     it(`${path} does not reference production-only secrets or variables`, () => {

@@ -5,6 +5,7 @@
  * Usage:
  *   node scripts/check-deploy-guards.mjs --target preview --config wrangler.jsonc
  *   node scripts/check-deploy-guards.mjs --target production --config wrangler.jsonc
+ *   node scripts/check-deploy-guards.mjs --mail-safety-config config/nonprod-mail-safety.json
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -16,7 +17,7 @@ import {
 
 function usage() {
   console.error(
-    "Usage: check-deploy-guards.mjs --target <preview|production> --config <path>",
+    "Usage: check-deploy-guards.mjs --target <preview|production> --config <path> [--mail-safety-config <path>]",
   );
   process.exit(1);
 }
@@ -24,10 +25,12 @@ function usage() {
 function parseArgs(argv) {
   let target = null;
   let configPath = resolve("wrangler.jsonc");
+  let mailSafetyConfigPath = resolve("config/nonprod-mail-safety.json");
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--target") target = argv[++i];
     else if (arg === "--config") configPath = resolve(argv[++i]);
+    else if (arg === "--mail-safety-config") mailSafetyConfigPath = resolve(argv[++i]);
     else if (arg === "--help" || arg === "-h") usage();
     else {
       console.error(`Unknown argument: ${arg}`);
@@ -35,7 +38,7 @@ function parseArgs(argv) {
     }
   }
   if (!target) usage();
-  return { target, configPath };
+  return { target, configPath, mailSafetyConfigPath };
 }
 
 function collectStrings(value, out = []) {
@@ -59,14 +62,13 @@ function fail(message) {
   process.exit(1);
 }
 
-// Validates config/nonprod-mail-safety.json only until the consumer Worker ships (DIDI-577).
-function checkNonprodMailSafety() {
-  const path = resolve("config/nonprod-mail-safety.json");
+// Validates nonprod mail safety spec only until the consumer Worker ships (DIDI-577).
+function checkNonprodMailSafety(mailSafetyConfigPath) {
   let spec;
   try {
-    spec = JSON.parse(readFileSync(path, "utf8"));
+    spec = JSON.parse(readFileSync(mailSafetyConfigPath, "utf8"));
   } catch {
-    fail(`missing or invalid ${path}`);
+    fail(`missing or invalid ${mailSafetyConfigPath}`);
   }
   if (spec.failClosedIfUnset !== true) {
     fail("nonprod mail safety must fail closed when WE_MET_TEST_MAIL_TO is unset");
@@ -190,6 +192,11 @@ function checkProductionBlock(config) {
   const queueRows = config.queues?.producers ?? [];
   const rlRows = config.ratelimits ?? [];
 
+  if (d1Rows.length === 0) fail("production d1_databases is required");
+  if (r2Rows.length === 0) fail("production r2_buckets is required");
+  if (queueRows.length === 0) fail("production queues.producers is required");
+  if (rlRows.length === 0) fail("production ratelimits is required");
+
   for (const row of d1Rows) {
     if (row.database_name !== PRODUCTION_RESOURCE_MARKERS.d1Name) {
       fail("production D1 name");
@@ -213,10 +220,10 @@ function checkProductionBlock(config) {
 }
 
 function main() {
-  const { target, configPath } = parseArgs(process.argv.slice(2));
+  const { target, configPath, mailSafetyConfigPath } = parseArgs(process.argv.slice(2));
   const config = parseJsonc(readFileSync(configPath, "utf8"));
 
-  checkNonprodMailSafety();
+  checkNonprodMailSafety(mailSafetyConfigPath);
   checkDistinctD1Ids(config);
 
   if (target === "preview") {

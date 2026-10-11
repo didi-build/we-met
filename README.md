@@ -51,7 +51,7 @@ npm run db:migrate:remote   # allowlisted to we-met-db-nonprod only
 ## Deploy
 
 - **Preview:** each PR from this repo runs [`.github/workflows/preview.yml`](./.github/workflows/preview.yml). Look for the **Cloudflare Preview** URL in the PR comment (`pr-<number>` on Worker `we-met`, non-prod bindings).
-- **Production:** every push to `main` runs [`.github/workflows/deploy-production.yml`](./.github/workflows/deploy-production.yml). The job waits on the GitHub **`production`** environment until a reviewer approves, then runs migrations and deploys to `https://we-met.link`.
+- **Production:** pushes to `main` (docs-only changes are skipped) or manual **workflow_dispatch** run [`.github/workflows/deploy-production.yml`](./.github/workflows/deploy-production.yml). The job waits on the GitHub **`production`** environment until a reviewer approves, then runs migrations and deploys to `https://we-met.link`.
 
 Details, secrets, and operator steps: [docs/runbooks/deploy.md](./docs/runbooks/deploy.md).
 

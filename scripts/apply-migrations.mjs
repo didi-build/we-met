@@ -17,7 +17,9 @@ import { resolve } from "node:path";
 import { WRANGLER_D1_NONPROD_CI_CONFIG } from "./lib/wrangler-placeholders.mjs";
 
 const REMOTE_ALLOWED_DATABASE = "we-met-db-nonprod";
-const D1_CI_CONFIG = resolve(WRANGLER_D1_NONPROD_CI_CONFIG);
+// Relative path for Wrangler CLI (shell:true breaks on absolute paths with spaces).
+const D1_CI_CONFIG_REL = WRANGLER_D1_NONPROD_CI_CONFIG;
+const D1_CI_CONFIG_ABS = resolve(D1_CI_CONFIG_REL);
 const args = process.argv.slice(2);
 
 let mode = "local";
@@ -69,7 +71,7 @@ if (mode === "remote") {
         "--target",
         "d1-migrate-nonprod",
         "--output",
-        D1_CI_CONFIG,
+        D1_CI_CONFIG_REL,
       ],
       { encoding: "utf8" },
     );
@@ -77,7 +79,7 @@ if (mode === "remote") {
       if (prep.stderr) process.stderr.write(prep.stderr);
       process.exit(prep.status ?? 1);
     }
-    configFlag = ["-c", D1_CI_CONFIG];
+    configFlag = ["-c", D1_CI_CONFIG_REL];
   } catch (error) {
     console.error(error);
     process.exit(1);
@@ -106,7 +108,7 @@ try {
 } finally {
   if (mode === "remote") {
     try {
-      rmSync(D1_CI_CONFIG, { force: true });
+      rmSync(D1_CI_CONFIG_ABS, { force: true });
     } catch {
       // ignore cleanup errors
     }

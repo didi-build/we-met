@@ -4,7 +4,7 @@ Repo-side workflows and guards land in [DIDI-572](https://linear.app/didi-build/
 
 ## 1. GitHub secrets and variables
 
-1. Create the **`production`** environment with yourself as a required reviewer.
+1. Create the **`production`** environment with yourself as a required reviewer. Under **Deployment branches**, choose **Selected branches** and allow **`main` only**.
 2. **Repository secrets:** `CLOUDFLARE_API_TOKEN_NONPROD` (non-prod Cloudflare token), `CLOUDFLARE_ACCOUNT_ID`.
 3. **`production` environment secret:** `CLOUDFLARE_API_TOKEN_PRODUCTION` (production-scoped token only).
 4. **Repository variables:** `WE_MET_D1_DATABASE_ID_NONPROD`, `WE_MET_TURNSTILE_SITE_KEY_NONPROD` (widget **we-met nonprod**).

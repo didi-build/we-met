@@ -14,7 +14,7 @@
 - **Fork PRs** skip preview deploy (`head.repo` must equal `github.repository`).
 - **Dependabot** PRs skip preview (`github.actor` is `dependabot[bot]`) because repository secrets are unavailable.
 - On `pull_request: closed`, the same workflow deletes the preview with `wrangler preview delete --name pr-<number>` (cleanup uses the same `if:` guards as deploy; delete tolerates missing previews).
-- Post or update the preview URL with `gh pr comment --edit-last --create-if-none`.
+- Post or update the preview URL in a PR comment tagged with `<!-- we-met-preview -->` (find via GitHub API and PATCH, or create if missing).
 
 ## Shared non-prod D1
 
