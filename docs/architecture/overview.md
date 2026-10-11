@@ -10,7 +10,7 @@
 
 - The Next.js app (UI, `/api/exchange` and `/api/details` handlers, card rendering).
 - Cloudflare Workers deployment (OpenNext), `we-met-*` queues, consumers, D1, R2, and env-specific bindings.
-- Card presentation, theming tokens, and the contact-exchange pipeline through to email and Linear.
+- Card presentation, theming tokens, and the contact-exchange pipeline through to email and the **LeadSink** ([0018](../decisions/0018-lead-sink.md)).
 
 **Out of scope**
 
@@ -18,26 +18,27 @@
 - General company site, marketing CMS, or unrelated Didi Build products.
 - Account billing, custom DNS, and multi-tenant admin (backlog; see [open questions](#open-questions)).
 
-## Four seams
+## Seams
 
 Agents should extend behavior only through these interfaces, not ad hoc fetches or hardcoded hosts.
 
-| Seam             | Responsibility                                                                             | Shape                                                                                                                                                             |
-| ---------------- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Card data**    | Load the card record for the current request (contact fields, variant, footer link, slug). | Async function or adapter: input is lookup context; output is a typed card object. Backed by **D1** ([0010](../decisions/0010-card-data-d1-and-load-script.md)).  |
-| **Email sender** | Send the fixed-template exchange emails (visitor ↔ card owner).                            | Adapter that accepts rendered plain-text bodies and metadata; production uses the bound queue + consumer; local may noop or log.                                  |
-| **Base URL**     | One canonical origin for absolute links in email and metadata (`https://…`, no path).      | Single config value per environment (see [environments](./environments.md)); never scatter hostnames in code.                                                     |
-| **Lookup**       | Resolve which card serves a request.                                                       | Order: **hostname** (custom domain later) → **path** (`/hi/<slug>`) → **card record**. Reserved names: [0014](../decisions/0014-reserved-hostnames-and-paths.md). |
+| Seam             | Responsibility                                                                                               | Shape                                                                                                                                                                         |
+| ---------------- | ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Card data**    | Load the card record for the current request (contact fields, variant, footer link, slug, lead destination). | Async function or adapter: input is lookup context; output is a typed card object. Backed by **D1** ([0010](../decisions/0010-card-data-d1-and-load-script.md)).              |
+| **Lead sink**    | Record leads, append details, note email failures.                                                           | **`LeadSink`** built per card from **lead destination** on the record (`kind` + non-secret config). Step 1: **`kind: "none"`** only ([0018](../decisions/0018-lead-sink.md)). |
+| **Email sender** | Send the fixed-template exchange emails (visitor ↔ card owner).                                              | Adapter that accepts rendered plain-text bodies and metadata; production uses the bound queue + consumer; local may noop or log.                                              |
+| **Base URL**     | One canonical origin for absolute links in email and metadata (`https://…`, no path).                        | Single config value per environment (see [environments](./environments.md)); never scatter hostnames in code.                                                                 |
+| **Lookup**       | Resolve which card serves a request.                                                                         | Order: **hostname** (custom domain later) → **path** (`/hi/<slug>`) → **card record**. Reserved names: [0014](../decisions/0014-reserved-hostnames-and-paths.md).             |
 
 ## Routes
 
-| Route                    | Role                                          |
-| ------------------------ | --------------------------------------------- |
-| `/`                      | Placeholder landing page.                     |
-| `/hi/<slug>`             | Public card page.                             |
-| `/hi/<slug>/contact.vcf` | vCard download (inline).                      |
-| `POST /api/exchange`     | Exchange submit (Turnstile, Linear, enqueue). |
-| `POST /api/details`      | Optional details (signed token).              |
+| Route                    | Role                                             |
+| ------------------------ | ------------------------------------------------ |
+| `/`                      | Placeholder landing page.                        |
+| `/hi/<slug>`             | Public card page.                                |
+| `/hi/<slug>/contact.vcf` | vCard download (inline).                         |
+| `POST /api/exchange`     | Exchange submit (Turnstile, lead sink, enqueue). |
+| `POST /api/details`      | Optional details (signed token).                 |
 
 **Step 1 legacy mapping (in this app):** `didi.build/hi` → `/hi/didi`; vCard equivalent. **`didi.build` is not redirected in step 1.** Slug rules and lookup: [0003](../decisions/0003-urls-and-lookup.md). API routes: [0008](../decisions/0008-api-routes-exchange-and-details.md).
 
@@ -55,39 +56,43 @@ Agents should extend behavior only through these interfaces, not ad hoc fetches 
 sequenceDiagram
   participant V as Visitor browser
   participant M as we-met Worker
-  participant L as Linear
+  participant S as LeadSink
   participant Q as we-met-followup-email queue
   participant C as we-met-followup-email-consumer
 
   V->>M: POST /api/exchange (Turnstile + form)
   M->>M: Turnstile, honeypot, rate limit
-  M->>L: Create lead
+  M->>S: Record lead
   M->>Q: Enqueue visitor_followup, owner_lead
   M-->>V: 200 + signed token (2h TTL)
 
   V->>M: POST /api/details (token + fields)
-  M->>L: Comment on lead (details)
+  M->>S: Append details
   M->>Q: Enqueue owner_details (best effort)
   M-->>V: 200
 
   Q->>C: Deliver jobs
   C->>C: Gmail API: visitor vCard follow-up (one recipient); owner notifications
+  C-->>S: Note email failure (when send exhausted)
 ```
 
-The **consumer** Worker (`we-met-followup-email-consumer` or `-nonprod`) registers on the queue in its own Wrangler config; it is not a binding on the main Worker. Queue payloads carry a card field snapshot ([0016](../decisions/0016-queue-message-snapshot.md)).
+The **consumer** Worker (`we-met-followup-email-consumer` or `-nonprod`) registers on the queue in its own Wrangler config; it is not a binding on the main Worker. Queue payloads carry a card field snapshot ([0016](../decisions/0016-queue-message-snapshot.md)). Step 1 uses a **no-op** LeadSink (`kind: "none"`); a **Linear** sink merges before cutover ([0018](../decisions/0018-lead-sink.md)).
 
 **Failure handling**
 
-| Condition                              | Behavior                                                                  |
-| -------------------------------------- | ------------------------------------------------------------------------- |
-| Honeypot filled (`website` non-empty)  | Fake **200**, empty token; nothing created in Linear or the queue         |
-| Turnstile fails                        | **403**                                                                   |
-| Rate limited                           | **429**                                                                   |
-| Linear create fails                    | **500**, generic message to client                                        |
-| Enqueue fails after Linear lead exists | **500**; Linear comment that the follow-up email could not be queued      |
-| Visitor email fails after 5 attempts   | Linear comment on the lead; message acknowledged                          |
-| Owner email fails                      | Retry with backoff; acknowledge after max attempts; **no** Linear comment |
-| Details enqueue fails                  | Logged only; **details** response is still **200**                        |
+| Condition                             | Behavior                                                                             |
+| ------------------------------------- | ------------------------------------------------------------------------------------ |
+| Honeypot filled (`website` non-empty) | Fake **200**, empty token; no lead sink call and nothing enqueued                    |
+| Turnstile fails                       | **403**                                                                              |
+| Rate limited                          | **429**                                                                              |
+| Lead sink record fails                | **500**, generic message to client (lead not silently dropped)                       |
+| Enqueue fails after lead recorded     | **500**; **note email failure** on the sink when the implementation supports it      |
+| Visitor email fails after 5 attempts  | **Note email failure** on the sink; message acknowledged                             |
+| Owner email fails                     | Retry with backoff; acknowledge after max attempts; **note** only if policy requires |
+| Lead sink append/details fails        | **500** on that request                                                              |
+| Details enqueue fails                 | Logged only; **details** response is still **200**                                   |
+
+The no-op sink never fails; sink errors apply once a real implementation (e.g. Linear) is enabled.
 
 Non-production mail is redirected on the consumer; see [0006](../decisions/0006-non-prod-safety.md) and [environments](./environments.md).
 

@@ -12,7 +12,7 @@ Early docs assumed a **staging** Worker (`we-met-staging`, `we-met.didi.build`).
 
 - **Environments:** `local`, `preview`, and `production` only. There is **no staging** environment or `we-met-staging` Worker.
 - **App Worker:** `we-met` in all cases. Production bindings sit at the top level of Wrangler config; **non-prod bindings** sit in the **`previews`** block (previews do not inherit production settings).
-- **Preview:** every PR gets a Cloudflare Preview under `we-met` with non-prod queue, consumer, D1, R2, rate limiter, and Linear test project only.
+- **Preview:** every PR gets a Cloudflare Preview under `we-met` with non-prod queue, consumer, D1, R2, and rate limiter only.
 - **Production:** deployed to the same Worker name with production bindings; live on `we-met.link` when cut over.
 - **`WE_MET_ENV`:** `local` | `preview` | `production`.
 

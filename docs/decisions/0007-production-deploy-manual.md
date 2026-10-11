@@ -5,7 +5,7 @@
 
 ## Context
 
-Production touches real visitors, mail, and Linear. Every production change needs a human gate, including dependency updates merged to `main`.
+Production touches real visitors and mail. Every production change needs a human gate, including dependency updates merged to `main`.
 
 ## Decision
 

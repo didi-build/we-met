@@ -31,17 +31,18 @@ Project docs live here so humans and agents share the same map.
 | [decisions/0015-cache-friendly-not-cached-yet.md](./decisions/0015-cache-friendly-not-cached-yet.md)                 | Cache headers; caching backlog          |
 | [decisions/0016-queue-message-snapshot.md](./decisions/0016-queue-message-snapshot.md)                               | Queue payload; consumer without D1      |
 | [decisions/0017-cloudflare-api-credentials.md](./decisions/0017-cloudflare-api-credentials.md)                       | Non-prod vs prod API tokens             |
+| [decisions/0018-lead-sink.md](./decisions/0018-lead-sink.md)                                                         | LeadSink; no-op in step 1               |
 
 ## Runbooks
 
-| Path                                                 | Purpose                                 |
-| ---------------------------------------------------- | --------------------------------------- |
-| [runbooks/deploy.md](./runbooks/deploy.md)           | Preview and production deploy           |
-| [runbooks/rollback.md](./runbooks/rollback.md)       | Production rollback                     |
-| [runbooks/test-leads.md](./runbooks/test-leads.md)   | Test leads in Linear and E2E mail check |
-| [runbooks/bootstrap.md](./runbooks/bootstrap.md)     | Launchpad bootstrap workflow            |
-| [runbooks/incident.md](./runbooks/incident.md)       | Incident notes                          |
-| [runbooks/action-pins.md](./runbooks/action-pins.md) | Pinned GitHub Actions                   |
+| Path                                                 | Purpose                                      |
+| ---------------------------------------------------- | -------------------------------------------- |
+| [runbooks/deploy.md](./runbooks/deploy.md)           | Preview and production deploy                |
+| [runbooks/rollback.md](./runbooks/rollback.md)       | Production rollback                          |
+| [runbooks/test-leads.md](./runbooks/test-leads.md)   | Test leads when Linear sink exists; E2E mail |
+| [runbooks/bootstrap.md](./runbooks/bootstrap.md)     | Launchpad bootstrap workflow                 |
+| [runbooks/incident.md](./runbooks/incident.md)       | Incident notes                               |
+| [runbooks/action-pins.md](./runbooks/action-pins.md) | Pinned GitHub Actions                        |
 
 ## Other
 
