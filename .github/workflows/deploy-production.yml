@@ -30,7 +30,6 @@ jobs:
       - name: Prepare Wrangler config (production D1 IDs)
         env:
           WE_MET_D1_DATABASE_ID_PRODUCTION: ${{ vars.WE_MET_D1_DATABASE_ID_PRODUCTION }}
-          WE_MET_D1_DATABASE_ID_NONPROD: ${{ vars.WE_MET_D1_DATABASE_ID_NONPROD }}
         run: |
           set -euo pipefail
           node scripts/prepare-wrangler-config.mjs \

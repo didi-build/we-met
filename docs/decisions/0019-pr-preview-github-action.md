@@ -13,7 +13,8 @@
 - **Do not** use Cloudflare Git integration for previews in this repo.
 - **Fork PRs** skip preview deploy (`head.repo` must equal `github.repository`).
 - **Dependabot** PRs skip preview (`github.actor` is `dependabot[bot]`) because repository secrets are unavailable.
-- On `pull_request: closed`, the same workflow deletes the preview with `wrangler preview delete --name pr-<number>` (cleanup uses the same `if:` guards as deploy; delete tolerates missing previews).
+- On `pull_request: closed`, the same workflow deletes the preview with `wrangler preview delete --name pr-<number>` (cleanup uses the same fork guard as deploy; delete tolerates missing previews).
+- Preview and cleanup jobs use GitHub environment **`preview`** (deploy job sets `environment.url` from the preview URL).
 - Post or update the preview URL in a PR comment tagged with `<!-- we-met-preview -->` (find via GitHub API and PATCH, or create if missing).
 - Commit **`workers_dev`: `false`** and **`preview_urls`: `true`** in `wrangler.jsonc` so production stays on `we-met.link` while previews get workers.dev URLs.
 
@@ -27,9 +28,15 @@ All PR previews bind the **same** remote D1 database **`we-met-db-nonprod`**. Th
 - Fork safety is explicit in GitHub `if:` conditions; Cloudflare tokens are not exposed to fork workflows.
 - Matches [Cloudflare’s PR preview example](https://developers.cloudflare.com/workers/previews/examples/) without requiring Workers Builds for the app repo.
 
+## Why a `preview` environment
+
+- **Deployment history** per PR in GitHub’s Deployments tab (same ergonomics as `production`).
+- **Symmetry:** non-prod secret and variable names map 1:1 to the `preview` environment; production names stay on `production`; no repo-level fallback for preview-only values.
+- **No extra protection by design:** the environment has no required reviewers and no branch restriction, because previews run on every PR push (including `refs/pull/N/merge`) and must not wait for approval. Security for these values is equivalent to repository scope.
+
 ## Consequences
 
-- Repository secrets `CLOUDFLARE_API_TOKEN_NONPROD` and `CLOUDFLARE_ACCOUNT_ID` (non-prod-scoped token) are required for previews.
+- GitHub **`preview` environment** secret `CLOUDFLARE_API_TOKEN_NONPROD` and variables `WE_MET_D1_DATABASE_ID_NONPROD`, `WE_MET_TURNSTILE_SITE_KEY_NONPROD`, plus repository secret `CLOUDFLARE_ACCOUNT_ID`, are required for previews.
 - Operators set shared preview Worker secrets once via `wrangler preview base-config secret` (documented in [deploy.md](../runbooks/deploy.md)).
 - Non-prod Turnstile is bound to the account **workers.dev** subdomain; preview hostnames must stay on workers.dev (not custom preview domains).
 

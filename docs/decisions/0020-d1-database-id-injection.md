@@ -10,15 +10,15 @@
 ## Decision
 
 - **`scripts/prepare-wrangler-config.mjs`** writes a gitignored config at the **repository root** (`wrangler.ci.jsonc` for deploy/preview, `wrangler.d1-nonprod.ci.jsonc` for remote non-prod migrations) by substituting placeholders before `wrangler deploy`, `wrangler preview`, or production D1 migrations. Output must be a direct child of the repo root so Wrangler resolves `main`, `assets.directory`, and `migrations_dir` correctly.
-- **GitHub repository variable** `WE_MET_D1_DATABASE_ID_NONPROD` — used by preview workflow and `npm run db:migrate:remote`.
-- **GitHub `production` environment variable** `WE_MET_D1_DATABASE_ID_PRODUCTION` — used only by the production deploy workflow.
+- **GitHub `preview` environment variable** `WE_MET_D1_DATABASE_ID_NONPROD` — used by the preview workflow; operators export the same value locally for `npm run db:migrate:remote`.
+- **GitHub `production` environment variable** `WE_MET_D1_DATABASE_ID_PRODUCTION` — required for `--target production` (non-prod placeholder may remain in the `previews` block).
 - Deploy-time guards run against the **substituted** config in CI before deploy.
-- If any placeholder UUID remains after substitution, the prepare script **exits non-zero**.
+- **Preview** and **d1-migrate-nonprod** prepare steps fail if the non-prod placeholder remains. **Production** prepare fails only if the production placeholder remains.
 
 ## Reasons
 
 - Variables are not secret; D1 IDs are identifiers, not credentials.
-- Splitting non-prod (repo) vs prod (`production` environment) matches [0017](./0017-cloudflare-api-credentials.md).
+- Splitting non-prod (`preview` environment) vs prod (`production` environment) matches [0017](./0017-cloudflare-api-credentials.md).
 
 ## Consequences
 

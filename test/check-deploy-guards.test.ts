@@ -62,6 +62,34 @@ describe("check-deploy-guards (unit)", () => {
     expect(result.status).toBe(0);
   });
 
+  it("passes production guards on production-prepared config with nonprod placeholder left in", () => {
+    const configPath = `wrangler.guards-test-${process.pid}.ci.jsonc`;
+    const prep = spawnSync(
+      "node",
+      [
+        "scripts/prepare-wrangler-config.mjs",
+        "--target",
+        "production",
+        "--output",
+        configPath,
+      ],
+      {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          WE_MET_D1_DATABASE_ID_PRODUCTION: "11111111-1111-1111-1111-111111111111",
+        },
+      },
+    );
+    expect(prep.status).toBe(0);
+    try {
+      const result = runGuards("production", configPath);
+      expect(result.status).toBe(0);
+    } finally {
+      rmSync(configPath, { force: true });
+    }
+  });
+
   it("fails when previews block references production queue", () => {
     const { path } = writeTempConfig((config) => {
       const previews = config.previews as Record<string, unknown>;

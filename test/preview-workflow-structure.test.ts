@@ -4,6 +4,17 @@ import { describe, expect, it } from "vitest";
 describe("Preview workflow structure (unit)", () => {
   const preview = readFileSync(".github/workflows/preview.yml", "utf8");
 
+  it("both jobs use the preview GitHub environment; deploy job sets deployment url", () => {
+    expect(preview).toMatch(/^\s+environment:\s*$/m);
+    expect(preview).toContain("name: preview");
+    expect(preview).toContain("url: ${{ steps.preview.outputs.preview_url }}");
+    expect(preview).toMatch(/cleanup:[\s\S]*?environment:\s+preview/m);
+  });
+
+  it("does not skip preview or cleanup when a D1 variable is unset", () => {
+    expect(preview).not.toContain("vars.WE_MET_D1_DATABASE_ID_NONPROD !=");
+  });
+
   it("comment lookup trusts only github-actions[bot] comments with the preview marker", () => {
     expect(preview).toContain("github-actions[bot]");
     expect(preview).toMatch(/user\.login == \\"github-actions\[bot\]\\"/);

@@ -11,7 +11,8 @@
  *
  * Environment:
  *   WE_MET_D1_DATABASE_ID_PRODUCTION — required for --target production
- *   WE_MET_D1_DATABASE_ID_NONPROD — required for --target preview and d1-migrate-nonprod
+ *   WE_MET_D1_DATABASE_ID_NONPROD — required for --target preview and d1-migrate-nonprod;
+ *     optional for production (non-prod placeholder may remain in previews block)
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -67,18 +68,6 @@ function replaceD1Ids(text, { productionId, nonprodId }) {
   return out;
 }
 
-function assertNoPlaceholders(text) {
-  if (
-    text.includes(D1_PLACEHOLDER_PRODUCTION) ||
-    text.includes(D1_PLACEHOLDER_NONPROD)
-  ) {
-    console.error(
-      "Wrangler config still contains placeholder D1 database_id values after substitution.",
-    );
-    process.exit(1);
-  }
-}
-
 function buildD1MigrateNonprodConfig(config, nonprodId) {
   const previewD1 = config.previews?.d1_databases?.[0];
   if (!previewD1) {
@@ -108,9 +97,16 @@ function main() {
 
   if (target === "production") {
     const productionId = requireEnv("WE_MET_D1_DATABASE_ID_PRODUCTION");
-    const nonprodId = requireEnv("WE_MET_D1_DATABASE_ID_NONPROD");
-    const text = replaceD1Ids(sourceText, { productionId, nonprodId });
-    assertNoPlaceholders(text);
+    const text = replaceD1Ids(sourceText, { productionId });
+    if (!process.env.WE_MET_D1_DATABASE_ID_NONPROD?.trim()) {
+      console.error(
+        "Warning: WE_MET_D1_DATABASE_ID_NONPROD unset; non-prod placeholder left in file (production deploy uses top-level bindings only).",
+      );
+    }
+    if (text.includes(D1_PLACEHOLDER_PRODUCTION)) {
+      console.error("Failed to substitute production D1 database_id.");
+      process.exit(1);
+    }
     writeFileSync(output, text, "utf8");
     return;
   }

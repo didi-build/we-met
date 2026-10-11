@@ -26,7 +26,6 @@ const prep = spawnSync(
     env: {
       ...process.env,
       WE_MET_D1_DATABASE_ID_PRODUCTION: "11111111-1111-1111-1111-111111111111",
-      WE_MET_D1_DATABASE_ID_NONPROD: "22222222-2222-2222-2222-222222222222",
     },
   },
 );

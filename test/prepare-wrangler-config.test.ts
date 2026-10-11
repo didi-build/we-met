@@ -31,33 +31,29 @@ afterEach(() => {
 });
 
 describe("prepare-wrangler-config (unit)", () => {
-  it("substitutes both D1 IDs for production target", () => {
+  it("substitutes production D1 ID only; leaves nonprod placeholder", () => {
     const output = trackRootOutput(`wrangler.test-${process.pid}.ci.jsonc`);
     const result = runPrepare("production", output, {
       WE_MET_D1_DATABASE_ID_PRODUCTION: "11111111-1111-1111-1111-111111111111",
-      WE_MET_D1_DATABASE_ID_NONPROD: "22222222-2222-2222-2222-222222222222",
     });
     expect(result.status).toBe(0);
     const text = readFileSync(output, "utf8");
     expect(text).toContain("11111111-1111-1111-1111-111111111111");
-    expect(text).toContain("22222222-2222-2222-2222-222222222222");
     expect(text).not.toContain(D1_PLACEHOLDER_PRODUCTION);
-    expect(text).not.toContain(D1_PLACEHOLDER_NONPROD);
+    expect(text).toContain(D1_PLACEHOLDER_NONPROD);
   });
 
-  it("fails production target when a placeholder env var is missing", () => {
+  it("fails production target when production D1 env var is missing", () => {
     const output = trackRootOutput(`wrangler.test-${process.pid}.ci.jsonc`);
-    const result = runPrepare("production", output, {
-      WE_MET_D1_DATABASE_ID_PRODUCTION: "11111111-1111-1111-1111-111111111111",
-    });
+    const result = runPrepare("production", output, {});
     expect(result.status).toBe(1);
+    expect(result.stderr).toContain("WE_MET_D1_DATABASE_ID_PRODUCTION");
   });
 
   it("fails when --output is not a file in the repository root", () => {
     const output = join(tmpdir(), "wrangler-outside-root.jsonc");
     const result = runPrepare("production", output, {
       WE_MET_D1_DATABASE_ID_PRODUCTION: "11111111-1111-1111-1111-111111111111",
-      WE_MET_D1_DATABASE_ID_NONPROD: "22222222-2222-2222-2222-222222222222",
     });
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("repository root");

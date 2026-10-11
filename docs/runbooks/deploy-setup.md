@@ -28,7 +28,6 @@ npm ci
 
 ```bash
 export WE_MET_D1_DATABASE_ID_PRODUCTION='<production-db-uuid>'
-export WE_MET_D1_DATABASE_ID_NONPROD='<nonprod-db-uuid>'
 export NEXT_PUBLIC_TURNSTILE_SITE_KEY='<production-widget-site-key>'
 
 npm run build
@@ -41,6 +40,7 @@ curl -sI https://we-met.link
 ### c. Preview deploy
 
 ```bash
+export WE_MET_D1_DATABASE_ID_NONPROD='<nonprod-db-uuid>'
 export NEXT_PUBLIC_TURNSTILE_SITE_KEY='<nonprod-widget-site-key>'
 
 npm run build
@@ -126,13 +126,15 @@ Details and caveats: [0017](../decisions/0017-cloudflare-api-credentials.md).
 
 ## 3. GitHub secrets and variables
 
-1. Create the **`production`** environment with yourself as a required reviewer. Under **Deployment branches**, choose **Selected branches** and allow **`main` only**.
-2. **Repository secrets:** `CLOUDFLARE_API_TOKEN_NONPROD` (value from `we-met-ci-nonprod`), `CLOUDFLARE_ACCOUNT_ID`.
-3. **`production` environment secret:** `CLOUDFLARE_API_TOKEN_PRODUCTION` (value from `we-met-ci-production`).
-4. **Repository variables:** `WE_MET_D1_DATABASE_ID_NONPROD`, `WE_MET_TURNSTILE_SITE_KEY_NONPROD` (widget **we-met nonprod**).
+1. Create the **`preview`** environment (Settings → Environments → New environment): **no** required reviewers, **no** branch restriction (PR workflows run on `refs/pull/N/merge` and must not wait for approval). Security is equivalent to repository scope for these values; the environment exists for deployment history and symmetry with `production`. Add:
+   - **Secret:** `CLOUDFLARE_API_TOKEN_NONPROD` (value from `we-met-ci-nonprod`)
+   - **Variables:** `WE_MET_D1_DATABASE_ID_NONPROD`, `WE_MET_TURNSTILE_SITE_KEY_NONPROD` (widget **we-met nonprod**)
+2. Create the **`production`** environment with yourself as a required reviewer. Under **Deployment branches**, choose **Selected branches** and allow **`main` only**.
+3. **Repository secret:** `CLOUDFLARE_ACCOUNT_ID` only (used by both workflows).
+4. **`production` environment secret:** `CLOUDFLARE_API_TOKEN_PRODUCTION` (value from `we-met-ci-production`).
 5. **`production` environment variables:** `WE_MET_D1_DATABASE_ID_PRODUCTION`, `WE_MET_TURNSTILE_SITE_KEY_PRODUCTION` (widget **we-met production**).
 
-Remove or rename any legacy unsuffixed `CLOUDFLARE_API_TOKEN` secrets. Do **not** duplicate `CLOUDFLARE_ACCOUNT_ID` on the production environment unless you intentionally use a different account (the repo uses one repo-level `CLOUDFLARE_ACCOUNT_ID` for both workflows).
+Remove or rename any legacy unsuffixed `CLOUDFLARE_API_TOKEN` secrets. Do **not** duplicate `CLOUDFLARE_ACCOUNT_ID` on the `preview` or `production` environments unless you intentionally use a different account (the repo uses one repo-level `CLOUDFLARE_ACCOUNT_ID` for both workflows).
 
 ## 4. Guard failure demos (throwaway branch)
 
