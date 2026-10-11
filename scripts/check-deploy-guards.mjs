@@ -170,6 +170,14 @@ function checkPreviewBlock(previews) {
     fail('previews.vars.WE_MET_ENV must be "preview"');
   }
 
+  const previewHostSuffix = previewVars?.WE_MET_PREVIEW_HOST_SUFFIX ?? "";
+  if (!previewHostSuffix.trim()) {
+    fail("previews.vars.WE_MET_PREVIEW_HOST_SUFFIX must be non-empty");
+  }
+  if (!previewHostSuffix.startsWith("-we-met.")) {
+    fail('previews.vars.WE_MET_PREVIEW_HOST_SUFFIX must start with "-we-met."');
+  }
+
   assertEveryPreviewD1(
     previews,
     (row) => row.database_name === NONPROD_RESOURCE_MARKERS.d1Name,
@@ -198,6 +206,13 @@ function checkProductionBlock(config) {
   }
   if (config.vars?.WE_MET_ENV !== "production") {
     fail('top-level WE_MET_ENV must be "production"');
+  }
+
+  const productionHostSuffix = config.vars?.WE_MET_PREVIEW_HOST_SUFFIX ?? "";
+  if (productionHostSuffix !== "") {
+    fail(
+      'top-level vars.WE_MET_PREVIEW_HOST_SUFFIX must be "" (preview suffix lives in previews.vars only)',
+    );
   }
 
   const d1Rows = config.d1_databases ?? [];

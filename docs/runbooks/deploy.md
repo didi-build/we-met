@@ -43,6 +43,8 @@ npm run worker:dry-run
 npm run worker:dry-run:generated
 ```
 
+Card data load (local / remote non-prod / production): [card-loading.md](./card-loading.md).
+
 Proof deploys before first CI run: [deploy-setup.md](./deploy-setup.md) (maintainer `wrangler login` first, then CI tokens).
 
 ## GitHub configuration
