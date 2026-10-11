@@ -81,11 +81,13 @@ The consumer Worker registers on the queue in **its own** Wrangler config; it is
 
 **GitHub Actions secrets**
 
-| Name                              | Scope                                                                                                         |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `CLOUDFLARE_API_TOKEN_NONPROD`    | Repository secret — **non-prod** token for previews ([0017](../decisions/0017-cloudflare-api-credentials.md)) |
-| `CLOUDFLARE_ACCOUNT_ID`           | Repository secret — used by preview and production workflows                                                  |
-| `CLOUDFLARE_API_TOKEN_PRODUCTION` | **`production` environment** secret only — production-scoped token                                            |
+| Name                              | Scope                                                                                                                                                                 |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CLOUDFLARE_API_TOKEN_NONPROD`    | Repository secret — dashboard token **`we-met-ci-nonprod`**: Workers **Editor** on Worker **`we-met`** only ([0017](../decisions/0017-cloudflare-api-credentials.md)) |
+| `CLOUDFLARE_ACCOUNT_ID`           | Repository secret — used by preview and production workflows                                                                                                          |
+| `CLOUDFLARE_API_TOKEN_PRODUCTION` | **`production` environment** secret — **`we-met-ci-production`**: Workers **Editor** on **`we-met`** plus **D1 Edit** for migrations                                  |
+
+Create tokens after the maintainer proof deploy ([deploy-setup.md](../runbooks/deploy-setup.md)). D1/R2/Queues API permissions are account-level until Cloudflare offers resource scopes; add R2/Queues only if CI returns a named 403. Never use **Admin** to fix permission errors.
 
 Never use org-wide **`BOOTSTRAP_TOKEN`** for We Met deploys.
 

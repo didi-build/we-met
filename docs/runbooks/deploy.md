@@ -43,9 +43,11 @@ npm run worker:dry-run
 npm run worker:dry-run:generated
 ```
 
-Proof deploys before first CI run: [deploy-setup.md](./deploy-setup.md).
+Proof deploys before first CI run: [deploy-setup.md](./deploy-setup.md) (maintainer `wrangler login` first, then CI tokens).
 
 ## GitHub configuration
+
+CI Cloudflare tokens use **Workers Editor** scoped to Worker **`we-met`** ([0017](../decisions/0017-cloudflare-api-credentials.md)): `we-met-ci-nonprod` → `CLOUDFLARE_API_TOKEN_NONPROD`; `we-met-ci-production` → `CLOUDFLARE_API_TOKEN_PRODUCTION` plus **D1 Edit** for production migrations. No zone permissions after the proof deploy attaches `we-met.link`. Add permissions only when a 403 names them.
 
 | Name                                   | Where                             | Used by                                          |
 | -------------------------------------- | --------------------------------- | ------------------------------------------------ |
@@ -57,7 +59,7 @@ Proof deploys before first CI run: [deploy-setup.md](./deploy-setup.md).
 | `WE_MET_TURNSTILE_SITE_KEY_NONPROD`    | Repository variable               | Preview build                                    |
 | `WE_MET_TURNSTILE_SITE_KEY_PRODUCTION` | `production` environment variable | Production build                                 |
 
-Worker secrets (`WE_MET_TOKEN_SECRET`, `TURNSTILE_SECRET_KEY`): **Previews base** (non-prod values) via `wrangler preview base-config secret put …`; production Worker via `wrangler secret put …` (production token). See [0017](../decisions/0017-cloudflare-api-credentials.md).
+Worker secrets (`WE_MET_TOKEN_SECRET`, `TURNSTILE_SECRET_KEY`): set during the maintainer proof deploy in [deploy-setup.md](./deploy-setup.md) (`wrangler login`, then `wrangler secret put` / `wrangler preview base-config secret put`).
 
 ## Verification
 
