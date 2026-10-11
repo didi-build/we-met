@@ -1,10 +1,10 @@
-# Architecture overview — {{PROJECT_NAME}}
+# Architecture overview — We Met
 
 Replace this file with your system’s architecture. Keep it short; link to deeper docs as the project grows.
 
 ## Purpose
 
-{{PROJECT_PURPOSE}}
+Digital business cards: share your contact details in one tap and swap contacts at events, no app needed.
 
 ## Boundaries
 
