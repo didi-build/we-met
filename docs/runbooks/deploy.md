@@ -12,7 +12,7 @@
 
 - **Trigger:** [DIDI-572](https://linear.app/didi-build/issue/DIDI-572) chooses Cloudflare Git integration vs a GitHub Action. Forks do not get deploy access.
 - **Touches:** Preview instance on **`we-met-staging`**; `we-met-followup-email-nonprod`; separate **`we-met-followup-email-consumer-nonprod`**; non-prod rate limiter; always-pass Turnstile test pair; shared Linear test project; mail redirect hardwired in the non-prod consumer.
-- **Verify:** Open the preview URL, load `/p/didi`, submit a test exchange; confirm test lead in Linear ([test-leads.md](./test-leads.md)).
+- **Verify:** Open the preview URL, load `/p/didi`, submit a test exchange; confirm test lead in Linear ([test-leads.md](./test-leads.md)). Links in redirected test emails point at staging (`WE_MET_BASE_URL`) by design.
 
 ## Staging (from `main`)
 

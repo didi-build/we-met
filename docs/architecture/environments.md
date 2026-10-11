@@ -29,7 +29,7 @@ Whether previews are triggered by Cloudflare Git integration or a GitHub Action 
 
 **UNVERIFIED:** whether an OpenNext build runs under `wrangler preview`. [DIDI-572](https://linear.app/didi-build/issue/DIDI-572) starts with a proof: one PR gets a preview URL, a form submission reaches the non-prod queue, and a test email arrives at the test address.
 
-Previews are created under the **staging** Worker (`we-met-staging`; `previews` block in that Wrangler environment). Each preview uses non-prod bindings only.
+Previews are created under the **staging** Worker (`we-met-staging`; `previews` block in that Wrangler environment). Each preview uses non-prod bindings only. **`WE_MET_BASE_URL` in that block is the staging origin** (`https://we-met.didi.build`), so links in test emails, the vCard URL field, and canonical/OG URLs from a preview point at staging, not the PR preview hostname. The preview hostname still serves the card via lookup configuration.
 
 ## Deploy-time guards
 
@@ -45,22 +45,22 @@ CI/deploy ([DIDI-572](https://linear.app/didi-build/issue/DIDI-572)) **must fail
 
 Values live in GitHub Environments, the Cloudflare dashboard, or local `.env`. **Names only** (values differ per environment where noted).
 
-| Name                             | Where used                  | Notes                                                     |
-| -------------------------------- | --------------------------- | --------------------------------------------------------- |
-| `WE_MET_ENV`                     | App Worker, consumer        | `local` \| `preview` \| `staging` \| `production`         |
-| `WE_MET_BASE_URL`                | App Worker, consumer        | Email links and footers are built from it                 |
-| `WE_MET_TOKEN_SECRET`            | App Worker                  | Signs the details-step token                              |
-| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Build time (browser bundle) | Public; only `NEXT_PUBLIC_*` vars reach the client        |
-| `TURNSTILE_SECRET_KEY`           | App Worker                  | Server-side Turnstile verify                              |
-| `LINEAR_API_KEY`                 | App Worker, consumer        | Non-prod → shared test project; prod → production project |
-| `LINEAR_TEAM_ID`                 | App Worker, consumer        | Per-environment value                                     |
-| `LINEAR_PROJECT_ID`              | App Worker, consumer        | Non-prod → shared test project                            |
-| `LINEAR_LEAD_LABEL_ID`           | App Worker, consumer        | Includes `we-met-test-lead` on non-prod                   |
-| `GMAIL_SERVICE_ACCOUNT_JSON`     | Consumer                    | Gmail API credentials                                     |
-| `GMAIL_SENDER`                   | Consumer                    | From address for Gmail API                                |
-| `LEAD_NOTIFY_TO`                 | Consumer                    | Owner inbox for lead notifications                        |
-| `WE_MET_TEST_MAIL_TO`            | Consumer                    | **Non-prod only:** all outbound mail redirected here      |
-| `BOOKING_URL`                    | App Worker                  | Public booking link in the card flow                      |
+| Name                             | Where used                  | Notes                                                                                                                                                  |
+| -------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `WE_MET_ENV`                     | App Worker, consumer        | `local` \| `preview` \| `staging` \| `production`                                                                                                      |
+| `WE_MET_BASE_URL`                | App Worker, consumer        | Email links and footers are built from it. On previews: staging origin `https://we-met.didi.build` (set in the previews block with other preview vars) |
+| `WE_MET_TOKEN_SECRET`            | App Worker                  | Signs the details-step token                                                                                                                           |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Build time (browser bundle) | Public; only `NEXT_PUBLIC_*` vars reach the client                                                                                                     |
+| `TURNSTILE_SECRET_KEY`           | App Worker                  | Server-side Turnstile verify                                                                                                                           |
+| `LINEAR_API_KEY`                 | App Worker, consumer        | Non-prod → shared test project; prod → production project                                                                                              |
+| `LINEAR_TEAM_ID`                 | App Worker, consumer        | Per-environment value                                                                                                                                  |
+| `LINEAR_PROJECT_ID`              | App Worker, consumer        | Non-prod → shared test project                                                                                                                         |
+| `LINEAR_LEAD_LABEL_ID`           | App Worker, consumer        | Non-prod: the ID of the `we-met-test-lead` label (it replaces the normal lead label). Production: the production lead label.                           |
+| `GMAIL_SERVICE_ACCOUNT_JSON`     | Consumer                    | Gmail API credentials                                                                                                                                  |
+| `GMAIL_SENDER`                   | Consumer                    | From address for Gmail API                                                                                                                             |
+| `LEAD_NOTIFY_TO`                 | Consumer                    | Owner inbox for lead notifications                                                                                                                     |
+| `WE_MET_TEST_MAIL_TO`            | Consumer                    | **Non-prod only:** all outbound mail redirected here                                                                                                   |
+| `BOOKING_URL`                    | App Worker                  | Public booking link in the card flow                                                                                                                   |
 
 **Wrangler bindings (app Worker: `we-met-staging` or `we-met`)**
 

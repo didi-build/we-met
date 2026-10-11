@@ -14,7 +14,7 @@ Cards need stable shareable links, support for a default host now and custom dom
 - Default card path: **`/p/<slug>`** on the configured host (planned production host: `we-met.link`).
 - **Step 1 legacy mapping in this app:** `/hi` → `/p/didi`; `/hi/contact.vcf` → `/p/didi/contact.vcf`; `/api/hi/*` unchanged. **`didi.build` is not redirected in step 1.**
 - **Lookup order:** hostname → path (`/p/<slug>`) → card record. Step 1 has **one** card (`didi`). Preview and staging hosts resolve to that card through **configuration**, never hardcoded hostnames.
-- **`WE_MET_BASE_URL`** (one value per environment) is the canonical origin for links in code and email.
+- **`WE_MET_BASE_URL`** (one value per environment) is the canonical origin for links in code and email. It is **never** derived from the incoming request host (that would let a caller choose links in outgoing email); it is always a configured value.
 
 ## Reasons
 
