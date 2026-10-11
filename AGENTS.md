@@ -23,13 +23,13 @@ Do not break these; each links to the canonical doc.
 - **Card images** enter only through the single image ingestion function; nothing else writes to R2: [0012](docs/decisions/0012-r2-images-single-ingestion.md).
 - **No public write endpoints** in step 1 (no API to create or update cards): [0010](docs/decisions/0010-card-data-d1-and-load-script.md).
 - **No personal card data or card images** in git; load from gitignored files per environment: [0010](docs/decisions/0010-card-data-d1-and-load-script.md).
-- **Docs:** write “verified” only with evidence from a named run or command and its date; otherwise keep the note UNVERIFIED. Production-only findings go as a comment on the Linear ticket (convention: comment on DIDI-564); open a docs change only when a documented claim is wrong.
 
 ## Engineering standards
 
 - Prefer clean, modular boundaries; small extensions over clever hacks; readable names; minimal duplication.
 - Follow this repo’s docs and config over your general habits.
 - Mark unknowns as unknown. Do not guess requirements or infrastructure.
+- **Docs:** write “verified” only with evidence from a named run or command and its date; otherwise keep the note UNVERIFIED. Production-only findings go as a comment on the Linear ticket (convention: comment on DIDI-564); open a docs change only when a documented claim is wrong.
 
 ## Testing
 
