@@ -16,7 +16,8 @@ jobs:
   preview:
     if: >-
       github.event.action != 'closed' &&
-      github.event.pull_request.head.repo.full_name == github.repository
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      vars.WE_MET_D1_DATABASE_ID_NONPROD != ''
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
