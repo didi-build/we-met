@@ -9,9 +9,9 @@ Preview and staging run real code paths that enqueue email and create Linear iss
 
 ## Decision
 
-- **Preview** and **staging** share one **non-prod queue** (`we-met-email-queue-nonprod`) and **non-prod consumer** (`we-met-email-consumer-nonprod`).
+- **Preview** and **staging** share one **non-prod queue** (`we-met-followup-email-nonprod`) and **non-prod consumer** (`we-met-followup-email-consumer-nonprod`).
 - The non-prod consumer **redirects all outbound mail** to **`WE_MET_TEST_MAIL_TO`**.
-- Linear issues created from non-prod are **automatically marked as test leads** (label + title prefix + environment metadata)—see [test-leads.md](../runbooks/test-leads.md).
+- All non-prod Linear leads go to the **one shared test project**, marked with label **`we-met-test-lead`**, title prefix **`[we-met-test]`**, and **`WE_MET_ENV`** in the issue description—see [test-leads.md](../runbooks/test-leads.md).
 - PR environments use **Cloudflare Previews**, not ad hoc version URLs on production workers.
 
 ## Reasons

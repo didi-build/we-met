@@ -1,23 +1,23 @@
 # Test leads in Linear
 
-**Purpose:** Non-prod runs create real Linear issues with safe mail. Recognize them, clean up after tests, and run a deliberate end-to-end check.
+**Purpose:** Non-prod runs create issues in the **one shared Linear test project** with safe mail. Recognize them, clean up after tests, and run a deliberate end-to-end check.
 
 ## How to recognize a test lead
 
-A non-prod exchange should create an issue with **all** of:
+Every non-prod exchange should create an issue with **all** of:
 
-| Signal           | What to look for                                                                      |
-| ---------------- | ------------------------------------------------------------------------------------- |
-| **Label**        | `we-met-test` (or the env-specific test label configured for non-prod)                |
-| **Title prefix** | `[we-met test]` at the start of the title                                             |
-| **Environment**  | Field or comment metadata showing `preview`, `staging`, or `local` — not `production` |
+| Signal           | What to look for                                                                                         |
+| ---------------- | -------------------------------------------------------------------------------------------------------- |
+| **Label**        | `we-met-test-lead`                                                                                       |
+| **Title prefix** | `[we-met-test]` at the start of the title                                                                |
+| **Environment**  | `WE_MET_ENV` value (`local`, `preview`, or `staging`) recorded in the issue description—not `production` |
 
-If any signal is missing on a issue you believe came from non-prod, treat it as suspicious and check deploy bindings ([environments.md](../architecture/environments.md)).
+If any signal is missing on an issue you believe came from non-prod, treat it as suspicious and check deploy bindings ([environments.md](../architecture/environments.md)).
 
 ## Cleanup
 
-1. In Linear, filter by label `we-met-test` (and your team).
-2. Confirm the environment metadata is non-prod.
+1. In Linear, filter by label `we-met-test-lead` in the shared test project.
+2. Confirm the description includes a non-prod `WE_MET_ENV`.
 3. Archive or delete test issues after the test session. Do not merge test leads into production reporting.
 
 ## Deliberate end-to-end email test
@@ -25,10 +25,13 @@ If any signal is missing on a issue you believe came from non-prod, treat it as 
 Use this after changing the mail or consumer path:
 
 1. Deploy to **staging** or open a **PR preview** (non-prod bindings only).
-2. Submit the card form with Turnstile test keys (use obvious fake contact details).
-3. Confirm the browser gets success and a job lands on the **non-prod** queue.
-4. Check **`WE_MET_TEST_MAIL_TO`** inbox for both sides of the exchange email (redirected from real addresses).
-5. Confirm a new Linear issue with test label and title prefix.
-6. Run [cleanup](#cleanup) when done.
+2. Submit the exchange form with obvious fake contact details.
+   - **Preview or local:** Turnstile uses Cloudflare’s always-pass **test key pair** (widget auto-passes).
+   - **Staging:** complete the **real** Turnstile challenge (real keys for `we-met.didi.build`).
+3. Confirm exchange returns **200** and a non-empty signed token; optional details step returns **200**.
+4. Confirm jobs on **`we-met-followup-email-nonprod`**.
+5. Check **`WE_MET_TEST_MAIL_TO`** for redirected visitor and owner mail.
+6. Confirm a new Linear issue in the **test project** with label `we-met-test-lead`, title prefix `[we-met-test]`, and `WE_MET_ENV` in the description.
+7. Run [cleanup](#cleanup) when done.
 
-Production E2E to real inboxes is out of scope for routine testing; use staging and the test address only.
+Routine testing does not send mail to production inboxes; use non-prod environments and `WE_MET_TEST_MAIL_TO` only.

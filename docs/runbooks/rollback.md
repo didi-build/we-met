@@ -6,7 +6,7 @@
 
 - Card or API errors affecting real visitors on `we-met.link`.
 - Production mail or Linear creation failing after a production deploy.
-- Wrong bindings detected (e.g. non-prod queue on production)—treat as incident and rollback immediately.
+- Wrong bindings detected (e.g. `we-met-followup-email-nonprod` on production)—treat as incident and rollback immediately.
 
 ## Steps
 

@@ -11,7 +11,7 @@ Step 1 is one card; multi-user needs per-card fields and visual variants without
 
 - **Card data seam** supplies all per-card fields (contact info, slug, variant, footer link, etc.).
 - **Brand variants** are a **closed set:** `green` and `mono`, stored on the card record.
-- **Colors** exist only in **theme token files**; UI uses tokens, not raw color literals.
+- **Colors** exist only under **`src/theme/tokens/`** (e.g. `green.light.css`, `green.dark.css`; `mono.*` later). UI uses tokens, not raw color literals. A **`theme-colors`** check (to be added) will fail `npm run check` if color literals appear outside that folder.
 - User-editable text in email and UI is **plain text**, escaped at output boundaries.
 
 ## Reasons

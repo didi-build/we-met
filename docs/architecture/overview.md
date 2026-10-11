@@ -41,36 +41,52 @@ Legacy `/hi` on `didi.build` is redirected after cutover; that redirect lives ou
 ## Theming
 
 - **Variants:** closed set `green` and `mono`, chosen per card in card data.
-- **Colors:** only in theme token files (CSS variables / token modules). Components reference tokens, not raw hex or RGB.
+- **Colors:** only under `src/theme/tokens/` (e.g. `green.light.css`, `green.dark.css`; `mono.*` later). Components use CSS variables from those files, not raw hex or RGB. A `theme-colors` check (to be added) will reject color literals outside that folder as part of `npm run check`.
 - **Per-card copy:** footer link and similar fields live on the card record, not in shared layout code.
 
 ## Pipeline flow
 
+**Protections (exchange path):** Cloudflare Turnstile; honeypot (`website` field—non-empty is treated as a bot); per-IP rate limit (10 requests per 60 seconds via `WE_MET_EXCHANGE_RATE_LIMITER`); signed short-lived token for the details step (2 hour TTL); one recipient per submission for visitor email.
+
 ```mermaid
 sequenceDiagram
   participant V as Visitor browser
-  participant W as We Met Worker
-  participant Q as Email queue
-  participant C as Queue consumer
+  participant M as we-met Worker
   participant L as Linear
-  participant M as Mail provider
+  participant Q as we-met-followup-email queue
+  participant C as we-met-followup-email-consumer
 
-  V->>W: POST /api/hi/* (form + Turnstile)
-  W->>W: Validate, escape plain text, build job
-  W->>Q: Enqueue send job
-  W-->>V: Success or error response
-  Q->>C: Deliver job
-  C->>M: Send email(s)
-  C->>L: Create lead issue
+  V->>M: POST /api/hi/exchange (Turnstile + form)
+  M->>M: Turnstile, honeypot, rate limit
+  M->>L: Create lead
+  M->>Q: Enqueue visitor_followup, owner_lead
+  M-->>V: 200 + signed token (2h TTL)
+
+  V->>M: POST /api/hi/details (token + fields)
+  M->>L: Comment on lead (details)
+  M->>Q: Enqueue owner_details (best effort)
+  M-->>V: 200
+
+  Q->>C: Deliver jobs
+  C->>C: Gmail API: visitor vCard follow-up (one recipient); owner notifications
 ```
+
+The **consumer** Worker (`we-met-followup-email-consumer` or `-nonprod`) registers on the queue in its own Wrangler config; it is not a binding on the main Worker.
 
 **Failure handling**
 
-- **Validation / Turnstile failure:** 4xx to the browser; nothing enqueued.
-- **Enqueue failure:** 5xx to the browser; no email and no Linear issue (client may retry).
-- **Consumer / provider failure:** message retries per queue policy; dead-letter or alert is configured on the `we-met-*` queue (operational detail in runbooks). Partial success (email sent, Linear failed) is logged; operators reconcile via [test leads](../runbooks/test-leads.md) patterns.
+| Condition                              | Behavior                                                                  |
+| -------------------------------------- | ------------------------------------------------------------------------- |
+| Honeypot filled (`website` non-empty)  | Fake **200**, empty token; nothing created in Linear or the queue         |
+| Turnstile fails                        | **403**                                                                   |
+| Rate limited                           | **429**                                                                   |
+| Linear create fails                    | **500**, generic message to client                                        |
+| Enqueue fails after Linear lead exists | **500**; Linear comment that the follow-up email could not be queued      |
+| Visitor email fails after 5 attempts   | Linear comment on the lead; message acknowledged                          |
+| Owner email fails                      | Retry with backoff; acknowledge after max attempts; **no** Linear comment |
+| Details enqueue fails                  | Logged only; **details** response is still **200**                        |
 
-Non-production environments never deliver mail to real inboxes; see [0006](../decisions/0006-non-prod-safety.md) and [environments](./environments.md).
+Non-production mail is redirected on the consumer; see [0006](../decisions/0006-non-prod-safety.md) and [environments](./environments.md).
 
 ## Environments
 
