@@ -2,20 +2,20 @@
 
 Three environments share one codebase. Worker name is always **`we-met`**: production bindings at the top level of Wrangler config, **non-prod bindings** in the **`previews`** block (previews do not inherit production settings). **Non-prod never uses the production queue, consumer, rate limiter namespace, D1 database, or R2 bucket.**
 
-|                     | **Local**                                                          | **Preview**                                                                          | **Production**                                                                                      |
-| ------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
-| **Purpose**         | Developer machine                                                  | Per-PR smoke on Cloudflare                                                           | Live card(s) on `we-met.link`                                                                       |
-| **Deploy**          | `npm run dev`                                                      | Cloudflare Preview per PR ([DIDI-572](https://linear.app/didi-build/issue/DIDI-572)) | Merge to `main` + GitHub `production` approval ([deploy runbook](../runbooks/deploy.md))            |
-| **Hostname**        | `localhost`                                                        | Preview URL (`*.workers.dev` or custom preview host)                                 | `we-met.link` (and later `app.we-met.link` for auth — [0013](../decisions/0013-future-app-host.md)) |
-| **App Worker**      | `we-met` config with non-prod bindings when using remote resources | `we-met` preview instance (non-prod bindings only)                                   | `we-met` (production bindings)                                                                      |
-| **D1**              | `we-met-db-nonprod` (local emulation or remote)                    | `we-met-db-nonprod`                                                                  | `we-met-db`                                                                                         |
-| **R2**              | `we-met-assets-nonprod`                                            | `we-met-assets-nonprod`                                                              | `we-met-assets`                                                                                     |
-| **Follow-up queue** | Optional / mock                                                    | `we-met-followup-email-nonprod`                                                      | `we-met-followup-email`                                                                             |
-| **Consumer Worker** | Local stub or skipped                                              | `we-met-followup-email-consumer-nonprod`                                             | `we-met-followup-email-consumer`                                                                    |
-| **Rate limiter**    | Non-prod namespace                                                 | Non-prod namespace (`WE_MET_EXCHANGE_RATE_LIMITER` in preview block)                 | Production namespace                                                                                |
-| **Mail delivery**   | Redirect via `WE_MET_TEST_MAIL_TO`                                 | Same                                                                                 | Real addresses (`LEAD_NOTIFY_TO` for owner)                                                         |
-| **Lead sink**       | No-op (`kind: "none"` on card)                                     | Same                                                                                 | Same until Linear sink before cutover ([0018](../decisions/0018-lead-sink.md))                      |
-| **Turnstile**       | Cloudflare **always-pass test key pair** (site + secret)           | Same test pair                                                                       | Real keys for `we-met.link` (covers `app.we-met.link`)                                              |
+|                     | **Local**                                                                                    | **Preview**                                                                          | **Production**                                                                                      |
+| ------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
+| **Purpose**         | Developer machine                                                                            | Per-PR smoke on Cloudflare                                                           | Live card(s) on `we-met.link`                                                                       |
+| **Deploy**          | `npm run dev`                                                                                | Cloudflare Preview per PR ([DIDI-572](https://linear.app/didi-build/issue/DIDI-572)) | Merge to `main` + GitHub `production` approval ([deploy runbook](../runbooks/deploy.md))            |
+| **Hostname**        | `localhost`                                                                                  | Preview URL (`*.workers.dev` or custom preview host)                                 | `we-met.link` (and later `app.we-met.link` for auth — [0013](../decisions/0013-future-app-host.md)) |
+| **App Worker**      | `we-met` config with non-prod bindings when using remote resources                           | `we-met` preview instance (non-prod bindings only)                                   | `we-met` (production bindings)                                                                      |
+| **D1**              | `we-met-db-nonprod` (local emulation or remote)                                              | `we-met-db-nonprod`                                                                  | `we-met-db`                                                                                         |
+| **R2**              | `we-met-assets-nonprod`                                                                      | `we-met-assets-nonprod`                                                              | `we-met-assets`                                                                                     |
+| **Follow-up queue** | Optional / mock                                                                              | `we-met-followup-email-nonprod`                                                      | `we-met-followup-email`                                                                             |
+| **Consumer Worker** | Local stub or skipped                                                                        | `we-met-followup-email-consumer-nonprod`                                             | `we-met-followup-email-consumer`                                                                    |
+| **Rate limiter**    | Non-prod namespace                                                                           | Non-prod namespace (`WE_MET_EXCHANGE_RATE_LIMITER` in preview block)                 | Production namespace                                                                                |
+| **Mail delivery**   | Redirect via `WE_MET_TEST_MAIL_TO`                                                           | Same                                                                                 | Real visitor/owner addresses via Gmail API (no `LEAD_NOTIFY_TO` env)                                |
+| **Lead sinks**      | `lead_sinks` rows; **no implementations** in step 1 ([0018](../decisions/0018-lead-sink.md)) | Same                                                                                 | Same until step 2 sink kinds ship                                                                   |
+| **Turnstile**       | Cloudflare **always-pass test key pair** (site + secret)                                     | Same test pair                                                                       | Real keys for `we-met.link` (covers `app.we-met.link`)                                              |
 
 Use the test site key and test secret together on local and preview: a production secret rejects the dummy token from the test widget.
 
@@ -42,11 +42,9 @@ CI/deploy ([DIDI-572](https://linear.app/didi-build/issue/DIDI-572)) **must fail
 - The non-prod email **redirect is disabled** or misconfigured (consumer would send to real addresses).
 - `WE_MET_ENV` is `production` without the GitHub **`production`** environment.
 
-When the **Linear lead sink** is enabled, add guards so non-prod never uses production Linear project credentials (validate **`LINEAR_PROJECT_ID`** for sink-backed cards).
-
 ## Config and secret names
 
-Values live in GitHub Environments, the Cloudflare dashboard, or local `.env`. **Names only** (values differ per environment where noted).
+Values live in GitHub Environments, the Cloudflare dashboard, or local `.env`. **Names only** (values differ per environment where noted). **Platform-owned Worker secrets** for step 1:
 
 | Name                             | Where used                  | Notes                                                                            |
 | -------------------------------- | --------------------------- | -------------------------------------------------------------------------------- |
@@ -55,20 +53,12 @@ Values live in GitHub Environments, the Cloudflare dashboard, or local `.env`. *
 | `WE_MET_TOKEN_SECRET`            | App Worker                  | Signs the details-step token                                                     |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Build time (browser bundle) | Public; only `NEXT_PUBLIC_*` vars reach the client                               |
 | `TURNSTILE_SECRET_KEY`           | App Worker                  | Server-side Turnstile verify                                                     |
-| `GMAIL_SERVICE_ACCOUNT_JSON`     | Consumer                    | Gmail API credentials                                                            |
+| `GMAIL_SERVICE_ACCOUNT_JSON`     | Consumer                    | Gmail API credentials (follow-up email)                                          |
 | `GMAIL_SENDER`                   | Consumer                    | From address for Gmail API                                                       |
-| `LEAD_NOTIFY_TO`                 | Consumer                    | Owner inbox for lead notifications                                               |
 | `WE_MET_TEST_MAIL_TO`            | Consumer                    | **Non-prod only:** all outbound mail redirected here                             |
 | `BOOKING_URL`                    | App Worker                  | Public booking link in the card flow                                             |
 
-**Linear sink implementation (later)** — not used in step 1 ([0018](../decisions/0018-lead-sink.md)). Worker secrets for the Linear `LeadSink` only:
-
-| Name                   | Where used | Notes                                                |
-| ---------------------- | ---------- | ---------------------------------------------------- |
-| `LINEAR_API_KEY`       | App Worker | Linear API access for the sink implementation        |
-| `LINEAR_TEAM_ID`       | App Worker | Per-environment value                                |
-| `LINEAR_PROJECT_ID`    | App Worker | Non-prod → shared test project; prod → production    |
-| `LINEAR_LEAD_LABEL_ID` | App Worker | Non-prod: `we-met-test-lead` label when sink enabled |
+Lead sink destinations (Linear project IDs, owner email addresses, etc.) live in **`lead_sinks.config`** per card, not in Worker env. OAuth **`connectionId`** references a future **`connections`** table ([0018](../decisions/0018-lead-sink.md)). There is **no** `LEAD_NOTIFY_TO` or **`LINEAR_*`** Worker variable.
 
 **Wrangler bindings (app Worker `we-met`)**
 

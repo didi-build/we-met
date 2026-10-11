@@ -1,4 +1,4 @@
-# 0018. LeadSink: per-card destination, no-op in step 1
+# 0018. Lead sinks: list per card, async dispatch, no implementations in step 1
 
 - **Status:** accepted
 - **Date:** 2026-10-11
@@ -6,26 +6,27 @@
 
 ## Context
 
-The exchange pipeline must record leads somewhere, but **Linear is not part of step 1**. Cutover ([DIDI-566](https://linear.app/didi-build/issue/DIDI-566)) requires a real lead sink merged **before** go-live.
+Card owners will send leads to **multiple destinations** (Linear, email, later Jira, Zapier, webhooks). Step 1 must model that in D1 and the pipeline **without** shipping working sinks. **Linear is not in step 1**; email and Linear sinks land in **step 2**. Auth for Linear is **per-user OAuth** with accounts (step 3, `app.we-met.link`) — not Worker-level `LINEAR_API_KEY`.
 
 ## Decision
 
-- **`LeadSink` interface** (app-owned seam), with three operations:
-  - **Record a lead** (exchange submit).
-  - **Append details** (details step).
-  - **Note an email failure** (consumer or app when follow-up mail cannot be sent).
-- **Resolution:** build a sink instance **per card** from **lead destination** on the card record: a **`kind`** plus **non-secret config** (JSON). **Credentials** for a given implementation stay **Worker secrets** owned by that implementation, not on the card row.
-- **Step 1:** only a **no-op sink** (`kind: "none"`) ships. It is used in **preview and production** until a **Linear** implementation lands in a follow-up ticket. The no-op **never fails**.
-- **Errors:** any **real** sink failure fails the request with **500** so a lead is never silently lost. The exchange path records the lead **before** enqueue; if enqueue fails after a successful record, the handler returns **500** and calls **note an email failure** when the sink supports it.
+- Each card has a **list** of lead sinks (not a single destination field on `cards`).
+- **`lead_sinks` table:** `id`, `card_id`, `kind`, `config` (JSON text), `enabled`, `created_at`, `updated_at`. One row per sink. No per-kind config tables.
+- **`config`:** non-secret settings only, validated per **`kind`** on every read and write through the **card-data seam** (typed objects in app code; nothing outside the repo sees raw JSON). Examples: `email` → `{ "to": "…" }`; `linear` → `{ "projectId", "labelId", "connectionId" }`.
+- **Credentials** never live in `config`. Auth uses **`connectionId`** referencing a future **`connections`** table (accounts / step 3). Do not design that table in step 1; document the reference only.
+- Every **`kind`** implements the same **`LeadSink`** interface: **record lead**, **append details**, **note delivery failure**.
+- **Dispatcher:** on exchange (and details where applicable), enqueue **one queue message per enabled sink** so each delivery has its own retries; **one failing sink never blocks or duplicates another** (same idea as separate visitor vs owner email jobs in `didi-build/web`). The **visitor follow-up email** remains its **own** message, independent of lead sinks.
+- **Step 1:** ship the table, interface, and dispatcher. **No sink implementations** and **no `"none"` kind**. A card with **zero enabled sinks** sends leads nowhere; **exchange still succeeds**.
+- **Step 2:** email sink and Linear sink implementations (not this ticket).
 
 ## Reasons
 
-- Per-card destination supports multi-tenant sinks later without hardcoding one CRM.
-- No-op unblocks step 1 deploy and email testing without Linear credentials on the Worker.
-- Fail-closed behavior matches the old Linear contract without binding step 1 to Linear.
+- A list model matches owner choice of multiple CRMs and channels.
+- Async per-sink messages isolate failure and retry domains.
+- Step 1 schema and dispatcher avoid a rewrite when step 2 sinks arrive.
 
 ## Consequences
 
-- Card load data and D1 schema include lead destination ([0010](./0010-card-data-d1-and-load-script.md)).
-- `LINEAR_*` env vars belong to the **Linear sink implementation** only ([environments.md](../architecture/environments.md)).
-- [test-leads.md](../runbooks/test-leads.md) marking rules apply **after** the Linear sink exists.
+- Remove any singular `lead_destination` fields from schema and docs ([0010](./0010-card-data-d1-and-load-script.md)).
+- No `LEAD_NOTIFY_TO` or `LINEAR_*` Worker variables ([environments.md](../architecture/environments.md)).
+- [test-leads.md](../runbooks/test-leads.md) applies when a **Linear** sink row exists (step 2+).

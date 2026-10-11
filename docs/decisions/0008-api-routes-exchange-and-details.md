@@ -10,7 +10,7 @@ Public card URLs move to `/hi/<slug>` (see [0003](./0003-urls-and-lookup.md)). T
 
 ## Decision
 
-- **`POST /api/exchange`** — exchange submit (Turnstile, honeypot, rate limit, lead sink record, enqueue).
+- **`POST /api/exchange`** — exchange submit (Turnstile, honeypot, rate limit, dispatch lead sinks, enqueue follow-up email).
 - **`POST /api/details`** — optional details step (signed token).
 
 No `/api/hi/*` routes in this app.

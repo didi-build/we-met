@@ -10,7 +10,7 @@
 
 - The Next.js app (UI, `/api/exchange` and `/api/details` handlers, card rendering).
 - Cloudflare Workers deployment (OpenNext), `we-met-*` queues, consumers, D1, R2, and env-specific bindings.
-- Card presentation, theming tokens, and the contact-exchange pipeline through to email and the **LeadSink** ([0018](../decisions/0018-lead-sink.md)).
+- Card presentation, theming tokens, and the contact-exchange pipeline through to follow-up email and **lead sink dispatch** ([0018](../decisions/0018-lead-sink.md)).
 
 **Out of scope**
 
@@ -22,23 +22,23 @@
 
 Agents should extend behavior only through these interfaces, not ad hoc fetches or hardcoded hosts.
 
-| Seam             | Responsibility                                                                                               | Shape                                                                                                                                                                         |
-| ---------------- | ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Card data**    | Load the card record for the current request (contact fields, variant, footer link, slug, lead destination). | Async function or adapter: input is lookup context; output is a typed card object. Backed by **D1** ([0010](../decisions/0010-card-data-d1-and-load-script.md)).              |
-| **Lead sink**    | Record leads, append details, note email failures.                                                           | **`LeadSink`** built per card from **lead destination** on the record (`kind` + non-secret config). Step 1: **`kind: "none"`** only ([0018](../decisions/0018-lead-sink.md)). |
-| **Email sender** | Send the fixed-template exchange emails (visitor ↔ card owner).                                              | Adapter that accepts rendered plain-text bodies and metadata; production uses the bound queue + consumer; local may noop or log.                                              |
-| **Base URL**     | One canonical origin for absolute links in email and metadata (`https://…`, no path).                        | Single config value per environment (see [environments](./environments.md)); never scatter hostnames in code.                                                                 |
-| **Lookup**       | Resolve which card serves a request.                                                                         | Order: **hostname** (custom domain later) → **path** (`/hi/<slug>`) → **card record**. Reserved names: [0014](../decisions/0014-reserved-hostnames-and-paths.md).             |
+| Seam             | Responsibility                                                                        | Shape                                                                                                                                                                             |
+| ---------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Card data**    | Load the card record and its **lead sinks** for the current request.                  | Async adapter: lookup context → typed card + validated **`lead_sinks`** rows ([0010](../decisions/0010-card-data-d1-and-load-script.md), [0018](../decisions/0018-lead-sink.md)). |
+| **Lead sink**    | Deliver a lead to one destination (`kind` implementation).                            | **`LeadSink`**: record lead, append details, note delivery failure. One implementation per **`kind`**; step 1 defines the interface and dispatcher only.                          |
+| **Email sender** | Send the fixed-template exchange emails (visitor ↔ card owner).                       | Adapter that accepts rendered plain-text bodies and metadata; production uses the bound queue + consumer; local may noop or log.                                                  |
+| **Base URL**     | One canonical origin for absolute links in email and metadata (`https://…`, no path). | Single config value per environment (see [environments](./environments.md)); never scatter hostnames in code.                                                                     |
+| **Lookup**       | Resolve which card serves a request.                                                  | Order: **hostname** (custom domain later) → **path** (`/hi/<slug>`) → **card record**. Reserved names: [0014](../decisions/0014-reserved-hostnames-and-paths.md).                 |
 
 ## Routes
 
-| Route                    | Role                                             |
-| ------------------------ | ------------------------------------------------ |
-| `/`                      | Placeholder landing page.                        |
-| `/hi/<slug>`             | Public card page.                                |
-| `/hi/<slug>/contact.vcf` | vCard download (inline).                         |
-| `POST /api/exchange`     | Exchange submit (Turnstile, lead sink, enqueue). |
-| `POST /api/details`      | Optional details (signed token).                 |
+| Route                    | Role                                                     |
+| ------------------------ | -------------------------------------------------------- |
+| `/`                      | Placeholder landing page.                                |
+| `/hi/<slug>`             | Public card page.                                        |
+| `/hi/<slug>/contact.vcf` | vCard download (inline).                                 |
+| `POST /api/exchange`     | Exchange submit (Turnstile, dispatch lead sinks + mail). |
+| `POST /api/details`      | Optional details (signed token).                         |
 
 **Step 1 legacy mapping (in this app):** `didi.build/hi` → `/hi/didi`; vCard equivalent. **`didi.build` is not redirected in step 1.** Slug rules and lookup: [0003](../decisions/0003-urls-and-lookup.md). API routes: [0008](../decisions/0008-api-routes-exchange-and-details.md).
 
@@ -56,43 +56,43 @@ Agents should extend behavior only through these interfaces, not ad hoc fetches 
 sequenceDiagram
   participant V as Visitor browser
   participant M as we-met Worker
-  participant S as LeadSink
-  participant Q as we-met-followup-email queue
-  participant C as we-met-followup-email-consumer
+  participant D as Lead sink dispatcher
+  participant Q as Queues
+  participant C as Consumers
 
   V->>M: POST /api/exchange (Turnstile + form)
   M->>M: Turnstile, honeypot, rate limit
-  M->>S: Record lead
-  M->>Q: Enqueue visitor_followup, owner_lead
+  M->>D: Dispatch enabled lead sinks
+  D->>Q: One message per enabled sink
+  M->>Q: Enqueue visitor_followup (independent)
+  M->>Q: Enqueue owner_lead (independent)
   M-->>V: 200 + signed token (2h TTL)
 
   V->>M: POST /api/details (token + fields)
-  M->>S: Append details
+  M->>D: Dispatch append per enabled sink
   M->>Q: Enqueue owner_details (best effort)
   M-->>V: 200
 
-  Q->>C: Deliver jobs
-  C->>C: Gmail API: visitor vCard follow-up (one recipient); owner notifications
-  C-->>S: Note email failure (when send exhausted)
+  Q->>C: Deliver jobs (per-message retries)
+  C->>C: Follow-up email via Gmail; sink delivery per kind (step 2+)
 ```
 
-The **consumer** Worker (`we-met-followup-email-consumer` or `-nonprod`) registers on the queue in its own Wrangler config; it is not a binding on the main Worker. Queue payloads carry a card field snapshot ([0016](../decisions/0016-queue-message-snapshot.md)). Step 1 uses a **no-op** LeadSink (`kind: "none"`); a **Linear** sink merges before cutover ([0018](../decisions/0018-lead-sink.md)).
+The **follow-up email** consumer (`we-met-followup-email-consumer` or `-nonprod`) registers on the email queue in its own Wrangler config. **Lead sink delivery** uses **one queue message per sink** so retries and failures are independent ([0018](../decisions/0018-lead-sink.md)). Queue payloads for email carry a card field snapshot ([0016](../decisions/0016-queue-message-snapshot.md)). **Step 1:** dispatcher and `lead_sinks` table only — **no sink implementations**; zero enabled sinks means no lead delivery messages.
 
 **Failure handling**
 
-| Condition                             | Behavior                                                                             |
-| ------------------------------------- | ------------------------------------------------------------------------------------ |
-| Honeypot filled (`website` non-empty) | Fake **200**, empty token; no lead sink call and nothing enqueued                    |
-| Turnstile fails                       | **403**                                                                              |
-| Rate limited                          | **429**                                                                              |
-| Lead sink record fails                | **500**, generic message to client (lead not silently dropped)                       |
-| Enqueue fails after lead recorded     | **500**; **note email failure** on the sink when the implementation supports it      |
-| Visitor email fails after 5 attempts  | **Note email failure** on the sink; message acknowledged                             |
-| Owner email fails                     | Retry with backoff; acknowledge after max attempts; **note** only if policy requires |
-| Lead sink append/details fails        | **500** on that request                                                              |
-| Details enqueue fails                 | Logged only; **details** response is still **200**                                   |
-
-The no-op sink never fails; sink errors apply once a real implementation (e.g. Linear) is enabled.
+| Condition                                     | Behavior                                                                 |
+| --------------------------------------------- | ------------------------------------------------------------------------ |
+| Honeypot filled (`website` non-empty)         | Fake **200**, empty token; nothing dispatched or enqueued                |
+| Turnstile fails                               | **403**                                                                  |
+| Rate limited                                  | **429**                                                                  |
+| Visitor follow-up enqueue fails               | **500**, generic message to client                                       |
+| Owner lead / details email enqueue fails      | **500** on exchange; details step may still **200** for optional enqueue |
+| Lead sink dispatch enqueue fails (one sink)   | **Does not** fail other sinks or the HTTP response; that message retries |
+| Lead sink delivery fails (consumer, one sink) | Retries for **that message only**; other sinks and email unaffected      |
+| Visitor email fails after max attempts        | Acknowledged; **note delivery failure** on sinks when implemented        |
+| Owner email fails                             | Retry with backoff; acknowledge after max attempts                       |
+| Zero enabled lead sinks                       | Exchange **200**; leads go nowhere until sinks are added (step 2+)       |
 
 Non-production mail is redirected on the consumer; see [0006](../decisions/0006-non-prod-safety.md) and [environments](./environments.md).
 

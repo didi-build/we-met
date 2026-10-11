@@ -31,7 +31,7 @@ Project docs live here so humans and agents share the same map.
 | [decisions/0015-cache-friendly-not-cached-yet.md](./decisions/0015-cache-friendly-not-cached-yet.md)                 | Cache headers; caching backlog          |
 | [decisions/0016-queue-message-snapshot.md](./decisions/0016-queue-message-snapshot.md)                               | Queue payload; consumer without D1      |
 | [decisions/0017-cloudflare-api-credentials.md](./decisions/0017-cloudflare-api-credentials.md)                       | Non-prod vs prod API tokens             |
-| [decisions/0018-lead-sink.md](./decisions/0018-lead-sink.md)                                                         | LeadSink; no-op in step 1               |
+| [decisions/0018-lead-sink.md](./decisions/0018-lead-sink.md)                                                         | `lead_sinks` list; dispatch in step 1   |
 
 ## Runbooks
 
