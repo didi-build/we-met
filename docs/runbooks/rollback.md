@@ -10,16 +10,16 @@
 
 ## Steps
 
-1. **Identify last good release:** Git tag or commit SHA from the previous successful **production** workflow run (history added by [DIDI-572](https://linear.app/didi-build/issue/DIDI-572)).
-2. **Redeploy that artifact:** Run the production deploy workflow on the known-good commit with GitHub `production` environment approval (same path as [deploy.md](./deploy.md)).
+1. **Identify last good release:** Commit SHA from the previous successful [**Deploy production**](../../.github/workflows/deploy-production.yml) run on `main` (Actions tab).
+2. **Redeploy that artifact:** Checkout the good commit on `main` (revert PR or cherry-pick), push, approve the **Deploy production** workflow when prompted; or re-run the workflow on the known-good SHA with `production` environment approval ([deploy.md](./deploy.md)).
 3. **Verify:** Card page loads; confirm queue consumer metrics recover.
 4. **Notify:** Note the incident in Linear and link the bad and good commits.
 
 ## Post-rollback
 
 - Root-cause in a follow-up PR; do not hot-patch production bindings without a decision update if the seam contract changes.
-- Preview rollback: close/reopen the PR preview or push a fix branch; there is no separate staging host.
+- Preview rollback: push a fix to the PR branch (Preview workflow updates `pr-<number>`) or close the PR and open a new one.
 
 ## What is not decided here
 
-- Automated instant rollback / blue-green on Workers: use manual redeploy until [DIDI-572](https://linear.app/didi-build/issue/DIDI-572) documents any faster path.
+- Automated instant rollback / blue-green on Workers: not implemented; redeploy a known-good commit via **Deploy production**.

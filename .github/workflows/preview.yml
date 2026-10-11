@@ -1,0 +1,80 @@
+name: Preview
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    if: >-
+      github.event.action != 'closed' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Prepare Wrangler config (non-prod D1 IDs)
+        env:
+          WE_MET_D1_DATABASE_ID_NONPROD: ${{ vars.WE_MET_D1_DATABASE_ID_NONPROD }}
+        run: |
+          set -euo pipefail
+          node scripts/prepare-wrangler-config.mjs \
+            --target preview \
+            --output .wrangler/ci/wrangler.jsonc
+      - name: Deploy-time guards (preview)
+        run: node scripts/check-deploy-guards.mjs --target preview --config .wrangler/ci/wrangler.jsonc
+      - name: Build OpenNext (non-prod Turnstile site key)
+        env:
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.WE_MET_TURNSTILE_SITE_KEY_NONPROD }}
+        run: npm run build
+      - name: Create or update Cloudflare Preview
+        id: preview
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          output="$(npx wrangler preview \
+            --config .wrangler/ci/wrangler.jsonc \
+            --name "pr-${{ github.event.pull_request.number }}" \
+            --json)"
+          printf '%s\n' "$output"
+          preview_url="$(printf '%s' "$output" | jq -er '.preview.urls[0]')"
+          echo "preview_url=$preview_url" >> "$GITHUB_OUTPUT"
+      - name: Comment preview URL
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr comment "${{ github.event.pull_request.number }}" \
+            --body "Cloudflare Preview: ${{ steps.preview.outputs.preview_url }}"
+
+  cleanup:
+    if: github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Delete Cloudflare Preview
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx wrangler preview delete \
+            --name "pr-${{ github.event.pull_request.number }}" \
+            --skip-confirmation

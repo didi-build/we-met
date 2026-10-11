@@ -12,6 +12,9 @@
  * approved deploy workflow ([DIDI-572]).
  */
 import { spawnSync } from "node:child_process";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const REMOTE_ALLOWED_DATABASE = "we-met-db-nonprod";
 const args = process.argv.slice(2);
@@ -54,13 +57,45 @@ if (mode === "remote") {
   }
 }
 
+let configFlag = [];
+let cleanupDir = null;
+
+if (mode === "remote") {
+  cleanupDir = mkdtempSync(join(tmpdir(), "we-met-wrangler-"));
+  const preparedConfig = join(cleanupDir, "wrangler-d1-nonprod.jsonc");
+  const prep = spawnSync(
+    "node",
+    [
+      "scripts/prepare-wrangler-config.mjs",
+      "--target",
+      "d1-migrate-nonprod",
+      "--output",
+      preparedConfig,
+    ],
+    { encoding: "utf8" },
+  );
+  if (prep.status !== 0) {
+    if (prep.stderr) process.stderr.write(prep.stderr);
+    process.exit(prep.status ?? 1);
+  }
+  configFlag = ["-c", preparedConfig];
+}
+
 const wranglerTarget = mode === "remote" ? "--remote" : "--local";
 const applyTarget = mode === "remote" ? databaseName : "WE_MET_DB";
 
 const result = spawnSync(
   "npx",
-  ["wrangler", "d1", "migrations", "apply", applyTarget, wranglerTarget],
+  ["wrangler", ...configFlag, "d1", "migrations", "apply", applyTarget, wranglerTarget],
   { stdio: "inherit", shell: true },
 );
+
+if (cleanupDir) {
+  try {
+    rmSync(cleanupDir, { recursive: true, force: true });
+  } catch {
+    // ignore temp cleanup errors
+  }
+}
 
 process.exit(result.status ?? 1);

@@ -63,22 +63,23 @@ Do not break these; each links to the canonical doc.
 
 ## Commands
 
-| Script                       | Purpose                                                                                  |
-| ---------------------------- | ---------------------------------------------------------------------------------------- |
-| `npm run check`              | Format, lint, typecheck, test, build, worker dry-run, secrets, placeholders, attribution |
-| `npm run dev`                | Next.js dev server (Turbopack)                                                           |
-| `npm run next:build`         | Next.js production build (used by OpenNext)                                              |
-| `npm run build`              | OpenNext build for Cloudflare Workers                                                    |
-| `npm run worker:dry-run`     | Validate Wrangler deploy without uploading (`wrangler deploy --dry-run`)                 |
-| `npm run db:migrate`         | Apply D1 migrations locally                                                              |
-| `npm run db:migrate:remote`  | Apply D1 migrations to remote `we-met-db-nonprod` only (never production)                |
-| `npm run lint`               | ESLint                                                                                   |
-| `npm run format`             | Prettier write                                                                           |
-| `npm run format:check`       | Prettier check                                                                           |
-| `npm run typecheck`          | `tsc --noEmit`                                                                           |
-| `npm run test`               | Vitest (CI uses JUnit output)                                                            |
-| `npm run secrets`            | Secretlint                                                                               |
-| `npm run secret-usage`       | Fail if `BOOTSTRAP_TOKEN` appears outside `bootstrap.yml` workflows                      |
-| `npm run init-project`       | Replace `{{…}}` placeholders after creating a repo from Launchpad                        |
-| `npm run repo-settings`      | Dry-run, `--apply`, or `--verify` recommended GitHub repo settings                       |
-| `npm run verify-action-pins` | Verify each pinned action SHA matches its version comment (`# vX.Y.Z`)                   |
+| Script                       | Purpose                                                                                                 |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `npm run check`              | Format, lint, typecheck, test, build, worker dry-run, deploy guards, secrets, placeholders, attribution |
+| `npm run dev`                | Next.js dev server (Turbopack)                                                                          |
+| `npm run next:build`         | Next.js production build (used by OpenNext)                                                             |
+| `npm run build`              | OpenNext build for Cloudflare Workers                                                                   |
+| `npm run worker:dry-run`     | Validate Wrangler deploy without uploading (`wrangler deploy --dry-run`)                                |
+| `npm run deploy:guards`      | Enforce deploy-time binding guards on `wrangler.jsonc` (preview + production)                           |
+| `npm run db:migrate`         | Apply D1 migrations locally                                                                             |
+| `npm run db:migrate:remote`  | Apply D1 migrations to remote `we-met-db-nonprod` only (never production)                               |
+| `npm run lint`               | ESLint                                                                                                  |
+| `npm run format`             | Prettier write                                                                                          |
+| `npm run format:check`       | Prettier check                                                                                          |
+| `npm run typecheck`          | `tsc --noEmit`                                                                                          |
+| `npm run test`               | Vitest (CI uses JUnit output)                                                                           |
+| `npm run secrets`            | Secretlint                                                                                              |
+| `npm run secret-usage`       | Fail if `BOOTSTRAP_TOKEN` appears outside `bootstrap.yml` workflows                                     |
+| `npm run init-project`       | Replace `{{…}}` placeholders after creating a repo from Launchpad                                       |
+| `npm run repo-settings`      | Dry-run, `--apply`, or `--verify` recommended GitHub repo settings                                      |
+| `npm run verify-action-pins` | Verify each pinned action SHA matches its version comment (`# vX.Y.Z`)                                  |
