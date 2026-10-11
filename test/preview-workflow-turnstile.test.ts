@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-describe("Turnstile site keys in deploy workflows (unit)", () => {
+describe("Cloudflare credentials in deploy workflows (unit)", () => {
   const preview = readFileSync(".github/workflows/preview.yml", "utf8");
   const production = readFileSync(".github/workflows/deploy-production.yml", "utf8");
 
@@ -13,5 +13,23 @@ describe("Turnstile site keys in deploy workflows (unit)", () => {
   it("production workflow uses production Turnstile variable", () => {
     expect(production).toContain("vars.WE_MET_TURNSTILE_SITE_KEY_PRODUCTION");
     expect(production).not.toContain("WE_MET_TURNSTILE_SITE_KEY_NONPROD");
+  });
+
+  it("preview workflow uses non-prod Cloudflare API token only", () => {
+    expect(preview).toContain("secrets.CLOUDFLARE_API_TOKEN_NONPROD");
+    expect(preview).not.toContain("CLOUDFLARE_API_TOKEN_PRODUCTION");
+    expect(preview).not.toMatch(/secrets\.CLOUDFLARE_API_TOKEN[^_]/);
+  });
+
+  it("production workflow uses production Cloudflare API token only", () => {
+    expect(production).toContain("secrets.CLOUDFLARE_API_TOKEN_PRODUCTION");
+    expect(production).not.toContain("CLOUDFLARE_API_TOKEN_NONPROD");
+    expect(production).not.toMatch(/secrets\.CLOUDFLARE_API_TOKEN[^_]/);
+  });
+
+  it("both workflows use repo-level CLOUDFLARE_ACCOUNT_ID", () => {
+    expect(preview).toContain("secrets.CLOUDFLARE_ACCOUNT_ID");
+    expect(production).toContain("secrets.CLOUDFLARE_ACCOUNT_ID");
+    expect(production).not.toContain("secrets.CLOUDFLARE_ACCOUNT_ID_PRODUCTION");
   });
 });

@@ -39,12 +39,15 @@ Whether previews are triggered by Cloudflare Git integration or a GitHub Action 
 
 ## Deploy-time guards
 
-CI/deploy ([DIDI-572](https://linear.app/didi-build/issue/DIDI-572)) **must fail** if:
+`scripts/check-deploy-guards.mjs` (CI and `npm run deploy:guards`) **must fail** if:
 
-- **Any binding in the `previews` block** uses a **production** resource name (queue, consumer, rate limiter namespace, D1, or R2).
-- A preview binds the **production** queue, consumer, rate limiter namespace, database, or bucket (including live preview binding checks against config).
-- The non-prod email **redirect is disabled** or misconfigured (consumer would send to real addresses).
-- `WE_MET_ENV` is `production` without the GitHub **`production`** environment.
+- **Any entry** in `previews` `d1_databases`, `r2_buckets`, `queues.producers`, or `ratelimits` uses a **production** resource name or marker string.
+- `previews.vars.WE_MET_ENV` is not `preview`, or top-level `WE_MET_ENV` is not `production` when checking production.
+- Top-level production bindings (D1, R2, queue, rate limiter) do not match production resource names.
+- Preview and top-level `database_id` values are identical (including after CI substitution).
+- `config/nonprod-mail-safety.json` is missing, invalid, or does not **fail closed** when `WE_MET_TEST_MAIL_TO` is unset (spec file only until the consumer Worker ships in [DIDI-577](https://linear.app/didi-build/issue/DIDI-577)).
+
+Production deploys use the GitHub **`production`** environment (required reviewers); that gate is enforced by workflow structure tests, not by this script.
 
 ## Config and secret names
 
@@ -78,12 +81,11 @@ The consumer Worker registers on the queue in **its own** Wrangler config; it is
 
 **GitHub Actions secrets**
 
-| Name                           | Scope                                                                                                         |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------- |
-| `CLOUDFLARE_API_TOKEN`         | Repository secret — **non-prod** token for previews ([0017](../decisions/0017-cloudflare-api-credentials.md)) |
-| `CLOUDFLARE_ACCOUNT_ID`        | Repository secret                                                                                             |
-| `CLOUDFLARE_API_TOKEN` (prod)  | **`production` environment** secret only — production-scoped token                                            |
-| `CLOUDFLARE_ACCOUNT_ID` (prod) | **`production` environment** secret (if distinct from repo)                                                   |
+| Name                              | Scope                                                                                                         |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `CLOUDFLARE_API_TOKEN_NONPROD`    | Repository secret — **non-prod** token for previews ([0017](../decisions/0017-cloudflare-api-credentials.md)) |
+| `CLOUDFLARE_ACCOUNT_ID`           | Repository secret — used by preview and production workflows                                                  |
+| `CLOUDFLARE_API_TOKEN_PRODUCTION` | **`production` environment** secret only — production-scoped token                                            |
 
 Never use org-wide **`BOOTSTRAP_TOKEN`** for We Met deploys.
 

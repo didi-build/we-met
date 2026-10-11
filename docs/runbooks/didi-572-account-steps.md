@@ -5,12 +5,14 @@ Repo-side workflows and guards land in [DIDI-572](https://linear.app/didi-build/
 ## 1. GitHub secrets and variables
 
 1. Create the **`production`** environment with yourself as a required reviewer.
-2. **Repository secrets** (non-prod Cloudflare token): `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`.
-3. **`production` environment secrets:** production-scoped `CLOUDFLARE_API_TOKEN` (and `CLOUDFLARE_ACCOUNT_ID` if not reused from repo).
+2. **Repository secrets:** `CLOUDFLARE_API_TOKEN_NONPROD` (non-prod Cloudflare token), `CLOUDFLARE_ACCOUNT_ID`.
+3. **`production` environment secret:** `CLOUDFLARE_API_TOKEN_PRODUCTION` (production-scoped token only).
 4. **Repository variables:** `WE_MET_D1_DATABASE_ID_NONPROD`, `WE_MET_TURNSTILE_SITE_KEY_NONPROD` (widget **we-met nonprod**).
 5. **`production` environment variables:** `WE_MET_D1_DATABASE_ID_PRODUCTION`, `WE_MET_TURNSTILE_SITE_KEY_PRODUCTION` (widget **we-met production**).
 
-Token scopes: narrow each token to Workers, D1, R2, Queues, and Zone DNS as needed; previews use the **same** Worker `we-met` as production ([0017](../decisions/0017-cloudflare-api-credentials.md)).
+Remove or rename any legacy unsuffixed `CLOUDFLARE_API_TOKEN` secrets. Do **not** duplicate `CLOUDFLARE_ACCOUNT_ID` on the production environment unless you intentionally use a different account (the repo uses one repo-level `CLOUDFLARE_ACCOUNT_ID` for both workflows).
+
+Token scopes: narrow each token as Cloudflare allows; previews use the **same** Worker `we-met` as production ([0017](../decisions/0017-cloudflare-api-credentials.md)).
 
 ## 2. Worker secrets
 
@@ -38,7 +40,7 @@ Use a **gitignored** config with real D1 IDs (copy `wrangler.jsonc` → `wrangle
 npm ci
 npm run build
 
-# Production Worker placeholder (workers.dev + we-met.link route when domain attached)
+# Production Worker (workers.dev + we-met.link custom domain from committed routes)
 npx wrangler deploy --config wrangler.local.jsonc
 
 # Preview (Wrangler 4.135+)
