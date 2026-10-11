@@ -1,0 +1,4 @@
+# Copy to `.dev.vars` (gitignored). Used by OpenNext / Wrangler local dev (`npm run dev`).
+# Top-level wrangler.jsonc sets WE_MET_ENV=production; local dev needs local for localhost card lookup.
+
+WE_MET_ENV=local

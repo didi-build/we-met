@@ -12,6 +12,26 @@ Load personal card data from a **gitignored** JSON file into D1. Real card value
 Uses the `WE_MET_DB` binding from `wrangler.jsonc` with Wrangler’s **local** D1 persistence:
 
 ```bash
+npm run db:migrate
+npm run cards:load -- --file data/cards.example.json
+```
+
+### Local dev (`npm run dev`)
+
+Committed `wrangler.jsonc` sets top-level `WE_MET_ENV` to `production`, so **`localhost` is not a card-serving host** unless you override it for local dev.
+
+1. Copy [`.dev.vars.example`](../../.dev.vars.example) to **`.dev.vars`** (gitignored): `WE_MET_ENV=local`.
+2. `npm run dev`
+3. Smoke test (after loading `data/cards.example.json`):
+
+```bash
+curl -i http://localhost:3000/hi/demo    # expect 200 when demo card is loaded
+curl -i http://localhost:3000/hi/unknown # expect 404
+```
+
+For your own data, use `data/cards.local.json` instead of the example file:
+
+```bash
 npm run cards:load
 # or
 npm run cards:load -- --file data/cards.local.json
