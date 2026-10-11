@@ -5,6 +5,8 @@ node_modules/
 dist/
 build/
 .next/
+.open-next/
+.wrangler/
 out/
 .turbo/
 
@@ -19,6 +21,9 @@ test-results/
 .env
 .env.*
 !.env.example
+
+# Card load data (never commit real card values)
+data/cards.local.json
 
 # Logs
 logs/

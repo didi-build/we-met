@@ -22,22 +22,22 @@
 
 Agents should extend behavior only through these interfaces, not ad hoc fetches or hardcoded hosts.
 
-| Seam             | Responsibility                                                                             | Shape                                                                                                                                          |
-| ---------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Card data**    | Load the card record for the current request (contact fields, variant, footer link, slug). | Async function or adapter: input is lookup context; output is a typed card object. Backed by **D1** ([0010](../decisions/0010-card-data-d1-and-load-script.md)). |
-| **Email sender** | Send the fixed-template exchange emails (visitor ↔ card owner).                            | Adapter that accepts rendered plain-text bodies and metadata; production uses the bound queue + consumer; local may noop or log.               |
-| **Base URL**     | One canonical origin for absolute links in email and metadata (`https://…`, no path).      | Single config value per environment (see [environments](./environments.md)); never scatter hostnames in code.                                  |
+| Seam             | Responsibility                                                                             | Shape                                                                                                                                                             |
+| ---------------- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Card data**    | Load the card record for the current request (contact fields, variant, footer link, slug). | Async function or adapter: input is lookup context; output is a typed card object. Backed by **D1** ([0010](../decisions/0010-card-data-d1-and-load-script.md)).  |
+| **Email sender** | Send the fixed-template exchange emails (visitor ↔ card owner).                            | Adapter that accepts rendered plain-text bodies and metadata; production uses the bound queue + consumer; local may noop or log.                                  |
+| **Base URL**     | One canonical origin for absolute links in email and metadata (`https://…`, no path).      | Single config value per environment (see [environments](./environments.md)); never scatter hostnames in code.                                                     |
 | **Lookup**       | Resolve which card serves a request.                                                       | Order: **hostname** (custom domain later) → **path** (`/hi/<slug>`) → **card record**. Reserved names: [0014](../decisions/0014-reserved-hostnames-and-paths.md). |
 
 ## Routes
 
-| Route                      | Role                                          |
-| -------------------------- | --------------------------------------------- |
-| `/`                        | Placeholder landing page.                     |
-| `/hi/<slug>`               | Public card page.                             |
-| `/hi/<slug>/contact.vcf`     | vCard download (inline).                      |
-| `POST /api/exchange`       | Exchange submit (Turnstile, Linear, enqueue). |
-| `POST /api/details`        | Optional details (signed token).              |
+| Route                    | Role                                          |
+| ------------------------ | --------------------------------------------- |
+| `/`                      | Placeholder landing page.                     |
+| `/hi/<slug>`             | Public card page.                             |
+| `/hi/<slug>/contact.vcf` | vCard download (inline).                      |
+| `POST /api/exchange`     | Exchange submit (Turnstile, Linear, enqueue). |
+| `POST /api/details`      | Optional details (signed token).              |
 
 **Step 1 legacy mapping (in this app):** `didi.build/hi` → `/hi/didi`; vCard equivalent. **`didi.build` is not redirected in step 1.** Slug rules and lookup: [0003](../decisions/0003-urls-and-lookup.md). API routes: [0008](../decisions/0008-api-routes-exchange-and-details.md).
 

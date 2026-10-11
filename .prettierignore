@@ -1,5 +1,7 @@
 node_modules/
-dist/
+.next/
+.open-next/
+.wrangler/
 coverage/
 test-results/
 package-lock.json

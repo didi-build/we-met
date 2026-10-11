@@ -6,10 +6,10 @@
 
 Every non-prod exchange should create an issue with **all** of:
 
-| Signal           | What to look for                                                                                           |
-| ---------------- | ---------------------------------------------------------------------------------------------------------- |
-| **Label**        | `we-met-test-lead`                                                                                         |
-| **Title prefix** | `[we-met-test]` at the start of the title                                                                  |
+| Signal           | What to look for                                                                               |
+| ---------------- | ---------------------------------------------------------------------------------------------- |
+| **Label**        | `we-met-test-lead`                                                                             |
+| **Title prefix** | `[we-met-test]` at the start of the title                                                      |
 | **Environment**  | `WE_MET_ENV` value (`local` or `preview`) recorded in the issue description (not `production`) |
 
 If any signal is missing on an issue you believe came from non-prod, treat it as suspicious and check deploy bindings ([environments.md](../architecture/environments.md)).
