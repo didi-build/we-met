@@ -29,13 +29,13 @@ Preview and local (remote) share **one** non-prod queue and consumer. The redire
 
 PR previews are served on **workers.dev** (`<preview-name>-we-met.<subdomain>.workers.dev`) and via Cloudflare **Previews**. **Version URLs** reuse the Worker’s own resources; Cloudflare advises against them for PR testing. **Previews isolate per PR.**
 
-Whether previews are triggered by Cloudflare Git integration or a GitHub Action is decided in [DIDI-572](https://linear.app/didi-build/issue/DIDI-572). **Forks never get deploy access.** Secrets are set once in the **Previews base configuration** and apply to every new preview. A preview is **deleted when its PR closes**. Previews may **produce** to queues but **cannot consume** them; the non-prod consumer is a **separate Worker**. Requires **Wrangler 4.135.0+**.
+PR previews deploy via a **GitHub Actions** workflow that runs `wrangler preview` ([0019](../decisions/0019-pr-preview-github-action.md)). **Forks never get deploy access.** Secrets are set once in the **Previews base configuration** and apply to every new preview (per Cloudflare docs; not yet verified here, see [deploy-setup.md](../runbooks/deploy-setup.md#worker-secrets)). A preview is **deleted when its PR closes**. Previews may **produce** to queues but **cannot consume** them; the non-prod consumer is a **separate Worker**. Requires **Wrangler 4.135.0+**.
 
 **`WE_MET_BASE_URL` in the `previews` block is `https://we-met.link`**, so links in test emails, the vCard URL field, and canonical/OG URLs from a preview point at production card pages, not the preview hostname. The preview hostname still serves the card via lookup configuration.
 
-**UNVERIFIED:** The `previews` block in `wrangler.jsonc` lists D1, R2, queues, rate limits, and vars only — not `ASSETS`, `IMAGES`, or `WORKER_SELF_REFERENCE`. Docs say previews do not inherit production settings; for an OpenNext Worker it is **unknown** which bindings a preview instance actually receives. [DIDI-572](https://linear.app/didi-build/issue/DIDI-572)’s first proof must confirm effective preview bindings, including **ASSETS**, **IMAGES**, and the self-reference service.
+Preview deployments receive **ASSETS**, **IMAGES** (when `previews.images` is set), **WE_MET_ASSETS**, **WE_MET_BASE_URL**, **WE_MET_DB** (non-prod D1), **WE_MET_ENV** = `preview`, **WE_MET_EXCHANGE_RATE_LIMITER** (namespace **2001**), and **WE_MET_FOLLOWUP_EMAIL_QUEUE** (non-prod queue); they do **not** receive **WORKER_SELF_REFERENCE** (production does). Details: [0019 § Proof deploy findings](../decisions/0019-pr-preview-github-action.md#proof-deploy-findings) (verified **2026-10-11**).
 
-**D1 `database_id` values** in `wrangler.jsonc` are **placeholders** (real IDs stay out of the public repo). [DIDI-572](https://linear.app/didi-build/issue/DIDI-572) decides how CI injects the real IDs at deploy time.
+**D1 `database_id` values** in `wrangler.jsonc` are **placeholders** (real IDs stay out of the public repo). CI injects the real IDs from GitHub environment variables at deploy time ([0020](../decisions/0020-d1-database-id-injection.md)).
 
 ## Deploy-time guards
 

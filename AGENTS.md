@@ -29,6 +29,7 @@ Do not break these; each links to the canonical doc.
 - Prefer clean, modular boundaries; small extensions over clever hacks; readable names; minimal duplication.
 - Follow this repo’s docs and config over your general habits.
 - Mark unknowns as unknown. Do not guess requirements or infrastructure.
+- **Docs:** write “verified” only with evidence from a named run or command and its date; otherwise keep the note UNVERIFIED. Production-only findings go as a comment on the Linear ticket (convention: comment on DIDI-564); open a docs change only when a documented claim is wrong.
 
 ## Testing
 
