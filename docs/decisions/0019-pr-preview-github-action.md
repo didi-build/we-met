@@ -30,3 +30,7 @@ All PR previews bind the **same** remote D1 database **`we-met-db-nonprod`**. Th
 
 - Repository secrets `CLOUDFLARE_API_TOKEN_NONPROD` and `CLOUDFLARE_ACCOUNT_ID` (non-prod-scoped token) are required for previews.
 - Operators set shared preview Worker secrets once via `wrangler preview base-config secret` (documented in [deploy.md](../runbooks/deploy.md)).
+
+## Proof deploy findings
+
+TBD after proof deploy ([deploy-setup.md](../runbooks/deploy-setup.md) §3).

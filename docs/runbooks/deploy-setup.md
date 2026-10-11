@@ -44,17 +44,17 @@ npm run build
 npx wrangler deploy --config wrangler.local.jsonc
 
 # Preview (Wrangler 4.135+)
-npx wrangler preview --config wrangler.local.jsonc --name didi-572-proof --json
+npx wrangler preview --config wrangler.local.jsonc --name deploy-proof --json
 ```
 
 Paste command output (no secrets) on the Linear hosting ticket when asked.
 
 ### Effective preview bindings
 
-After preview is live, confirm bindings (dashboard: Worker **we-met** → Previews → `didi-572-proof` → Bindings), or:
+After preview is live, confirm bindings (dashboard: Worker **we-met** → Previews → `deploy-proof` → Bindings), or:
 
 ```bash
-npx wrangler preview secret list --name didi-572-proof
+npx wrangler preview secret list --name deploy-proof
 ```
 
 Expect non-prod queue `we-met-followup-email-nonprod`, D1 `we-met-db-nonprod`, R2 `we-met-assets-nonprod`, rate limiter namespace **2001**, plus **ASSETS** (top-level assets upload), **IMAGES** (`previews.images`), and note **WORKER_SELF_REFERENCE** still targets production per Cloudflare limitation.
@@ -62,8 +62,14 @@ Expect non-prod queue `we-met-followup-email-nonprod`, D1 `we-met-db-nonprod`, R
 Delete proof preview:
 
 ```bash
-npx wrangler preview delete --name didi-572-proof --skip-confirmation
+npx wrangler preview delete --name deploy-proof --skip-confirmation
 ```
+
+### Questions the proof deploy must answer
+
+- [ ] Does the live preview URL serve the OpenNext app (not just a static stub)? **How to check:** open the preview URL, load `/`, and confirm it renders the Next.js app and the Worker logs show requests.
+- [ ] How does `WORKER_SELF_REFERENCE` behave on a preview? Cloudflare says service bindings from a Preview call the bound Worker’s production deployment. **How to check:** after the preview is live, confirm whether the app starts and serves `/` without needing the self-reference binding, or fails when it is used. Record the outcome in [0019](../decisions/0019-pr-preview-github-action.md#proof-deploy-findings).
+- [ ] Does `opennextjs-cloudflare deploy --config wrangler.ci.jsonc` use the generated config end to end? **How to check:** read the first production deploy log for the Worker name, bindings, and any cache-population step.
 
 ## 4. Guard failure demos (throwaway branch)
 
