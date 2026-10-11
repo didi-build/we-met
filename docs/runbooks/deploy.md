@@ -47,7 +47,9 @@ Proof deploys before first CI run: [deploy-setup.md](./deploy-setup.md) (maintai
 
 ## GitHub configuration
 
-CI Cloudflare tokens use **Workers Editor** scoped to Worker **`we-met`** ([0017](../decisions/0017-cloudflare-api-credentials.md)): `we-met-ci-nonprod` → `CLOUDFLARE_API_TOKEN_NONPROD`; `we-met-ci-production` → `CLOUDFLARE_API_TOKEN_PRODUCTION` plus **D1 Edit** for production migrations. No zone permissions after the proof deploy attaches `we-met.link`. Add permissions only when a 403 names them.
+CI Cloudflare tokens use **Workers Editor** scoped to Worker **`we-met`** ([0017](../decisions/0017-cloudflare-api-credentials.md)): `we-met-ci-nonprod` → `CLOUDFLARE_API_TOKEN_NONPROD` (Worker **Editor** only; no zone policy). `we-met-ci-production` → `CLOUDFLARE_API_TOKEN_PRODUCTION` with **Workers Editor** on **`we-met`**, account-level **D1 Edit** for production migrations, and a **third policy** on zone **`we-met.link`** (**Workers Routes Write** + **Zone Read**, verified **2026-10-11**) because production deploy re-sends the custom domain. Add further permissions only when a 403 names them.
+
+**Troubleshooting:** `The zone "we-met.link" does not exist on your account [code: 10084]` during production deploy means the CI token lacks zone access on `we-met.link`; see [0017](../decisions/0017-cloudflare-api-credentials.md#token-scoping-cloudflare-2026).
 
 | Name                                   | Where                             | Used by                                          |
 | -------------------------------------- | --------------------------------- | ------------------------------------------------ |
