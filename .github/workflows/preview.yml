@@ -62,8 +62,12 @@ jobs:
             --name "pr-${{ github.event.pull_request.number }}" \
             --json)"
           printf '%s\n' "$output"
-          preview_url="$(printf '%s' "$output" | jq -er '.preview.urls[0]')"
-          echo "preview_url=$preview_url" >> "$GITHUB_OUTPUT"
+          preview_url="$(printf '%s' "$output" | jq -r '.preview.urls[0] // empty')"
+          if [ -z "${preview_url}" ]; then
+            echo "::error::Preview URL missing from wrangler preview --json. Enable Preview URLs: set preview_urls: true in wrangler.jsonc and turn on the Preview toggle under Worker we-met > Domains in the Cloudflare dashboard."
+            exit 1
+          fi
+          echo "preview_url=${preview_url}" >> "$GITHUB_OUTPUT"
       - name: Comment preview URL
         env:
           GH_TOKEN: ${{ github.token }}

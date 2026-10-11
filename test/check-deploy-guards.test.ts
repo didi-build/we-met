@@ -168,6 +168,34 @@ describe("check-deploy-guards (unit)", () => {
     expect(result.stderr).toContain("database_id");
   });
 
+  const wranglerDomainCases = [
+    {
+      label: "preview_urls not true",
+      message: "preview_urls must be true",
+      mutate: (config: Record<string, unknown>) => {
+        config.preview_urls = false;
+      },
+    },
+    {
+      label: "workers_dev not false",
+      message: "workers_dev must be false",
+      mutate: (config: Record<string, unknown>) => {
+        config.workers_dev = true;
+      },
+    },
+  ] as const;
+
+  for (const target of ["preview", "production"] as const) {
+    for (const { label, message, mutate } of wranglerDomainCases) {
+      it(`fails ${target} guards when ${label}`, () => {
+        const { path } = writeTempConfig(mutate);
+        const result = runGuards(target, path);
+        expect(result.status).toBe(1);
+        expect(result.stderr).toContain(message);
+      });
+    }
+  }
+
   const productionMissingBindingCases = [
     {
       label: "d1_databases",

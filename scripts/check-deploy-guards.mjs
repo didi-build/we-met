@@ -113,6 +113,19 @@ function assertEveryPreviewRateLimit(previews, predicate, message) {
   }
 }
 
+function checkWranglerDomainSettings(config) {
+  if (config.preview_urls !== true) {
+    fail(
+      "preview_urls must be true (CI preview URL comment and non-prod Turnstile require workers.dev preview URLs)",
+    );
+  }
+  if (config.workers_dev !== false) {
+    fail(
+      "workers_dev must be false (production serves we-met.link only; preview URLs use preview_urls)",
+    );
+  }
+}
+
 function checkDistinctD1Ids(config) {
   const topLevelIds = (config.d1_databases ?? [])
     .map((row) => row.database_id)
@@ -224,6 +237,7 @@ function main() {
   const config = parseJsonc(readFileSync(configPath, "utf8"));
 
   checkNonprodMailSafety(mailSafetyConfigPath);
+  checkWranglerDomainSettings(config);
   checkDistinctD1Ids(config);
 
   if (target === "preview") {

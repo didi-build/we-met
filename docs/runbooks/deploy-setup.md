@@ -52,9 +52,11 @@ npx wrangler preview delete --name deploy-proof --skip-confirmation
 
 ### Questions the proof deploy must answer
 
-- [ ] Does the live preview URL serve the OpenNext app (not just a static stub)? **How to check:** open the preview URL, load `/`, and confirm it renders the Next.js app and the Worker logs show requests.
-- [ ] How does `WORKER_SELF_REFERENCE` behave on a preview? Cloudflare says service bindings from a Preview call the bound Worker’s production deployment. **How to check:** after the preview is live, confirm whether the app starts and serves `/` without needing the self-reference binding, or fails when it is used. Record the outcome in [0019](../decisions/0019-pr-preview-github-action.md#proof-deploy-findings).
-- [ ] Does `opennextjs-cloudflare deploy --config wrangler.ci.jsonc` use the generated config end to end? **How to check:** read the first production deploy log for the Worker name, bindings, and any cache-population step.
+- [x] Does the live preview URL serve the OpenNext app (not just a static stub)? **Answer (2026-10-11):** Yes — HTTP 200 on `/` with the OpenNext-built placeholder page; Worker logs show requests.
+- [x] How does `WORKER_SELF_REFERENCE` behave on a preview? **Answer:** Preview deployments do **not** include a `WORKER_SELF_REFERENCE` binding; production does. The placeholder app served `/` without it; impact on the real card flow is **unknown until the card ships** ([0019](../decisions/0019-pr-preview-github-action.md#proof-deploy-findings)).
+- [x] Does `opennextjs-cloudflare deploy --config wrangler.ci.jsonc` use the generated config end to end? **Answer:** Yes — deploy succeeds; incremental/tag cache steps report no population needed for this config.
+
+If the account’s **workers.dev** subdomain is ever renamed, update the **we-met nonprod** Turnstile widget hostname and re-check **Preview URLs** (`preview_urls: true`).
 
 ## 2. Cloudflare API tokens for CI
 

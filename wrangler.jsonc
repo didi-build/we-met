@@ -2,6 +2,8 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "main": ".open-next/worker.js",
   "name": "we-met",
+  "workers_dev": false,
+  "preview_urls": true,
   "routes": [
     {
       "pattern": "we-met.link",
