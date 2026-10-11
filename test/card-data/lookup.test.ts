@@ -5,7 +5,8 @@ import type { CardLoadInput } from "@/card-data/types";
 
 const hostConfig = {
   baseUrl: "https://we-met.link",
-  previewHostSuffix: "-we-met.preview.workers.dev",
+  previewHostSuffix: "-we-met.diademshoukralla.workers.dev",
+  weMetEnv: "production",
 };
 
 const sampleCard: CardLoadInput = {
@@ -56,7 +57,7 @@ describe("lookup (unit)", () => {
     await repo.upsertCard(sampleCard);
     const card = await lookupCard(
       {
-        hostname: "pr-1-we-met.preview.workers.dev",
+        hostname: "pr-1-we-met.diademshoukralla.workers.dev",
         pathname: "/hi/didi",
       },
       repo,

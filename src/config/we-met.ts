@@ -1,6 +1,7 @@
 export type WeMetHostConfig = {
   baseUrl: string;
   previewHostSuffix: string | null;
+  weMetEnv: string;
 };
 
 function requireNonEmpty(name: string, value: string | undefined): string {
@@ -14,10 +15,12 @@ function requireNonEmpty(name: string, value: string | undefined): string {
 export function readWeMetHostConfig(env: {
   WE_MET_BASE_URL?: string;
   WE_MET_PREVIEW_HOST_SUFFIX?: string;
+  WE_MET_ENV?: string;
 }): WeMetHostConfig {
   const baseUrl = requireNonEmpty("WE_MET_BASE_URL", env.WE_MET_BASE_URL);
   const previewHostSuffix = env.WE_MET_PREVIEW_HOST_SUFFIX?.trim() || null;
-  return { baseUrl, previewHostSuffix };
+  const weMetEnv = env.WE_MET_ENV?.trim() || "production";
+  return { baseUrl, previewHostSuffix, weMetEnv };
 }
 
 export function baseUrlHostname(baseUrl: string): string {
@@ -27,7 +30,7 @@ export function baseUrlHostname(baseUrl: string): string {
 export function isCardServingHost(hostname: string, config: WeMetHostConfig): boolean {
   const host = hostname.toLowerCase().split(":")[0] ?? "";
   if (host === "localhost" || host === "127.0.0.1") {
-    return true;
+    return config.weMetEnv === "local";
   }
   if (host === baseUrlHostname(config.baseUrl)) {
     return true;

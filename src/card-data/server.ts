@@ -20,8 +20,7 @@ export async function resolveCardForRequest(
   const { env } = await getCloudflareContext({ async: true });
   const hostConfig = readWeMetHostConfig(env);
   const headerList = await headers();
-  const hostname =
-    headerList.get("x-forwarded-host") ?? headerList.get("host") ?? "localhost";
+  const hostname = headerList.get("host") ?? "localhost";
   const repo = await getCardRepository();
   return lookupCard({ hostname, pathname }, repo, hostConfig);
 }
