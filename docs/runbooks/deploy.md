@@ -6,25 +6,25 @@
 
 - CI green on the commit you deploy (`npm run check` on PRs).
 - Architecture/decision docs updated if bindings or seams changed.
-- Non-prod deploys must not request production queue, consumer, or Linear credentials ([0006](../decisions/0006-non-prod-safety.md)).
+- Deploy must satisfy [deploy-time guards](../architecture/environments.md#deploy-time-guards): non-prod never binds production queue, consumer, or rate limiter; non-prod `LINEAR_PROJECT_ID` is the shared test project; non-prod mail redirect stays enabled; non-prod never targets Worker `we-met`; production requires the GitHub `production` environment.
 
 ## Preview (per pull request)
 
-- **Trigger:** Open or update a PR; Cloudflare **Preview** builds automatically.
-- **Touches:** `we-met-followup-email-nonprod` and `we-met-followup-email-consumer-nonprod`, non-prod rate limiter namespace, Cloudflare always-pass Turnstile **test key pair**, shared Linear test project, mail redirect to `WE_MET_TEST_MAIL_TO`.
-- **Verify:** Open the preview URL, load `/p/<slug>`, submit a test exchange; confirm test lead in Linear ([test-leads.md](./test-leads.md)).
+- **Trigger:** [DIDI-572](https://linear.app/didi-build/issue/DIDI-572) chooses Cloudflare Git integration vs a GitHub Action. Forks do not get deploy access.
+- **Touches:** Preview instance on **`we-met-staging`**; `we-met-followup-email-nonprod`; separate **`we-met-followup-email-consumer-nonprod`**; non-prod rate limiter; always-pass Turnstile test pair; shared Linear test project; mail redirect hardwired in the non-prod consumer.
+- **Verify:** Open the preview URL, load `/p/didi`, submit a test exchange; confirm test lead in Linear ([test-leads.md](./test-leads.md)).
 
 ## Staging (from `main`)
 
-- **Trigger:** Merge to `main` deploys staging (workflow added by [DIDI-572](https://linear.app/didi-build/issue/DIDI-572)).
-- **Touches:** Same non-prod queue, consumer, and Linear test project as preview; **`we-met.didi.build`** with **real** Turnstile keys (public URL; mail still redirected via `WE_MET_TEST_MAIL_TO`).
+- **Trigger:** Merge to `main` deploys **`we-met-staging`** ([DIDI-572](https://linear.app/didi-build/issue/DIDI-572)).
+- **Touches:** Same non-prod queue, consumer, and Linear test project as preview; **`we-met.didi.build`** with **real** Turnstile keys (mail still redirected via `WE_MET_TEST_MAIL_TO`).
 - **Verify:** Smoke test on staging host; optional E2E per [test-leads.md](./test-leads.md).
 
 ## Production (manual)
 
 - **Trigger:** Manual workflow dispatch on `main`, after **GitHub `production` environment** approval ([0007](../decisions/0007-production-deploy-manual.md)).
 - **Who:** Only users with approval on the `production` environment.
-- **Touches:** `we-met-followup-email`, `we-met-followup-email-consumer`, production rate limiter namespace, real Turnstile keys, production Linear project, real mail via Gmail API.
+- **Touches:** Worker **`we-met`** (when `we-met.link` is live); `we-met-followup-email`; `we-met-followup-email-consumer`; production rate limiter namespace; real Turnstile keys; production Linear project; real mail via Gmail API.
 - **Command:** Added by [DIDI-572](https://linear.app/didi-build/issue/DIDI-572) (e.g. `npm run deploy:production` or workflow name documented there).
 
 ## Verification

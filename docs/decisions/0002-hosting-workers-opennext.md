@@ -5,13 +5,14 @@
 
 ## Context
 
-We Met must run as its own product at `we-met.link`, not as a route inside `didi-build/web`. We need hosting that fits a Next.js app, clear isolation from other Didi Build apps, and room for queues and consumers on the same platform.
+We Met must run as its own product (planned production domain `we-met.link`, not owned yet), not as a route inside `didi-build/web`. We need hosting that fits a Next.js app, clear isolation from other Didi Build apps, and room for queues and consumers on the same platform.
 
 ## Decision
 
 - Deploy the app with **OpenNext** to **Cloudflare Workers**.
+- Use Wrangler environments: staging app Worker **`we-met-staging`** (`we-met.didi.build`); production app Worker **`we-met`** (`we-met.link` when live).
 - Provision **dedicated `we-met-*`** queues, consumers, and bindings per environment (see [environments.md](../architecture/environments.md)).
-- **No runtime dependency** on `didi-build/web`—no shared code imports, no live calls into the monolith.
+- **No runtime dependency** on `didi-build/web` (no shared code imports, no live calls into the monolith).
 
 ## Reasons
 

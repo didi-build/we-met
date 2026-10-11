@@ -20,7 +20,7 @@
 
 ## Four seams
 
-Agents should extend behavior only through these interfaces—not ad hoc fetches or hardcoded hosts.
+Agents should extend behavior only through these interfaces, not ad hoc fetches or hardcoded hosts.
 
 | Seam             | Responsibility                                                                             | Shape                                                                                                                                          |
 | ---------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -31,22 +31,25 @@ Agents should extend behavior only through these interfaces—not ad hoc fetches
 
 ## Routes
 
-| Route       | Role                                                                                                                                                                                         |
-| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/p/<slug>` | Public card page (default on `we-met.link`).                                                                                                                                                 |
-| `/api/hi/*` | Exchange-contact API (submit, validation, enqueue). **Step 1 keeps these path names** so behavior matches the existing `/hi` card; see [0005](../decisions/0005-keep-api-hi-route-names.md). |
+| Route                   | Role                                          |
+| ----------------------- | --------------------------------------------- |
+| `/`                     | Placeholder landing page.                     |
+| `/p/<slug>`             | Public card page.                             |
+| `/p/<slug>/contact.vcf` | vCard download (inline).                      |
+| `POST /api/hi/exchange` | Exchange submit (Turnstile, Linear, enqueue). |
+| `POST /api/hi/details`  | Optional details (signed token).              |
 
-Legacy `/hi` on `didi.build` is redirected after cutover; that redirect lives outside this repo.
+**Step 1 legacy mapping (in this app):** `/hi` → `/p/didi`; `/hi/contact.vcf` → `/p/didi/contact.vcf`; `/api/hi/*` paths unchanged. **`didi.build` is not redirected in step 1.** Slug rules and lookup: [0003](../decisions/0003-urls-and-lookup.md). API path names: [0005](../decisions/0005-keep-api-hi-route-names.md).
 
 ## Theming
 
-- **Variants:** closed set `green` and `mono`, chosen per card in card data.
+- **Variants:** closed set `green` and `mono`. The **brand variant** is chosen **server-side** from the card record; **light/dark** preference stays in the **browser**.
 - **Colors:** only under `src/theme/tokens/` (e.g. `green.light.css`, `green.dark.css`; `mono.*` later). Components use CSS variables from those files, not raw hex or RGB. A `theme-colors` check (to be added) will reject color literals outside that folder as part of `npm run check`.
 - **Per-card copy:** footer link and similar fields live on the card record, not in shared layout code.
 
 ## Pipeline flow
 
-**Protections (exchange path):** Cloudflare Turnstile; honeypot (`website` field—non-empty is treated as a bot); per-IP rate limit (10 requests per 60 seconds via `WE_MET_EXCHANGE_RATE_LIMITER`); signed short-lived token for the details step (2 hour TTL); one recipient per submission for visitor email.
+**Protections (exchange path):** Cloudflare Turnstile; honeypot (`website` field: non-empty is treated as a bot); per-IP rate limit (10 requests per 60 seconds via `WE_MET_EXCHANGE_RATE_LIMITER`); signed short-lived token for the details step (2 hour TTL); one recipient per submission for visitor email.
 
 ```mermaid
 sequenceDiagram
@@ -97,4 +100,5 @@ See [environments.md](./environments.md) for queues, secrets names, previews, an
 - **Multi-user:** accounts, per-user cards, storage, and abuse limits ([DIDI-581](https://linear.app/didi-build/issue/DIDI-581)).
 - **Custom domains:** `card.theirdomain.com` flow and DNS ([DIDI-580](https://linear.app/didi-build/issue/DIDI-580)).
 - **Pricing and packaging** ([DIDI-579](https://linear.app/didi-build/issue/DIDI-579)).
-- **Exact cutover** from `didi.build/hi` to `we-met.link` (redirect timing and comms)—tracked under step 1 parent [DIDI-564](https://linear.app/didi-build/issue/DIDI-564), not finalized in this doc.
+- **`didi.build/hi` and `/hi/contact.vcf` at cutover:** whether those URLs redirect (decide before [DIDI-566](https://linear.app/didi-build/issue/DIDI-566)).
+- **`we-met.didi.build` after go-live:** keep as staging, or redirect to `we-met.link` ([DIDI-564](https://linear.app/didi-build/issue/DIDI-564)).

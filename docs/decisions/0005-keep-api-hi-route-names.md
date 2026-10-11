@@ -13,7 +13,7 @@ For step 1, **retain `/api/hi/*`** for the exchange-contact API (submit, validat
 
 ## Reasons
 
-- Reduces risk during extraction: clients, tests, and behavior stay aligned with the inventoryed card.
+- Reduces risk during extraction: clients, tests, and behavior stay aligned with the inventoried card.
 - Renaming can happen later behind a single routing change once step 1 is stable.
 
 ## Consequences
