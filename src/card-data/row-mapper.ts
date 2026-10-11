@@ -1,10 +1,10 @@
 import type {
   BrandVariant,
   CardContact,
-  CardExchangeCopy,
+  CardCopy,
+  CardLinks,
   CardPageCopy,
   CardRecord,
-  FooterLink,
 } from "@/card-data/types";
 
 export type CardsRow = {
@@ -14,10 +14,10 @@ export type CardsRow = {
   display_name: string;
   email: string;
   photo_key: string | null;
-  footer_link_json: string;
+  links_json: string;
   page_copy_json: string;
   contact_json: string;
-  exchange_copy_json: string;
+  copy_json: string;
   updated_at: string;
 };
 
@@ -47,10 +47,10 @@ export function mapCardRow(row: CardsRow): CardRecord {
     displayName: row.display_name,
     email: row.email,
     photoKey: row.photo_key,
-    footerLink: parseJson<FooterLink>("footer_link", row.footer_link_json),
+    links: parseJson<CardLinks>("links", row.links_json),
     pageCopy: parseJson<CardPageCopy>("page_copy", row.page_copy_json),
     contact: parseJson<CardContact>("contact", row.contact_json),
-    exchangeCopy: parseJson<CardExchangeCopy>("exchange_copy", row.exchange_copy_json),
+    copy: parseJson<CardCopy>("copy", row.copy_json),
     updatedAt: row.updated_at,
   };
 }

@@ -31,7 +31,7 @@ export class D1CardRepository implements CardRepository {
     const row = await this.db
       .prepare(
         `SELECT id, slug, variant, display_name, email, photo_key,
-                footer_link_json, page_copy_json, contact_json, exchange_copy_json, updated_at
+                links_json, page_copy_json, contact_json, copy_json, updated_at
          FROM cards WHERE slug = ?`,
       )
       .bind(slug)
@@ -43,7 +43,7 @@ export class D1CardRepository implements CardRepository {
     const row = await this.db
       .prepare(
         `SELECT c.id, c.slug, c.variant, c.display_name, c.email, c.photo_key,
-                c.footer_link_json, c.page_copy_json, c.contact_json, c.exchange_copy_json, c.updated_at
+                c.links_json, c.page_copy_json, c.contact_json, c.copy_json, c.updated_at
          FROM hostnames h
          JOIN cards c ON c.id = h.card_id
          WHERE h.hostname = ?`,
@@ -56,17 +56,17 @@ export class D1CardRepository implements CardRepository {
   async upsertCard(input: CardLoadInput): Promise<CardRecord> {
     const existing = await this.getBySlug(input.slug);
     const updatedAt = nowIso();
-    const footerLinkJson = JSON.stringify(input.footerLink);
+    const linksJson = JSON.stringify(input.links);
     const pageCopyJson = JSON.stringify(input.pageCopy);
     const contactJson = JSON.stringify(input.contact);
-    const exchangeCopyJson = JSON.stringify(input.exchangeCopy);
+    const copyJson = JSON.stringify(input.copy);
 
     if (existing) {
       await this.db
         .prepare(
           `UPDATE cards SET
             variant = ?, display_name = ?, email = ?, photo_key = ?,
-            footer_link_json = ?, page_copy_json = ?, contact_json = ?, exchange_copy_json = ?,
+            links_json = ?, page_copy_json = ?, contact_json = ?, copy_json = ?,
             updated_at = ?
            WHERE id = ?`,
         )
@@ -75,10 +75,10 @@ export class D1CardRepository implements CardRepository {
           input.displayName,
           input.email,
           input.photoKey,
-          footerLinkJson,
+          linksJson,
           pageCopyJson,
           contactJson,
-          exchangeCopyJson,
+          copyJson,
           updatedAt,
           existing.id,
         )
@@ -96,7 +96,7 @@ export class D1CardRepository implements CardRepository {
       .prepare(
         `INSERT INTO cards (
           id, slug, variant, display_name, email, photo_key,
-          footer_link_json, page_copy_json, contact_json, exchange_copy_json, updated_at
+          links_json, page_copy_json, contact_json, copy_json, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
@@ -106,10 +106,10 @@ export class D1CardRepository implements CardRepository {
         input.displayName,
         input.email,
         input.photoKey,
-        footerLinkJson,
+        linksJson,
         pageCopyJson,
         contactJson,
-        exchangeCopyJson,
+        copyJson,
         updatedAt,
       )
       .run();

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { lookupCard } from "@/card-data/lookup";
 import { MemoryCardRepository } from "@/card-data/memory-repository";
-import type { CardLoadInput } from "@/card-data/types";
+import { exampleCardInput } from "../helpers/example-card";
 
 const hostConfig = {
   baseUrl: "https://we-met.link",
@@ -9,41 +9,11 @@ const hostConfig = {
   weMetEnv: "production",
 };
 
-const sampleCard: CardLoadInput = {
-  slug: "didi",
-  variant: "green",
-  displayName: "Didi",
-  email: "hello@example.com",
-  photoKey: null,
-  footerLink: { label: "Site", url: "https://example.com" },
-  pageCopy: {
-    pageTitle: "Hi",
-    emailFromName: "Didi",
-    headshotAlt: "Didi",
-    greetingName: "Didi",
-    exchangeButton: "Exchange",
-    bookLink: "Book",
-  },
-  contact: {
-    name: {
-      full: "Didi",
-      family: "X",
-      given: "Didi",
-      nickname: "Didi",
-    },
-    org: "Org",
-    title: "Title",
-    email: "hello@example.com",
-    phone: "+1-555-0100",
-    vcardNote: "Note",
-  },
-  exchangeCopy: {},
-};
-
 describe("lookup (unit)", () => {
   it("resolves by slug on the card host", async () => {
     const repo = new MemoryCardRepository();
-    await repo.upsertCard(sampleCard);
+    const sample = { ...exampleCardInput(), slug: "didi" };
+    await repo.upsertCard(sample);
     const card = await lookupCard(
       { hostname: "we-met.link", pathname: "/hi/didi" },
       repo,
@@ -54,7 +24,8 @@ describe("lookup (unit)", () => {
 
   it("resolves by slug on preview hosts matching the suffix", async () => {
     const repo = new MemoryCardRepository();
-    await repo.upsertCard(sampleCard);
+    const sample = { ...exampleCardInput(), slug: "didi" };
+    await repo.upsertCard(sample);
     const card = await lookupCard(
       {
         hostname: "pr-1-we-met.diademshoukralla.workers.dev",
@@ -88,7 +59,8 @@ describe("lookup (unit)", () => {
 
   it("does not resolve reserved hostnames via hostname table", async () => {
     const repo = new MemoryCardRepository();
-    await repo.upsertCard(sampleCard);
+    const sample = { ...exampleCardInput(), slug: "didi" };
+    await repo.upsertCard(sample);
     await repo.upsertHostname({ hostname: "app.we-met.link", slug: "didi" });
     const card = await lookupCard(
       { hostname: "app.we-met.link", pathname: "/" },
@@ -100,7 +72,8 @@ describe("lookup (unit)", () => {
 
   it("resolves custom hostname mappings", async () => {
     const repo = new MemoryCardRepository();
-    await repo.upsertCard(sampleCard);
+    const sample = { ...exampleCardInput(), slug: "didi" };
+    await repo.upsertCard(sample);
     await repo.upsertHostname({ hostname: "card.example.com", slug: "didi" });
     const card = await lookupCard(
       { hostname: "card.example.com", pathname: "/" },

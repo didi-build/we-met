@@ -6,6 +6,7 @@
  *   npx tsx scripts/load-cards.ts [--file data/cards.local.json]
  *   npx tsx scripts/load-cards.ts --remote [--file path]
  *   npx tsx scripts/load-cards.ts --remote --production [--file path]
+ *   npx tsx scripts/load-cards.ts --validate-only [--file path]
  */
 import { createInterface } from "node:readline/promises";
 import { spawnSync } from "node:child_process";
@@ -23,6 +24,7 @@ const args = process.argv.slice(2);
 let mode: "local" | "remote" = "local";
 let filePath = DEFAULT_FILE;
 let production = false;
+let validateOnly = false;
 
 for (let i = 0; i < args.length; i++) {
   const arg = args[i];
@@ -30,6 +32,8 @@ for (let i = 0; i < args.length; i++) {
     mode = "local";
   } else if (arg === "--remote") {
     mode = "remote";
+  } else if (arg === "--validate-only") {
+    validateOnly = true;
   } else if (arg === "--production") {
     production = true;
   } else if (arg === "--file") {
@@ -53,6 +57,33 @@ if (production && mode !== "remote") {
 }
 
 async function main(): Promise<void> {
+  let raw: string;
+  try {
+    raw = readFileSync(resolve(filePath), "utf8");
+  } catch (error) {
+    console.error(`Failed to read load file: ${filePath}`);
+    console.error(error);
+    process.exitCode = 1;
+    return;
+  }
+
+  let loadFile;
+  try {
+    loadFile = parseCardsLoadFile(JSON.parse(raw));
+  } catch (error) {
+    console.error("Invalid load file:");
+    console.error(error);
+    process.exitCode = 1;
+    return;
+  }
+
+  if (validateOnly) {
+    console.log(
+      `OK: ${loadFile.cards.length} cards, ${loadFile.hostnames.length} hostnames`,
+    );
+    return;
+  }
+
   if (mode === "remote" && !production) {
     if (!process.env.WE_MET_D1_DATABASE_ID_NONPROD?.trim()) {
       console.error(
@@ -81,26 +112,6 @@ async function main(): Promise<void> {
       process.exitCode = 1;
       return;
     }
-  }
-
-  let raw: string;
-  try {
-    raw = readFileSync(resolve(filePath), "utf8");
-  } catch (error) {
-    console.error(`Failed to read load file: ${filePath}`);
-    console.error(error);
-    process.exitCode = 1;
-    return;
-  }
-
-  let loadFile;
-  try {
-    loadFile = parseCardsLoadFile(JSON.parse(raw));
-  } catch (error) {
-    console.error("Invalid load file:");
-    console.error(error);
-    process.exitCode = 1;
-    return;
   }
 
   const sqlRel = `load-${process.pid}.sql`;

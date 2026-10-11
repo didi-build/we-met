@@ -4,43 +4,12 @@ import {
   clearLeadSinkKindsForTests,
   registerLeadSinkKind,
 } from "@/card-data/lead-sink-registry";
+import { buildCardsLoadSql, newCardIdsForLoad } from "@/card-data/load-sql";
 import { MemoryCardRepository } from "@/card-data/memory-repository";
 import type { CardRepository } from "@/card-data/repository";
-import type { CardLoadInput } from "@/card-data/types";
-import { buildCardsLoadSql, newCardIdsForLoad } from "@/card-data/load-sql";
 import { splitSqlStatements } from "@/card-data/sql-statements";
+import { exampleCardInput } from "../helpers/example-card";
 import { withLocalD1 } from "../helpers/d1";
-
-const sampleCard: CardLoadInput = {
-  slug: "contract-demo",
-  variant: "green",
-  displayName: "Contract Demo",
-  email: "demo@example.com",
-  photoKey: "photos/demo.jpg",
-  footerLink: { label: "Site", url: "https://example.com" },
-  pageCopy: {
-    pageTitle: "Hi",
-    emailFromName: "Demo",
-    headshotAlt: "Demo",
-    greetingName: "Demo",
-    exchangeButton: "Exchange",
-    bookLink: "Book",
-  },
-  contact: {
-    name: {
-      full: "Demo",
-      family: "Demo",
-      given: "Demo",
-      nickname: "Demo",
-    },
-    org: "Org",
-    title: "Title",
-    email: "demo@example.com",
-    phone: "+1-555-0100",
-    vcardNote: "Note",
-  },
-  exchangeCopy: { key: "value" },
-};
 
 function registerTestSinkKind() {
   registerLeadSinkKind("test_sink", {
@@ -74,20 +43,23 @@ function defineContract(
 
     it("round-trips card upsert and slug lookup", async () => {
       await withRepo(async (repo) => {
-        const slug = `${sampleCard.slug}-${label}`;
-        const saved = await repo.upsertCard({ ...sampleCard, slug });
-        expect(saved.photoKey).toBe("photos/demo.jpg");
+        const slug = `contract-demo-${label}`;
+        const saved = await repo.upsertCard({
+          ...exampleCardInput(),
+          slug,
+        });
+        expect(saved.photoKey).toBeNull();
         const loaded = await repo.getBySlug(slug);
-        expect(loaded?.displayName).toBe("Contract Demo");
-        expect(loaded?.exchangeCopy).toEqual({ key: "value" });
+        expect(loaded?.displayName).toBe("Demo User");
+        expect(loaded?.copy.thanksMessage).toContain("{firstName}");
       });
     });
 
     it("lists and validates lead sinks", async () => {
       await withRepo(async (repo) => {
         registerTestSinkKind();
-        const slug = `${sampleCard.slug}-sink-${label}`;
-        const card = await repo.upsertCard({ ...sampleCard, slug });
+        const slug = `contract-demo-sink-${label}`;
+        const card = await repo.upsertCard({ ...exampleCardInput(), slug });
         const sink = await repo.addLeadSink(card.id, {
           kind: "test_sink",
           config: { to: "owner@example.com" },
@@ -101,8 +73,8 @@ function defineContract(
 
     it("round-trips hostname mapping case-insensitively", async () => {
       await withRepo(async (repo) => {
-        const slug = `${sampleCard.slug}-host-${label}`;
-        await repo.upsertCard({ ...sampleCard, slug });
+        const slug = `contract-demo-host-${label}`;
+        await repo.upsertCard({ ...exampleCardInput(), slug });
         await repo.upsertHostname({ hostname: "CARD.Example.COM", slug });
         const byLower = await repo.getByHostname("card.example.com");
         const byUpper = await repo.getByHostname("CARD.EXAMPLE.COM");
@@ -113,8 +85,8 @@ function defineContract(
 
     it("rejects unknown lead sink kinds", async () => {
       await withRepo(async (repo) => {
-        const slug = `${sampleCard.slug}-reject-${label}`;
-        const card = await repo.upsertCard({ ...sampleCard, slug });
+        const slug = `contract-demo-reject-${label}`;
+        const card = await repo.upsertCard({ ...exampleCardInput(), slug });
         await expect(
           repo.addLeadSink(card.id, {
             kind: "unknown",
@@ -145,7 +117,7 @@ describe("load SQL hostname mapping (d1 integration)", () => {
       const repo = new D1CardRepository(db);
       const slug = "sql-host-demo";
       const loadFile = {
-        cards: [{ ...sampleCard, slug }],
+        cards: [{ ...exampleCardInput(), slug }],
         hostnames: [{ hostname: "card.sql-test.example", slug }],
       };
       const sql = buildCardsLoadSql(loadFile, {

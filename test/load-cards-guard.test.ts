@@ -105,4 +105,18 @@ describe("load-cards remote guards (unit)", () => {
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("Unknown option");
   });
+
+  it("validate-only exits 0 on the example file without creating artifacts", () => {
+    const result = runScript(["--validate-only", "--file", "data/cards.example.json"]);
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("OK: 1 cards, 0 hostnames");
+    expect(leftoverGeneratedArtifacts()).toEqual([]);
+  });
+
+  it("validate-only exits 1 on a broken file", () => {
+    const result = runScript(["--validate-only", "--file", "package.json"]);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("Invalid load file");
+    expect(leftoverGeneratedArtifacts()).toEqual([]);
+  });
 });

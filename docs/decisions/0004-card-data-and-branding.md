@@ -10,7 +10,7 @@ Step 1 is one card; multi-user needs per-card fields and visual variants without
 
 ## Decision
 
-- **Card data seam** supplies all per-card fields (contact info, slug, variant, footer link, page copy, photo key, **enabled lead sinks**, etc.) from **D1** ([0010](./0010-card-data-d1-and-load-script.md)).
+- **Card data seam** supplies all per-card fields (contact info, slug, variant, **links** (booking + footer nav), page copy, **copy** (exchange/about/email templates), photo key, **enabled lead sinks**, etc.) from **D1** ([0010](./0010-card-data-d1-and-load-script.md)). Booking and profile URLs come from the card record, not hardcoded hosts.
 - **Lead sinks** live in **`lead_sinks`** rows keyed by `card_id` ([0018](./0018-lead-sink.md)). The seam loads sinks with the card, validates each row’s **`config`** against the schema for its **`kind`**, and exposes typed config to the app (no raw JSON outside the repository).
 - **Brand variants** are a **closed set:** `green` and `mono`, stored on the card record. The variant is applied **server-side** from that record; **light/dark** mode is a **browser** preference.
 - **Colors** exist only under **`src/theme/tokens/`** (e.g. `green.light.css`, `green.dark.css`; `mono.*` later). UI uses tokens, not raw color literals. A **`theme-colors`** check (to be added) will fail `npm run check` if color literals appear outside that folder.

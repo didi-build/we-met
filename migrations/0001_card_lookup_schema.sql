@@ -1,4 +1,7 @@
 -- Cards, hostname routing, and lead sinks (step 1 schema).
+-- Edited in place (2026-10-11): links_json and copy_json replace footer_link_json /
+-- exchange_copy_json. Migration 0001 has NOT been applied to any remote D1; safe to
+-- reshape before first db:migrate:remote or production deploy.
 CREATE TABLE IF NOT EXISTS cards (
   id TEXT PRIMARY KEY NOT NULL,
   slug TEXT NOT NULL UNIQUE,
@@ -6,10 +9,10 @@ CREATE TABLE IF NOT EXISTS cards (
   display_name TEXT NOT NULL,
   email TEXT NOT NULL,
   photo_key TEXT,
-  footer_link_json TEXT NOT NULL,
+  links_json TEXT NOT NULL,
   page_copy_json TEXT NOT NULL,
   contact_json TEXT NOT NULL,
-  exchange_copy_json TEXT NOT NULL,
+  copy_json TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
 

@@ -6,7 +6,21 @@
       "displayName": "Demo User",
       "email": "demo@example.com",
       "photoKey": null,
-      "footerLink": { "label": "Example", "url": "https://example.com" },
+      "links": {
+        "bookingUrl": "https://example.com",
+        "footer": [
+          {
+            "kind": "site",
+            "label": "Site",
+            "url": "https://example.com"
+          },
+          {
+            "kind": "github",
+            "label": "GitHub",
+            "url": "https://github.com/example"
+          }
+        ]
+      },
       "pageCopy": {
         "pageTitle": "Hi, I'm Demo",
         "emailFromName": "Demo at Example",
@@ -26,10 +40,73 @@
         "title": "Example role",
         "email": "demo@example.com",
         "phone": "+1-555-555-0100",
-        "vcardNote": "Met at an event."
+        "vcardNote": "Met at an event; Didi's note — demo 🎉",
+        "urls": [
+          {
+            "url": "https://example.com",
+            "type": "Portfolio"
+          }
+        ]
       },
-      "exchangeCopy": {
-        "thanksMessage": "Thanks, {firstName}. Talk soon."
+      "copy": {
+        "thanksMessage": "Thanks, {firstName}. Talk soon.",
+        "exchangeAriaLabel": "Open exchange form",
+        "footerNavLabel": "Footer links",
+        "about": {
+          "title": "About Demo",
+          "intro": "Demo intro with emoji 🎉 and semicolon; still one field.",
+          "expandedParagraphs": ["Paragraph one.", "Paragraph two."],
+          "consultationHighlight": "Book a consult",
+          "showMore": "Show more",
+          "showLess": "Show less",
+          "whatIDoTitle": "What I do",
+          "chips": [
+            {
+              "label": "Chip",
+              "explanation": "Chip detail"
+            }
+          ]
+        },
+        "exchangeSheet": {
+          "exchangeTitle": "Exchange",
+          "detailsTitle": "Details",
+          "detailsIntro": "Your details",
+          "nameLabel": "Name",
+          "emailLabel": "Email",
+          "phoneLabel": "Phone",
+          "phoneOptional": "Optional",
+          "countryCodeAriaLabel": "Country code",
+          "submitExchange": "Submit",
+          "submitDetails": "Send",
+          "consent": "I agree",
+          "closeLabel": "Close",
+          "exchangeFormAriaLabel": "Exchange form",
+          "detailsFormAriaLabel": "Details form",
+          "notePlaceholder": "Note",
+          "jobTitleLabel": "Job title",
+          "companyLabel": "Company",
+          "noteLabel": "Note",
+          "pendingExchange": "Pending",
+          "pendingDetails": "Pending details",
+          "detailsSaved": "Saved",
+          "networkErrorMessage": "Network error",
+          "exchangeNotSavedPrefix": "Could not save ",
+          "exchangeNotSavedEmail": "help@example.com",
+          "exchangeNotSavedSuffix": " please try again",
+          "errors": {
+            "nameRequired": "Name required",
+            "emailRequired": "Email required",
+            "emailInvalid": "Invalid email"
+          }
+        },
+        "followUpEmail": {
+          "subjectTemplate": "Nice meeting you",
+          "greetingTemplate": "Hi {firstName},",
+          "bodyParagraphs": ["Line one.", "Line two."],
+          "attachmentLine": "VCard attached",
+          "bookCtaLabel": "Book time",
+          "closingLine": "Cheers"
+        }
       }
     }
   ],

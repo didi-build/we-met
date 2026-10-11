@@ -5,14 +5,15 @@ export const LOAD_STRING_LIMITS = {
   displayName: 200,
   email: 254,
   photoKey: 256,
-  footerLabel: 120,
-  footerUrl: 2048,
+  url: 2048,
   pageCopyField: 500,
   contactField: 500,
   contactEmail: 254,
   contactPhone: 64,
-  exchangeCopyKey: 80,
-  exchangeCopyValue: 2000,
+  copyLeaf: 1000,
+  footerLabel: 60,
+  chipLabel: 60,
+  chipExplanation: 500,
 } as const;
 
 const CONTROL_OR_NUL = /[\u0000-\u001F\u007F]/;
@@ -72,14 +73,14 @@ function buildCardUpsertStatement(
   newId: string,
   updatedAt: string,
 ): string {
-  const footerLinkJson = cardJson(card.footerLink);
+  const linksJson = cardJson(card.links);
   const pageCopyJson = cardJson(card.pageCopy);
   const contactJson = cardJson(card.contact);
-  const exchangeCopyJson = cardJson(card.exchangeCopy);
+  const copyJson = cardJson(card.copy);
 
   return `INSERT INTO cards (
   id, slug, variant, display_name, email, photo_key,
-  footer_link_json, page_copy_json, contact_json, exchange_copy_json, updated_at
+  links_json, page_copy_json, contact_json, copy_json, updated_at
 ) VALUES (
   ${escapeSqlStringLiteral(newId)},
   ${escapeSqlStringLiteral(card.slug)},
@@ -87,10 +88,10 @@ function buildCardUpsertStatement(
   ${escapeSqlStringLiteral(card.displayName)},
   ${escapeSqlStringLiteral(card.email)},
   ${sqlNullableString(card.photoKey)},
-  ${footerLinkJson},
+  ${linksJson},
   ${pageCopyJson},
   ${contactJson},
-  ${exchangeCopyJson},
+  ${copyJson},
   ${escapeSqlStringLiteral(updatedAt)}
 )
 ON CONFLICT(slug) DO UPDATE SET
@@ -98,10 +99,10 @@ ON CONFLICT(slug) DO UPDATE SET
   display_name = excluded.display_name,
   email = excluded.email,
   photo_key = excluded.photo_key,
-  footer_link_json = excluded.footer_link_json,
+  links_json = excluded.links_json,
   page_copy_json = excluded.page_copy_json,
   contact_json = excluded.contact_json,
-  exchange_copy_json = excluded.exchange_copy_json,
+  copy_json = excluded.copy_json,
   updated_at = excluded.updated_at`;
 }
 

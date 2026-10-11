@@ -1,8 +1,16 @@
 export type BrandVariant = "green" | "mono";
 
-export type FooterLink = {
+export type FooterLinkKind = "site" | "linkedin" | "github" | "portfolio" | "google";
+
+export type CardFooterLink = {
+  kind: FooterLinkKind;
   label: string;
   url: string;
+};
+
+export type CardLinks = {
+  bookingUrl: string;
+  footer: CardFooterLink[];
 };
 
 export type ContactName = {
@@ -12,6 +20,11 @@ export type ContactName = {
   nickname: string;
 };
 
+export type ContactUrl = {
+  url: string;
+  type?: string;
+};
+
 export type CardContact = {
   name: ContactName;
   org: string;
@@ -19,6 +32,7 @@ export type CardContact = {
   email: string;
   phone: string;
   vcardNote: string;
+  urls: ContactUrl[];
 };
 
 export type CardPageCopy = {
@@ -30,7 +44,74 @@ export type CardPageCopy = {
   bookLink: string;
 };
 
-export type CardExchangeCopy = Record<string, unknown>;
+export type CardCopyAboutChip = {
+  label: string;
+  explanation: string;
+};
+
+export type CardCopyAbout = {
+  title: string;
+  intro: string;
+  expandedParagraphs: string[];
+  consultationHighlight: string;
+  showMore: string;
+  showLess: string;
+  whatIDoTitle: string;
+  chips: CardCopyAboutChip[];
+};
+
+export type CardCopyExchangeSheetErrors = {
+  nameRequired: string;
+  emailRequired: string;
+  emailInvalid: string;
+};
+
+export type CardCopyExchangeSheet = {
+  exchangeTitle: string;
+  detailsTitle: string;
+  detailsIntro: string;
+  nameLabel: string;
+  emailLabel: string;
+  phoneLabel: string;
+  phoneOptional: string;
+  countryCodeAriaLabel: string;
+  submitExchange: string;
+  submitDetails: string;
+  consent: string;
+  closeLabel: string;
+  exchangeFormAriaLabel: string;
+  detailsFormAriaLabel: string;
+  notePlaceholder: string;
+  jobTitleLabel: string;
+  companyLabel: string;
+  noteLabel: string;
+  pendingExchange: string;
+  pendingDetails: string;
+  detailsSaved: string;
+  networkErrorMessage: string;
+  exchangeNotSavedPrefix: string;
+  exchangeNotSavedEmail: string;
+  exchangeNotSavedSuffix: string;
+  errors: CardCopyExchangeSheetErrors;
+};
+
+export type CardCopyFollowUpEmail = {
+  subjectTemplate: string;
+  greetingTemplate: string;
+  bodyParagraphs: string[];
+  attachmentLine: string;
+  bookCtaLabel: string;
+  closingLine: string;
+};
+
+export type CardCopy = {
+  thanksMessage: string;
+  exchangeAriaLabel: string;
+  footerNavLabel: string;
+  about: CardCopyAbout;
+  exchangeSheet: CardCopyExchangeSheet;
+  followUpEmail: CardCopyFollowUpEmail;
+};
 
 export type CardRecord = {
   id: string;
@@ -39,10 +120,10 @@ export type CardRecord = {
   displayName: string;
   email: string;
   photoKey: string | null;
-  footerLink: FooterLink;
+  links: CardLinks;
   pageCopy: CardPageCopy;
   contact: CardContact;
-  exchangeCopy: CardExchangeCopy;
+  copy: CardCopy;
   updatedAt: string;
 };
 
@@ -62,10 +143,10 @@ export type CardLoadInput = {
   displayName: string;
   email: string;
   photoKey: string | null;
-  footerLink: FooterLink;
+  links: CardLinks;
   pageCopy: CardPageCopy;
   contact: CardContact;
-  exchangeCopy: CardExchangeCopy;
+  copy: CardCopy;
 };
 
 export type HostnameMapping = {

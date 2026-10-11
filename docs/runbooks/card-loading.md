@@ -2,17 +2,36 @@
 
 Load personal card data from a **gitignored** JSON file into D1. Real card values never belong in git ([0010](../decisions/0010-card-data-d1-and-load-script.md)).
 
+## Validate before load
+
+```bash
+npm run cards:load -- --validate-only --file data/cards.example.json
+# or data/cards.local.json once you have real data
+```
+
+Prints `OK: <n> cards, <m> hostnames` and exits 0 when the JSON matches the schema (no D1, no Wrangler, no generated files).
+
 ## Load file
 
 - **Path:** `data/cards.local.json` (copy from `data/cards.example.json` and edit).
+- **Shape:** each card has `slug`, `variant`, `displayName`, `email`, `photoKey`, `links` (`bookingUrl` + `footer[]`), `pageCopy` (six strings), `contact` (vCard fields + `urls[]`), and `copy` (thanks/exchange/about/follow-up email strings). See [0010](../decisions/0010-card-data-d1-and-load-script.md).
 - **Git:** `git check-ignore -v data/cards.local.json` must show the file is ignored.
 
 ## Local D1 (developer machine)
 
 Uses the `WE_MET_DB` binding from `wrangler.jsonc` with Wrangler’s **local** D1 persistence:
 
+If you previously migrated with an older `0001` schema (columns `footer_link_json` / `exchange_copy_json`), reset local D1 state:
+
 ```bash
+rm -rf .wrangler/state
 npm run db:migrate
+```
+
+Then load:
+
+```bash
+npm run cards:load -- --validate-only --file data/cards.example.json
 npm run cards:load -- --file data/cards.example.json
 ```
 
