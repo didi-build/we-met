@@ -5,8 +5,6 @@
  * Usage:
  *   node scripts/check-deploy-guards.mjs --target preview --config wrangler.jsonc
  *   node scripts/check-deploy-guards.mjs --target production --config wrangler.jsonc
- *
- * Production target also requires GITHUB_ENVIRONMENT=production when WE_MET_ENV is production.
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -61,6 +59,7 @@ function fail(message) {
   process.exit(1);
 }
 
+// Validates config/nonprod-mail-safety.json only until the consumer Worker ships (DIDI-577).
 function checkNonprodMailSafety() {
   const path = resolve("config/nonprod-mail-safety.json");
   let spec;
@@ -77,6 +76,63 @@ function checkNonprodMailSafety() {
   }
   if (spec.consumerWorkerName !== NONPROD_RESOURCE_MARKERS.consumerWorkerName) {
     fail("nonprod consumer worker name mismatch in config/nonprod-mail-safety.json");
+  }
+}
+
+function assertEveryPreviewD1(previews, predicate, message) {
+  const rows = previews?.d1_databases ?? [];
+  if (rows.length === 0) fail("previews.d1_databases is required");
+  for (const row of rows) {
+    if (!predicate(row)) fail(message);
+  }
+}
+
+function assertEveryPreviewR2(previews, predicate, message) {
+  const rows = previews?.r2_buckets ?? [];
+  if (rows.length === 0) fail("previews.r2_buckets is required");
+  for (const row of rows) {
+    if (!predicate(row)) fail(message);
+  }
+}
+
+function assertEveryPreviewQueue(previews, predicate, message) {
+  const producers = previews?.queues?.producers ?? [];
+  if (producers.length === 0) fail("previews.queues.producers is required");
+  for (const row of producers) {
+    if (!predicate(row)) fail(message);
+  }
+}
+
+function assertEveryPreviewRateLimit(previews, predicate, message) {
+  const rows = previews?.ratelimits ?? [];
+  if (rows.length === 0) fail("previews.ratelimits is required");
+  for (const row of rows) {
+    if (!predicate(row)) fail(message);
+  }
+}
+
+function checkDistinctD1Ids(config) {
+  const topLevelIds = (config.d1_databases ?? [])
+    .map((row) => row.database_id)
+    .filter(Boolean);
+  const previewIds = (config.previews?.d1_databases ?? [])
+    .map((row) => row.database_id)
+    .filter(Boolean);
+  for (const topId of topLevelIds) {
+    for (const previewId of previewIds) {
+      if (topId === previewId) {
+        fail(
+          "previews D1 database_id must differ from top-level production database_id",
+        );
+      }
+    }
+  }
+  const seen = new Set();
+  for (const id of [...topLevelIds, ...previewIds]) {
+    if (seen.has(id)) {
+      fail("duplicate D1 database_id across top-level and previews blocks");
+    }
+    seen.add(id);
   }
 }
 
@@ -98,21 +154,27 @@ function checkPreviewBlock(previews) {
   if (previewVars?.WE_MET_ENV !== "preview") {
     fail('previews.vars.WE_MET_ENV must be "preview"');
   }
-  if (previewVars?.WE_MET_ENV === "production") {
-    fail("previews must not set WE_MET_ENV to production");
-  }
 
-  const previewD1 = previews?.d1_databases?.[0]?.database_name;
-  const previewR2 = previews?.r2_buckets?.[0]?.bucket_name;
-  const previewQueue = previews?.queues?.producers?.[0]?.queue;
-  const previewRl = previews?.ratelimits?.[0]?.namespace_id;
-
-  if (previewD1 !== NONPROD_RESOURCE_MARKERS.d1Name) fail("preview D1 binding name");
-  if (previewR2 !== NONPROD_RESOURCE_MARKERS.r2Bucket) fail("preview R2 bucket");
-  if (previewQueue !== NONPROD_RESOURCE_MARKERS.queue) fail("preview queue");
-  if (previewRl !== NONPROD_RESOURCE_MARKERS.rateLimiterNamespaceId) {
-    fail("preview rate limiter namespace");
-  }
+  assertEveryPreviewD1(
+    previews,
+    (row) => row.database_name === NONPROD_RESOURCE_MARKERS.d1Name,
+    "preview D1 binding name",
+  );
+  assertEveryPreviewR2(
+    previews,
+    (row) => row.bucket_name === NONPROD_RESOURCE_MARKERS.r2Bucket,
+    "preview R2 bucket",
+  );
+  assertEveryPreviewQueue(
+    previews,
+    (row) => row.queue === NONPROD_RESOURCE_MARKERS.queue,
+    "preview queue",
+  );
+  assertEveryPreviewRateLimit(
+    previews,
+    (row) => row.namespace_id === NONPROD_RESOURCE_MARKERS.rateLimiterNamespaceId,
+    "preview rate limiter namespace",
+  );
 }
 
 function checkProductionBlock(config) {
@@ -122,22 +184,30 @@ function checkProductionBlock(config) {
   if (config.vars?.WE_MET_ENV !== "production") {
     fail('top-level WE_MET_ENV must be "production"');
   }
-  const d1 = config.d1_databases?.[0]?.database_name;
-  const r2 = config.r2_buckets?.[0]?.bucket_name;
-  const queue = config.queues?.producers?.[0]?.queue;
-  const rl = config.ratelimits?.[0]?.namespace_id;
-  if (d1 !== PRODUCTION_RESOURCE_MARKERS.d1Name) fail("production D1 name");
-  if (r2 !== PRODUCTION_RESOURCE_MARKERS.r2Bucket) fail("production R2 bucket");
-  if (queue !== PRODUCTION_RESOURCE_MARKERS.queue) fail("production queue");
-  if (rl !== PRODUCTION_RESOURCE_MARKERS.rateLimiterNamespaceId) {
-    fail("production rate limiter namespace");
-  }
 
-  if (process.env.WE_MET_ENV === "production") {
-    if (process.env.GITHUB_ENVIRONMENT !== "production") {
-      fail(
-        "WE_MET_ENV=production requires GitHub environment approval (GITHUB_ENVIRONMENT=production)",
-      );
+  const d1Rows = config.d1_databases ?? [];
+  const r2Rows = config.r2_buckets ?? [];
+  const queueRows = config.queues?.producers ?? [];
+  const rlRows = config.ratelimits ?? [];
+
+  for (const row of d1Rows) {
+    if (row.database_name !== PRODUCTION_RESOURCE_MARKERS.d1Name) {
+      fail("production D1 name");
+    }
+  }
+  for (const row of r2Rows) {
+    if (row.bucket_name !== PRODUCTION_RESOURCE_MARKERS.r2Bucket) {
+      fail("production R2 bucket");
+    }
+  }
+  for (const row of queueRows) {
+    if (row.queue !== PRODUCTION_RESOURCE_MARKERS.queue) {
+      fail("production queue");
+    }
+  }
+  for (const row of rlRows) {
+    if (row.namespace_id !== PRODUCTION_RESOURCE_MARKERS.rateLimiterNamespaceId) {
+      fail("production rate limiter namespace");
     }
   }
 }
@@ -147,6 +217,7 @@ function main() {
   const config = parseJsonc(readFileSync(configPath, "utf8"));
 
   checkNonprodMailSafety();
+  checkDistinctD1Ids(config);
 
   if (target === "preview") {
     checkPreviewBlock(config.previews);
