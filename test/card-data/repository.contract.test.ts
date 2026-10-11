@@ -7,6 +7,8 @@ import {
 import { MemoryCardRepository } from "@/card-data/memory-repository";
 import type { CardRepository } from "@/card-data/repository";
 import type { CardLoadInput } from "@/card-data/types";
+import { buildCardsLoadSql, newCardIdsForLoad } from "@/card-data/load-sql";
+import { splitSqlStatements } from "@/card-data/sql-statements";
 import { withLocalD1 } from "../helpers/d1";
 
 const sampleCard: CardLoadInput = {
@@ -97,6 +99,18 @@ function defineContract(
       });
     });
 
+    it("round-trips hostname mapping case-insensitively", async () => {
+      await withRepo(async (repo) => {
+        const slug = `${sampleCard.slug}-host-${label}`;
+        await repo.upsertCard({ ...sampleCard, slug });
+        await repo.upsertHostname({ hostname: "CARD.Example.COM", slug });
+        const byLower = await repo.getByHostname("card.example.com");
+        const byUpper = await repo.getByHostname("CARD.EXAMPLE.COM");
+        expect(byLower?.slug).toBe(slug);
+        expect(byUpper?.slug).toBe(slug);
+      });
+    });
+
     it("rejects unknown lead sink kinds", async () => {
       await withRepo(async (repo) => {
         const slug = `${sampleCard.slug}-reject-${label}`;
@@ -121,5 +135,28 @@ defineContract("d1", async (fn) => {
   await withLocalD1(async (db) => {
     await resetD1Tables(db);
     await fn(new D1CardRepository(db));
+  });
+});
+
+describe("load SQL hostname mapping (d1 integration)", () => {
+  it("maps hostname to the card loaded via SQL", async () => {
+    await withLocalD1(async (db) => {
+      await resetD1Tables(db);
+      const repo = new D1CardRepository(db);
+      const slug = "sql-host-demo";
+      const loadFile = {
+        cards: [{ ...sampleCard, slug }],
+        hostnames: [{ hostname: "card.sql-test.example", slug }],
+      };
+      const sql = buildCardsLoadSql(loadFile, {
+        updatedAt: "2026-10-11T12:00:00.000Z",
+        newCardIds: newCardIdsForLoad(loadFile),
+      });
+      for (const statement of splitSqlStatements(sql)) {
+        await db.prepare(statement).run();
+      }
+      const card = await repo.getByHostname("card.sql-test.example");
+      expect(card?.slug).toBe(slug);
+    });
   });
 });
