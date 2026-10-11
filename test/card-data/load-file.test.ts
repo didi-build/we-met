@@ -95,6 +95,33 @@ describe("parseCardsLoadFile (unit)", () => {
     ).toThrow(/Control characters/);
   });
 
+  it("preserves footerLink.url without normalizing away the original string", () => {
+    const file = parseCardsLoadFile({
+      cards: [
+        minimalCard({
+          footerLink: { label: "Site", url: "https://example.com" },
+        }),
+      ],
+      hostnames: [],
+    });
+    expect(file.cards[0].footerLink.url).toBe("https://example.com");
+  });
+
+  it("rejects invalid hostnames", () => {
+    expect(() =>
+      parseCardsLoadFile({
+        cards: [],
+        hostnames: [{ hostname: "bad host", slug: "demo" }],
+      }),
+    ).toThrow(/hostname/);
+    expect(() =>
+      parseCardsLoadFile({
+        cards: [],
+        hostnames: [{ hostname: ".evil.com", slug: "demo" }],
+      }),
+    ).toThrow(/hostname/);
+  });
+
   it("rejects non-string exchangeCopy values", () => {
     expect(() =>
       parseCardsLoadFile({

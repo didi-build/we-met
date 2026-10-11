@@ -1,3 +1,4 @@
+import { assertValidHostname } from "@/card-data/hostname";
 import { assertValidSlug, isValidSlug } from "@/card-data/slug";
 import { LOAD_STRING_LIMITS, assertNoControlCharacters } from "@/card-data/load-sql";
 import type { BrandVariant, CardsLoadFile, CardLoadInput } from "@/card-data/types";
@@ -40,7 +41,7 @@ function requireHttpsUrl(raw: string, field: string): string {
   if (parsed.username || parsed.password) {
     throw new Error(`${field} must not include credentials`);
   }
-  return parsed.toString();
+  return raw;
 }
 
 function requireEmail(value: string, field: string): string {
@@ -204,6 +205,7 @@ function parseHostnameMapping(raw: unknown): CardsLoadFile["hostnames"][number] 
     throw new Error("Each hostname mapping must be an object");
   }
   const hostname = requireBoundedString(raw, "hostname", 253).toLowerCase();
+  assertValidHostname(hostname);
   const slug = requireBoundedString(raw, "slug", 64);
   if (!isValidSlug(slug)) {
     throw new Error(`Invalid slug in hostname mapping: ${slug}`);
