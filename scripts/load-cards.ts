@@ -134,7 +134,10 @@ async function main(): Promise<void> {
       }
     }
 
-    if (process.env.WE_MET_LOAD_CARDS_TEST_FAIL_AFTER_CONFIG === "1") {
+    if (
+      process.env.NODE_ENV === "test" &&
+      process.env.WE_MET_LOAD_CARDS_TEST_FAIL_AFTER_CONFIG === "1"
+    ) {
       throw new Error("WE_MET_LOAD_CARDS_TEST_FAIL_AFTER_CONFIG");
     }
 

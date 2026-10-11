@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { readdirSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { execPath } from "node:process";
 import { describe, expect, it } from "vitest";
 
@@ -8,15 +8,28 @@ const SCRIPT = "scripts/load-cards.ts";
 function runScript(argv: string[], env: Record<string, string> = {}) {
   return spawnSync(execPath, ["--import", "tsx", SCRIPT, ...argv], {
     encoding: "utf8",
-    env: { ...process.env, ...env },
+    env: { ...process.env, NODE_ENV: "test", ...env },
   });
 }
 
+const LOAD_CARDS_CONFIG_ARTIFACTS = [
+  "wrangler.d1-nonprod.ci.jsonc",
+  "wrangler.load-production.ci.jsonc",
+] as const;
+
 function leftoverGeneratedArtifacts(): string[] {
-  const root = readdirSync(".");
-  return root
-    .filter((name) => name.endsWith(".ci.jsonc") && name.startsWith("wrangler"))
-    .concat(root.filter((name) => name.startsWith("load-") && name.endsWith(".sql")));
+  const found: string[] = [];
+  for (const name of LOAD_CARDS_CONFIG_ARTIFACTS) {
+    if (existsSync(name)) {
+      found.push(name);
+    }
+  }
+  for (const name of readdirSync(".")) {
+    if (name.startsWith("load-") && name.endsWith(".sql")) {
+      found.push(name);
+    }
+  }
+  return found;
 }
 
 describe("load-cards remote guards (unit)", () => {
