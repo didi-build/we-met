@@ -34,15 +34,12 @@ function joinVCardLines(lines: string[]): string {
 
 export type VCardPhoto = {
   base64: string;
-  mime: "image/jpeg" | "image/png";
 };
 
 export function buildVCard(
   contact: CardContact,
   options: { photo?: VCardPhoto | null } = {},
 ): string {
-  const photoType = options.photo?.mime === "image/png" ? "PNG" : "JPEG";
-
   const lines = [
     "BEGIN:VCARD",
     "VERSION:3.0",
@@ -56,7 +53,7 @@ export function buildVCard(
   ];
 
   if (options.photo?.base64) {
-    lines.push(`PHOTO;ENCODING=b;TYPE=${photoType}:${options.photo.base64}`);
+    lines.push(`PHOTO;ENCODING=b;TYPE=JPEG:${options.photo.base64}`);
   }
 
   for (const entry of contact.urls) {

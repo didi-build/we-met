@@ -25,7 +25,7 @@ describe("buildVCard", () => {
 
   it("includes photo when provided", () => {
     const vcard = buildVCard(contact, {
-      photo: { base64: "aGVsbG8=", mime: "image/jpeg" },
+      photo: { base64: "aGVsbG8=" },
     });
     expect(vcard).toContain("PHOTO;ENCODING=b;TYPE=JPEG:aGVsbG8=");
   });

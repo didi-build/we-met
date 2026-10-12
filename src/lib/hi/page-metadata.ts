@@ -17,7 +17,7 @@ export function resolveHiCardMetadata(
       follow: true,
     },
     alternates: {
-      canonical: pagePath,
+      canonical: pageUrl,
     },
     openGraph: {
       title: card.pageCopy.pageTitle,

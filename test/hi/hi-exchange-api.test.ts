@@ -48,7 +48,7 @@ describe("postHiExchange", () => {
       email: "sam@example.com",
       turnstileToken: "token",
     });
-    expect(result).toEqual({ ok: false, kind: "server", message: "nope" });
+    expect(result).toEqual({ ok: false, kind: "server" });
   });
 
   it("posts to /api/exchange", async () => {

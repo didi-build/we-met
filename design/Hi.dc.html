@@ -9,7 +9,7 @@
 <x-dc>
 <helmet>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Hi, I'm Didi</title>
+<title>Hi, I'm Demo</title>
 <link rel="stylesheet" href="_ds/didi-build-design-system-b51779c8-dac0-4a13-a587-18bef5d1ac59/tokens/fonts.css">
 <link rel="stylesheet" href="_ds/didi-build-design-system-b51779c8-dac0-4a13-a587-18bef5d1ac59/tokens/colors.css">
 <link rel="stylesheet" href="_ds/didi-build-design-system-b51779c8-dac0-4a13-a587-18bef5d1ac59/tokens/typography.css">
@@ -37,14 +37,14 @@ a:focus-visible,button:focus-visible,select:focus-visible{outline:3px solid var(
 
   <main style="max-width:420px;margin:0 auto;min-height:100svh;box-sizing:border-box;padding:16px 24px 20px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:48px">
     <div style="width:100%;display:flex;flex-direction:column;align-items:center;gap:28px">
-      <section aria-label="Didi Shoukralla" style="display:flex;flex-direction:column;align-items:center;gap:14px;padding-top:clamp(16px,5svh,48px)">
-        <img src="assets/didi.png" alt="Didi Shoukralla" width="104" height="104" style="display:block;width:104px;height:104px;border-radius:50%" />
+      <section aria-label="Demo User" style="display:flex;flex-direction:column;align-items:center;gap:14px;padding-top:clamp(16px,5svh,48px)">
+        <img src="assets/didi.png" alt="Demo User" width="104" height="104" style="display:block;width:104px;height:104px;border-radius:50%" />
         <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
-          <p style="margin:0;font-weight:600;font-size:1.75rem;line-height:1.15;color:var(--accent-text);letter-spacing:-0.03em">I'm Didi</p>
-          <p style="margin:0;font-size:15px;line-height:1.45;color:var(--ink-muted);font-weight:500">Software Engineer and Technical Advisor</p>
+          <p style="margin:0;font-weight:600;font-size:1.75rem;line-height:1.15;color:var(--accent-text);letter-spacing:-0.03em">I'm Demo</p>
+          <p style="margin:0;font-size:15px;line-height:1.45;color:var(--ink-muted);font-weight:500">Example role</p>
         </div>
       </section>
-      <section aria-label="Exchange contacts" style="width:100%;display:flex;flex-direction:column;gap:4px">
+      <section aria-label="Open exchange form" style="width:100%;display:flex;flex-direction:column;gap:4px">
         <x-import component-from-global-scope="DidiBuildDesignSystem_b51779.Button" variant="primary" size="lg" on-click="{{ openExchange }}" dc-props="{{ fullWidth }}" hint-size="100%,56px">Exchange contact</x-import>
         <a href="{{ bookingUrl }}" target="_blank" rel="noopener" style="align-self:center;display:inline-flex;align-items:center;min-height:44px;padding:0 8px;font-size:15px;font-weight:500;color:var(--ink-muted);text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px" style-hover="color:var(--ink)">or book a time directly</a>
         <sc-if value="{{ showThanks }}" hint-placeholder-val="{{ false }}">
@@ -53,11 +53,11 @@ a:focus-visible,button:focus-visible,select:focus-visible{outline:3px solid var(
       </section>
       <section aria-labelledby="about-title" style="width:100%;box-sizing:border-box;text-align:left;display:flex;flex-direction:column;gap:24px;padding:28px 24px;border-radius:24px;background:var(--surface);border:1px solid var(--line)">
         <div style="display:flex;flex-direction:column;gap:14px">
-          <h2 id="about-title" style="margin:0;font-weight:600;font-size:1.375rem;line-height:1.15;letter-spacing:-0.02em">About me</h2>
-          <p style="margin:0;font-size:17px;line-height:1.6;color:var(--ink-muted);text-wrap:pretty">I'm a software engineer in Toronto. I help founders who built their app with AI get it ready for real users, paying customers, or investors.</p>
+          <h2 id="about-title" style="margin:0;font-weight:600;font-size:1.375rem;line-height:1.15;letter-spacing:-0.02em">About Demo</h2>
+          <p style="margin:0;font-size:17px;line-height:1.6;color:var(--ink-muted);text-wrap:pretty">Demo intro with emoji 🎉 and semicolon; still one field.</p>
           <sc-if value="{{ aboutOpen }}" hint-placeholder-val="{{ false }}">
-            <p style="margin:0;font-size:17px;line-height:1.6;color:var(--ink-muted);text-wrap:pretty;animation:hiFade .25s ease-out">I've shipped software at startups and on production teams, so I know what breaks once people actually show up.</p>
-            <p style="margin:0;font-size:17px;line-height:1.6;color:var(--ink-muted);text-wrap:pretty;animation:hiFade .25s ease-out">If you're building something, I'm happy to give you an honest, straight read during your <span style="color:var(--accent-text);font-weight:600">free consultation.</span></p>
+            <p style="margin:0;font-size:17px;line-height:1.6;color:var(--ink-muted);text-wrap:pretty;animation:hiFade .25s ease-out">Paragraph one… with ellipsis.</p>
+            <p style="margin:0;font-size:17px;line-height:1.6;color:var(--ink-muted);text-wrap:pretty;animation:hiFade .25s ease-out">Paragraph two.</p>
           </sc-if>
           <sc-if value="{{ aboutClosed }}" hint-placeholder-val="{{ true }}"><button type="button" aria-expanded="{{ aboutOpenStr }}" onClick="{{ toggleAbout }}" style="align-self:flex-start;display:inline-flex;align-items:center;gap:6px;min-height:44px;margin:-8px 0 -8px;padding:0;border:0;background:transparent;color:var(--accent-text);font:600 15px var(--font-sans);text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px;cursor:pointer" style-hover="color:var(--ink)">Show more</button></sc-if>
           <sc-if value="{{ aboutOpen }}" hint-placeholder-val="{{ false }}"><button type="button" aria-expanded="{{ aboutOpenStr }}" onClick="{{ toggleAbout }}" style="align-self:flex-start;display:inline-flex;align-items:center;gap:6px;min-height:44px;margin:-8px 0 -8px;padding:0;border:0;background:transparent;color:var(--accent-text);font:600 15px var(--font-sans);text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px;cursor:pointer" style-hover="color:var(--ink)">Show less</button></sc-if>
@@ -91,13 +91,13 @@ a:focus-visible,button:focus-visible,select:focus-visible{outline:3px solid var(
       </section>
     </div>
 
-    <nav aria-label="Elsewhere" style="margin-top:auto">
+    <nav aria-label="Footer links" style="margin-top:auto">
       <ul style="margin:0;padding:0;list-style:none;display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:2px">
-        <li><a href="https://didi.build" style="display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 8px;border-radius:999px;font-size:15px;font-weight:500;color:var(--ink-muted);text-decoration:none" style-hover="color:var(--ink);background:var(--surface-2)">
-          <x-import component-from-global-scope="DidiBuildDesignSystem_b51779.LeafMark" size="{{ 12 }}" hint-size="12px,12px"></x-import>didi.build</a></li>
-        <li><a href="https://www.linkedin.com/in/diadem-shoukralla/" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 8px;border-radius:999px;font-size:15px;font-weight:500;color:var(--ink-muted);text-decoration:none" style-hover="color:var(--ink);background:var(--surface-2)">
-          <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M20.45 20.45h-3.56v-5.57c0-1.33-.02-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.35V9h3.41v1.56h.05c.48-.88 1.64-1.8 3.37-1.8 3.6 0 4.27 2.37 4.27 5.46v6.23zM5.34 7.43a2.06 2.06 0 110-4.13 2.06 2.06 0 010 4.13zM7.12 20.45H3.56V9h3.56v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.73v20.54C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.73V1.73C24 .77 23.2 0 22.22 0z"></path></svg>LinkedIn</a></li>
-        <li><a href="https://github.com/DiademShoukralla/" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 8px;border-radius:999px;font-size:15px;font-weight:500;color:var(--ink-muted);text-decoration:none" style-hover="color:var(--ink);background:var(--surface-2)">
+        <li><a href="https://example.com" style="display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 8px;border-radius:999px;font-size:15px;font-weight:500;color:var(--ink-muted);text-decoration:none" style-hover="color:var(--ink);background:var(--surface-2)">
+          <x-import component-from-global-scope="DidiBuildDesignSystem_b51779.LeafMark" size="{{ 12 }}" hint-size="12px,12px"></x-import>Site</a></li>
+        <li><a href="https://github.com/example" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 8px;border-radius:999px;font-size:15px;font-weight:500;color:var(--ink-muted);text-decoration:none" style-hover="color:var(--ink);background:var(--surface-2)">
+          <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>GitHub</a></li>
+        <li><a href="https://github.com/example" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 8px;border-radius:999px;font-size:15px;font-weight:500;color:var(--ink-muted);text-decoration:none" style-hover="color:var(--ink);background:var(--surface-2)">
           <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>GitHub</a></li>
         <li><button type="button" role="switch" aria-checked="{{ isDark }}" aria-label="Dark mode" onClick="{{ toggleTheme }}" style="display:flex;align-items:center;justify-content:center;width:52px;min-height:44px;padding:0;border:0;border-radius:999px;background:transparent;cursor:pointer">
           <span aria-hidden="true" style="position:relative;display:block;width:44px;height:26px;border-radius:999px;background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--line-strong);transition:background var(--dur-fast)">
@@ -198,7 +198,7 @@ a:focus-visible,button:focus-visible,select:focus-visible{outline:3px solid var(
   </sc-if>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:390,&quot;height&quot;:844},&quot;bookingUrl&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;https://didi.build/book&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:390,&quot;height&quot;:844},&quot;bookingUrl&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;https://example.com&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
 class Component extends DCLogic {
   state = {
     theme: (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light',
@@ -220,11 +220,7 @@ class Component extends DCLogic {
   ];
   fieldKeys = ['name', 'email', 'phone', 'jobTitle', 'company', 'note'];
   chipItems = [
-    ['System audit', "I review your app and give you a written summary: what's solid, what's risky, and what to do next."],
-    ['Custom development', "I build what your product needs, whether that's a new feature or a custom tool made just for you."],
-    ['Technical advisory', 'I answer your technical questions in plain English and help you decide what to build, what to skip, and what to ask your developers.'],
-    ['Fractional CTO', 'I act as your part-time technical lead: I guide the technical decisions and the team, without a full-time hire.'],
-    ['AI Integrations', 'I add AI to your product where it helps, like a chat assistant, smarter search, or an agent that handles tasks for you.']
+    ['Chip', 'Chip detail']
   ];
   chipPillEls = []; chipIconEls = []; chipBtnEls = []; chipAnims = [];
   chipMk = (arr) => this.chipItems.map((_, i) => (el) => { arr[i] = el; });
@@ -484,7 +480,7 @@ class Component extends DCLogic {
       lightOn: s.theme !== 'dark',
       isDark: s.theme === 'dark' ? 'true' : 'false',
       knobX: s.theme === 'dark' ? 'translateX(18px)' : 'translateX(0)',
-      bookingUrl: this.props.bookingUrl ?? 'https://didi.build/book',
+      bookingUrl: this.props.bookingUrl ?? 'https://example.com',
       openExchange: this.openExchange,
       showThanks: s.connected && !screen,
       firstName: s.name.trim().split(/\s+/)[0] || 'there',

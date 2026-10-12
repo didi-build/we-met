@@ -1,6 +1,11 @@
 import { getAssetStorage } from "@/assets/get-storage";
-import { resolveHiCardPage } from "@/lib/hi-card/resolve-card-route";
-import { buildVCard, readAssetAsBase64, type VCardPhoto } from "@/lib/hi/vcard";
+import {
+  CARD_PHOTO_JPEG_CONTENT_TYPE,
+  logNonJpegCardPhoto,
+  notFoundRouteResponse,
+} from "@/assets/card-photo";
+import { tryResolveHiCard } from "@/lib/hi-card/resolve-card-route";
+import { buildVCard, readAssetAsBase64 } from "@/lib/hi/vcard";
 
 const VCARD_CACHE_CONTROL = "private, max-age=0, must-revalidate";
 
@@ -11,30 +16,27 @@ function vcardFilename(card: { contact: { name: { full: string } } }): string {
   return `${safe || "contact"}.vcf`;
 }
 
-async function loadPhotoForVcard(photoKey: string | null): Promise<VCardPhoto | null> {
-  if (!photoKey) {
-    return null;
-  }
-  const storage = await getAssetStorage();
-  const asset = await storage.getObject(photoKey);
-  if (!asset) {
-    return null;
-  }
-  const base64 = await readAssetAsBase64(asset);
-  const mime =
-    asset.contentType === "image/png"
-      ? "image/png"
-      : asset.contentType === "image/jpeg" || asset.contentType === "image/jpg"
-        ? "image/jpeg"
-        : "image/jpeg";
-  return { base64, mime };
-}
-
 export async function GET(_request: Request, context: RouteContext) {
   const { slug } = await context.params;
-  const card = await resolveHiCardPage(slug);
-  const photo = await loadPhotoForVcard(card.photoKey);
-  const body = buildVCard(card.contact, { photo });
+  const card = await tryResolveHiCard(slug);
+  if (!card) {
+    return notFoundRouteResponse();
+  }
+
+  let photoBase64: string | null = null;
+  if (card.photoKey) {
+    const storage = await getAssetStorage();
+    const asset = await storage.getObject(card.photoKey);
+    if (asset?.contentType === CARD_PHOTO_JPEG_CONTENT_TYPE) {
+      photoBase64 = await readAssetAsBase64(asset);
+    } else if (asset) {
+      logNonJpegCardPhoto(slug, card.photoKey);
+    }
+  }
+
+  const body = buildVCard(card.contact, {
+    photo: photoBase64 ? { base64: photoBase64 } : null,
+  });
 
   return new Response(body, {
     headers: {

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { EXCHANGE_LIMITS } from "@/exchange/limits";
 import {
   hasForbiddenNoteControlChars,
   hasForbiddenSingleLineControlChars,
@@ -58,7 +59,28 @@ describe("exchange validation (unit)", () => {
   it("rejects oversize name", () => {
     const parsed = parseExchangeBody({
       ...validExchange,
-      name: "x".repeat(201),
+      name: "x".repeat(EXCHANGE_LIMITS.name + 1),
+    });
+    expect(parsed.ok).toBe(false);
+  });
+
+  it("accepts a formatted phone string within the server limit", () => {
+    const phone = `+1 ${"5".repeat(EXCHANGE_LIMITS.phone - 3)}`;
+    expect(phone.length).toBe(EXCHANGE_LIMITS.phone);
+    const parsed = parseExchangeBody({
+      ...validExchange,
+      phone,
+    });
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok && !("honeypot" in parsed)) {
+      expect(parsed.value.phone).toBe(phone);
+    }
+  });
+
+  it("rejects a formatted phone string over the server limit", () => {
+    const parsed = parseExchangeBody({
+      ...validExchange,
+      phone: `+1 ${"5".repeat(EXCHANGE_LIMITS.phone - 2)}`,
     });
     expect(parsed.ok).toBe(false);
   });

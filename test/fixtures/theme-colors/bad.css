@@ -1,0 +1,6 @@
+.bad {
+  color: red;
+  background: white;
+  border-color: rebeccapurple;
+  outline: 1px solid #f00;
+}

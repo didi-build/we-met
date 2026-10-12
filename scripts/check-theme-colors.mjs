@@ -1,32 +1,9 @@
 #!/usr/bin/env node
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+import { scanFileContent, SKIP_DIRS } from "./lib/theme-color-scan.mjs";
 
 const repoRoot = process.cwd();
-const ALLOWLIST = new Set([
-  "src/theme/tokens/green.light.css",
-  "src/theme/tokens/green.dark.css",
-  "design/Hi.dc.html",
-]);
-
-const SKIP_DIRS = new Set(["node_modules", ".next", ".open-next", "dist", "coverage"]);
-
-const CSS_COLOR_PATTERNS = [
-  /#[0-9a-fA-F]{3,8}\b/,
-  /\brgb\s*\(/i,
-  /\brgba\s*\(/i,
-  /\bhsl\s*\(/i,
-  /\bhsla\s*\(/i,
-  /\boklch\s*\(/i,
-  /\boklab\s*\(/i,
-];
-
-const TS_COLOR_PATTERNS = [
-  /#[0-9a-fA-F]{3,8}\b/,
-  /\boklch\s*\(/i,
-  /\brgb\s*\(/i,
-  /\bhsl\s*\(/i,
-];
 
 function walk(dir, files = []) {
   for (const entry of readdirSync(dir)) {
@@ -44,49 +21,25 @@ function walk(dir, files = []) {
   return files;
 }
 
-function scanCss(rel, text) {
-  const hits = [];
-  for (const pattern of CSS_COLOR_PATTERNS) {
-    if (pattern.test(text)) {
-      hits.push(pattern.source);
-    }
-  }
-  return hits;
-}
-
-function scanTs(rel, text) {
-  const hits = [];
-  for (const pattern of TS_COLOR_PATTERNS) {
-    if (pattern.test(text)) {
-      hits.push(pattern.source);
-    }
-  }
-  return hits;
-}
-
 function scanFile(path) {
   const rel = relative(repoRoot, path).replace(/\\/g, "/");
-  if (ALLOWLIST.has(rel)) {
+  if (rel.startsWith("test/fixtures/")) {
     return [];
   }
-  const text = readFileSync(path, "utf8");
-  if (path.endsWith(".css")) {
-    const patterns = scanCss(rel, text);
-    return patterns.length ? [{ file: rel, patterns }] : [];
+  const ext = path.slice(path.lastIndexOf("."));
+  if (![".css", ".ts", ".tsx", ".mjs"].includes(ext)) {
+    return [];
   }
-  if (path.endsWith(".ts") || path.endsWith(".tsx") || path.endsWith(".mjs")) {
-    const patterns = scanTs(rel, text);
-    return patterns.length ? [{ file: rel, patterns }] : [];
-  }
-  return [];
+  const reasons = scanFileContent(rel, readFileSync(path, "utf8"), ext);
+  return reasons.length ? [{ file: rel, reasons }] : [];
 }
 
 const offenders = walk(repoRoot).flatMap(scanFile);
 
 if (offenders.length > 0) {
   console.error("Raw color literals found outside src/theme/tokens/:\n");
-  for (const { file, patterns } of offenders) {
-    console.error(`  ${file} (matched: ${patterns.join(", ")})`);
+  for (const { file, reasons } of offenders) {
+    console.error(`  ${file} (${reasons.join(", ")})`);
   }
   process.exit(1);
 }

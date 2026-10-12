@@ -1,13 +1,17 @@
 // @vitest-environment jsdom
 
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
-import { hiChipFixtures } from "../helpers/hi-chips";
+import { exampleCardInput } from "../helpers/example-card";
 import { cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CHIPS_OPENED_STORAGE_KEY } from "@/components/hi/hi-chip-popover-position";
 import { HiWhatIDoChips } from "@/components/hi/HiWhatIDoChips";
 
-const chips = hiChipFixtures;
+const baseChips = exampleCardInput().copy.about.chips;
+const chips = [
+  ...baseChips,
+  { label: "Second chip", explanation: "Second chip detail" },
+];
 
 function renderChips() {
   return render(
@@ -98,18 +102,18 @@ describe("HiWhatIDoChips", () => {
 
   it("opens a popover with the chip explanation", async () => {
     const { container } = renderChips();
-    fireEvent.click(chipButton("System audit", container));
+    fireEvent.click(chipButton(chips[0].label, container));
     await waitFor(() => {
       expect(queryPopover()?.textContent).toContain(chips[0].explanation);
     });
-    expect(chipButton("System audit", container).getAttribute("aria-expanded")).toBe(
+    expect(chipButton(chips[0].label, container).getAttribute("aria-expanded")).toBe(
       "true",
     );
   });
 
   it("closes when the same chip is tapped again", async () => {
     const { container } = renderChips();
-    const btn = chipButton("System audit", container);
+    const btn = chipButton(chips[0].label, container);
     fireEvent.click(btn);
     await waitFor(() => expect(queryPopover()).toBeTruthy());
     fireEvent.click(btn);
@@ -119,7 +123,7 @@ describe("HiWhatIDoChips", () => {
 
   it("closes on outside pointerdown", async () => {
     const { container } = renderChips();
-    fireEvent.click(chipButton("Custom development", container));
+    fireEvent.click(chipButton(chips[1].label, container));
     await waitFor(() => expect(queryPopover()).toBeTruthy());
     fireEvent.pointerDown(document.body);
     await waitFor(() => expect(queryPopover()).toBeNull());
@@ -127,7 +131,7 @@ describe("HiWhatIDoChips", () => {
 
   it("closes on Escape and returns focus to the chip", async () => {
     const { container } = renderChips();
-    const btn = chipButton("Technical advisory", container);
+    const btn = chipButton(chips[0].label, container);
     fireEvent.click(btn);
     await waitFor(() => expect(queryPopover()).toBeTruthy());
     fireEvent.keyDown(document, { key: "Escape" });
@@ -137,18 +141,18 @@ describe("HiWhatIDoChips", () => {
 
   it("keeps only one popover open at a time", async () => {
     const { container } = renderChips();
-    fireEvent.click(chipButton("System audit", container));
+    fireEvent.click(chipButton(chips[0].label, container));
     await waitFor(() =>
       expect(queryPopover()?.textContent).toContain(chips[0].explanation),
     );
-    fireEvent.click(chipButton("Fractional CTO", container));
+    fireEvent.click(chipButton(chips[1].label, container));
     await waitFor(() =>
-      expect(queryPopover()?.textContent).toContain(chips[3].explanation),
+      expect(queryPopover()?.textContent).toContain(chips[1].explanation),
     );
-    expect(chipButton("System audit", container).getAttribute("aria-expanded")).toBe(
+    expect(chipButton(chips[0].label, container).getAttribute("aria-expanded")).toBe(
       "false",
     );
-    expect(chipButton("Fractional CTO", container).getAttribute("aria-expanded")).toBe(
+    expect(chipButton(chips[1].label, container).getAttribute("aria-expanded")).toBe(
       "true",
     );
   });
@@ -213,7 +217,7 @@ describe("HiWhatIDoChips", () => {
         [{ isIntersecting: true } as IntersectionObserverEntry],
         {} as IntersectionObserver,
       );
-      fireEvent.click(chipButton("System audit", container));
+      fireEvent.click(chipButton(chips[0].label, container));
       await waitFor(() => expect(cancel).toHaveBeenCalled());
     });
 
@@ -259,9 +263,9 @@ describe("HiWhatIDoChips", () => {
         throw new Error("blocked");
       });
       const { container } = renderChips();
-      fireEvent.click(chipButton("AI Integrations", container));
+      fireEvent.click(chipButton(chips[1].label, container));
       await waitFor(() => {
-        expect(queryPopover()?.textContent).toContain(chips[4].explanation);
+        expect(queryPopover()?.textContent).toContain(chips[1].explanation);
       });
     });
   });

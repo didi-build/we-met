@@ -8,7 +8,8 @@ import {
   formatHiPhone,
   HI_COUNTRY_DIAL_CODES,
 } from "@/lib/hi/exchange/country-codes";
-import { HI_FIELD_LIMITS } from "@/lib/hi/exchange/field-limits";
+import { EXCHANGE_LIMITS } from "@/exchange/limits";
+import { substituteFirstName } from "@/lib/copy/substitute-first-name";
 import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { HiExchangeFailureMessage } from "./HiExchangeFailureMessage";
@@ -177,9 +178,6 @@ export function HiExchangeSheet({
   const [detailsPending, setDetailsPending] = useState(false);
   const [exchangeFailureAlert, setExchangeFailureAlert] =
     useState<ExchangeFailureAlert | null>(null);
-  const [detailsFailureMessage, setDetailsFailureMessage] = useState<
-    string | undefined
-  >();
   const [turnstileError, setTurnstileError] = useState<string | undefined>();
   const [turnstileToken, setTurnstileToken] = useState("");
   const [detailsSaved, setDetailsSaved] = useState(false);
@@ -206,7 +204,6 @@ export function HiExchangeSheet({
     }
     setStep(initialStep);
     setExchangeFailureAlert(null);
-    setDetailsFailureMessage(undefined);
     setTurnstileError(undefined);
     setDetailsSaved(false);
     setToken(leadToken);
@@ -302,7 +299,6 @@ export function HiExchangeSheet({
     clearTurnstileWaitTimeout();
     setExchangePending(true);
     setExchangeFailureAlert(null);
-    setDetailsFailureMessage(undefined);
     setTurnstileError(undefined);
 
     if (typeof navigator !== "undefined" && navigator.onLine === false) {
@@ -343,7 +339,6 @@ export function HiExchangeSheet({
     event.preventDefault();
     setTriedExchange(true);
     setExchangeFailureAlert(null);
-    setDetailsFailureMessage(undefined);
     setTurnstileError(undefined);
 
     const errors = getExchangeErrors(name, email, copy);
@@ -380,7 +375,6 @@ export function HiExchangeSheet({
       return;
     }
     setExchangeFailureAlert(null);
-    setDetailsFailureMessage(undefined);
     setDetailsPending(true);
 
     if (typeof navigator !== "undefined" && navigator.onLine === false) {
@@ -397,13 +391,7 @@ export function HiExchangeSheet({
     });
     setDetailsPending(false);
     if (!result.ok) {
-      if (result.kind === "server") {
-        setDetailsFailureMessage(
-          result.message ?? "Something went wrong. Please try again.",
-        );
-      } else {
-        setExchangeFailureAlert("network");
-      }
+      setExchangeFailureAlert(result.kind === "server" ? "server" : "network");
       return;
     }
     setDetailsSaved(true);
@@ -504,7 +492,7 @@ export function HiExchangeSheet({
     return null;
   }
 
-  const detailsTitle = copy.detailsTitle.replace("{firstName}", firstName || "there");
+  const detailsTitle = substituteFirstName(copy.detailsTitle, firstName || "there");
 
   return (
     <div className="fixed inset-0 z-20 flex flex-col items-center justify-end pt-6">
@@ -563,11 +551,6 @@ export function HiExchangeSheet({
             {exchangeFailureAlert && (
               <HiExchangeFailureMessage copy={copy} variant={exchangeFailureAlert} />
             )}
-            {detailsFailureMessage && (
-              <p role="alert" className="m-0 text-[15px] font-medium text-error">
-                {detailsFailureMessage}
-              </p>
-            )}
             {turnstileError && (
               <p className="m-0 text-[15px] font-medium text-error">{turnstileError}</p>
             )}
@@ -604,7 +587,7 @@ export function HiExchangeSheet({
                     id={`${formId}-name`}
                     className={fieldInputClass}
                     value={name}
-                    maxLength={HI_FIELD_LIMITS.name}
+                    maxLength={EXCHANGE_LIMITS.name}
                     onChange={(event) => setName(event.target.value)}
                     onFocus={() => setFocusField("name")}
                     onBlur={() => setFocusField(null)}
@@ -631,7 +614,7 @@ export function HiExchangeSheet({
                     inputMode="email"
                     className={fieldInputClass}
                     value={email}
-                    maxLength={HI_FIELD_LIMITS.email}
+                    maxLength={EXCHANGE_LIMITS.email}
                     onChange={(event) => setEmail(event.target.value)}
                     onFocus={() => setFocusField("email")}
                     onBlur={() => setFocusField(null)}
@@ -674,7 +657,7 @@ export function HiExchangeSheet({
                       autoComplete="tel-national"
                       className={fieldInputClass}
                       value={phone}
-                      maxLength={HI_FIELD_LIMITS.phone}
+                      maxLength={EXCHANGE_LIMITS.phoneNational}
                       onChange={(event) => setPhone(event.target.value)}
                       onFocus={() => setFocusField("phone")}
                       onBlur={() => setFocusField(null)}
@@ -750,7 +733,7 @@ export function HiExchangeSheet({
                     id={`${formId}-job`}
                     className={fieldInputClass}
                     value={jobTitle}
-                    maxLength={HI_FIELD_LIMITS.jobTitle}
+                    maxLength={EXCHANGE_LIMITS.jobTitle}
                     onChange={(event) => setJobTitle(event.target.value)}
                     onFocus={() => setFocusField("jobTitle")}
                     onBlur={() => setFocusField(null)}
@@ -768,7 +751,7 @@ export function HiExchangeSheet({
                     id={`${formId}-company`}
                     className={fieldInputClass}
                     value={company}
-                    maxLength={HI_FIELD_LIMITS.company}
+                    maxLength={EXCHANGE_LIMITS.company}
                     onChange={(event) => setCompany(event.target.value)}
                     onFocus={() => setFocusField("company")}
                     onBlur={() => setFocusField(null)}
@@ -788,7 +771,7 @@ export function HiExchangeSheet({
                     placeholder={copy.notePlaceholder}
                     className={`${fieldInputClass} resize-none`}
                     value={note}
-                    maxLength={HI_FIELD_LIMITS.note}
+                    maxLength={EXCHANGE_LIMITS.note}
                     onChange={(event) => setNote(event.target.value)}
                     onFocus={() => setFocusField("note")}
                     onBlur={() => setFocusField(null)}

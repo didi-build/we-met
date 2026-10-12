@@ -1,0 +1,5 @@
+.ok {
+  color: var(--ink);
+  background: var(--bg);
+  border-color: transparent;
+}
