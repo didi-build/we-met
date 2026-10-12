@@ -14,7 +14,6 @@ export type ValidatedExchangeInput = {
   name: string;
   email: string;
   phone: string | null;
-  website: string;
   turnstileToken: string;
 };
 
@@ -115,9 +114,16 @@ function readOptionalNullableString(
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const FORBIDDEN_EMAIL_CHARS = /[,;<>"\\]/;
 
 export function isValidEmail(email: string): boolean {
   if (email.length > LIMITS.email) {
+    return false;
+  }
+  if (hasForbiddenSingleLineControlChars(email)) {
+    return false;
+  }
+  if (FORBIDDEN_EMAIL_CHARS.test(email)) {
     return false;
   }
   return EMAIL_RE.test(email);
@@ -171,7 +177,6 @@ export function parseExchangeBody(body: unknown): ParseExchangeBodyResult {
       name,
       email: emailRaw.toLowerCase(),
       phone: phoneRaw,
-      website: "",
       turnstileToken,
     },
   };

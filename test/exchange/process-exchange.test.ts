@@ -13,7 +13,6 @@ function baseInput(
     name: "Test Visitor",
     email: "visitor@example.com",
     phone: null,
-    website: "",
     turnstileToken: "token",
     ...overrides,
   };
@@ -52,26 +51,6 @@ function createDeps(
 }
 
 describe("processExchange (unit)", () => {
-  it("returns honeypot success without enqueueing", async () => {
-    const repo = new MemoryCardRepository();
-    const card = await repo.upsertCard(exampleCardInput());
-    const deps = createDeps();
-
-    const result = await processExchange(
-      baseInput({ website: "https://spam.example" }),
-      card,
-      [],
-      deps,
-    );
-
-    expect(result.status).toBe("honeypot");
-    if (result.status === "honeypot") {
-      expect(result.body.token).toBe("");
-    }
-    expect(deps.followupMessages).toHaveLength(0);
-    expect(deps.sinkMessages).toHaveLength(0);
-  });
-
   it("enqueues visitor follow-up and returns a token on success", async () => {
     const repo = new MemoryCardRepository();
     const card = await repo.upsertCard(exampleCardInput());

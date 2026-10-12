@@ -24,8 +24,3 @@ export async function resolveCardForRequest(
   const repo = await getCardRepository();
   return lookupCard({ hostname, pathname }, repo, hostConfig);
 }
-
-export async function resolveCardBySlug(slug: string): Promise<CardRecord | null> {
-  const repo = await getCardRepository();
-  return repo.getBySlug(slug);
-}

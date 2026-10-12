@@ -41,7 +41,6 @@ export async function POST(request: Request) {
   const result = await processExchange(exchangeInput, card, sinks, deps);
 
   switch (result.status) {
-    case "honeypot":
     case "success":
       return Response.json(result.body, { status: 200 });
     case "turnstile_failed":

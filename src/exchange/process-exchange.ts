@@ -28,7 +28,6 @@ export type ProcessExchangeDeps = {
 };
 
 export type ProcessExchangeResult =
-  | { status: "honeypot"; body: ExchangeSuccessResponse }
   | { status: "success"; body: ExchangeSuccessResponse }
   | { status: "turnstile_failed" }
   | { status: "rate_limited" }
@@ -59,10 +58,6 @@ export async function processExchange(
   sinks: LeadSinkRecord[],
   deps: ProcessExchangeDeps,
 ): Promise<ProcessExchangeResult> {
-  if (input.website.length > 0) {
-    return { status: "honeypot", body: { token: "" } };
-  }
-
   if (!card) {
     return { status: "card_not_found" };
   }

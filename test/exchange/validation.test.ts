@@ -15,14 +15,9 @@ const validExchange = {
 
 describe("exchange validation (unit)", () => {
   it("accepts a minimal valid exchange body", () => {
-    const parsed = parseExchangeBody({
-      ...validExchange,
-      website: "",
-    });
+    const parsed = parseExchangeBody(validExchange);
     expect(parsed.ok).toBe(true);
-    if (parsed.ok && !("honeypot" in parsed)) {
-      expect(parsed.value.website).toBe("");
-    }
+    expect("honeypot" in parsed).toBe(false);
   });
 
   it("rejects invalid email", () => {
@@ -31,6 +26,33 @@ describe("exchange validation (unit)", () => {
       email: "not-an-email",
     });
     expect(parsed.ok).toBe(false);
+  });
+
+  describe("email hardening", () => {
+    it("accepts a normal address with dot and plus", () => {
+      const parsed = parseExchangeBody({
+        ...validExchange,
+        email: "a.b+tag@example.co",
+      });
+      expect(parsed.ok).toBe(true);
+      if (parsed.ok && !("honeypot" in parsed)) {
+        expect(parsed.value.email).toBe("a.b+tag@example.co");
+      }
+    });
+
+    it.each([
+      ["NUL", "a\u0000b@example.com"],
+      ["BEL", "a\u0007b@example.com"],
+      ["DEL", "a\u007fb@example.com"],
+      ["comma", "junk,victim@example.com"],
+      ["semicolon", "a;b@example.com"],
+      ["less-than", "a<b@example.com"],
+      ["greater-than", "a>b@example.com"],
+      ["quote", 'a"b@example.com'],
+      ["backslash", "a\\b@example.com"],
+    ])("rejects %s in email", (_label, email) => {
+      expect(parseExchangeBody({ ...validExchange, email }).ok).toBe(false);
+    });
   });
 
   it("rejects oversize name", () => {
