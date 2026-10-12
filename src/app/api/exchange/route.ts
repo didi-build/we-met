@@ -19,6 +19,9 @@ export async function POST(request: Request) {
   if (!parsed.ok) {
     return Response.json({ error: "invalid_input" }, { status: 400 });
   }
+  if ("honeypot" in parsed) {
+    return Response.json({ token: "" }, { status: 200 });
+  }
 
   const headerList = await headers();
   const hostname = headerList.get("host") ?? "localhost";
@@ -29,12 +32,13 @@ export async function POST(request: Request) {
   }
 
   const repo = await getCardRepository();
-  const card = await repo.getBySlug(parsed.value.slug);
+  const exchangeInput = parsed.value;
+  const card = await repo.getBySlug(exchangeInput.slug);
   const sinks = card ? await repo.listLeadSinks(card.id) : [];
 
   const clientIp = clientIpFromHeaders(headerList);
   const deps = await createProcessExchangeDeps(clientIp);
-  const result = await processExchange(parsed.value, card, sinks, deps);
+  const result = await processExchange(exchangeInput, card, sinks, deps);
 
   switch (result.status) {
     case "honeypot":

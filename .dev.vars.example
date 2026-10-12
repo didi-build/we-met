@@ -2,3 +2,8 @@
 # Top-level wrangler.jsonc sets WE_MET_ENV=production; local dev needs local for localhost card lookup.
 
 WE_MET_ENV=local
+
+# Any random string works locally (details-step token signing).
+WE_MET_TOKEN_SECRET=
+
+# No Turnstile secret needed locally: WE_MET_ENV=local uses the always-pass verifier.

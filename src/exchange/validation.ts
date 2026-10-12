@@ -7,7 +7,6 @@ const LIMITS = {
   company: 200,
   note: 2000,
   turnstileToken: 2048,
-  website: 500,
 } as const;
 
 export type ValidatedExchangeInput = {
@@ -26,8 +25,48 @@ export type ValidatedDetailsInput = {
   note: string | null;
 };
 
+export type ParseExchangeBodyResult =
+  | { ok: true; honeypot: true }
+  | { ok: true; value: ValidatedExchangeInput }
+  | { ok: false };
+
+const SINGLE_LINE_CONTROL_CHARS = /[\u0000-\u001F\u007F\u0085\u2028\u2029]/;
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isWebsiteHoneypotField(raw: unknown): boolean {
+  if (raw === undefined || raw === null) {
+    return false;
+  }
+  if (typeof raw !== "string") {
+    return true;
+  }
+  return raw.trim().length > 0;
+}
+
+export function hasForbiddenSingleLineControlChars(value: string): boolean {
+  return SINGLE_LINE_CONTROL_CHARS.test(value);
+}
+
+export function hasForbiddenNoteControlChars(value: string): boolean {
+  for (const char of value) {
+    const code = char.codePointAt(0) ?? 0;
+    if (code === 0x09 || code === 0x0a) {
+      continue;
+    }
+    if (
+      code <= 0x1f ||
+      code === 0x7f ||
+      code === 0x85 ||
+      code === 0x2028 ||
+      code === 0x2029
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function readString(
@@ -84,11 +123,13 @@ export function isValidEmail(email: string): boolean {
   return EMAIL_RE.test(email);
 }
 
-export function parseExchangeBody(
-  body: unknown,
-): { ok: true; value: ValidatedExchangeInput } | { ok: false } {
+export function parseExchangeBody(body: unknown): ParseExchangeBodyResult {
   if (!isPlainObject(body)) {
     return { ok: false };
+  }
+
+  if (isWebsiteHoneypotField(body.website)) {
+    return { ok: true, honeypot: true };
   }
 
   const slug = readString(body, "slug", LIMITS.slug, true);
@@ -100,7 +141,6 @@ export function parseExchangeBody(
     LIMITS.turnstileToken,
     true,
   );
-  const website = readString(body, "website", LIMITS.website, false) ?? "";
 
   if (!slug || !name || !emailRaw || !turnstileToken) {
     return { ok: false };
@@ -114,6 +154,16 @@ export function parseExchangeBody(
     return { ok: false };
   }
 
+  if (hasForbiddenSingleLineControlChars(slug)) {
+    return { ok: false };
+  }
+  if (hasForbiddenSingleLineControlChars(name)) {
+    return { ok: false };
+  }
+  if (phoneRaw !== null && hasForbiddenSingleLineControlChars(phoneRaw)) {
+    return { ok: false };
+  }
+
   return {
     ok: true,
     value: {
@@ -121,7 +171,7 @@ export function parseExchangeBody(
       name,
       email: emailRaw.toLowerCase(),
       phone: phoneRaw,
-      website,
+      website: "",
       turnstileToken,
     },
   };
@@ -143,6 +193,16 @@ export function parseDetailsBody(
   const company = readOptionalNullableString(body, "company", LIMITS.company);
   const note = readOptionalNullableString(body, "note", LIMITS.note);
   if (jobTitle === undefined || company === undefined || note === undefined) {
+    return { ok: false };
+  }
+
+  if (jobTitle !== null && hasForbiddenSingleLineControlChars(jobTitle)) {
+    return { ok: false };
+  }
+  if (company !== null && hasForbiddenSingleLineControlChars(company)) {
+    return { ok: false };
+  }
+  if (note !== null && hasForbiddenNoteControlChars(note)) {
     return { ok: false };
   }
 

@@ -1,10 +1,11 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { readWeMetHostConfig } from "@/config/we-met";
+import type { CloudflareRateLimitBinding } from "@/exchange/rate-limit";
 import {
-  createCloudflareExchangeRateLimiter,
-  createNoopExchangeRateLimiter,
-  type CloudflareRateLimitBinding,
-} from "@/exchange/rate-limit";
+  requireSecret,
+  selectExchangeRateLimiter,
+  selectTurnstileVerifier,
+} from "@/exchange/runtime-adapters";
 import {
   createCloudflareFollowupEmailQueueProducer,
   createCloudflareLeadSinkQueueProducer,
@@ -13,11 +14,7 @@ import {
 } from "@/exchange/queue/producer";
 import type { ProcessDetailsDeps } from "@/exchange/process-details";
 import type { ProcessExchangeDeps } from "@/exchange/process-exchange";
-import {
-  createAlwaysPassTurnstileVerifier,
-  createCloudflareTurnstileVerifier,
-  type TurnstileLogger,
-} from "@/exchange/turnstile";
+import type { TurnstileLogger } from "@/exchange/turnstile";
 
 type ExchangeBindings = {
   WE_MET_FOLLOWUP_EMAIL_QUEUE?: CloudflareQueueBinding;
@@ -43,14 +40,6 @@ function consoleSinkLogger() {
   };
 }
 
-function requireSecret(name: string, value: string | undefined): string {
-  const trimmed = value?.trim();
-  if (!trimmed) {
-    throw new Error(`Missing required secret: ${name}`);
-  }
-  return trimmed;
-}
-
 export async function createProcessExchangeDeps(
   clientIp: string,
 ): Promise<ProcessExchangeDeps> {
@@ -63,19 +52,16 @@ export async function createProcessExchangeDeps(
     "WE_MET_FOLLOWUP_EMAIL_QUEUE",
   );
 
-  const rateBinding = bindings.WE_MET_EXCHANGE_RATE_LIMITER;
-  const rateLimiter = rateBinding
-    ? createCloudflareExchangeRateLimiter(rateBinding)
-    : createNoopExchangeRateLimiter();
+  const rateLimiter = selectExchangeRateLimiter(
+    hostConfig.weMetEnv,
+    bindings.WE_MET_EXCHANGE_RATE_LIMITER,
+  );
 
-  const turnstileSecret = bindings.TURNSTILE_SECRET_KEY?.trim();
-  const turnstile =
-    hostConfig.weMetEnv === "local"
-      ? createAlwaysPassTurnstileVerifier()
-      : createCloudflareTurnstileVerifier(
-          requireSecret("TURNSTILE_SECRET_KEY", turnstileSecret),
-          consoleTurnstileLogger(),
-        );
+  const turnstile = selectTurnstileVerifier(
+    hostConfig.weMetEnv,
+    bindings.TURNSTILE_SECRET_KEY,
+    consoleTurnstileLogger(),
+  );
 
   const tokenSecret = requireSecret(
     "WE_MET_TOKEN_SECRET",
