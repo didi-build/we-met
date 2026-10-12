@@ -1,4 +1,4 @@
-import type { D1Database } from "@cloudflare/workers-types";
+import type { D1Database, Queue } from "@cloudflare/workers-types";
 
 declare global {
   interface CloudflareEnv {
@@ -6,6 +6,12 @@ declare global {
     WE_MET_BASE_URL: string;
     WE_MET_PREVIEW_HOST_SUFFIX?: string;
     WE_MET_ENV?: string;
+    WE_MET_TOKEN_SECRET?: string;
+    TURNSTILE_SECRET_KEY?: string;
+    WE_MET_FOLLOWUP_EMAIL_QUEUE?: Queue;
+    WE_MET_EXCHANGE_RATE_LIMITER?: {
+      limit(options: { key: string }): Promise<{ success: boolean }>;
+    };
   }
 }
 
