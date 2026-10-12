@@ -16,6 +16,7 @@
 - On `pull_request: closed`, the same workflow deletes the preview with `wrangler preview delete --name pr-<number>` (cleanup uses the same fork guard as deploy; delete tolerates missing previews).
 - Preview and cleanup jobs use GitHub environment **`preview`** (deploy job sets `environment.url` from the preview URL).
 - Post or update the preview URL in a PR comment tagged with `<!-- we-met-preview -->` (find via GitHub API and PATCH, or create if missing).
+- When a PR changes files under `migrations/`, the same comment includes a short notice to run `npm run db:migrate:remote` against shared non-prod D1 before using the preview (detected via the pulls files API; no migrations in the PR means the plain URL-only comment).
 - Commit **`workers_dev`: `false`** and **`preview_urls`: `true`** in `wrangler.jsonc` so production stays on `we-met.link` while previews get workers.dev URLs.
 - Considered and rejected (2026-10-11): skipping previews for docs-only PRs via paths-ignore. GitHub path filters apply per workflow, so cleanup would need its own workflow, and edge cases (PR becomes docs-only after code was reverted) leave stale previews. A redundant preview build costs about a minute of CI and is cleaned up on close, so every same-repo PR gets a preview.
 
