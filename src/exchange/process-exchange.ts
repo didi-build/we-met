@@ -1,0 +1,115 @@
+import type { CardRecord, LeadSinkRecord } from "@/card-data/types";
+import { buildCardEmailSnapshot } from "@/exchange/card-snapshot";
+import {
+  dispatchLeadOnExchange,
+  type LeadSinkDispatchLogger,
+} from "@/exchange/lead-sink/dispatcher";
+import type {
+  FollowupEmailQueueProducer,
+  LeadSinkQueueProducer,
+} from "@/exchange/queue/producer";
+import type { ExchangeRateLimiter } from "@/exchange/rate-limit";
+import { createDetailsToken } from "@/exchange/token";
+import type { TurnstileVerifier } from "@/exchange/turnstile";
+import type { ExchangeSuccessResponse, VisitorLead } from "@/exchange/types";
+import type { ValidatedExchangeInput } from "@/exchange/validation";
+
+export type ProcessExchangeDeps = {
+  turnstile: TurnstileVerifier;
+  rateLimiter: ExchangeRateLimiter;
+  followupQueue: FollowupEmailQueueProducer;
+  leadSinkQueue: LeadSinkQueueProducer;
+  tokenSecret: string;
+  environment: string;
+  clientIp: string;
+  leadSinkLogger: LeadSinkDispatchLogger;
+  createLeadId: () => string;
+  now: () => Date;
+};
+
+export type ProcessExchangeResult =
+  | { status: "honeypot"; body: ExchangeSuccessResponse }
+  | { status: "success"; body: ExchangeSuccessResponse }
+  | { status: "turnstile_failed" }
+  | { status: "rate_limited" }
+  | { status: "card_not_found" }
+  | { status: "enqueue_failed" };
+
+function buildVisitorLead(
+  input: ValidatedExchangeInput,
+  leadId: string,
+  environment: string,
+  now: Date,
+): VisitorLead {
+  const isTestLead = environment !== "production";
+  return {
+    leadId,
+    submittedAt: now.toISOString(),
+    environment,
+    isTestLead,
+    name: input.name,
+    email: input.email,
+    phone: input.phone,
+  };
+}
+
+export async function processExchange(
+  input: ValidatedExchangeInput,
+  card: CardRecord | null,
+  sinks: LeadSinkRecord[],
+  deps: ProcessExchangeDeps,
+): Promise<ProcessExchangeResult> {
+  if (input.website.length > 0) {
+    return { status: "honeypot", body: { token: "" } };
+  }
+
+  if (!card) {
+    return { status: "card_not_found" };
+  }
+
+  const turnstile = await deps.turnstile.verify(input.turnstileToken, deps.clientIp);
+  if (!turnstile.success) {
+    return { status: "turnstile_failed" };
+  }
+
+  const rate = await deps.rateLimiter.check(deps.clientIp);
+  if (!rate.allowed) {
+    return { status: "rate_limited" };
+  }
+
+  const leadId = deps.createLeadId();
+  const lead = buildVisitorLead(input, leadId, deps.environment, deps.now());
+  const cardSnapshot = buildCardEmailSnapshot(card);
+
+  await dispatchLeadOnExchange(
+    sinks,
+    lead,
+    card.id,
+    card.slug,
+    deps.leadSinkQueue,
+    deps.leadSinkLogger,
+  );
+
+  try {
+    await deps.followupQueue.enqueueVisitorFollowup({
+      type: "visitor_followup",
+      lead,
+      card: cardSnapshot,
+    });
+  } catch {
+    return { status: "enqueue_failed" };
+  }
+
+  const token = createDetailsToken(
+    deps.tokenSecret,
+    {
+      leadId,
+      cardId: card.id,
+      cardSlug: card.slug,
+      visitorEmail: lead.email,
+    },
+    Math.floor(deps.now().getTime() / 1000),
+  );
+
+  return { status: "success", body: { token } };
+}

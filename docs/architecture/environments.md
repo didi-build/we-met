@@ -37,6 +37,8 @@ Preview deployments receive **ASSETS**, **IMAGES** (when `previews.images` is se
 
 **D1 `database_id` values** in `wrangler.jsonc` are **placeholders** (real IDs stay out of the public repo). CI injects the real IDs from GitHub environment variables at deploy time ([0020](../decisions/0020-d1-database-id-injection.md)).
 
+**Non-prod D1 contents:** `we-met-db-nonprod` is not limited to synthetic test cards. Diadem’s real card (`slug` `didi`) is loaded there so PR previews show the live card. Step 1 safety relies on that card having **zero enabled lead sinks** and on the non-prod consumer’s hardwired mail redirect — not on the database holding only test data. **Never** add a sink row that points at a real destination to any card in non-prod D1.
+
 ## Deploy-time guards
 
 `scripts/check-deploy-guards.mjs` (CI and `npm run deploy:guards`) **must fail** if:

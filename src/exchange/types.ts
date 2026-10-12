@@ -1,0 +1,48 @@
+import type {
+  CardContact,
+  CardCopyFollowUpEmail,
+  CardLinks,
+  CardPageCopy,
+} from "@/card-data/types";
+
+export type VisitorLead = {
+  leadId: string;
+  submittedAt: string;
+  environment: string;
+  isTestLead: boolean;
+  name: string;
+  email: string;
+  phone: string | null;
+};
+
+export type VisitorLeadDetails = {
+  jobTitle: string | null;
+  company: string | null;
+  note: string | null;
+};
+
+export type CardEmailSnapshot = {
+  slug: string;
+  displayName: string;
+  email: string;
+  photoKey: string | null;
+  contact: CardContact;
+  links: CardLinks;
+  pageCopy: Pick<CardPageCopy, "emailFromName">;
+  copy: {
+    followUpEmail: CardCopyFollowUpEmail;
+  };
+};
+
+export type ExchangeSuccessResponse = {
+  token: string;
+};
+
+export type ExchangeErrorCode =
+  | "invalid_input"
+  | "turnstile_failed"
+  | "rate_limited"
+  | "card_not_found"
+  | "server_error";
+
+export type DetailsErrorCode = "invalid_input" | "invalid_token" | "server_error";
