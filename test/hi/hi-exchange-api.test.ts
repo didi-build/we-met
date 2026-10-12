@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   HI_EXCHANGE_REQUEST_TIMEOUT_MS,
+  postHiDetails,
   postHiExchange,
 } from "@/components/hi/hi-exchange-api";
 
@@ -82,5 +83,71 @@ describe("postHiExchange", () => {
       turnstileToken: "token",
     });
     expect(result).toEqual({ ok: false, kind: "network" });
+  });
+});
+
+describe("postHiDetails", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it.each([
+    ["invalid_token", 401],
+    ["server_error", 500],
+    ["invalid_input", 400],
+  ] as const)(
+    "returns server failure for %s without a message field",
+    async (errorCode, status) => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(
+          async () => new Response(JSON.stringify({ error: errorCode }), { status }),
+        ),
+      );
+      const result = await postHiDetails({ token: "lead-token" });
+      expect(result).toEqual({ ok: false, kind: "server" });
+      expect(result).not.toHaveProperty("message");
+    },
+  );
+
+  it("returns network failure when fetch throws", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new Error("network down");
+      }),
+    );
+    const result = await postHiDetails({ token: "lead-token" });
+    expect(result).toEqual({ ok: false, kind: "network" });
+  });
+
+  it("returns timeout when the request does not complete in time", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        (_url: string, init?: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener("abort", () => {
+              reject(new DOMException("The operation was aborted.", "AbortError"));
+            });
+          }),
+      ),
+    );
+
+    const promise = postHiDetails({ token: "lead-token" });
+    await vi.advanceTimersByTimeAsync(HI_EXCHANGE_REQUEST_TIMEOUT_MS + 5);
+    const result = await promise;
+    expect(result).toEqual({ ok: false, kind: "timeout" });
+  });
+
+  it("returns ok on success", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200 })),
+    );
+    const result = await postHiDetails({ token: "lead-token" });
+    expect(result).toEqual({ ok: true });
   });
 });

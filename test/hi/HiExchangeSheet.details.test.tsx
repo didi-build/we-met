@@ -65,21 +65,19 @@ describe("HiExchangeSheet details submit", () => {
     cleanup();
   });
 
-  it.each(["invalid_token", "server_error", "invalid_input"])(
-    "shows not-saved copy for server error %s, never the API code",
-    async (code) => {
-      vi.mocked(postHiDetails).mockResolvedValue({ ok: false, kind: "server" });
+  it("shows not-saved copy on a details server failure", async () => {
+    vi.mocked(postHiDetails).mockResolvedValue({ ok: false, kind: "server" });
 
-      renderDetailsStep();
-      submitDetails();
+    renderDetailsStep();
+    submitDetails();
 
-      await waitFor(() => {
-        expect(alertText()).toContain(sheetCopy.exchangeNotSavedPrefix.trim());
-      });
-      expect(alertText()).not.toContain(code);
-      expect(alertText()).not.toContain("invalid_token");
-    },
-  );
+    await waitFor(() => {
+      expect(alertText()).toContain(sheetCopy.exchangeNotSavedPrefix.trim());
+    });
+    expect(alertText()).not.toContain("invalid_token");
+    expect(alertText()).not.toContain("server_error");
+    expect(alertText()).not.toContain("invalid_input");
+  });
 
   it("shows the network message on a details network failure", async () => {
     vi.mocked(postHiDetails).mockResolvedValue({ ok: false, kind: "network" });

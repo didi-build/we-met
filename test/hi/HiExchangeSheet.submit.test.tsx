@@ -266,7 +266,6 @@ describe("HiExchangeSheet exchange submit", () => {
     vi.mocked(postHiExchange).mockResolvedValue({
       ok: false,
       kind: "server",
-      message: "bad request",
     });
 
     renderOpenSheet();

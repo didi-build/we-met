@@ -7,6 +7,9 @@ const repoRoot = process.cwd();
 
 function walk(dir, files = []) {
   for (const entry of readdirSync(dir)) {
+    if (entry.startsWith(".")) {
+      continue;
+    }
     if (SKIP_DIRS.has(entry)) {
       continue;
     }

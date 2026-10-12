@@ -10,7 +10,7 @@ const SKIP_DIRS = new Set([
   ".open-next",
   "dist",
   "coverage",
-  "test/fixtures/theme-colors",
+  "test-results",
 ]);
 
 const CSS_LITERAL_PATTERNS = [
@@ -177,19 +177,113 @@ const NAMED_CSS_COLORS = new Set([
 const TAILWIND_PALETTE =
   "white|black|slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose";
 
-const TAILWIND_COLOR_UTILITY = new RegExp(
-  `(?:^|[\\s"'\\\`])((?:bg|text|border|ring|fill|stroke|from|via|to|shadow|outline|decoration|divide|caret|accent)-(?:${TAILWIND_PALETTE})(?:-(?:\\d{2,3}|950))?)(?=[\\s"'\\\`]|$)`,
-  "g",
-);
+const TAILWIND_UTILITY_NAMES =
+  "bg|text|border|ring|fill|stroke|from|via|to|shadow|outline|decoration|divide|caret|accent";
 
 const ALLOWED_TAILWIND_TOKEN =
-  /^(?:bg|text|border|ring|fill|stroke|from|via|to|shadow|outline|decoration|divide|caret|accent)-(?:bg|surface|surface-2|ink|ink-muted|line|line-strong|accent|accent-hover|accent-ink|accent-soft|accent-text|error|error-soft)(?:\/\d+)?$/;
+  /^(?:bg|text|border|ring|fill|stroke|from|via|to|shadow|outline|decoration|divide|caret|accent)-(?:bg|surface|surface-2|ink|ink-muted|line|line-strong|accent|accent-hover|accent-ink|accent-soft|accent-text|error|error-soft)(?:\/\d{1,3})?$/;
 
-const CSS_COLOR_PROPERTIES =
-  /(?:^|[;{])\s*(?:color|background|background-color|border-color|outline-color|fill|stroke|caret-color|text-decoration-color|box-shadow|filter)\s*:\s*([^;}{]+)/gi;
+const CSS_COLOR_PROPERTY_NAMES = [
+  "color",
+  "background",
+  "background-color",
+  "background-image",
+  "border",
+  "outline",
+  "fill",
+  "stroke",
+  "caret-color",
+  "accent-color",
+  "text-decoration",
+  "text-decoration-color",
+  "text-shadow",
+  "box-shadow",
+  "filter",
+  "column-rule",
+  "scrollbar-color",
+].join("|");
+
+const CSS_COLOR_PROPERTY_EXTRA =
+  "border(?:-(?:top|right|bottom|left|block|inline|start|end))?(?:-(?:color|width|style))?|outline(?:-(?:color|width|style|offset))?";
+
+const CSS_DECLARATION_PROPERTY = `(?:${CSS_COLOR_PROPERTY_NAMES}|${CSS_COLOR_PROPERTY_EXTRA})`;
+
+const INLINE_STYLE_PROPERTY =
+  "(?:color|background(?:Color|Image)?|border(?:Top|Right|Bottom|Left|Block|Inline|Start|End)?(?:Color|Width|Style)?|outline(?:Color|Width|Style|Offset)?|fill|stroke|caretColor|accentColor|textDecoration(?:Color)?|textShadow|boxShadow|filter|columnRule|scrollbarColor)";
 
 function isAllowlisted(rel) {
   return ALLOWLIST.has(rel);
+}
+
+function tailwindColorUtilityRegex() {
+  return new RegExp(
+    `(?:^|[\\s"'\\\`])((?:(?:[\\w-]+:)*!?)(?:${TAILWIND_UTILITY_NAMES})-(?:${TAILWIND_PALETTE})(?:-(?:\\d{2,3}|950))?(?:\\/\\d{1,3})?)(?=[\\s"'\\\`]|$)`,
+    "g",
+  );
+}
+
+function cssDeclarationRegex() {
+  return new RegExp(
+    `(?:^|[;{}\\n])\\s*(?:/\\*[^*]*(?:\\*(?!/)[^*]*)*\\*/\\s*)*(${CSS_DECLARATION_PROPERTY})\\s*:\\s*([^;]+)`,
+    "gi",
+  );
+}
+
+function inlineStyleRegex() {
+  return new RegExp(`${INLINE_STYLE_PROPERTY}\\s*:\\s*["'\`]([^"'\`]+)["'\`]`, "gi");
+}
+
+function normalizeTailwindUtility(className) {
+  let utility = className;
+  const lastColon = utility.lastIndexOf(":");
+  if (lastColon !== -1) {
+    utility = utility.slice(lastColon + 1);
+  }
+  if (utility.startsWith("!")) {
+    utility = utility.slice(1);
+  }
+  return utility;
+}
+
+function isAllowedCssColorValue(value) {
+  const trimmed = value.trim().toLowerCase();
+  if (
+    trimmed === "transparent" ||
+    trimmed === "currentcolor" ||
+    trimmed === "inherit" ||
+    trimmed === "none"
+  ) {
+    return true;
+  }
+  if (/^var\s*\(/i.test(trimmed)) {
+    return true;
+  }
+  return false;
+}
+
+function valueContainsNamedColor(value) {
+  if (isAllowedCssColorValue(value)) {
+    return false;
+  }
+  const lower = value.toLowerCase();
+  if (
+    /\bvar\s*\([^)]*\)/.test(lower) &&
+    !/\b(?:transparent|currentcolor|inherit|none)\b/.test(lower)
+  ) {
+    const withoutVar = lower.replace(/\bvar\s*\([^)]*\)/g, " ");
+    return tokenListContainsNamed(withoutVar);
+  }
+  return tokenListContainsNamed(lower);
+}
+
+function tokenListContainsNamed(lower) {
+  for (const name of NAMED_CSS_COLORS) {
+    const re = new RegExp(`\\b${name}\\b`, "i");
+    if (re.test(lower)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function scanCssLiterals(text) {
@@ -202,35 +296,20 @@ function scanCssLiterals(text) {
 }
 
 function scanCssNamedColors(text) {
-  let match;
-  while ((match = CSS_COLOR_PROPERTIES.exec(text)) !== null) {
-    const value = match[1].trim().toLowerCase();
-    if (
-      value === "transparent" ||
-      value === "currentcolor" ||
-      value === "inherit" ||
-      value === "none"
-    ) {
-      continue;
-    }
-    if (value.startsWith("var(")) {
-      continue;
-    }
-    const tokens = value.split(/[\s,/]+/);
-    for (const token of tokens) {
-      const bare = token.replace(/!important$/, "");
-      if (NAMED_CSS_COLORS.has(bare)) {
-        return true;
-      }
+  const re = cssDeclarationRegex();
+  for (const match of text.matchAll(re)) {
+    const value = match[2];
+    if (valueContainsNamedColor(value)) {
+      return true;
     }
   }
   return false;
 }
 
 function scanTailwindUtilities(text) {
-  let match;
-  while ((match = TAILWIND_COLOR_UTILITY.exec(text)) !== null) {
-    const utility = match[1];
+  const re = tailwindColorUtilityRegex();
+  for (const match of text.matchAll(re)) {
+    const utility = normalizeTailwindUtility(match[1]);
     if (ALLOWED_TAILWIND_TOKEN.test(utility)) {
       continue;
     }
@@ -252,23 +331,9 @@ function scanTsLiterals(text) {
 }
 
 function scanInlineStyleNamedColors(text) {
-  const styleProp =
-    /(?:color|backgroundColor|borderColor|outlineColor|fill|stroke)\s*:\s*["'`]([^"'`]+)["'`]/gi;
-  let match;
-  while ((match = styleProp.exec(text)) !== null) {
-    const value = match[1].trim().toLowerCase();
-    if (
-      value === "transparent" ||
-      value === "currentcolor" ||
-      value === "inherit" ||
-      value === "none"
-    ) {
-      continue;
-    }
-    if (value.startsWith("var(")) {
-      continue;
-    }
-    if (NAMED_CSS_COLORS.has(value)) {
+  const re = inlineStyleRegex();
+  for (const match of text.matchAll(re)) {
+    if (valueContainsNamedColor(match[1])) {
       return true;
     }
   }
