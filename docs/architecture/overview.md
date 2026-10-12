@@ -37,6 +37,7 @@ Agents should extend behavior only through these interfaces, not ad hoc fetches 
 | `/`                      | Placeholder landing page.                                |
 | `/hi/<slug>`             | Public card page.                                        |
 | `/hi/<slug>/contact.vcf` | vCard download (inline).                                 |
+| `/hi/<slug>/photo.jpg`   | Card headshot from R2 (`photoKey` on the card record).   |
 | `POST /api/exchange`     | Exchange submit (Turnstile, dispatch lead sinks + mail). |
 | `POST /api/details`      | Optional details (signed token).                         |
 
