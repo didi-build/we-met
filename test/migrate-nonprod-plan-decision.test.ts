@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  checkAppliedFileImmutability,
   decidePlanCommentState,
   validateMigrationFilename,
 } from "../scripts/migrate-nonprod/plan-lib.mjs";
+import { hashFileContent } from "../scripts/migrate-nonprod/hash.mjs";
 
 describe("decidePlanCommentState (table)", () => {
   const hashA = "a".repeat(64);
@@ -69,6 +71,30 @@ describe("decidePlanCommentState (table)", () => {
       expect(decidePlanCommentState(input).kind).toBe(expected);
     });
   }
+
+  it("real immutability failure flows to failed plan comment decision", () => {
+    const content = "CREATE TABLE IF NOT EXISTS t (id TEXT);";
+    const appliedState = {
+      hash: "x".repeat(64),
+      files: { "migrations/0001.sql": hashFileContent(content) },
+    };
+    const immutability = checkAppliedFileImmutability(appliedState, [
+      { path: "migrations/0001.sql", content: content + "\n" },
+    ]);
+    expect(immutability.ok).toBe(false);
+    if (immutability.ok) {
+      throw new Error("expected immutability failure");
+    }
+    const decision = decidePlanCommentState({
+      appliedHash: appliedState.hash,
+      migrationHash: "y".repeat(64),
+      immutability: { ok: false, message: immutability.message ?? "immutable" },
+    });
+    expect(decision).toEqual({
+      kind: "failed",
+      message: immutability.message,
+    });
+  });
 });
 
 describe("validateMigrationFilename (unit)", () => {

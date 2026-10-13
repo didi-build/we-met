@@ -8,7 +8,7 @@ import {
   parseAppliedMigrationHash,
   parseAppliedStateMarker,
 } from "./comment-body.mjs";
-import { hashFileContent, hashMigrationFiles } from "./hash.mjs";
+import { hashMigrationFiles } from "./hash.mjs";
 import { upsertMigrateNonprodComment } from "./gh-comment.mjs";
 import { findMigrateNonprodBotCommentBody } from "./gh-api-comments.mjs";
 import {
@@ -17,6 +17,8 @@ import {
   findDisallowedMigrationFileChanges,
   validateMigrationFilename,
 } from "./plan-lib.mjs";
+import { formatMarkdownCodeFence } from "./markdown-fence.mjs";
+import { sanitizeForComment } from "./sanitize-for-comment.mjs";
 import { validatePrNumber } from "./validate.mjs";
 
 const ARTIFACT_DIR = "migrate-nonprod-artifact";
@@ -125,7 +127,7 @@ function postPlanFailure(
     state: "failed",
     headSha,
     migrationHash,
-    error,
+    error: sanitizeForComment(error),
     runUrl,
     preservedAppliedMarker,
   });
@@ -189,7 +191,9 @@ function main() {
 
   const disallowed = findDisallowedMigrationFileChanges(pullFiles);
   if (disallowed.length > 0) {
-    const names = disallowed.map((f) => `${f.filename} (${f.status})`).join(", ");
+    const names = disallowed
+      .map((f) => sanitizeForComment(`${f.filename} (${f.status})`))
+      .join(", ");
     postPlanFailure(
       repository,
       prNumber,
@@ -237,19 +241,6 @@ function main() {
   }));
   const migrationHash = hashMigrationFiles(allMigrationFiles);
 
-  const immutability = checkAppliedFileImmutability(appliedState, allMigrationFiles);
-  if (!immutability.ok) {
-    postPlanFailure(
-      repository,
-      prNumber,
-      headSha,
-      migrationHash,
-      immutability.message,
-      preservedAppliedMarker,
-      runUrl,
-    );
-  }
-
   const filesToApply: { path: string; content: string }[] = [];
   for (const change of migrationChanges) {
     const content = fetchMigrationFile(repository, change.filename, headSha);
@@ -260,12 +251,32 @@ function main() {
         prNumber,
         headSha,
         migrationHash,
-        `${change.filename}: ${lint.message}`,
+        `${sanitizeForComment(change.filename)}: ${sanitizeForComment(lint.message)}`,
         preservedAppliedMarker,
         runUrl,
       );
     }
     filesToApply.push({ path: change.filename, content });
+  }
+
+  const immutability = checkAppliedFileImmutability(appliedState, allMigrationFiles);
+  const appliedHash = existingBody ? parseAppliedMigrationHash(existingBody) : null;
+  const planDecision = decidePlanCommentState({
+    appliedHash,
+    migrationHash,
+    immutability,
+  });
+
+  if (planDecision.kind === "failed") {
+    postPlanFailure(
+      repository,
+      prNumber,
+      headSha,
+      migrationHash,
+      planDecision.message,
+      preservedAppliedMarker,
+      runUrl,
+    );
   }
 
   writeSummary(
@@ -277,7 +288,10 @@ function main() {
       filesToApply.map((f) => `- \`${f.path}\``).join("\n") +
       `\n\n### SQL\n\n` +
       filesToApply
-        .map((f) => `#### \`${f.path}\`\n\n\`\`\`sql\n${f.content.trimEnd()}\n\`\`\`\n`)
+        .map(
+          (f) =>
+            `#### \`${sanitizeForComment(f.path)}\`\n\n${formatMarkdownCodeFence(f.content.trimEnd(), "sql")}`,
+        )
         .join("\n"),
   );
 
@@ -301,13 +315,6 @@ function main() {
   setOutput("head_sha", headSha);
   setOutput("migration_hash", migrationHash);
   setOutput("apply_files", filesToApply.map((f) => f.path).join(","));
-
-  const appliedHash = existingBody ? parseAppliedMigrationHash(existingBody) : null;
-  const planDecision = decidePlanCommentState({
-    appliedHash,
-    migrationHash,
-    immutability: { ok: true },
-  });
 
   if (planDecision.kind === "skipped") {
     console.log("Migration hash matches last successful apply; skipping approval.");

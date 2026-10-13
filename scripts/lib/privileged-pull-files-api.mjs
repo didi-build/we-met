@@ -34,10 +34,6 @@ export function normalizePullFileEntry(entry, index) {
 }
 
 /**
- * @param {string} stdout
- * @returns {{ filename: string; status: string }[]}
- */
-/**
  * Parse `gh api --paginate --slurp` stdout (nested page arrays) or a single JSON array.
  *
  * @param {string} stdout
@@ -80,16 +76,7 @@ export function parseGhApiPaginatedSlurpedStdout(stdout) {
  * @returns {{ filename: string; status: string }[]}
  */
 export function parsePullRequestFilesApiStdout(stdout) {
-  const trimmed = stdout.trim();
-  if (!trimmed) {
-    return [];
-  }
-
-  /** @type {unknown[]} */
-  let rawEntries = [];
-
-  rawEntries = parseGhApiPaginatedSlurpedStdout(stdout);
-
+  const rawEntries = parseGhApiPaginatedSlurpedStdout(stdout);
   return rawEntries.map((entry, index) => normalizePullFileEntry(entry, index));
 }
 
