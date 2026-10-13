@@ -123,19 +123,47 @@ Cloudflare supports **resource-scoped Workers roles** ([Workers granular authori
 
 ### GitHub Actions policy (pull_request_target)
 
-GitHub blocks `pull_request_target` by default on public repositories from **2026-11-02**. Before that date, a maintainer should allow workflows that must run from trusted `main` code:
+**Why:** GitHub blocks `pull_request_target` by default on public repositories from **2026-11-02** for repositories without an applicable event policy.
 
-- `.github/workflows/privileged-change.yml` — privileged-change flag ([DIDI-593](https://linear.app/didi-build/issue/DIDI-593))
-- `.github/workflows/migrate-nonprod.yml` — phone-friendly non-prod migrations ([DIDI-592](https://linear.app/didi-build/issue/DIDI-592))
+**Current configuration (verified by the maintainer on 2026-10-13 from the repository Settings page):**
 
-Also allow **`workflow_dispatch`** on `migrate-nonprod.yml` for manual retries.
+- **Location:** repository **Settings → Actions → Policies** (an **Actions policy**, separate from General). It is an **event policy** under **Workflow execution protections**.
+- **Policy name:** `Allow pull_request_target for trusted workflows`
+- **Enforcement status:** Active
+- **Target workflows (path criteria):**
+  - `.github/workflows/privileged-change.yml`
+  - `.github/workflows/migrate-nonprod.yml`
+  - `.github/workflows/dependabot-automerge.yml`
+- **Restrict events:** ON. **Allowed events:** `pull_request_target`, `workflow_dispatch`, `workflow_run`
+- **Restrict actors:** OFF
+- **Require lockfile** (preview feature): OFF
 
-In the repository go to **Settings → Actions → Policies**, create an **event policy** that allows **`pull_request_target`** (and **`workflow_dispatch`** for `migrate-nonprod.yml`), targeting these workflow files by path:
+**Why each workflow is targeted:**
 
-- `.github/workflows/privileged-change.yml`
-- `.github/workflows/migrate-nonprod.yml`
+| Workflow                   | Triggers covered by the policy                                                                                           |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `privileged-change.yml`    | `pull_request_target` ([DIDI-593](https://linear.app/didi-build/issue/DIDI-593))                                         |
+| `migrate-nonprod.yml`      | `pull_request_target` and `workflow_dispatch` (manual retries; [DIDI-592](https://linear.app/didi-build/issue/DIDI-592)) |
+| `dependabot-automerge.yml` | `pull_request_target` and `workflow_run` (the `workflow_run` trigger performs the actual auto-merge after CI finishes)   |
 
-Add further permissions **only** when a **403** names them (Cloudflare 403 responses link to the required permission). **Never use Admin as the fix.**
+**Restrict events is an allowlist for the targeted workflows only.** Never target **All workflows** with a restricted event list: CI, Preview, and other workflows use `pull_request` and `push` and would stop running.
+
+**Setup rule:** Any new workflow that uses `pull_request_target` must be added to this policy’s targets (and its events to the allowed list), or it is blocked once the default applies. `npm run check` enforces this allowlist in git (see **Repo guard** below). The repo file `.github/actions-policy-workflows.json` mirrors the GitHub setting; **update both together** when the policy changes.
+
+**UNVERIFIED (policy page copy):** The policy UI says GitHub features such as Dependabot are exempt. Our reading is that this refers to GitHub’s own Dependabot runs (**Dependabot Updates**), not our `dependabot-automerge.yml` workflow, which is why that workflow is targeted explicitly. It is unknown how the default rule treats workflows the policy does not target.
+
+**Verification steps:**
+
+| Step                                                                                                     | Status                                              |
+| -------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| `privileged-change` run after the policy is active shows no policy warning annotation and posts normally | To be checked, dated, by the maintainer             |
+| First real `migrate-nonprod` run shows no policy warning and the plan job starts                         | UNVERIFIED until the first PR that adds a migration |
+| A **Dependabot auto-merge** `workflow_run` appears after CI finishes on a PR                             | UNVERIFIED until checked                            |
+| CI and Preview still start on pushes                                                                     | To be checked, dated                                |
+
+**Repo guard (cannot read GitHub):** `scripts/check-actions-policy-workflows.mjs` compares `.github/workflows/` to `.github/actions-policy-workflows.json`. It does not read the live policy in Settings. When the check fails, update **both** the GitHub policy and the JSON file.
+
+Add further Cloudflare token permissions **only** when a **403** names them (Cloudflare 403 responses link to the required permission). **Never use Admin as the fix.**
 
 The **consumer Worker** ([DIDI-577](https://linear.app/didi-build/issue/DIDI-577)) is a separate script: the maintainer must create that Worker first (outside this runbook’s proof deploy). CI will need either a dedicated scoped token for that Worker or additional scopes on a token — decide when the consumer ships.
 
