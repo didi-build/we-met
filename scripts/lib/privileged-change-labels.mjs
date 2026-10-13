@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { parseGhHttpStatus } from "./gh-api-errors.mjs";
+import { shouldIgnoreIssueLabelDeleteError } from "./gh-api-errors.mjs";
 
 export const privilegedChangeLabel = "privileged-change";
 export const privilegedChangeReviewedLabel = "privileged-change-reviewed";
@@ -104,7 +104,7 @@ export function removeIssueLabel(repo, issueNumber, label) {
       typeof err.stderr === "string"
         ? err.stderr
         : String(err);
-    if (parseGhHttpStatus(stderr) === 404) {
+    if (shouldIgnoreIssueLabelDeleteError(stderr)) {
       return;
     }
     throw err;

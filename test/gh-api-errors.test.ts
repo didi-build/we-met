@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   branchProtectionReadFailureReason,
   parseGhHttpStatus,
+  shouldIgnoreIssueLabelDeleteError,
 } from "../scripts/lib/gh-api-errors.mjs";
 
 describe("gh-api-errors (unit)", () => {
@@ -12,7 +13,25 @@ describe("gh-api-errors (unit)", () => {
     expect(
       parseGhHttpStatus('gh: Not Found (HTTP 404): {"message":"Branch not protected"}'),
     ).toBe(404);
+    expect(
+      parseGhHttpStatus(
+        'gh: Label not found (HTTP 404): {"message":"Label does not exist"}',
+      ),
+    ).toBe(404);
     expect(parseGhHttpStatus("network error")).toBeNull();
+  });
+
+  it("shouldIgnoreIssueLabelDeleteError swallows 404 and not other statuses", () => {
+    expect(
+      shouldIgnoreIssueLabelDeleteError(
+        'gh: Label not found (HTTP 404): {"message":"Label does not exist"}',
+      ),
+    ).toBe(true);
+    expect(
+      shouldIgnoreIssueLabelDeleteError(
+        "gh: Resource not accessible by integration (HTTP 403)",
+      ),
+    ).toBe(false);
   });
 
   it("maps HTTP status to branch protection read messages", () => {

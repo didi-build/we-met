@@ -44,6 +44,23 @@ jobs:
     );
   });
 
+  it("flags infrastructure edits to privileged pull-files parser", () => {
+    const result = analyzePrivilegedChange(
+      [{ filename: "scripts/lib/privileged-pull-files-api.mjs", status: "modified" }],
+      {},
+      { trustedOrg: "didi-build" },
+    );
+    expect(result.flagged).toBe(true);
+    expect(
+      result.findings.some((f) =>
+        f.message.includes("Changes privileged-change flag infrastructure"),
+      ),
+    ).toBe(true);
+    expect(
+      result.findings.some((f) => f.message.includes("privileged-pull-files-api.mjs")),
+    ).toBe(true);
+  });
+
   it("check state succeeds when reviewed label present", () => {
     expect(privilegedChangeCheckState(true, [])).toBe("failure");
     expect(privilegedChangeCheckState(true, ["privileged-change-reviewed"])).toBe(

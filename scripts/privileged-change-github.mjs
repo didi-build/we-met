@@ -16,7 +16,7 @@ import {
 import {
   parsePullRequestFilesApiStdout,
   shouldFetchWorkflowFileContent,
-} from "./lib/parse-pull-files-api.mjs";
+} from "./lib/privileged-pull-files-api.mjs";
 import { shouldClearStalePrivilegedReview } from "./lib/privileged-change-stale-review.mjs";
 import { isWorkflowFile } from "./lib/privileged-paths.mjs";
 import { privilegedChangeErrorStatusPayload } from "./lib/privileged-change-status.mjs";

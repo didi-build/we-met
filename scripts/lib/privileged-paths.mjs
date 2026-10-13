@@ -3,7 +3,15 @@
  * Read from trusted code on `main` (pull_request_target workflow).
  */
 
-/** @type {readonly { id: string; test: (filename: string) => boolean }[]} */
+export const privilegedPathsConfigPath = "scripts/lib/privileged-paths.mjs";
+
+export const privilegedChangeWorkflowPath = ".github/workflows/privileged-change.yml";
+
+export const secretUsageScriptPath = "scripts/check-secret-usage.mjs";
+
+export const ghApiErrorsPath = "scripts/lib/gh-api-errors.mjs";
+
+/** @type {readonly { id: string; infrastructure?: boolean; test: (filename: string) => boolean }[]} */
 export const privilegedPathMatchers = [
   {
     id: "github-tree",
@@ -39,47 +47,37 @@ export const privilegedPathMatchers = [
   },
   {
     id: "privileged-change-scripts",
+    infrastructure: true,
     test: (filename) => /^scripts\/privileged-change-[^/]+\.mjs$/.test(filename),
   },
   {
     id: "privileged-lib",
+    infrastructure: true,
     test: (filename) => /^scripts\/lib\/privileged-[^/]+\.mjs$/.test(filename),
   },
   {
     id: "secret-usage",
-    test: (filename) => filename === "scripts/check-secret-usage.mjs",
+    infrastructure: true,
+    test: (filename) => filename === secretUsageScriptPath,
+  },
+  {
+    id: "gh-api-errors",
+    infrastructure: true,
+    test: (filename) => filename === ghApiErrorsPath,
+  },
+  {
+    id: "privileged-change-workflow",
+    infrastructure: true,
+    test: (filename) => filename === privilegedChangeWorkflowPath,
   },
 ];
 
-export const privilegedPathsConfigPath = "scripts/lib/privileged-paths.mjs";
-
-export const privilegedChangeWorkflowPath = ".github/workflows/privileged-change.yml";
-
-export const secretUsageScriptPath = "scripts/check-secret-usage.mjs";
-
 /**
- * Paths that implement or configure the privileged-change flag (high severity when edited).
- *
  * @param {string} filename
  * @returns {boolean}
  */
 export function isPrivilegedFlagInfrastructurePath(filename) {
-  if (filename === privilegedPathsConfigPath) {
-    return true;
-  }
-  if (filename === privilegedChangeWorkflowPath) {
-    return true;
-  }
-  if (filename === secretUsageScriptPath) {
-    return true;
-  }
-  if (/^scripts\/privileged-change-[^/]+\.mjs$/.test(filename)) {
-    return true;
-  }
-  if (/^scripts\/lib\/privileged-[^/]+\.mjs$/.test(filename)) {
-    return true;
-  }
-  return false;
+  return privilegedPathMatchers.some((m) => m.infrastructure && m.test(filename));
 }
 
 /**

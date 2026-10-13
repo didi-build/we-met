@@ -17,6 +17,8 @@ describe("privileged-paths (table)", () => {
     { path: "migrations/0001_init.sql", privileged: true },
     { path: "scripts/privileged-change-github.mjs", privileged: true },
     { path: "scripts/lib/privileged-paths.mjs", privileged: true },
+    { path: "scripts/lib/privileged-pull-files-api.mjs", privileged: true },
+    { path: "scripts/lib/gh-api-errors.mjs", privileged: true },
     { path: "scripts/check-secret-usage.mjs", privileged: true },
     { path: "src/app/page.tsx", privileged: false },
     { path: "scripts/preview-comment-body.mjs", privileged: false },
@@ -42,6 +44,8 @@ describe("privileged-paths (table)", () => {
       "privileged-change-scripts",
       "privileged-lib",
       "secret-usage",
+      "gh-api-errors",
+      "privileged-change-workflow",
     ]);
   });
 });
