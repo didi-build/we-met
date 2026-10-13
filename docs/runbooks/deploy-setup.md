@@ -115,10 +115,11 @@ Create these **after** the proof deploy (the `we-met` Worker and `we-met.link` r
 
 Cloudflare supports **resource-scoped Workers roles** ([Workers granular authorization](https://blog.cloudflare.com/workers-granular-authorization), September 2026): **Editor** on a single Worker can deploy without creating or deleting resources. Because `wrangler.jsonc` attaches **`we-met.link` as a custom domain**, every production CI deploy re-sends that route — the production token needs a **zone** policy on `we-met.link` (see table and [0017](../decisions/0017-cloudflare-api-credentials.md)). Legacy **Workers Scripts Edit** maps to **Editor** in Cloudflare’s migration table (no published deprecation date). **D1 / R2 / KV resource-level token scoping is not available yet** — those permissions remain account-level.
 
-| Token name (dashboard) | GitHub secret                     | Scopes (verified **2026-10-11** where noted)                                                                                                                                                                                                                               |
-| ---------------------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `we-met-ci-nonprod`    | `CLOUDFLARE_API_TOKEN_NONPROD`    | **Workers Editor**, scoped to Worker **`we-met`** only. No zone policy (previews do not touch `we-met.link`). No R2 or Queues permissions initially.                                                                                                                       |
-| `we-met-ci-production` | `CLOUDFLARE_API_TOKEN_PRODUCTION` | **Workers Editor** on **`we-met`**, plus account-level **D1 Edit** (dashboard **D1 Write**) for `wrangler d1 migrations apply`, plus a **third policy**: **Specified Domains** → `we-met.link` with **Workers Routes Write** and **Zone Read**. No R2 or Queues initially. |
+| Token name (dashboard)      | GitHub secret                          | Scopes (verified **2026-10-11** where noted)                                                                                                                                                                                                                               |
+| --------------------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `we-met-ci-nonprod`         | `CLOUDFLARE_API_TOKEN_NONPROD`         | **Workers Editor**, scoped to Worker **`we-met`** only. No zone policy (previews do not touch `we-met.link`). No R2 or Queues permissions initially.                                                                                                                       |
+| `we-met-ci-production`      | `CLOUDFLARE_API_TOKEN_PRODUCTION`      | **Workers Editor** on **`we-met`**, plus account-level **D1 Edit** (dashboard **D1 Write**) for `wrangler d1 migrations apply`, plus a **third policy**: **Specified Domains** → `we-met.link` with **Workers Routes Write** and **Zone Read**. No R2 or Queues initially. |
+| `we-met-ci-migrate-nonprod` | `CLOUDFLARE_API_TOKEN_MIGRATE_NONPROD` | **D1 Edit** only (account-level; **UNVERIFIED** whether Cloudflare offers per-database scope). One-year expiry; calendar reminder.                                                                                                                                         |
 
 Add further permissions **only** when a **403** names them (Cloudflare 403 responses link to the required permission). **Never use Admin as the fix.**
 
@@ -146,8 +147,13 @@ After PR #3 merged (**2026-10-11**), the first GitHub Actions runs (Wrangler **4
 3. **Repository secret:** `CLOUDFLARE_ACCOUNT_ID` only (used by both workflows).
 4. **`production` environment secret:** `CLOUDFLARE_API_TOKEN_PRODUCTION` (value from `we-met-ci-production`).
 5. **`production` environment variables:** `WE_MET_D1_DATABASE_ID_PRODUCTION`, `WE_MET_TURNSTILE_SITE_KEY_PRODUCTION` (widget **we-met production**).
+6. Create the **`migrate-nonprod`** environment with yourself as required reviewer. **Deployment branches:** **`main` only**. Turn **Prevent self-review** **off** (you are the only reviewer; runs you push must still be approvable). Add:
+   - **Secret:** `CLOUDFLARE_API_TOKEN_MIGRATE_NONPROD` (from `we-met-ci-migrate-nonprod`; **never** as a repository or organization secret)
+   - **Variable:** `WE_MET_D1_DATABASE_ID_NONPROD` (same value as `preview`)
 
 Remove or rename any legacy unsuffixed `CLOUDFLARE_API_TOKEN` secrets. Do **not** duplicate `CLOUDFLARE_ACCOUNT_ID` on the `preview` or `production` environments unless you intentionally use a different account (the repo uses one repo-level `CLOUDFLARE_ACCOUNT_ID` for both workflows).
+
+**Known gap:** closing a PR without merging leaves its expand-only migration applied in shared non-prod D1; add a new migration to revert if needed.
 
 ## 4. Guard failure demos (throwaway branch)
 

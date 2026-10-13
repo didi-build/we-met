@@ -22,7 +22,7 @@
 - **Workflow:** [Preview](../../.github/workflows/preview.yml) (`name: Preview`).
 - **Trigger:** `pull_request` opened, synchronized, or reopened (not from forks; skipped when the actor is Dependabot). Uses GitHub environment **`preview`** (no required reviewers).
 - **Touches:** Preview instance on **`we-met`** (non-prod bindings in `previews` block); shared **`we-met-db-nonprod`** (see [0019](../decisions/0019-pr-preview-github-action.md)); `we-met-assets-nonprod`; `we-met-followup-email-nonprod`; separate **`we-met-followup-email-consumer-nonprod`**; rate limiter namespace **2001**; Turnstile widget **we-met nonprod** (`WE_MET_TURNSTILE_SITE_KEY_NONPROD` at build time); lead sink dispatcher (no implementations in step 1); mail redirect hardwired in the non-prod consumer.
-- **D1 migrations:** The preview workflow does **not** apply migrations. Before opening a PR that adds a migration, run `npm run db:migrate:remote` against the shared non-prod database and keep migrations backward compatible (expand/contract) because other previews and the previous production deploy share that schema.
+- **D1 migrations:** The preview workflow does **not** apply migrations. PRs that change `migrations/` start [**Migrate non-prod D1**](../../.github/workflows/migrate-nonprod.yml): the plan job prints SQL in the run summary; approve the **`migrate-nonprod`** environment to apply to `we-met-db-nonprod` (phone-friendly). Terminal fallback: `npm run db:migrate:remote`. Keep migrations backward compatible (expand/contract) because other previews and the previous production deploy share that schema. Closing a PR without merging leaves its expand-only migration applied in non-prod.
 - **Find the URL:** GitHub PR comment from `github-actions[bot]` (“Cloudflare Preview: …”), or Cloudflare dashboard → Workers & Pages → **we-met** → Previews → `pr-<number>`. PRs that change files under `migrations/` get a D1 migration notice in that comment.
 - **Cleanup:** Closing the PR runs the `cleanup` job in the same workflow (`wrangler preview delete --name pr-<number>`); delete is tolerant of “preview not found”.
 - **Verify:** Open the preview URL, load `/` (placeholder until the card ships). Full exchange smoke: [test-leads.md](./test-leads.md) after [DIDI-575](https://linear.app/didi-build/issue/DIDI-575) / [DIDI-577](https://linear.app/didi-build/issue/DIDI-577).
@@ -62,15 +62,16 @@ CI Cloudflare tokens use **Workers Editor** scoped to Worker **`we-met`** ([0017
 
 **Troubleshooting:** `The zone "we-met.link" does not exist on your account [code: 10084]` during production deploy means the CI token lacks zone access on `we-met.link`; see [0017](../decisions/0017-cloudflare-api-credentials.md#token-scoping-cloudflare-2026).
 
-| Name                                   | Where                             | Used by                                          |
-| -------------------------------------- | --------------------------------- | ------------------------------------------------ |
-| `CLOUDFLARE_ACCOUNT_ID`                | Repository secret                 | Preview and production workflows                 |
-| `CLOUDFLARE_API_TOKEN_NONPROD`         | `preview` environment secret      | Preview workflow                                 |
-| `WE_MET_D1_DATABASE_ID_NONPROD`        | `preview` environment variable    | Preview workflow, `db:migrate:remote` (local)    |
-| `WE_MET_TURNSTILE_SITE_KEY_NONPROD`    | `preview` environment variable    | Preview build                                    |
-| `CLOUDFLARE_API_TOKEN_PRODUCTION`      | `production` environment secret   | Production deploy only                           |
-| `WE_MET_D1_DATABASE_ID_PRODUCTION`     | `production` environment variable | Production deploy (`prepare` needs only this D1) |
-| `WE_MET_TURNSTILE_SITE_KEY_PRODUCTION` | `production` environment variable | Production build                                 |
+| Name                                   | Where                                                 | Used by                                                         |
+| -------------------------------------- | ----------------------------------------------------- | --------------------------------------------------------------- |
+| `CLOUDFLARE_ACCOUNT_ID`                | Repository secret                                     | Preview and production workflows                                |
+| `CLOUDFLARE_API_TOKEN_NONPROD`         | `preview` environment secret                          | Preview workflow                                                |
+| `CLOUDFLARE_API_TOKEN_MIGRATE_NONPROD` | `migrate-nonprod` environment secret                  | Migrate non-prod D1 workflow (D1 only; names only here)         |
+| `WE_MET_D1_DATABASE_ID_NONPROD`        | `preview` and `migrate-nonprod` environment variables | Preview workflow, migrate workflow, `db:migrate:remote` (local) |
+| `WE_MET_TURNSTILE_SITE_KEY_NONPROD`    | `preview` environment variable                        | Preview build                                                   |
+| `CLOUDFLARE_API_TOKEN_PRODUCTION`      | `production` environment secret                       | Production deploy only                                          |
+| `WE_MET_D1_DATABASE_ID_PRODUCTION`     | `production` environment variable                     | Production deploy (`prepare` needs only this D1)                |
+| `WE_MET_TURNSTILE_SITE_KEY_PRODUCTION` | `production` environment variable                     | Production build                                                |
 
 Worker secrets (`WE_MET_TOKEN_SECRET`, `TURNSTILE_SECRET_KEY`): set during the maintainer proof deploy in [deploy-setup.md](./deploy-setup.md) (`wrangler login`, then `wrangler secret put` / `wrangler preview base-config secret put`).
 

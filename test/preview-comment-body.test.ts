@@ -6,7 +6,11 @@ const PREVIEW_URL = "https://pr-42-we-met.example.workers.dev";
 
 const MIGRATION_NOTICE = `
 
-> **⚠️ This PR changes D1 migrations.** The preview will not work until they are applied to the shared non-prod database. Run this in a terminal where you are logged in (\`npx wrangler login\`):
+> **⚠️ This PR changes D1 migrations.** The preview will not work until they are applied to the shared non-prod database.
+>
+> **From GitHub (phone-friendly):** the [**Migrate non-prod D1**](https://github.com/didi-build/we-met/actions/workflows/migrate-nonprod.yml) workflow plans the SQL on this PR and waits for your approval on the \`migrate-nonprod\` environment. Watch for the separate status comment tagged \`we-met-migrate-nonprod\`.
+>
+> **From a terminal** (logged in with \`npx wrangler login\`):
 >
 > \`\`\`bash
 > export WE_MET_D1_DATABASE_ID_NONPROD=<non-prod D1 database id>
@@ -38,6 +42,8 @@ describe("preview-comment-body (unit)", () => {
     const body = result.stdout;
     expect(body.split("\n")[0]).toBe("<!-- we-met-preview -->");
     expect(body).toContain(`Cloudflare Preview: ${PREVIEW_URL}`);
+    expect(body).toContain("Migrate non-prod D1");
+    expect(body).toContain("we-met-migrate-nonprod");
     expect(body).toContain("export WE_MET_D1_DATABASE_ID_NONPROD=");
     expect(body).toContain("npm run db:migrate:remote");
     expect(body).not.toMatch(UUID_RE);

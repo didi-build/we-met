@@ -12,8 +12,9 @@
  * repo root for the Wrangler invocation, then deletes it.
  */
 import { spawnSync } from "node:child_process";
-import { rmSync } from "node:fs";
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { parseJsonc } from "./lib/parse-jsonc.mjs";
 import { WRANGLER_D1_NONPROD_CI_CONFIG } from "./lib/wrangler-placeholders.mjs";
 
 const REMOTE_ALLOWED_DATABASE = "we-met-db-nonprod";
@@ -24,12 +25,27 @@ const args = process.argv.slice(2);
 
 let mode = "local";
 let databaseName = null;
+let migrationsDir = null;
+let configPath = null;
 
-for (const arg of args) {
+for (let i = 0; i < args.length; i++) {
+  const arg = args[i];
   if (arg === "--local") {
     mode = "local";
   } else if (arg === "--remote") {
     mode = "remote";
+  } else if (arg === "--migrations-dir") {
+    migrationsDir = args[++i];
+    if (!migrationsDir) {
+      console.error("--migrations-dir requires a path");
+      process.exit(1);
+    }
+  } else if (arg === "--config") {
+    configPath = args[++i];
+    if (!configPath) {
+      console.error("--config requires a path");
+      process.exit(1);
+    }
   } else if (arg.startsWith("-")) {
     console.error(`Unknown option: ${arg}`);
     process.exit(1);
@@ -61,33 +77,59 @@ if (mode === "remote") {
 }
 
 let configFlag = [];
+let configRel = D1_CI_CONFIG_REL;
+let configAbs = D1_CI_CONFIG_ABS;
+let wroteConfig = false;
 
 if (mode === "remote") {
   try {
-    const prep = spawnSync(
-      "node",
-      [
-        "scripts/prepare-wrangler-config.mjs",
-        "--target",
-        "d1-migrate-nonprod",
-        "--output",
-        D1_CI_CONFIG_REL,
-      ],
-      { encoding: "utf8" },
-    );
-    if (prep.status !== 0) {
-      if (prep.stderr) process.stderr.write(prep.stderr);
-      process.exit(prep.status ?? 1);
+    if (configPath) {
+      configRel = configPath;
+      configAbs = resolve(configPath);
+    } else {
+      const prep = spawnSync(
+        "node",
+        [
+          "scripts/prepare-wrangler-config.mjs",
+          "--target",
+          "d1-migrate-nonprod",
+          "--output",
+          D1_CI_CONFIG_REL,
+        ],
+        { encoding: "utf8" },
+      );
+      if (prep.status !== 0) {
+        if (prep.stderr) process.stderr.write(prep.stderr);
+        process.exit(prep.status ?? 1);
+      }
+      wroteConfig = true;
     }
-    configFlag = ["-c", D1_CI_CONFIG_REL];
+    configFlag = ["-c", configRel];
   } catch (error) {
     console.error(error);
     process.exit(1);
   }
 }
 
+if (migrationsDir && mode !== "remote") {
+  console.error("--migrations-dir is only supported with --remote");
+  process.exit(1);
+}
+
 const wranglerTarget = mode === "remote" ? "--remote" : "--local";
 const applyTarget = mode === "remote" ? databaseName : "WE_MET_DB";
+
+if (migrationsDir && mode === "remote") {
+  const configText = readFileSync(configAbs, "utf8");
+  const config = parseJsonc(configText);
+  config.migrations_dir = migrationsDir;
+  if (Array.isArray(config.d1_databases)) {
+    for (const entry of config.d1_databases) {
+      entry.migrations_dir = migrationsDir;
+    }
+  }
+  writeFileSync(configAbs, `${JSON.stringify(config, null, 2)}\n`, "utf8");
+}
 
 let exitCode = 1;
 try {
@@ -106,7 +148,7 @@ try {
   );
   exitCode = result.status ?? 1;
 } finally {
-  if (mode === "remote") {
+  if (mode === "remote" && wroteConfig) {
     try {
       rmSync(D1_CI_CONFIG_ABS, { force: true });
     } catch {
