@@ -204,7 +204,7 @@ const CSS_COLOR_PROPERTY_NAMES = [
 ].join("|");
 
 const CSS_COLOR_PROPERTY_EXTRA =
-  "border(?:-(?:top|right|bottom|left|block|inline|start|end))?(?:-(?:color|width|style))?|outline(?:-(?:color|width|style|offset))?";
+  "border(?:-(?:top|right|bottom|left))(?:-(?:color|width|style))?|border-(?:block|inline)(?:-(?:start|end))?(?:-(?:color|width|style))?|outline(?:-(?:color|width|style|offset))?";
 
 const CSS_DECLARATION_PROPERTY = `(?:${CSS_COLOR_PROPERTY_NAMES}|${CSS_COLOR_PROPERTY_EXTRA})`;
 
@@ -215,16 +215,18 @@ function isAllowlisted(rel) {
   return ALLOWLIST.has(rel);
 }
 
+const TAILWIND_VARIANT_PREFIX = "(?:(?:[\\w-]+|\\[[^\\]]+\\]|data-\\[[^\\]]+\\]):)*";
+
 function tailwindColorUtilityRegex() {
   return new RegExp(
-    `(?:^|[\\s"'\\\`])((?:(?:[\\w-]+:)*!?)(?:${TAILWIND_UTILITY_NAMES})-(?:${TAILWIND_PALETTE})(?:-(?:\\d{2,3}|950))?(?:\\/\\d{1,3})?)(?=[\\s"'\\\`]|$)`,
+    `(?:^|[\\s"'\\\`])((?:${TAILWIND_VARIANT_PREFIX}!?)(?:${TAILWIND_UTILITY_NAMES})-(?:${TAILWIND_PALETTE})(?:-(?:\\d{2,3}|950))?(?:\\/\\d{1,3})?!?)(?=[\\s"'\\\`]|$)`,
     "g",
   );
 }
 
 function cssDeclarationRegex() {
   return new RegExp(
-    `(?:^|[;{}\\n])\\s*(?:/\\*[^*]*(?:\\*(?!/)[^*]*)*\\*/\\s*)*(${CSS_DECLARATION_PROPERTY})\\s*:\\s*([^;]+)`,
+    `(?:^|[;{}\\n])\\s*(?:/\\*[^*]*(?:\\*(?!/)[^*]*)*\\*/\\s*)*(${CSS_DECLARATION_PROPERTY})\\s*:\\s*([^;}]*)`,
     "gi",
   );
 }
@@ -242,38 +244,70 @@ function normalizeTailwindUtility(className) {
   if (utility.startsWith("!")) {
     utility = utility.slice(1);
   }
+  if (utility.endsWith("!")) {
+    utility = utility.slice(0, -1);
+  }
   return utility;
 }
 
 function isAllowedCssColorValue(value) {
   const trimmed = value.trim().toLowerCase();
-  if (
+  return (
     trimmed === "transparent" ||
     trimmed === "currentcolor" ||
     trimmed === "inherit" ||
     trimmed === "none"
-  ) {
-    return true;
-  }
-  if (/^var\s*\(/i.test(trimmed)) {
-    return true;
-  }
-  return false;
+  );
 }
 
-function valueContainsNamedColor(value) {
+function stripVarFunctions(value) {
+  let result = "";
+  let i = 0;
+  while (i < value.length) {
+    const rest = value.slice(i);
+    const varMatch = rest.match(/^var\s*\(/i);
+    if (varMatch) {
+      i += varMatch[0].length;
+      let depth = 1;
+      while (i < value.length && depth > 0) {
+        const ch = value[i];
+        if (ch === "(") {
+          depth += 1;
+        } else if (ch === ")") {
+          depth -= 1;
+        }
+        i += 1;
+      }
+      result += " ";
+      continue;
+    }
+    result += value[i];
+    i += 1;
+  }
+  return result;
+}
+
+function valueContainsOffendingColor(value) {
   if (isAllowedCssColorValue(value)) {
     return false;
   }
-  const lower = value.toLowerCase();
-  if (
-    /\bvar\s*\([^)]*\)/.test(lower) &&
-    !/\b(?:transparent|currentcolor|inherit|none)\b/.test(lower)
-  ) {
-    const withoutVar = lower.replace(/\bvar\s*\([^)]*\)/g, " ");
-    return tokenListContainsNamed(withoutVar);
+  const withoutVar = stripVarFunctions(value);
+  const trimmed = withoutVar.trim();
+  if (trimmed.length === 0) {
+    return false;
+  }
+  if (isAllowedCssColorValue(trimmed)) {
+    return false;
+  }
+  const lower = withoutVar.toLowerCase();
+  if (scanCssLiterals(lower)) {
+    return true;
   }
   return tokenListContainsNamed(lower);
+}
+
+function valueContainsNamedColor(value) {
+  return valueContainsOffendingColor(value);
 }
 
 function tokenListContainsNamed(lower) {
@@ -333,7 +367,37 @@ function scanTsLiterals(text) {
 function scanInlineStyleNamedColors(text) {
   const re = inlineStyleRegex();
   for (const match of text.matchAll(re)) {
-    if (valueContainsNamedColor(match[1])) {
+    if (valueContainsOffendingColor(match[1])) {
+      return true;
+    }
+  }
+  return false;
+}
+
+const JSX_COLOR_ATTR = "(?:fill|stroke|stopColor|floodColor|lightingColor|color)";
+
+function jsxColorAttrRegex() {
+  return new RegExp(`${JSX_COLOR_ATTR}=["']([^"']+)["']`, "gi");
+}
+
+function isAllowedJsxAttrColorValue(value) {
+  const trimmed = value.trim().toLowerCase();
+  return (
+    trimmed === "currentcolor" ||
+    trimmed === "none" ||
+    trimmed === "transparent" ||
+    trimmed === "inherit"
+  );
+}
+
+function scanJsxColorAttributes(text) {
+  const re = jsxColorAttrRegex();
+  for (const match of text.matchAll(re)) {
+    const raw = match[1];
+    if (isAllowedJsxAttrColorValue(raw)) {
+      continue;
+    }
+    if (valueContainsOffendingColor(raw)) {
       return true;
     }
   }
@@ -362,6 +426,9 @@ export function scanFileContent(rel, text, ext) {
     }
     if (scanInlineStyleNamedColors(text)) {
       reasons.push("inline-named");
+    }
+    if (scanJsxColorAttributes(text)) {
+      reasons.push("jsx-attr");
     }
   }
   return reasons;

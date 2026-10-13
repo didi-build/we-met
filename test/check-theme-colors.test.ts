@@ -92,6 +92,86 @@ describe("theme-color scan (unit)", () => {
     expect(reasons).toContain("inline-named");
   });
 
+  it("flags border with var() and a named color in CSS", () => {
+    const reasons = scanCss("x.css", ".x { border: var(--bw) solid " + "red; }");
+    expect(reasons).toContain("css-named");
+  });
+
+  it("flags box-shadow with var() and a named color in CSS", () => {
+    const reasons = scanCss("x.css", ".x { box-shadow: var(--s) 0 0 " + "red; }");
+    expect(reasons).toContain("css-named");
+  });
+
+  it("flags inline style border with var() and a named color", () => {
+    const borderValue = "var(--w) solid " + "red";
+    const reasons = scanTsx(
+      "x.tsx",
+      `export function X() { return <div style={{ border: "${borderValue}" }} />; }`,
+    );
+    expect(reasons).toContain("inline-named");
+  });
+
+  it("allows border with only var() color tokens in CSS", () => {
+    const reasons = scanCss("x.css", ".x { border: var(--bw) solid var(--line); }");
+    expect(reasons).not.toContain("css-named");
+  });
+
+  it("flags red in a rule after a rule without a trailing semicolon", () => {
+    const red = "red";
+    const reasons = scanCss("x.css", `.a { color: var(--ink) }\n.b { color: ${red} }`);
+    expect(reasons).toContain("css-named");
+  });
+
+  it("flags border-inline-start-color with a named color in CSS", () => {
+    const reasons = scanCss("x.css", ".x { border-inline-start-color: " + "red; }");
+    expect(reasons).toContain("css-named");
+  });
+
+  it("flags path fill with a named color in JSX", () => {
+    const fill = "red";
+    const reasons = scanTsx(
+      "x.tsx",
+      `export function X() { return <path fill="${fill}" />; }`,
+    );
+    expect(reasons).toContain("jsx-attr");
+  });
+
+  it("flags path stroke with a named color in JSX", () => {
+    const stroke = "white";
+    const reasons = scanTsx(
+      "x.tsx",
+      `export function X() { return <path stroke="${stroke}" />; }`,
+    );
+    expect(reasons).toContain("jsx-attr");
+  });
+
+  it("flags a trailing-important white background utility", () => {
+    const cls = "bg-" + "white" + "!";
+    const reasons = scanTsx(
+      "x.tsx",
+      `export function X() { return <div className="${cls}" />; }`,
+    );
+    expect(reasons).toContain("tailwind-palette");
+  });
+
+  it("flags a bracket-variant white background utility", () => {
+    const cls = "[&:hover]:bg-" + "white";
+    const reasons = scanTsx(
+      "x.tsx",
+      `export function X() { return <div className="${cls}" />; }`,
+    );
+    expect(reasons).toContain("tailwind-palette");
+  });
+
+  it("flags a data-attribute-variant white background utility", () => {
+    const cls = "data-[state=open]:bg-" + "white";
+    const reasons = scanTsx(
+      "x.tsx",
+      `export function X() { return <div className="${cls}" />; }`,
+    );
+    expect(reasons).toContain("tailwind-palette");
+  });
+
   it("allows currentColor in CSS color properties", () => {
     const reasons = scanCss("x.css", ".x { color: currentColor; }");
     expect(reasons).not.toContain("css-named");
@@ -117,6 +197,30 @@ describe("theme-color scan (unit)", () => {
     expect(reasons).not.toContain("css-named");
   });
 
+  it("allows fill currentColor in JSX", () => {
+    const reasons = scanTsx(
+      "x.tsx",
+      `export function X() { return <path fill="currentColor" />; }`,
+    );
+    expect(reasons).not.toContain("jsx-attr");
+  });
+
+  it("allows fill none in JSX", () => {
+    const reasons = scanTsx(
+      "x.tsx",
+      `export function X() { return <path fill="none" />; }`,
+    );
+    expect(reasons).not.toContain("jsx-attr");
+  });
+
+  it("allows stroke currentColor in JSX", () => {
+    const reasons = scanTsx(
+      "x.tsx",
+      `export function X() { return <path stroke="currentColor" />; }`,
+    );
+    expect(reasons).not.toContain("jsx-attr");
+  });
+
   it("allows bg-accent/50", () => {
     const reasons = scanTsx(
       "x.tsx",
@@ -133,19 +237,13 @@ describe("theme-color scan (unit)", () => {
     expect(reasons).not.toContain("tailwind-palette");
   });
 
-  it("flags both fixtures when scanned in sequence (no stale regex lastIndex)", () => {
-    const first = scanFileContent(
-      "test/fixtures/theme-colors/bad.css",
-      fixture("bad.css"),
-      ".css",
-    );
-    const second = scanFileContent(
-      "test/fixtures/theme-colors/bad.tsx",
-      fixture("bad.tsx"),
-      ".tsx",
-    );
-    expect(first.length).toBeGreaterThan(0);
-    expect(second.length).toBeGreaterThan(0);
+  it("flags the same single-match source on every repeated scan", () => {
+    const cls = "bg-" + "white";
+    const source = `export function X() { return <div className="${cls}" />; }`;
+    for (let i = 0; i < 3; i += 1) {
+      const reasons = scanTsx("x.tsx", source);
+      expect(reasons).toContain("tailwind-palette");
+    }
   });
 
   it("allows token utilities and CSS variables in fixtures", () => {
