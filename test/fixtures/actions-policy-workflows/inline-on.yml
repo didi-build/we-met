@@ -1,0 +1,7 @@
+name: inline on fixture
+on: [push, pull_request_target]
+jobs:
+  noop:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ok

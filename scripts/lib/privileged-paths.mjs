@@ -66,6 +66,11 @@ export const privilegedPathMatchers = [
     test: (filename) => filename === "scripts/dependabot-automerge.mjs",
   },
   {
+    id: "actions-policy-workflows",
+    infrastructure: true,
+    test: (filename) => filename === "scripts/check-actions-policy-workflows.mjs",
+  },
+  {
     id: "gh-api-errors",
     infrastructure: true,
     test: (filename) => filename === ghApiErrorsPath,

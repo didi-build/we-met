@@ -161,7 +161,7 @@ Cloudflare supports **resource-scoped Workers roles** ([Workers granular authori
 | A **Dependabot auto-merge** `workflow_run` appears after CI finishes on a PR                             | UNVERIFIED until checked                            |
 | CI and Preview still start on pushes                                                                     | To be checked, dated                                |
 
-**Repo guard (cannot read GitHub):** `scripts/check-actions-policy-workflows.mjs` compares `.github/workflows/` to `.github/actions-policy-workflows.json`. It does not read the live policy in Settings. When the check fails, update **both** the GitHub policy and the JSON file.
+**Repo guard (cannot read GitHub):** `scripts/check-actions-policy-workflows.mjs` (part of `npm run check`) compares every file under `.github/workflows/` to `.github/actions-policy-workflows.json`. It cannot see the live policy in **Settings → Actions → Policies**. When the check fails, update **both** the GitHub policy and the JSON file. The check uses block-style `on:` parsing via `extractWorkflowMetadata` (no extra YAML dependency); inline `on:` forms fail closed.
 
 Add further Cloudflare token permissions **only** when a **403** names them (Cloudflare 403 responses link to the required permission). **Never use Admin as the fix.**
 
