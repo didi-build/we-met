@@ -37,6 +37,7 @@ Agents should extend behavior only through these interfaces, not ad hoc fetches 
 | `/`                      | Placeholder landing page.                                |
 | `/hi/<slug>`             | Public card page.                                        |
 | `/hi/<slug>/contact.vcf` | vCard download (inline).                                 |
+| `/hi/<slug>/photo.jpg`   | Card headshot from R2 (`photoKey` on the card record).   |
 | `POST /api/exchange`     | Exchange submit (Turnstile, dispatch lead sinks + mail). |
 | `POST /api/details`      | Optional details (signed token).                         |
 
@@ -45,7 +46,7 @@ Agents should extend behavior only through these interfaces, not ad hoc fetches 
 ## Theming
 
 - **Variants:** closed set `green` and `mono`. The **brand variant** is chosen **server-side** from the card record; **light/dark** preference stays in the **browser**.
-- **Colors:** only under `src/theme/tokens/` (e.g. `green.light.css`, `green.dark.css`; `mono.*` later). Components use CSS variables from those files, not raw hex or RGB. A `theme-colors` check (to be added) will reject color literals outside that folder as part of `npm run check`.
+- **Colors:** only under `src/theme/tokens/` (e.g. `green.light.css`, `green.dark.css`; `mono.*` later). Components use CSS variables from those files, not raw hex or RGB. `npm run theme-colors` (in `npm run check`) rejects color literals outside that folder.
 - **Per-card copy:** footer link and similar fields live on the card record, not in shared layout code.
 
 ## Pipeline flow

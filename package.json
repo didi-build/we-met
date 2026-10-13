@@ -9,7 +9,8 @@
     "node": ">=22"
   },
   "scripts": {
-    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build && npm run worker:dry-run && npm run worker:dry-run:generated && npm run deploy:guards && npm run secrets && npm run secret-usage && npm run placeholders && npm run attribution",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run theme-colors && npm run build && npm run worker:dry-run && npm run worker:dry-run:generated && npm run deploy:guards && npm run secrets && npm run secret-usage && npm run placeholders && npm run attribution",
+    "theme-colors": "node scripts/check-theme-colors.mjs",
     "dev": "next dev --turbopack",
     "next:build": "next build",
     "build": "opennextjs-cloudflare build",
@@ -44,17 +45,20 @@
     ]
   },
   "dependencies": {
+    "@marsidev/react-turnstile": "^1.6.2",
     "@opennextjs/cloudflare": "^1.20.6",
     "next": "^15.5.27",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261006.1",
     "@eslint/eslintrc": "^3.3.1",
     "@eslint/js": "9.39.5",
     "@secretlint/secretlint-rule-preset-recommend": "10.2.2",
     "@tailwindcss/postcss": "^4.1.13",
-    "@cloudflare/workers-types": "^5.20261006.1",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
     "@types/node": "22.20.5",
     "@types/react": "^19.1.13",
     "@types/react-dom": "^19.1.9",
@@ -63,6 +67,7 @@
     "eslint-config-prettier": "^10.1.8",
     "globals": "16.5.0",
     "husky": "9.1.7",
+    "jsdom": "^29.1.1",
     "lint-staged": "16.4.0",
     "prettier": "3.9.9",
     "secretlint": "10.2.2",

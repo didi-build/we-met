@@ -1,13 +1,4 @@
-const LIMITS = {
-  slug: 48,
-  name: 200,
-  email: 254,
-  phone: 40,
-  jobTitle: 200,
-  company: 200,
-  note: 2000,
-  turnstileToken: 2048,
-} as const;
+import { EXCHANGE_LIMITS as LIMITS } from "@/exchange/limits";
 
 export type ValidatedExchangeInput = {
   slug: string;

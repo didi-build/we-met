@@ -1,31 +1,28 @@
-import { notFound } from "next/navigation";
-import { isValidSlug } from "@/card-data/slug";
-import { resolveCardForRequest } from "@/card-data/server";
+import { HiPageClient } from "@/components/hi/HiPageClient";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { readWeMetHostConfig } from "@/config/we-met";
+import { hiPhotoPath } from "@/lib/hi-card/paths";
+import { resolveHiCardPage } from "@/lib/hi-card/resolve-card-route";
+import { resolveHiCardMetadata } from "@/lib/hi/page-metadata";
+import type { Metadata } from "next";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
 };
 
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const card = await resolveHiCardPage(slug);
+  const { env } = await getCloudflareContext({ async: true });
+  const hostConfig = readWeMetHostConfig(env);
+  return resolveHiCardMetadata(card, hostConfig);
+}
+
 export default async function HiCardPage({ params }: PageProps) {
   const { slug } = await params;
-  if (!isValidSlug(slug)) {
-    notFound();
-  }
+  const card = await resolveHiCardPage(slug);
 
-  const card = await resolveCardForRequest(`/hi/${slug}`);
-  if (!card || card.slug !== slug) {
-    notFound();
-  }
+  const photoUrl = card.photoKey ? hiPhotoPath(slug) : null;
 
-  return (
-    <main className="mx-auto flex min-h-screen max-w-lg flex-col justify-center gap-4 p-8">
-      <p className="text-sm uppercase tracking-wide text-neutral-500">We Met</p>
-      <h1 className="text-3xl font-semibold">{card.pageCopy.pageTitle}</h1>
-      <p className="text-lg text-neutral-700">{card.displayName}</p>
-      <p className="text-sm text-neutral-600">
-        Stand-in card page for <span className="font-mono">/hi/{card.slug}</span> (full
-        UI in a follow-up ticket).
-      </p>
-    </main>
-  );
+  return <HiPageClient card={card} photoUrl={photoUrl} />;
 }

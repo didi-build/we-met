@@ -10,7 +10,7 @@ Cards need stable shareable links, support for a default host now and custom dom
 
 ## Decision
 
-- Public routes: `/` (placeholder landing), `/hi/<slug>`, `/hi/<slug>/contact.vcf` (inline vCard), `POST /api/exchange`, `POST /api/details` ([0008](./0008-api-routes-exchange-and-details.md)).
+- Public routes: `/` (placeholder landing), `/hi/<slug>`, `/hi/<slug>/photo.jpg` (card headshot from R2), `/hi/<slug>/contact.vcf` (inline vCard), `POST /api/exchange`, `POST /api/details` ([0008](./0008-api-routes-exchange-and-details.md)).
 - **Slug rules:** lowercase letters, numbers, and hyphens only; no leading or trailing hyphen; length 1–48.
 - **Default card path:** **`/hi/<slug>`** on the configured host (production host: `we-met.link`).
 - **Step 1 legacy mapping in this app:** `didi.build/hi` → `/hi/didi` (and vCard equivalent). **`didi.build` is not redirected in step 1.**
