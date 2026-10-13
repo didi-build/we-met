@@ -1,55 +1,117 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { extractWorkflowMetadata } from "./lib/privileged-workflow-extract.mjs";
 
 export const ACTIONS_POLICY_CONFIG_PATH = ".github/actions-policy-workflows.json";
 export const WORKFLOWS_DIR = ".github/workflows";
 
+export const CANNOT_DETERMINE_TRIGGERS = "cannot determine workflow triggers";
+
 /**
- * @param {string} content
- * @returns {string}
+ * @param {string} repoPath
+ * @param {string} [detail]
  */
-export function extractWorkflowOnBlock(content) {
-  const lines = content.split("\n");
-  /** @type {string[]} */
-  const sectionLines = [];
-  let inOn = false;
-  let onIndent = -1;
+export function cannotDetermineTriggersMessage(repoPath, detail) {
+  const suffix = detail ? ` (${detail})` : "";
+  return `${repoPath}: ${CANNOT_DETERMINE_TRIGGERS}${suffix}; use block-style \`on:\` with one event per line or list item, then update ${ACTIONS_POLICY_CONFIG_PATH} and the GitHub policy if needed.`;
+}
 
-  for (const line of lines) {
-    if (/^\s*on:\s*$/.test(line)) {
-      inOn = true;
-      onIndent = line.match(/^\s*/)?.[0].length ?? 0;
-      sectionLines.push(line);
-      continue;
-    }
-    if (inOn) {
-      const trimmed = line.trimEnd();
-      const indent = line.match(/^\s*/)?.[0].length ?? 0;
-      if (trimmed && indent <= onIndent) {
-        break;
-      }
-      sectionLines.push(line);
-    }
-  }
-
-  return sectionLines.join("\n");
+/**
+ * @param {string} line
+ */
+function stripYamlComment(line) {
+  return line.replace(/#.*$/, "");
 }
 
 /**
  * @param {string} content
- * @returns {string[]}
+ * @returns {{ ok: true; triggers: string[] } | { ok: false; reason: string }}
  */
-export function listWorkflowTriggerEvents(content) {
-  if (hasInlineWorkflowOnClause(content)) {
-    return [];
+export function parseWorkflowOnTriggerEvents(content) {
+  const lines = content.split("\n");
+  let onLineIndex = -1;
+
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i];
+    const trimmed = raw.trim();
+    if (!trimmed || trimmed.startsWith("#")) {
+      continue;
+    }
+    const indent = raw.match(/^(\s*)/)?.[1].length ?? 0;
+    if (indent !== 0) {
+      continue;
+    }
+    const noComment = stripYamlComment(raw).trimEnd();
+
+    if (/^on:\s*$/.test(noComment) || /^["']on["']:\s*$/.test(noComment.trim())) {
+      onLineIndex = i;
+      break;
+    }
+    if (/^on:\s+\S/.test(noComment) || /^["']on["']:\s+\S/.test(noComment.trim())) {
+      return { ok: false, reason: "inline on form" };
+    }
   }
-  const onBlock = extractWorkflowOnBlock(content);
-  if (!onBlock) {
-    return [];
+
+  if (onLineIndex === -1) {
+    return { ok: false, reason: "missing on key" };
   }
-  return extractWorkflowMetadata(onBlock).triggers;
+
+  const onIndent = 0;
+  let childIndent = -1;
+  /** @type {Set<string>} */
+  const triggers = new Set();
+  let sawDirectChild = false;
+
+  for (let i = onLineIndex + 1; i < lines.length; i++) {
+    const raw = lines[i];
+    const noComment = stripYamlComment(raw);
+    const trimmed = noComment.trim();
+    if (!trimmed) {
+      continue;
+    }
+    const indent = noComment.match(/^(\s*)/)?.[1].length ?? 0;
+    if (indent <= onIndent) {
+      break;
+    }
+
+    if (childIndent === -1) {
+      childIndent = indent;
+    }
+
+    if (indent < childIndent) {
+      break;
+    }
+
+    if (indent > childIndent) {
+      continue;
+    }
+
+    const seqMatch = /^\s*-\s+([A-Za-z_][A-Za-z0-9_-]*)\s*:?\s*$/.exec(noComment);
+    if (seqMatch) {
+      triggers.add(seqMatch[1].toLowerCase());
+      sawDirectChild = true;
+      continue;
+    }
+
+    const keyMatch = /^\s*([A-Za-z_][A-Za-z0-9_-]*)\s*:/.exec(noComment);
+    if (keyMatch) {
+      triggers.add(keyMatch[1].toLowerCase());
+      sawDirectChild = true;
+      continue;
+    }
+
+    if (/^\s*-\s+/.test(noComment)) {
+      return { ok: false, reason: "unparsed on block sequence entry" };
+    }
+
+    return { ok: false, reason: "unparsed on block line" };
+  }
+
+  if (!sawDirectChild || triggers.size === 0) {
+    return { ok: false, reason: "empty on block" };
+  }
+
+  return { ok: true, triggers: [...triggers].sort() };
 }
 
 /**
@@ -58,15 +120,23 @@ export function listWorkflowTriggerEvents(content) {
  */
 export function hasInlineWorkflowOnClause(content) {
   for (const line of content.split("\n")) {
-    const match = /^\s*on:\s*(.*)$/.exec(line);
-    if (!match) {
-      continue;
+    const noComment = stripYamlComment(line).trimEnd();
+    const match = /^\s*on:\s*(.*)$/.exec(noComment);
+    if (match) {
+      const rest = match[1].trim();
+      if (rest.length > 0) {
+        return true;
+      }
+      return false;
     }
-    const rest = match[1].trim();
-    if (rest.length > 0 && !rest.startsWith("#")) {
-      return true;
+    const quoted = /^\s*["']on["']:\s*(.*)$/.exec(noComment.trim());
+    if (quoted) {
+      const rest = quoted[1].trim();
+      if (rest.length > 0) {
+        return true;
+      }
+      return false;
     }
-    return false;
   }
   return false;
 }
@@ -130,14 +200,13 @@ export function findActionsPolicyWorkflowViolations({
     const repoPath = workflowPathFromFilename(filename);
     const content = readFileSync(join(workflowsDir, filename), "utf8");
 
-    if (hasInlineWorkflowOnClause(content)) {
-      violations.push(
-        `${repoPath}: cannot determine workflow triggers (inline \`on:\` form); use block-style \`on:\` with one trigger per line, or add explicit support. Until fixed, update ${ACTIONS_POLICY_CONFIG_PATH} and the GitHub policy manually.`,
-      );
+    const parsed = parseWorkflowOnTriggerEvents(content);
+    if (!parsed.ok) {
+      violations.push(cannotDetermineTriggersMessage(repoPath, parsed.reason));
       continue;
     }
 
-    const triggerList = listWorkflowTriggerEvents(content).map((t) => t.toLowerCase());
+    const triggerList = parsed.triggers.map((t) => t.toLowerCase());
 
     if (triggerList.includes("pull_request_target") && !listedPaths.has(repoPath)) {
       violations.push(

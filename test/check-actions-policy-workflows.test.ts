@@ -3,8 +3,10 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
 import {
+  CANNOT_DETERMINE_TRIGGERS,
   findActionsPolicyWorkflowViolations,
   hasInlineWorkflowOnClause,
+  parseWorkflowOnTriggerEvents,
 } from "../scripts/check-actions-policy-workflows.mjs";
 
 const allowlist = {
@@ -20,11 +22,22 @@ function writeWorkflow(dir: string, name: string, body: string) {
   writeFileSync(join(dir, name), body, "utf8");
 }
 
+function fixture(name: string) {
+  return readFileSync(join("test/fixtures/actions-policy-workflows", name), "utf8");
+}
+
 describe("hasInlineWorkflowOnClause (unit)", () => {
   it("detects inline on forms", () => {
     expect(hasInlineWorkflowOnClause("on: pull_request_target\n")).toBe(true);
     expect(hasInlineWorkflowOnClause("on: [push, pull_request_target]\n")).toBe(true);
     expect(hasInlineWorkflowOnClause("on:\n  push:\n")).toBe(false);
+  });
+});
+
+describe("parseWorkflowOnTriggerEvents (unit)", () => {
+  it("parses four-space indented on children", () => {
+    const result = parseWorkflowOnTriggerEvents(fixture("four-space-on.yml"));
+    expect(result).toEqual({ ok: true, triggers: ["pull_request_target"] });
   });
 });
 
@@ -102,23 +115,106 @@ describe("findActionsPolicyWorkflowViolations (table)", () => {
   });
 
   it("inline on form fails closed", () => {
-    const fixture = readFileSync(
-      join("test/fixtures/actions-policy-workflows", "inline-on.yml"),
-      "utf8",
-    );
-    expect(hasInlineWorkflowOnClause(fixture)).toBe(true);
+    const inline = fixture("inline-on.yml");
+    expect(hasInlineWorkflowOnClause(inline)).toBe(true);
     const root = mkdtempSync(join(tmpdir(), "actions-policy-"));
     const workflowsDir = join(root, ".github/workflows");
     mkdirSync(workflowsDir, { recursive: true });
-    writeWorkflow(workflowsDir, "inline.yml", fixture);
+    writeWorkflow(workflowsDir, "inline.yml", inline);
     const violations = findActionsPolicyWorkflowViolations({
       repoRoot: root,
       config: allowlist,
       workflowsDir,
     });
     expect(
-      violations.some((v) => v.includes("inline") && v.includes("cannot determine")),
+      violations.some(
+        (v) => v.includes("inline.yml") && v.includes(CANNOT_DETERMINE_TRIGGERS),
+      ),
     ).toBe(true);
+  });
+
+  it("quoted on inline form fails closed", () => {
+    const root = mkdtempSync(join(tmpdir(), "actions-policy-"));
+    const workflowsDir = join(root, ".github/workflows");
+    mkdirSync(workflowsDir, { recursive: true });
+    writeWorkflow(workflowsDir, "quoted.yml", fixture("quoted-on.yml"));
+    const violations = findActionsPolicyWorkflowViolations({
+      repoRoot: root,
+      config: allowlist,
+      workflowsDir,
+    });
+    expect(
+      violations.some(
+        (v) => v.includes("quoted.yml") && v.includes(CANNOT_DETERMINE_TRIGGERS),
+      ),
+    ).toBe(true);
+  });
+
+  it("empty on block fails closed", () => {
+    const root = mkdtempSync(join(tmpdir(), "actions-policy-"));
+    const workflowsDir = join(root, ".github/workflows");
+    mkdirSync(workflowsDir, { recursive: true });
+    writeWorkflow(workflowsDir, "empty.yml", fixture("empty-on.yml"));
+    const violations = findActionsPolicyWorkflowViolations({
+      repoRoot: root,
+      config: allowlist,
+      workflowsDir,
+    });
+    expect(
+      violations.some(
+        (v) => v.includes("empty.yml") && v.includes(CANNOT_DETERMINE_TRIGGERS),
+      ),
+    ).toBe(true);
+  });
+
+  it("listed workflow with unknown event fails allowedEvents rule", () => {
+    const root = mkdtempSync(join(tmpdir(), "actions-policy-"));
+    const workflowsDir = join(root, ".github/workflows");
+    mkdirSync(workflowsDir, { recursive: true });
+    writeWorkflow(
+      workflowsDir,
+      "privileged-change.yml",
+      "name: pc\non:\n  pull_request_target:\n    types: [opened]\n  branch_protection_rule:\n    types: [created]\n",
+    );
+    writeWorkflow(
+      workflowsDir,
+      "migrate-nonprod.yml",
+      "name: m\non:\n  pull_request_target:\n    types: [opened]\n  workflow_dispatch:\n",
+    );
+    writeWorkflow(
+      workflowsDir,
+      "dependabot-automerge.yml",
+      "name: d\non:\n  pull_request_target:\n    types: [opened]\n  workflow_run:\n    workflows: [CI]\n    types: [completed]\n",
+    );
+    const violations = findActionsPolicyWorkflowViolations({
+      repoRoot: root,
+      config: allowlist,
+      workflowsDir,
+    });
+    expect(
+      violations.some(
+        (v) =>
+          v.includes("branch_protection_rule") && v.includes("privileged-change.yml"),
+      ),
+    ).toBe(true);
+  });
+
+  it("four-space on indentation is detected for listed workflow", () => {
+    const root = mkdtempSync(join(tmpdir(), "actions-policy-"));
+    const workflowsDir = join(root, ".github/workflows");
+    mkdirSync(workflowsDir, { recursive: true });
+    const config = {
+      allowedEvents: ["pull_request_target"],
+      workflows: [".github/workflows/privileged-change.yml"],
+    };
+    writeWorkflow(workflowsDir, "privileged-change.yml", fixture("four-space-on.yml"));
+    expect(
+      findActionsPolicyWorkflowViolations({
+        repoRoot: root,
+        config,
+        workflowsDir,
+      }),
+    ).toEqual([]);
   });
 
   it("dispatch-only unlisted workflow passes", () => {

@@ -32,17 +32,30 @@ export function listIssueComments(repository, prNumber) {
  * @param {string} prNumber
  * @returns {string | null}
  */
+/**
+ * @param {unknown} comment
+ */
+export function isMigrateNonprodBotComment(comment) {
+  return (
+    comment &&
+    typeof comment === "object" &&
+    /** @type {{ user?: { login?: string }; body?: string }} */ (comment).user
+      ?.login === "github-actions[bot]" &&
+    typeof (/** @type {{ body?: string }} */ (comment).body) === "string" &&
+    /** @type {{ body: string }} */ (comment).body.includes(MIGRATE_NONPROD_MARKER)
+  );
+}
+
+/**
+ * @param {unknown[]} comments
+ */
+export function findMigrateNonprodBotComment(comments) {
+  return comments.find(isMigrateNonprodBotComment);
+}
+
 export function findMigrateNonprodBotCommentBody(repository, prNumber) {
   const comments = listIssueComments(repository, prNumber);
-  const existing = comments.find(
-    (c) =>
-      c &&
-      typeof c === "object" &&
-      /** @type {{ user?: { login?: string }; body?: string }} */ (c).user?.login ===
-        "github-actions[bot]" &&
-      typeof (/** @type {{ body?: string }} */ (c).body) === "string" &&
-      /** @type {{ body: string }} */ (c).body.includes(MIGRATE_NONPROD_MARKER),
-  );
+  const existing = findMigrateNonprodBotComment(comments);
   return existing && typeof existing === "object" && typeof existing.body === "string"
     ? existing.body
     : null;

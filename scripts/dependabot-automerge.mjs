@@ -67,6 +67,7 @@ export function dependabotTouchesProtectedWorkflow(changedFiles) {
  *   labels: string[];
  *   changedFiles?: string[];
  * }} input
+ * @returns {{ ok: true } | { ok: false; reason: string }}
  */
 export function isEligible(input) {
   const { author, headRef, labels, changedFiles = [] } = input;

@@ -1,0 +1,7 @@
+name: quoted inline on
+"on": [pull_request_target]
+jobs:
+  noop:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ok

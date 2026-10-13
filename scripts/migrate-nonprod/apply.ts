@@ -9,6 +9,10 @@ import { upsertMigrateNonprodComment } from "./gh-comment.mjs";
 import { hashFileContent } from "./hash.mjs";
 import { resolveApplyHeadCheck, validateApplyPrHead } from "./apply-guard.mjs";
 import { findMigrateNonprodBotCommentBody } from "./gh-api-comments.mjs";
+import {
+  formatApplyFailureCommentError,
+  formatApplyResultSummaryBlock,
+} from "./apply-output.mjs";
 import { redactMigrationLog } from "./redact.mjs";
 import { validatePrNumber } from "./validate.mjs";
 
@@ -44,12 +48,12 @@ function failWithComment(
     state: "failed",
     headSha,
     migrationHash,
-    error: redactMigrationLog(error),
+    error: formatApplyFailureCommentError(error),
     runUrl,
     preservedAppliedMarker,
   });
   upsertMigrateNonprodComment({ repository, prNumber, body });
-  console.error(redactMigrationLog(error));
+  console.error(formatApplyFailureCommentError(error));
   process.exit(1);
 }
 
@@ -130,7 +134,7 @@ function main() {
   }
 
   const redactedOut = redactMigrationLog((apply.stdout || "OK").trim());
-  writeSummary(`### Result\n\n\`\`\`\n${redactedOut}\n\`\`\`\n`);
+  writeSummary(`${formatApplyResultSummaryBlock(redactedOut)}\n`);
 
   const fileHashes: Record<string, string> = {};
   for (const path of manifest.files) {
