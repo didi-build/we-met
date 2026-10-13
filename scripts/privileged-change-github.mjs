@@ -13,6 +13,7 @@ import {
   privilegedChangeReviewedLabel,
   removeIssueLabel,
 } from "./lib/privileged-change-labels.mjs";
+import { ghApiCall } from "./lib/privileged-gh-api.mjs";
 import {
   parsePullRequestFilesApiStdout,
   shouldFetchWorkflowFileContent,
@@ -22,75 +23,90 @@ import { isWorkflowFile } from "./lib/privileged-paths.mjs";
 import { privilegedChangeErrorStatusPayload } from "./lib/privileged-change-status.mjs";
 import { buildPrivilegedChangeCommentBody } from "./privileged-change-comment-body.mjs";
 
-const MARKER = "<!-- we-met-privileged-change -->";
+export const PRIVILEGED_CHANGE_MARKER = "<!-- we-met-privileged-change -->";
 
-function ghEnv() {
-  return {
-    ...process.env,
-    GH_TOKEN: process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN,
-  };
-}
-
-function ghApi(args, input) {
-  return execFileSync("gh", ["api", ...args], {
-    encoding: "utf8",
-    input,
-    env: ghEnv(),
-  });
+/**
+ * @param {import('./lib/privileged-gh-api.mjs').GhExec} exec
+ * @param {Record<string, string | undefined>} env
+ * @param {string[]} args
+ * @param {string} [input]
+ */
+function ghApi(exec, env, args, input) {
+  return ghApiCall(exec, env, args, input);
 }
 
 /**
  * @param {string} repo
  * @param {string} headSha
+ * @param {import('./lib/privileged-gh-api.mjs').GhExec} exec
+ * @param {Record<string, string | undefined>} env
  */
-export function postPrivilegedChangeErrorStatus(repo, headSha) {
+export function postPrivilegedChangeErrorStatus(repo, headSha, exec, env) {
   ghApi(
+    exec,
+    env,
     ["--method", "POST", `repos/${repo}/statuses/${headSha}`],
     JSON.stringify(privilegedChangeErrorStatusPayload()),
   );
 }
 
-function findMarkerCommentId(repo, prNumber) {
-  const commentIds = execFileSync(
+/**
+ * @param {string} repo
+ * @param {string} prNumber
+ * @param {import('./lib/privileged-gh-api.mjs').GhExec} exec
+ * @param {Record<string, string | undefined>} env
+ */
+function findMarkerCommentId(repo, prNumber, exec, env) {
+  const commentIds = exec(
     "gh",
     [
       "api",
       `repos/${repo}/issues/${prNumber}/comments`,
       "--paginate",
       "--jq",
-      `.[] | select(.user.login == "github-actions[bot]" and (.body | contains("${MARKER}"))) | .id`,
+      `.[] | select(.user.login == "github-actions[bot]" and (.body | contains("${PRIVILEGED_CHANGE_MARKER}"))) | .id`,
     ],
-    { encoding: "utf8", env: ghEnv() },
+    { encoding: "utf8", env },
   ).trim();
   const commentId = commentIds.split("\n")[0]?.trim();
   return commentId || null;
 }
 
-function run() {
-  const repo = process.env.REPOSITORY ?? process.env.GITHUB_REPOSITORY;
-  const prNumber = process.env.PR_NUMBER;
-  const headSha = process.env.HEAD_SHA;
-  const trustedOrg = process.env.TRUSTED_ORG;
-  const eventAction = process.env.EVENT_ACTION ?? "";
+/**
+ * @param {{ exec?: import('./lib/privileged-gh-api.mjs').GhExec; env?: Record<string, string | undefined> }} [options]
+ * @returns {number} exit code
+ */
+export function runPrivilegedChange(options = {}) {
+  const exec = options.exec ?? execFileSync;
+  const env = {
+    ...process.env,
+    ...options.env,
+  };
+
+  const repo = env.REPOSITORY ?? env.GITHUB_REPOSITORY;
+  const prNumber = env.PR_NUMBER;
+  const headSha = env.HEAD_SHA;
+  const trustedOrg = env.TRUSTED_ORG;
+  const eventAction = env.EVENT_ACTION ?? "";
 
   if (!repo || !prNumber || !headSha || !trustedOrg) {
     console.error(
       "Set REPOSITORY (or GITHUB_REPOSITORY), PR_NUMBER, HEAD_SHA, and TRUSTED_ORG",
     );
-    process.exit(1);
+    return 1;
   }
 
   try {
-    ensurePrivilegedChangeLabels(repo);
+    ensurePrivilegedChangeLabels(repo, exec, env);
 
-    const filesStdout = ghApi([
+    const filesStdout = ghApi(exec, env, [
       `repos/${repo}/pulls/${prNumber}/files?per_page=100`,
       "--paginate",
       "--slurp",
     ]);
     const changedFiles = parsePullRequestFilesApiStdout(filesStdout);
 
-    const prJson = ghApi([`repos/${repo}/pulls/${prNumber}`]);
+    const prJson = ghApi(exec, env, [`repos/${repo}/pulls/${prNumber}`]);
     const pr = JSON.parse(prJson);
     let prLabels = (pr.labels ?? []).map((l) => l.name);
 
@@ -107,7 +123,9 @@ function run() {
         .split("/")
         .map((part) => encodeURIComponent(part))
         .join("/");
-      const contentJson = ghApi([`repos/${repo}/contents/${encoded}?ref=${headSha}`]);
+      const contentJson = ghApi(exec, env, [
+        `repos/${repo}/contents/${encoded}?ref=${headSha}`,
+      ]);
       const payload = JSON.parse(contentJson);
       if (payload.content && payload.encoding === "base64") {
         workflowContentsByPath[file.filename] = Buffer.from(
@@ -127,11 +145,11 @@ function run() {
       prLabels,
     );
     if (staleReviewCleared) {
-      removeIssueLabel(repo, prNumber, privilegedChangeReviewedLabel);
+      removeIssueLabel(repo, prNumber, privilegedChangeReviewedLabel, exec, env);
       prLabels = prLabels.filter((name) => name !== privilegedChangeReviewedLabel);
     }
 
-    const existingCommentId = findMarkerCommentId(repo, prNumber);
+    const existingCommentId = findMarkerCommentId(repo, prNumber, exec, env);
     const commentAction = decidePrivilegedChangeCommentAction(
       analysis.flagged,
       existingCommentId !== null,
@@ -144,11 +162,15 @@ function run() {
       const commentPayload = JSON.stringify({ body });
       if (commentAction === "update" && existingCommentId) {
         ghApi(
+          exec,
+          env,
           ["--method", "PATCH", `repos/${repo}/issues/comments/${existingCommentId}`],
           commentPayload,
         );
       } else {
         ghApi(
+          exec,
+          env,
           ["--method", "POST", `repos/${repo}/issues/${prNumber}/comments`],
           commentPayload,
         );
@@ -157,9 +179,9 @@ function run() {
 
     const hasFlagLabel = prLabels.includes(privilegedChangeLabel);
     if (analysis.flagged && !hasFlagLabel) {
-      addIssueLabels(repo, prNumber, [privilegedChangeLabel]);
+      addIssueLabels(repo, prNumber, [privilegedChangeLabel], exec, env);
     } else if (!analysis.flagged && hasFlagLabel) {
-      removeIssueLabel(repo, prNumber, privilegedChangeLabel);
+      removeIssueLabel(repo, prNumber, privilegedChangeLabel, exec, env);
     }
 
     const checkState = privilegedChangeCheckState(analysis.flagged, prLabels);
@@ -171,6 +193,8 @@ function run() {
         : "Privileged change needs maintainer review (add privileged-change-reviewed)";
 
     ghApi(
+      exec,
+      env,
       ["--method", "POST", `repos/${repo}/statuses/${headSha}`],
       JSON.stringify({
         state: checkState,
@@ -189,14 +213,15 @@ function run() {
         findingCount: analysis.findings.length,
       }),
     );
+    return 0;
   } catch (err) {
     try {
-      postPrivilegedChangeErrorStatus(repo, headSha);
+      postPrivilegedChangeErrorStatus(repo, headSha, exec, env);
     } catch (statusErr) {
       console.error("Failed to post privileged-change error status:", statusErr);
     }
     console.error(err);
-    process.exit(1);
+    return 1;
   }
 }
 
@@ -205,5 +230,5 @@ const isMain =
   import.meta.url === pathToFileURL(process.argv[1]).href;
 
 if (isMain) {
-  run();
+  process.exit(runPrivilegedChange());
 }
