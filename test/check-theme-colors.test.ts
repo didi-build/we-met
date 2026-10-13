@@ -127,6 +127,26 @@ describe("theme-color scan (unit)", () => {
     expect(reasons).toContain("css-named");
   });
 
+  it("flags border-color with a named color in CSS", () => {
+    const reasons = scanCss("x.css", ".x { border-color: " + "red; }");
+    expect(reasons).toContain("css-named");
+  });
+
+  it("allows border-color with a CSS variable in CSS", () => {
+    const reasons = scanCss("x.css", ".x { border-color: var(--line); }");
+    expect(reasons).not.toContain("css-named");
+  });
+
+  it("allows border-width without a named color in CSS", () => {
+    const reasons = scanCss("x.css", ".x { border-width: 1px; }");
+    expect(reasons).not.toContain("css-named");
+  });
+
+  it("allows border-style without a named color in CSS", () => {
+    const reasons = scanCss("x.css", ".x { border-style: solid; }");
+    expect(reasons).not.toContain("css-named");
+  });
+
   it("flags path fill with a named color in JSX", () => {
     const fill = "red";
     const reasons = scanTsx(

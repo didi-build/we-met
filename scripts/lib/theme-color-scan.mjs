@@ -204,7 +204,7 @@ const CSS_COLOR_PROPERTY_NAMES = [
 ].join("|");
 
 const CSS_COLOR_PROPERTY_EXTRA =
-  "border(?:-(?:top|right|bottom|left))(?:-(?:color|width|style))?|border-(?:block|inline)(?:-(?:start|end))?(?:-(?:color|width|style))?|outline(?:-(?:color|width|style|offset))?";
+  "border(?:-(?:top|right|bottom|left))?(?:-(?:color|width|style))?|border-(?:block|inline)(?:-(?:start|end))?(?:-(?:color|width|style))?|outline(?:-(?:color|width|style|offset))?";
 
 const CSS_DECLARATION_PROPERTY = `(?:${CSS_COLOR_PROPERTY_NAMES}|${CSS_COLOR_PROPERTY_EXTRA})`;
 
