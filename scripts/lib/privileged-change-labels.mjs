@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { shouldIgnoreIssueLabelDeleteError } from "./gh-api-errors.mjs";
+import { buildGhApiArgs } from "./privileged-gh-api.mjs";
 
 export const privilegedChangeLabel = "privileged-change";
 export const privilegedChangeReviewedLabel = "privileged-change-reviewed";
@@ -18,30 +19,39 @@ const LABELS = [
   },
 ];
 
-function ghEnv() {
+/**
+ * @param {Record<string, string | undefined>} env
+ */
+function tokenEnv(env) {
   return {
-    ...process.env,
-    GH_TOKEN: process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN,
+    ...env,
+    GH_TOKEN: env.GH_TOKEN ?? env.GITHUB_TOKEN,
   };
 }
 
 /**
  * @param {string} repo
+ * @param {import('./privileged-gh-api.mjs').GhExec} [exec]
+ * @param {Record<string, string | undefined>} [env]
  */
-export function ensurePrivilegedChangeLabels(repo) {
+export function ensurePrivilegedChangeLabels(
+  repo,
+  exec = execFileSync,
+  env = process.env,
+) {
+  const ghEnv = tokenEnv(env);
   const names = JSON.parse(
-    execFileSync(
-      "gh",
-      ["label", "list", "--repo", repo, "--limit", "200", "--json", "name"],
-      { encoding: "utf8", env: ghEnv() },
-    ),
+    exec("gh", ["label", "list", "--repo", repo, "--limit", "200", "--json", "name"], {
+      encoding: "utf8",
+      env: ghEnv,
+    }),
   ).map((l) => l.name);
 
   for (const label of LABELS) {
     if (names.includes(label.name)) {
       continue;
     }
-    execFileSync(
+    exec(
       "gh",
       [
         "label",
@@ -54,7 +64,7 @@ export function ensurePrivilegedChangeLabels(repo) {
         "--description",
         label.description,
       ],
-      { stdio: "inherit", env: ghEnv() },
+      { stdio: "inherit", env: ghEnv },
     );
   }
 }
@@ -63,18 +73,30 @@ export function ensurePrivilegedChangeLabels(repo) {
  * @param {string} repo
  * @param {string | number} issueNumber
  * @param {string[]} labels
+ * @param {import('./privileged-gh-api.mjs').GhExec} [exec]
+ * @param {Record<string, string | undefined>} [env]
  */
-export function addIssueLabels(repo, issueNumber, labels) {
+export function addIssueLabels(
+  repo,
+  issueNumber,
+  labels,
+  exec = execFileSync,
+  env = process.env,
+) {
   if (labels.length === 0) {
     return;
   }
-  execFileSync(
+  const body = JSON.stringify({ labels });
+  exec(
     "gh",
-    ["api", "--method", "POST", `repos/${repo}/issues/${issueNumber}/labels`],
+    buildGhApiArgs(
+      ["--method", "POST", `repos/${repo}/issues/${issueNumber}/labels`],
+      true,
+    ),
     {
       encoding: "utf8",
-      input: JSON.stringify({ labels }),
-      env: ghEnv(),
+      input: body,
+      env: tokenEnv(env),
     },
   );
 }
@@ -83,10 +105,18 @@ export function addIssueLabels(repo, issueNumber, labels) {
  * @param {string} repo
  * @param {string | number} issueNumber
  * @param {string} label
+ * @param {import('./privileged-gh-api.mjs').GhExec} [exec]
+ * @param {Record<string, string | undefined>} [env]
  */
-export function removeIssueLabel(repo, issueNumber, label) {
+export function removeIssueLabel(
+  repo,
+  issueNumber,
+  label,
+  exec = execFileSync,
+  env = process.env,
+) {
   try {
-    execFileSync(
+    exec(
       "gh",
       [
         "api",
@@ -94,7 +124,7 @@ export function removeIssueLabel(repo, issueNumber, label) {
         "DELETE",
         `repos/${repo}/issues/${issueNumber}/labels/${encodeURIComponent(label)}`,
       ],
-      { encoding: "utf8", env: ghEnv(), stdio: "pipe" },
+      { encoding: "utf8", env: tokenEnv(env), stdio: "pipe" },
     );
   } catch (err) {
     const stderr =
