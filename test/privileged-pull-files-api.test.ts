@@ -7,6 +7,17 @@ import {
 } from "../scripts/lib/privileged-pull-files-api.mjs";
 
 describe("privileged-pull-files-api (unit)", () => {
+  it("parses pretty-printed single JSON array (whole-output parse)", () => {
+    const stdout = `[
+  { "filename": "a.txt", "status": "modified" },
+  { "filename": "b.txt", "status": "added" }
+]`;
+    expect(parsePullRequestFilesApiStdout(stdout)).toEqual([
+      { filename: "a.txt", status: "modified" },
+      { filename: "b.txt", status: "added" },
+    ]);
+  });
+
   it("parses a flat JSON array", () => {
     const stdout = JSON.stringify([
       { filename: "a.txt", status: "modified" },

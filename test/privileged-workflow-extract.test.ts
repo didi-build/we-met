@@ -56,6 +56,12 @@ describe("privileged-workflow-extract (unit)", () => {
     );
   });
 
+  it("matches uses owners case-insensitively for trusted org checks", () => {
+    const meta = extractWorkflowMetadata(fixtures("case-mixed-uses.yml"));
+    expect(findUntrustedUsesOwners(meta.usesOwners, "didi-build")).toEqual([]);
+    expect(meta.usesOwners.map((o) => o.toLowerCase())).toContain("actions");
+  });
+
   it("matches environments, secrets, and owners case-insensitively", () => {
     const meta = extractWorkflowMetadata(fixtures("case-mixed.yml"));
     expect(meta.environments.map((e) => e.toLowerCase())).toContain("production");

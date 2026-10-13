@@ -43,19 +43,30 @@ export function parsePullRequestFilesApiStdout(stdout) {
     return [];
   }
 
-  const lines = trimmed.split("\n").filter((line) => line.trim());
   /** @type {unknown[]} */
   let rawEntries = [];
 
-  if (lines.length === 1 && lines[0].startsWith("[")) {
-    rawEntries = flattenPullFilesPayload(JSON.parse(lines[0]));
-  } else {
-    for (const line of lines) {
-      const parsed = JSON.parse(line);
-      if (Array.isArray(parsed)) {
-        rawEntries.push(...flattenPullFilesPayload(parsed));
-      } else {
-        rawEntries.push(parsed);
+  if (trimmed.startsWith("[")) {
+    try {
+      rawEntries = flattenPullFilesPayload(JSON.parse(trimmed));
+    } catch {
+      // fall through to per-line parsing
+    }
+  }
+
+  if (rawEntries.length === 0) {
+    const lines = trimmed.split("\n").filter((line) => line.trim());
+
+    if (lines.length === 1 && lines[0].startsWith("[")) {
+      rawEntries = flattenPullFilesPayload(JSON.parse(lines[0]));
+    } else {
+      for (const line of lines) {
+        const parsed = JSON.parse(line);
+        if (Array.isArray(parsed)) {
+          rawEntries.push(...flattenPullFilesPayload(parsed));
+        } else {
+          rawEntries.push(parsed);
+        }
       }
     }
   }
