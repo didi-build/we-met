@@ -57,6 +57,21 @@ describe("migrate-nonprod comment body (unit)", () => {
     expect(parseAppliedMigrationHash(skippedAgain)).toBe(hash);
   });
 
+  it("failed state includes error text for plan-stage failures", () => {
+    const reason =
+      "Refusing changed migration files (only new files allowed): migrations/a.sql (modified)";
+    const body = buildMigrateNonprodCommentBody({
+      state: "failed",
+      headSha: "abc",
+      migrationHash: hash,
+      error: reason,
+      runUrl: "https://example.com/run/2",
+    });
+    expect(body).toContain("**Status:** Failed.");
+    expect(body).toContain(reason);
+    expect(body).toContain("[Open workflow run](https://example.com/run/2)");
+  });
+
   it("changed hash after apply goes to waiting without losing applied marker record", () => {
     const appliedMarker = buildAppliedStateMarker({ hash, files: fileHashes });
     const newHash = "c".repeat(64);
