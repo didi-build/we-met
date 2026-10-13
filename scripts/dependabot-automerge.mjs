@@ -50,10 +50,34 @@ export function pickPrNumber(prNumbers) {
 }
 
 /**
- * @param {{ author: { login: string; is_bot?: boolean }; headRef: string; labels: string[] }} input
+ * @param {string[]} changedFiles
+ */
+export function dependabotTouchesProtectedWorkflow(changedFiles) {
+  return changedFiles.some(
+    (path) =>
+      path === ".github/workflows/migrate-nonprod.yml" ||
+      path.startsWith(".github/workflows/migrate-nonprod."),
+  );
+}
+
+/**
+ * @param {{
+ *   author: { login: string; is_bot?: boolean };
+ *   headRef: string;
+ *   labels: string[];
+ *   changedFiles?: string[];
+ * }} input
  * @returns {{ ok: true } | { ok: false; reason: string }}
  */
-export function isEligible({ author, headRef, labels }) {
+export function isEligible(input) {
+  const { author, headRef, labels, changedFiles = [] } = input;
+  if (dependabotTouchesProtectedWorkflow(changedFiles)) {
+    return {
+      ok: false,
+      reason:
+        "PR modifies .github/workflows/migrate-nonprod.yml; auto-merge is disabled for this workflow.",
+    };
+  }
   if (!isDependabotAuthor(author)) {
     return {
       ok: false,
@@ -81,11 +105,13 @@ export function isEligible({ author, headRef, labels }) {
  */
 export function evaluatePrJson(rawJsonString) {
   const pr = JSON.parse(rawJsonString);
-  const labels = pr.labels.map((l) => l.name);
+  const labels = (pr.labels ?? []).map((l) => (typeof l === "string" ? l : l.name));
+  const changedFiles = pr.changedFiles ?? [];
   return isEligible({
     author: pr.author,
     headRef: pr.headRefName,
     labels,
+    changedFiles,
   });
 }
 
@@ -178,10 +204,18 @@ function main() {
     "--repo",
     repo,
     "--json",
-    "author,headRefName,labels",
+    "author,headRefName,labels,files",
   ]);
   const pr = JSON.parse(raw);
-  const eligibility = evaluatePrJson(raw);
+  const changedFiles = (pr.files ?? []).map((f) => f.path);
+  const eligibility = evaluatePrJson(
+    JSON.stringify({
+      author: pr.author,
+      headRefName: pr.headRefName,
+      labels: pr.labels,
+      changedFiles,
+    }),
+  );
 
   if (!eligibility.ok) {
     console.log(`PR #${prNumber}: ${eligibility.reason}`);

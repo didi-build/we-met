@@ -1,0 +1,8 @@
+{
+  "allowedEvents": ["pull_request_target", "workflow_dispatch", "workflow_run"],
+  "workflows": [
+    ".github/workflows/privileged-change.yml",
+    ".github/workflows/migrate-nonprod.yml",
+    ".github/workflows/dependabot-automerge.yml"
+  ]
+}

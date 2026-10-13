@@ -9,7 +9,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run theme-colors && npm run build && npm run worker:dry-run && npm run worker:dry-run:generated && npm run deploy:guards && npm run secrets && npm run secret-usage && npm run placeholders && npm run attribution",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run theme-colors && npm run build && npm run worker:dry-run && npm run worker:dry-run:generated && npm run deploy:guards && npm run secrets && npm run secret-usage && npm run actions-policy-workflows && npm run placeholders && npm run attribution",
     "theme-colors": "node scripts/check-theme-colors.mjs",
     "dev": "next dev --turbopack",
     "next:build": "next build",
@@ -28,6 +28,7 @@
     "test:watch": "vitest",
     "secrets": "secretlint \"**/*\"",
     "secret-usage": "node scripts/check-secret-usage.mjs",
+    "actions-policy-workflows": "node scripts/check-actions-policy-workflows.mjs",
     "placeholders": "node scripts/check-placeholders.mjs",
     "attribution": "node scripts/check-attribution.mjs",
     "init-project": "node scripts/init-project.mjs",

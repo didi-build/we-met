@@ -21,6 +21,8 @@ describe("privileged-paths (table)", () => {
     { path: "scripts/lib/privileged-gh-api.mjs", privileged: true },
     { path: "scripts/lib/gh-api-errors.mjs", privileged: true },
     { path: "scripts/check-secret-usage.mjs", privileged: true },
+    { path: "scripts/dependabot-automerge.mjs", privileged: true },
+    { path: "scripts/check-actions-policy-workflows.mjs", privileged: true },
     { path: "src/app/page.tsx", privileged: false },
     { path: "scripts/preview-comment-body.mjs", privileged: false },
     { path: "package.json", privileged: false },
@@ -45,6 +47,8 @@ describe("privileged-paths (table)", () => {
       "privileged-change-scripts",
       "privileged-lib",
       "secret-usage",
+      "dependabot-automerge",
+      "actions-policy-workflows",
       "gh-api-errors",
       "privileged-change-workflow",
     ]);

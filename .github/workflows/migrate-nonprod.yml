@@ -1,0 +1,95 @@
+name: Migrate non-prod D1
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize]
+    paths:
+      - migrations/**
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number (manual retry)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  plan:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request_target' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login != 'dependabot[bot]')
+    runs-on: ubuntu-latest
+    outputs:
+      has_migrations: ${{ steps.plan.outputs.has_migrations }}
+      skip_apply: ${{ steps.plan.outputs.skip_apply }}
+      head_sha: ${{ steps.plan.outputs.head_sha }}
+      migration_hash: ${{ steps.plan.outputs.migration_hash }}
+    concurrency:
+      group: migrate-nonprod-${{ github.event.pull_request.number || inputs.pr_number }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Plan migrations (fetch PR SQL via API)
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+        run: npx tsx scripts/migrate-nonprod/plan.ts
+      - name: Upload migration artifact
+        if: steps.plan.outputs.has_migrations == 'true' && steps.plan.outputs.skip_apply != 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: migrate-nonprod-${{ github.event.pull_request.number || inputs.pr_number }}
+          path: migrate-nonprod-artifact/
+          retention-days: 7
+
+  apply:
+    needs: plan
+    if: needs.plan.outputs.has_migrations == 'true' && needs.plan.outputs.skip_apply != 'true'
+    runs-on: ubuntu-latest
+    environment: migrate-nonprod
+    concurrency:
+      group: migrate-nonprod-apply
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Mask non-prod D1 database id
+        env:
+          WE_MET_D1_DATABASE_ID_NONPROD: ${{ vars.WE_MET_D1_DATABASE_ID_NONPROD }}
+        run: |
+          set -euo pipefail
+          echo "::add-mask::${WE_MET_D1_DATABASE_ID_NONPROD}"
+      - name: Download migration artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: migrate-nonprod-${{ github.event.pull_request.number || inputs.pr_number }}
+          path: migrate-nonprod-artifact/
+      - name: Apply migrations to we-met-db-nonprod
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+          WE_MET_D1_DATABASE_ID_NONPROD: ${{ vars.WE_MET_D1_DATABASE_ID_NONPROD }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_MIGRATE_NONPROD }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx tsx scripts/migrate-nonprod/apply.ts

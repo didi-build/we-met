@@ -3,8 +3,11 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const WORKFLOWS_DIR = ".github/workflows";
-const ALLOWED_FILE = "bootstrap.yml";
+const ALLOWED_BOOTSTRAP_FILE = "bootstrap.yml";
+const ALLOWED_MIGRATE_NONPROD_FILE = "migrate-nonprod.yml";
 const SECRET_NAME = "BOOTSTRAP_TOKEN";
+const MIGRATE_NONPROD_SECRET = "CLOUDFLARE_API_TOKEN_MIGRATE_NONPROD";
+const MIGRATE_NONPROD_ENV = "migrate-nonprod";
 
 /**
  * @param {string} workflowsDir
@@ -20,7 +23,7 @@ export function findBootstrapTokenViolations(workflowsDir) {
     if (!entry.isFile()) continue;
     const name = entry.name;
     if (!name.endsWith(".yml") && !name.endsWith(".yaml")) continue;
-    if (name === ALLOWED_FILE) continue;
+    if (name === ALLOWED_BOOTSTRAP_FILE) continue;
     const text = readFileSync(join(workflowsDir, name), "utf8");
     if (text.includes(SECRET_NAME)) {
       violations.push(name);
@@ -29,13 +32,46 @@ export function findBootstrapTokenViolations(workflowsDir) {
   return violations.sort();
 }
 
+/**
+ * @param {string} workflowsDir
+ * @returns {string[]}
+ */
+export function findMigrateNonprodCredentialViolations(workflowsDir) {
+  if (!existsSync(workflowsDir)) {
+    return [];
+  }
+  const violations = [];
+  for (const entry of readdirSync(workflowsDir, { withFileTypes: true })) {
+    if (!entry.isFile()) continue;
+    const name = entry.name;
+    if (!name.endsWith(".yml") && !name.endsWith(".yaml")) continue;
+    if (name === ALLOWED_MIGRATE_NONPROD_FILE) continue;
+    const text = readFileSync(join(workflowsDir, name), "utf8");
+    if (text.includes(MIGRATE_NONPROD_SECRET) || text.includes(MIGRATE_NONPROD_ENV)) {
+      violations.push(name);
+    }
+  }
+  return violations.sort();
+}
+
 function runCli() {
-  const violations = findBootstrapTokenViolations(WORKFLOWS_DIR);
-  if (violations.length > 0) {
+  const bootstrapViolations = findBootstrapTokenViolations(WORKFLOWS_DIR);
+  if (bootstrapViolations.length > 0) {
     console.error(
-      `${SECRET_NAME} must only appear in .github/workflows/${ALLOWED_FILE}. Offenders:\n`,
+      `${SECRET_NAME} must only appear in .github/workflows/${ALLOWED_BOOTSTRAP_FILE}. Offenders:\n`,
     );
-    for (const file of violations) {
+    for (const file of bootstrapViolations) {
+      console.error(`  - ${file}`);
+    }
+    process.exit(1);
+  }
+
+  const migrateViolations = findMigrateNonprodCredentialViolations(WORKFLOWS_DIR);
+  if (migrateViolations.length > 0) {
+    console.error(
+      `${MIGRATE_NONPROD_SECRET} and environment name ${MIGRATE_NONPROD_ENV} must only appear in .github/workflows/${ALLOWED_MIGRATE_NONPROD_FILE}. Offenders:\n`,
+    );
+    for (const file of migrateViolations) {
       console.error(`  - ${file}`);
     }
     process.exit(1);

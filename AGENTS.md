@@ -84,6 +84,7 @@ Do not break these; each links to the canonical doc.
 | `npm run test`                     | Vitest (CI uses JUnit output)                                                                                         |
 | `npm run secrets`                  | Secretlint                                                                                                            |
 | `npm run secret-usage`             | Fail if `BOOTSTRAP_TOKEN` appears outside `bootstrap.yml` workflows                                                   |
+| `npm run actions-policy-workflows` | Fail if workflow `on:` triggers disagree with `.github/actions-policy-workflows.json` (GitHub Actions policy mirror)  |
 | `npm run init-project`             | Replace `{{…}}` placeholders after creating a repo from Launchpad                                                     |
 | `npm run repo-settings`            | Dry-run, `--apply`, or `--verify` recommended GitHub repo settings                                                    |
 | `npm run verify-action-pins`       | Verify each pinned action SHA matches its version comment (`# vX.Y.Z`)                                                |

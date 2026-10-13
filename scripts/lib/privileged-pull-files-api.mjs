@@ -34,32 +34,49 @@ export function normalizePullFileEntry(entry, index) {
 }
 
 /**
+ * Parse `gh api --paginate --slurp` stdout (nested page arrays) or a single JSON array.
+ *
  * @param {string} stdout
- * @returns {{ filename: string; status: string }[]}
+ * @returns {unknown[]}
  */
-export function parsePullRequestFilesApiStdout(stdout) {
+export function parseGhApiPaginatedSlurpedStdout(stdout) {
   const trimmed = stdout.trim();
   if (!trimmed) {
     return [];
   }
 
-  const lines = trimmed.split("\n").filter((line) => line.trim());
-  /** @type {unknown[]} */
-  let rawEntries = [];
-
-  if (lines.length === 1 && lines[0].startsWith("[")) {
-    rawEntries = flattenPullFilesPayload(JSON.parse(lines[0]));
-  } else {
-    for (const line of lines) {
-      const parsed = JSON.parse(line);
-      if (Array.isArray(parsed)) {
-        rawEntries.push(...flattenPullFilesPayload(parsed));
-      } else {
-        rawEntries.push(parsed);
-      }
+  if (trimmed.startsWith("[")) {
+    try {
+      return flattenPullFilesPayload(JSON.parse(trimmed));
+    } catch {
+      // fall through
     }
   }
 
+  const lines = trimmed.split("\n").filter((line) => line.trim());
+  if (lines.length === 1 && lines[0].startsWith("[")) {
+    return flattenPullFilesPayload(JSON.parse(lines[0]));
+  }
+
+  /** @type {unknown[]} */
+  const rawEntries = [];
+  for (const line of lines) {
+    const parsed = JSON.parse(line);
+    if (Array.isArray(parsed)) {
+      rawEntries.push(...flattenPullFilesPayload(parsed));
+    } else {
+      rawEntries.push(parsed);
+    }
+  }
+  return rawEntries;
+}
+
+/**
+ * @param {string} stdout
+ * @returns {{ filename: string; status: string }[]}
+ */
+export function parsePullRequestFilesApiStdout(stdout) {
+  const rawEntries = parseGhApiPaginatedSlurpedStdout(stdout);
   return rawEntries.map((entry, index) => normalizePullFileEntry(entry, index));
 }
 
