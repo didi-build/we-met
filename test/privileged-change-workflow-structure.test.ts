@@ -30,8 +30,13 @@ describe("Privileged change workflow structure (unit)", () => {
   it("passes PR values through env only, not inline in run", () => {
     expect(workflow).toContain("PR_NUMBER: ${{ github.event.pull_request.number }}");
     expect(workflow).toContain("HEAD_SHA: ${{ github.event.pull_request.head.sha }}");
+    expect(workflow).toContain("EVENT_ACTION: ${{ github.event.action }}");
     expect(workflow).toMatch(/run: node scripts\/privileged-change-github\.mjs\s*$/m);
     expect(workflow).not.toMatch(/run:[^\n]*github\.event/);
+  });
+
+  it("checks out base ref with persist-credentials disabled", () => {
+    expect(workflow).toContain("persist-credentials: false");
   });
 
   it("restricts to same-repo PRs", () => {

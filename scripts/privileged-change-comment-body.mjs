@@ -21,9 +21,11 @@ export const PRIVILEGED_CHANGE_MARKER = "<!-- we-met-privileged-change -->";
  *     usesOwners: string[];
  *   }>;
  * }} analysis
+ * @param {{ staleReviewNotice?: boolean }} [options]
  * @returns {string}
  */
-export function buildPrivilegedChangeCommentBody(analysis) {
+export function buildPrivilegedChangeCommentBody(analysis, options = {}) {
+  const { staleReviewNotice = false } = options;
   const lines = [PRIVILEGED_CHANGE_MARKER];
 
   if (!analysis.flagged) {
@@ -42,6 +44,13 @@ export function buildPrivilegedChangeCommentBody(analysis) {
     "",
     "This PR touches deploy infrastructure, workflows, or other paths that can reach privileged credentials. A maintainer should review before merge.",
   );
+
+  if (staleReviewNotice) {
+    lines.push(
+      "",
+      "> **New commits pushed:** the `privileged-change-reviewed` label was removed; privileged changes need re-review before merge.",
+    );
+  }
 
   const high = analysis.findings.filter((f) => f.severity === "high");
   const normal = analysis.findings.filter((f) => f.severity !== "high");

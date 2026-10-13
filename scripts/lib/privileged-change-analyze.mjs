@@ -1,8 +1,7 @@
 import {
+  isPrivilegedFlagInfrastructurePath,
   isPrivilegedPath,
   isWorkflowFile,
-  privilegedChangeWorkflowPath,
-  privilegedPathsConfigPath,
 } from "./privileged-paths.mjs";
 import {
   extractWorkflowMetadata,
@@ -42,16 +41,10 @@ export function analyzePrivilegedChange(
   const workflowDetails = {};
 
   for (const file of changedFiles) {
-    if (file.filename === privilegedPathsConfigPath) {
+    if (isPrivilegedFlagInfrastructurePath(file.filename)) {
       findings.push({
         severity: "high",
-        message: `Changes privileged-paths list (${privilegedPathsConfigPath})`,
-      });
-    }
-    if (file.filename === privilegedChangeWorkflowPath) {
-      findings.push({
-        severity: "high",
-        message: `Changes privileged-change workflow (${privilegedChangeWorkflowPath})`,
+        message: `Changes privileged-change flag infrastructure (${file.filename})`,
       });
     }
   }
@@ -90,7 +83,8 @@ export function analyzePrivilegedChange(
     }
 
     for (const env of meta.environments) {
-      if (env === "production" || env === "migrate-nonprod") {
+      const normalized = env.toLowerCase();
+      if (normalized === "production" || normalized === "migrate-nonprod") {
         findings.push({
           severity: "high",
           message: `${file.filename}: GitHub environment: ${env}`,
@@ -99,7 +93,7 @@ export function analyzePrivilegedChange(
     }
 
     for (const secret of meta.secrets) {
-      if (secret.startsWith("CLOUDFLARE_API_TOKEN_")) {
+      if (secret.toUpperCase().startsWith("CLOUDFLARE_API_TOKEN_")) {
         findings.push({
           severity: "high",
           message: `${file.filename}: secret reference: ${secret}`,

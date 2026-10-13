@@ -56,4 +56,18 @@ describe("privileged-change-comment-body (unit)", () => {
     expect(filesIndex).toBeGreaterThan(highIndex);
     expect(body).toMatchSnapshot();
   });
+
+  it("includes stale review notice when requested on flagged PRs", () => {
+    const body = buildPrivilegedChangeCommentBody(
+      {
+        flagged: true,
+        privilegedFiles: ["wrangler.jsonc"],
+        findings: [],
+        workflowDetails: {},
+      },
+      { staleReviewNotice: true },
+    );
+    expect(body).toContain("privileged-change-reviewed");
+    expect(body).toContain("re-review");
+  });
 });

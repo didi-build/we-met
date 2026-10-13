@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { parseGhHttpStatus } from "./gh-api-errors.mjs";
 
 export const privilegedChangeLabel = "privileged-change";
 export const privilegedChangeReviewedLabel = "privileged-change-reviewed";
@@ -17,6 +18,13 @@ const LABELS = [
   },
 ];
 
+function ghEnv() {
+  return {
+    ...process.env,
+    GH_TOKEN: process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN,
+  };
+}
+
 /**
  * @param {string} repo
  */
@@ -25,7 +33,7 @@ export function ensurePrivilegedChangeLabels(repo) {
     execFileSync(
       "gh",
       ["label", "list", "--repo", repo, "--limit", "200", "--json", "name"],
-      { encoding: "utf8" },
+      { encoding: "utf8", env: ghEnv() },
     ),
   ).map((l) => l.name);
 
@@ -46,7 +54,59 @@ export function ensurePrivilegedChangeLabels(repo) {
         "--description",
         label.description,
       ],
-      { stdio: "inherit" },
+      { stdio: "inherit", env: ghEnv() },
     );
+  }
+}
+
+/**
+ * @param {string} repo
+ * @param {string | number} issueNumber
+ * @param {string[]} labels
+ */
+export function addIssueLabels(repo, issueNumber, labels) {
+  if (labels.length === 0) {
+    return;
+  }
+  execFileSync(
+    "gh",
+    ["api", "--method", "POST", `repos/${repo}/issues/${issueNumber}/labels`],
+    {
+      encoding: "utf8",
+      input: JSON.stringify({ labels }),
+      env: ghEnv(),
+    },
+  );
+}
+
+/**
+ * @param {string} repo
+ * @param {string | number} issueNumber
+ * @param {string} label
+ */
+export function removeIssueLabel(repo, issueNumber, label) {
+  try {
+    execFileSync(
+      "gh",
+      [
+        "api",
+        "--method",
+        "DELETE",
+        `repos/${repo}/issues/${issueNumber}/labels/${encodeURIComponent(label)}`,
+      ],
+      { encoding: "utf8", env: ghEnv(), stdio: "pipe" },
+    );
+  } catch (err) {
+    const stderr =
+      err &&
+      typeof err === "object" &&
+      "stderr" in err &&
+      typeof err.stderr === "string"
+        ? err.stderr
+        : String(err);
+    if (parseGhHttpStatus(stderr) === 404) {
+      return;
+    }
+    throw err;
   }
 }

@@ -40,4 +40,28 @@ describe("privileged-workflow-extract (unit)", () => {
     expect(findUntrustedUsesOwners(meta.usesOwners, "didi-build")).toEqual(["pnpm"]);
     expect(meta.usesOwners).toContain("actions");
   });
+
+  it("flags docker:// uses as high severity", () => {
+    expect(findHighSeverityContentSignals(fixtures("docker-uses.yml"))).toContain(
+      "uses: docker://...",
+    );
+    expect(extractWorkflowMetadata(fixtures("docker-uses.yml")).usesOwners).toContain(
+      "docker",
+    );
+  });
+
+  it("flags secrets: inherit as high severity", () => {
+    expect(findHighSeverityContentSignals(fixtures("secrets-inherit.yml"))).toContain(
+      "secrets: inherit",
+    );
+  });
+
+  it("matches environments, secrets, and owners case-insensitively", () => {
+    const meta = extractWorkflowMetadata(fixtures("case-mixed.yml"));
+    expect(meta.environments.map((e) => e.toLowerCase())).toContain("production");
+    expect(meta.secrets).toContain("CLOUDFLARE_API_TOKEN_PRODUCTION");
+    expect(findHighSeverityContentSignals(fixtures("case-mixed.yml"))).toContain(
+      "environment reference: production",
+    );
+  });
 });

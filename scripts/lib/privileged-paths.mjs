@@ -37,11 +37,50 @@ export const privilegedPathMatchers = [
     id: "migrations",
     test: (filename) => filename.startsWith("migrations/"),
   },
+  {
+    id: "privileged-change-scripts",
+    test: (filename) => /^scripts\/privileged-change-[^/]+\.mjs$/.test(filename),
+  },
+  {
+    id: "privileged-lib",
+    test: (filename) => /^scripts\/lib\/privileged-[^/]+\.mjs$/.test(filename),
+  },
+  {
+    id: "secret-usage",
+    test: (filename) => filename === "scripts/check-secret-usage.mjs",
+  },
 ];
 
 export const privilegedPathsConfigPath = "scripts/lib/privileged-paths.mjs";
 
 export const privilegedChangeWorkflowPath = ".github/workflows/privileged-change.yml";
+
+export const secretUsageScriptPath = "scripts/check-secret-usage.mjs";
+
+/**
+ * Paths that implement or configure the privileged-change flag (high severity when edited).
+ *
+ * @param {string} filename
+ * @returns {boolean}
+ */
+export function isPrivilegedFlagInfrastructurePath(filename) {
+  if (filename === privilegedPathsConfigPath) {
+    return true;
+  }
+  if (filename === privilegedChangeWorkflowPath) {
+    return true;
+  }
+  if (filename === secretUsageScriptPath) {
+    return true;
+  }
+  if (/^scripts\/privileged-change-[^/]+\.mjs$/.test(filename)) {
+    return true;
+  }
+  if (/^scripts\/lib\/privileged-[^/]+\.mjs$/.test(filename)) {
+    return true;
+  }
+  return false;
+}
 
 /**
  * @param {string} filename

@@ -5,11 +5,21 @@ import {
   analyzePrivilegedChange,
   privilegedChangeCheckState,
 } from "./lib/privileged-change-analyze.mjs";
+import { decidePrivilegedChangeCommentAction } from "./lib/privileged-change-comment-lifecycle.mjs";
 import {
+  addIssueLabels,
   ensurePrivilegedChangeLabels,
   privilegedChangeLabel,
+  privilegedChangeReviewedLabel,
+  removeIssueLabel,
 } from "./lib/privileged-change-labels.mjs";
+import {
+  parsePullRequestFilesApiStdout,
+  shouldFetchWorkflowFileContent,
+} from "./lib/parse-pull-files-api.mjs";
+import { shouldClearStalePrivilegedReview } from "./lib/privileged-change-stale-review.mjs";
 import { isWorkflowFile } from "./lib/privileged-paths.mjs";
+import { privilegedChangeErrorStatusPayload } from "./lib/privileged-change-status.mjs";
 import { buildPrivilegedChangeCommentBody } from "./privileged-change-comment-body.mjs";
 
 const MARKER = "<!-- we-met-privileged-change -->";
@@ -29,57 +39,18 @@ function ghApi(args, input) {
   });
 }
 
-function run() {
-  const repo = process.env.REPOSITORY ?? process.env.GITHUB_REPOSITORY;
-  const prNumber = process.env.PR_NUMBER;
-  const headSha = process.env.HEAD_SHA;
-  const trustedOrg = process.env.TRUSTED_ORG;
+/**
+ * @param {string} repo
+ * @param {string} headSha
+ */
+export function postPrivilegedChangeErrorStatus(repo, headSha) {
+  ghApi(
+    ["--method", "POST", `repos/${repo}/statuses/${headSha}`],
+    JSON.stringify(privilegedChangeErrorStatusPayload()),
+  );
+}
 
-  if (!repo || !prNumber || !headSha || !trustedOrg) {
-    console.error(
-      "Set REPOSITORY (or GITHUB_REPOSITORY), PR_NUMBER, HEAD_SHA, and TRUSTED_ORG",
-    );
-    process.exit(1);
-  }
-
-  ensurePrivilegedChangeLabels(repo);
-
-  const filesJson = ghApi([`repos/${repo}/pulls/${prNumber}/files`, "--paginate"]);
-  /** @type {{ filename: string; status: string }[]} */
-  const changedFiles = JSON.parse(filesJson).map((f) => ({
-    filename: f.filename,
-    status: f.status,
-  }));
-
-  const prJson = ghApi([`repos/${repo}/pulls/${prNumber}`]);
-  const pr = JSON.parse(prJson);
-  const prLabels = (pr.labels ?? []).map((l) => l.name);
-
-  /** @type {Record<string, string>} */
-  const workflowContentsByPath = {};
-  for (const file of changedFiles) {
-    if (!isWorkflowFile(file.filename)) {
-      continue;
-    }
-    const encoded = file.filename
-      .split("/")
-      .map((part) => encodeURIComponent(part))
-      .join("/");
-    const contentJson = ghApi([`repos/${repo}/contents/${encoded}?ref=${headSha}`]);
-    const payload = JSON.parse(contentJson);
-    if (payload.content && payload.encoding === "base64") {
-      workflowContentsByPath[file.filename] = Buffer.from(
-        payload.content,
-        "base64",
-      ).toString("utf8");
-    }
-  }
-
-  const analysis = analyzePrivilegedChange(changedFiles, workflowContentsByPath, {
-    trustedOrg,
-  });
-
-  const body = buildPrivilegedChangeCommentBody(analysis);
+function findMarkerCommentId(repo, prNumber) {
   const commentIds = execFileSync(
     "gh",
     [
@@ -89,80 +60,144 @@ function run() {
       "--jq",
       `.[] | select(.user.login == "github-actions[bot]" and (.body | contains("${MARKER}"))) | .id`,
     ],
-    {
-      encoding: "utf8",
-      env: {
-        ...process.env,
-        GH_TOKEN: process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN,
-      },
-    },
+    { encoding: "utf8", env: ghEnv() },
   ).trim();
   const commentId = commentIds.split("\n")[0]?.trim();
-  const commentPayload = JSON.stringify({ body });
-  if (commentId) {
-    ghApi(
-      ["--method", "PATCH", `repos/${repo}/issues/comments/${commentId}`],
-      commentPayload,
+  return commentId || null;
+}
+
+function run() {
+  const repo = process.env.REPOSITORY ?? process.env.GITHUB_REPOSITORY;
+  const prNumber = process.env.PR_NUMBER;
+  const headSha = process.env.HEAD_SHA;
+  const trustedOrg = process.env.TRUSTED_ORG;
+  const eventAction = process.env.EVENT_ACTION ?? "";
+
+  if (!repo || !prNumber || !headSha || !trustedOrg) {
+    console.error(
+      "Set REPOSITORY (or GITHUB_REPOSITORY), PR_NUMBER, HEAD_SHA, and TRUSTED_ORG",
     );
-  } else {
-    ghApi(
-      ["--method", "POST", `repos/${repo}/issues/${prNumber}/comments`],
-      commentPayload,
-    );
+    process.exit(1);
   }
 
-  const hasFlagLabel = prLabels.includes(privilegedChangeLabel);
-  if (analysis.flagged && !hasFlagLabel) {
-    execFileSync(
-      "gh",
-      ["pr", "edit", prNumber, "--repo", repo, "--add-label", privilegedChangeLabel],
-      {
-        stdio: "inherit",
-        env: {
-          ...process.env,
-          GH_TOKEN: process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN,
-        },
-      },
+  try {
+    ensurePrivilegedChangeLabels(repo);
+
+    const filesStdout = ghApi([
+      `repos/${repo}/pulls/${prNumber}/files?per_page=100`,
+      "--paginate",
+      "--slurp",
+    ]);
+    const changedFiles = parsePullRequestFilesApiStdout(filesStdout);
+
+    const prJson = ghApi([`repos/${repo}/pulls/${prNumber}`]);
+    const pr = JSON.parse(prJson);
+    let prLabels = (pr.labels ?? []).map((l) => l.name);
+
+    /** @type {Record<string, string>} */
+    const workflowContentsByPath = {};
+    for (const file of changedFiles) {
+      if (!isWorkflowFile(file.filename)) {
+        continue;
+      }
+      if (!shouldFetchWorkflowFileContent(file.status)) {
+        continue;
+      }
+      const encoded = file.filename
+        .split("/")
+        .map((part) => encodeURIComponent(part))
+        .join("/");
+      const contentJson = ghApi([`repos/${repo}/contents/${encoded}?ref=${headSha}`]);
+      const payload = JSON.parse(contentJson);
+      if (payload.content && payload.encoding === "base64") {
+        workflowContentsByPath[file.filename] = Buffer.from(
+          payload.content,
+          "base64",
+        ).toString("utf8");
+      }
+    }
+
+    const analysis = analyzePrivilegedChange(changedFiles, workflowContentsByPath, {
+      trustedOrg,
+    });
+
+    const staleReviewCleared = shouldClearStalePrivilegedReview(
+      eventAction,
+      analysis.flagged,
+      prLabels,
     );
-  } else if (!analysis.flagged && hasFlagLabel) {
-    execFileSync(
-      "gh",
-      ["pr", "edit", prNumber, "--repo", repo, "--remove-label", privilegedChangeLabel],
-      {
-        stdio: "inherit",
-        env: {
-          ...process.env,
-          GH_TOKEN: process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN,
-        },
-      },
+    if (staleReviewCleared) {
+      removeIssueLabel(repo, prNumber, privilegedChangeReviewedLabel);
+      prLabels = prLabels.filter((name) => name !== privilegedChangeReviewedLabel);
+    }
+
+    const existingCommentId = findMarkerCommentId(repo, prNumber);
+    const commentAction = decidePrivilegedChangeCommentAction(
+      analysis.flagged,
+      existingCommentId !== null,
     );
+
+    if (commentAction !== "skip") {
+      const body = buildPrivilegedChangeCommentBody(analysis, {
+        staleReviewNotice: staleReviewCleared && analysis.flagged,
+      });
+      const commentPayload = JSON.stringify({ body });
+      if (commentAction === "update" && existingCommentId) {
+        ghApi(
+          ["--method", "PATCH", `repos/${repo}/issues/comments/${existingCommentId}`],
+          commentPayload,
+        );
+      } else {
+        ghApi(
+          ["--method", "POST", `repos/${repo}/issues/${prNumber}/comments`],
+          commentPayload,
+        );
+      }
+    }
+
+    const hasFlagLabel = prLabels.includes(privilegedChangeLabel);
+    if (analysis.flagged && !hasFlagLabel) {
+      addIssueLabels(repo, prNumber, [privilegedChangeLabel]);
+    } else if (!analysis.flagged && hasFlagLabel) {
+      removeIssueLabel(repo, prNumber, privilegedChangeLabel);
+    }
+
+    const checkState = privilegedChangeCheckState(analysis.flagged, prLabels);
+    const description =
+      checkState === "success"
+        ? analysis.flagged
+          ? "Privileged change reviewed"
+          : "No privileged paths changed"
+        : "Privileged change needs maintainer review (add privileged-change-reviewed)";
+
+    ghApi(
+      ["--method", "POST", `repos/${repo}/statuses/${headSha}`],
+      JSON.stringify({
+        state: checkState,
+        context: "privileged-change",
+        description,
+      }),
+    );
+
+    console.log(
+      JSON.stringify({
+        flagged: analysis.flagged,
+        checkState,
+        commentAction,
+        staleReviewCleared,
+        privilegedFileCount: analysis.privilegedFiles.length,
+        findingCount: analysis.findings.length,
+      }),
+    );
+  } catch (err) {
+    try {
+      postPrivilegedChangeErrorStatus(repo, headSha);
+    } catch (statusErr) {
+      console.error("Failed to post privileged-change error status:", statusErr);
+    }
+    console.error(err);
+    process.exit(1);
   }
-
-  const checkState = privilegedChangeCheckState(analysis.flagged, prLabels);
-  const description =
-    checkState === "success"
-      ? analysis.flagged
-        ? "Privileged change reviewed"
-        : "No privileged paths changed"
-      : "Privileged change needs maintainer review (add privileged-change-reviewed)";
-
-  ghApi(
-    ["--method", "POST", `repos/${repo}/statuses/${headSha}`],
-    JSON.stringify({
-      state: checkState,
-      context: "privileged-change",
-      description,
-    }),
-  );
-
-  console.log(
-    JSON.stringify({
-      flagged: analysis.flagged,
-      checkState,
-      privilegedFileCount: analysis.privilegedFiles.length,
-      findingCount: analysis.findings.length,
-    }),
-  );
 }
 
 const isMain =

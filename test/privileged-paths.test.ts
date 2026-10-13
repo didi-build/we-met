@@ -15,6 +15,9 @@ describe("privileged-paths (table)", () => {
     { path: "wrangler.ci.jsonc", privileged: true },
     { path: "open-next.config.ts", privileged: true },
     { path: "migrations/0001_init.sql", privileged: true },
+    { path: "scripts/privileged-change-github.mjs", privileged: true },
+    { path: "scripts/lib/privileged-paths.mjs", privileged: true },
+    { path: "scripts/check-secret-usage.mjs", privileged: true },
     { path: "src/app/page.tsx", privileged: false },
     { path: "scripts/preview-comment-body.mjs", privileged: false },
     { path: "package.json", privileged: false },
@@ -36,6 +39,9 @@ describe("privileged-paths (table)", () => {
       "wrangler-config",
       "open-next-config",
       "migrations",
+      "privileged-change-scripts",
+      "privileged-lib",
+      "secret-usage",
     ]);
   });
 });
