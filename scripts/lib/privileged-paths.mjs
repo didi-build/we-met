@@ -61,6 +61,11 @@ export const privilegedPathMatchers = [
     test: (filename) => filename === secretUsageScriptPath,
   },
   {
+    id: "dependabot-automerge",
+    infrastructure: true,
+    test: (filename) => filename === "scripts/dependabot-automerge.mjs",
+  },
+  {
     id: "gh-api-errors",
     infrastructure: true,
     test: (filename) => filename === ghApiErrorsPath,

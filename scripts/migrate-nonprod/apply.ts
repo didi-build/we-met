@@ -7,7 +7,8 @@ import {
 } from "./comment-body.mjs";
 import { upsertMigrateNonprodComment } from "./gh-comment.mjs";
 import { hashFileContent } from "./hash.mjs";
-import { validateApplyPrHead } from "./apply-guard.mjs";
+import { resolveApplyHeadCheck, validateApplyPrHead } from "./apply-guard.mjs";
+import { findMigrateNonprodBotCommentBody } from "./gh-api-comments.mjs";
 import { redactMigrationLog } from "./redact.mjs";
 import { validatePrNumber } from "./validate.mjs";
 
@@ -72,23 +73,9 @@ function main() {
     files: string[];
   };
 
-  const commentsRaw = execFileSync(
-    "gh",
-    ["api", "--paginate", `repos/${repository}/issues/${prNumber}/comments`],
-    { encoding: "utf8", env: process.env },
-  );
-  const commentsJson = JSON.parse(commentsRaw) as {
-    user?: { login?: string };
-    body?: string;
-  }[];
-  const existingComment = commentsJson.find(
-    (c) =>
-      c.user?.login === "github-actions[bot]" &&
-      typeof c.body === "string" &&
-      c.body.includes("<!-- we-met-migrate-nonprod -->"),
-  );
-  const preservedAppliedMarker = existingComment?.body
-    ? extractPreservedAppliedMarker(existingComment.body)
+  const existingBody = findMigrateNonprodBotCommentBody(repository, prNumber);
+  const preservedAppliedMarker = existingBody
+    ? extractPreservedAppliedMarker(existingBody)
     : null;
 
   const prJson = execFileSync("gh", ["api", `repos/${repository}/pulls/${prNumber}`], {
@@ -101,16 +88,11 @@ function main() {
     prHeadSha: pr.head.sha,
     manifestHeadSha: manifest.headSha,
   });
-  if (!headCheck.ok) {
-    failWithComment(
-      repository,
-      prNumber,
-      manifest.headSha,
-      manifest.migrationHash,
-      headCheck.reason,
-      preservedAppliedMarker,
-      runUrl,
-    );
+  const headOutcome = resolveApplyHeadCheck(headCheck);
+  if (!headOutcome.proceed) {
+    writeSummary(`## Migrate non-prod D1 apply aborted\n\n${headOutcome.reason}\n`);
+    console.error(headOutcome.reason);
+    process.exit(headOutcome.exitCode);
   }
 
   writeSummary(

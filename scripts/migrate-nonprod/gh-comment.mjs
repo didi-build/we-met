@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { MIGRATE_NONPROD_MARKER } from "./comment-body.mjs";
+import { listIssueComments } from "./gh-api-comments.mjs";
 
 function ghApi(args, input) {
   const result = spawnSync("gh", ["api", ...args], {
@@ -18,24 +18,26 @@ function ghApi(args, input) {
  */
 export function upsertMigrateNonprodComment(opts) {
   const { repository, prNumber, body } = opts;
-  const commentsJson = ghApi([
-    `repos/${repository}/issues/${prNumber}/comments`,
-    "--paginate",
-  ]);
-  const comments = JSON.parse(commentsJson);
+  const comments = listIssueComments(repository, prNumber);
   const existing = comments.find(
     (c) =>
-      c.user?.login === "github-actions[bot]" &&
-      typeof c.body === "string" &&
-      c.body.includes(MIGRATE_NONPROD_MARKER),
+      c &&
+      typeof c === "object" &&
+      /** @type {{ user?: { login?: string }; body?: string }} */ (c).user?.login ===
+        "github-actions[bot]" &&
+      typeof (/** @type {{ body?: string }} */ (c).body) === "string" &&
+      /** @type {{ body: string }} */ (c).body.includes(
+        "<!-- we-met-migrate-nonprod -->",
+      ),
   );
   const payload = JSON.stringify({ body });
   if (existing) {
+    const commentId = /** @type {{ id: number }} */ (existing).id;
     ghApi(
       [
         "--method",
         "PATCH",
-        `repos/${repository}/issues/comments/${existing.id}`,
+        `repos/${repository}/issues/comments/${commentId}`,
         "--input",
         "-",
       ],

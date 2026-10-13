@@ -1,61 +1,124 @@
-const FORBIDDEN_LEADING = /^(DROP|DELETE|UPDATE|RENAME|PRAGMA|ATTACH)\b/i;
+const FORBIDDEN_LEADING = /^(DROP|DELETE|UPDATE|INSERT|RENAME|PRAGMA|ATTACH)\b/i;
 
 const CREATE_TABLE_IF_NOT_EXISTS = /^CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+/i;
 const CREATE_INDEX_IF_NOT_EXISTS = /^CREATE\s+INDEX\s+IF\s+NOT\s+EXISTS\s+/i;
 const ALTER_TABLE_ADD_COLUMN =
   /^ALTER\s+TABLE\s+(?:"[^"]+"|'[^']+'|\[[^\]]+\]|`[^`]+`|\w+)\s+ADD\s+COLUMN\s+/i;
 
+type LexMode =
+  | "normal"
+  | "single"
+  | "double"
+  | "backtick"
+  | "bracket"
+  | "lineComment"
+  | "blockComment";
+
 /**
- * Migration lint splitter (deny-by-default). Not used by card-data SQL loading.
- * Handles line comments, block comments, doubled quotes, and unterminated strings.
+ * SQLite-faithful statement splitter for migration lint (deny-by-default).
+ * Not used by card-data SQL loading.
  */
 export function splitMigrationSqlForLint(sql: string): string[] {
   const statements: string[] = [];
   let current = "";
-  let inString = false;
-
+  let mode: LexMode = "normal";
   for (let i = 0; i < sql.length; i++) {
     const ch = sql[i];
 
-    if (!inString && ch === "-" && sql[i + 1] === "-") {
-      while (i < sql.length && sql[i] !== "\n") {
-        i++;
+    if (mode === "lineComment") {
+      if (ch === "\n") {
+        mode = "normal";
+        current += ch;
       }
       continue;
     }
 
-    if (!inString && ch === "/" && sql[i + 1] === "*") {
-      i += 2;
-      while (i < sql.length && !(sql[i] === "*" && sql[i + 1] === "/")) {
-        i++;
-      }
-      if (i < sql.length) {
-        i++;
+    if (mode === "blockComment") {
+      if (ch === "*" && sql[i + 1] === "/") {
+        i += 1;
+        mode = "normal";
       }
       continue;
     }
 
-    if (inString && ch === "\\") {
+    if (mode === "single") {
       current += ch;
-      if (i + 1 < sql.length) {
-        current += sql[i + 1];
-        i++;
+      if (ch === "'") {
+        if (sql[i + 1] === "'") {
+          current += "'";
+          i += 1;
+        } else {
+          mode = "normal";
+        }
       }
       continue;
     }
 
+    if (mode === "double") {
+      current += ch;
+      if (ch === '"') {
+        if (sql[i + 1] === '"') {
+          current += '"';
+          i += 1;
+        } else {
+          mode = "normal";
+        }
+      }
+      continue;
+    }
+
+    if (mode === "backtick") {
+      current += ch;
+      if (ch === "`") {
+        if (sql[i + 1] === "`") {
+          current += "`";
+          i += 1;
+        } else {
+          mode = "normal";
+        }
+      }
+      continue;
+    }
+
+    if (mode === "bracket") {
+      current += ch;
+      if (ch === "]") {
+        mode = "normal";
+      }
+      continue;
+    }
+
+    // normal
+    if (ch === "-" && sql[i + 1] === "-") {
+      mode = "lineComment";
+      continue;
+    }
+    if (ch === "/" && sql[i + 1] === "*") {
+      i += 1;
+      mode = "blockComment";
+      continue;
+    }
     if (ch === "'") {
       current += ch;
-      if (inString && sql[i + 1] === "'") {
-        current += "'";
-        i++;
-        continue;
-      }
-      inString = !inString;
+      mode = "single";
       continue;
     }
-
-    if (!inString && ch === ";") {
+    if (ch === '"') {
+      current += ch;
+      mode = "double";
+      continue;
+    }
+    if (ch === "`") {
+      current += ch;
+      mode = "backtick";
+      continue;
+    }
+    if (ch === "[") {
+      current += ch;
+      mode = "bracket";
+      continue;
+    }
+    if (ch === ";") {
       const trimmed = current.trim();
       if (trimmed) {
         statements.push(trimmed);
@@ -67,10 +130,18 @@ export function splitMigrationSqlForLint(sql: string): string[] {
     current += ch;
   }
 
-  if (inString) {
-    throw new Error("Unterminated string literal in migration SQL");
+  if (mode === "single") {
+    throw new Error("Unterminated single-quoted string in migration SQL");
   }
-
+  if (mode === "double") {
+    throw new Error("Unterminated double-quoted identifier in migration SQL");
+  }
+  if (mode === "backtick") {
+    throw new Error("Unterminated backtick identifier in migration SQL");
+  }
+  if (mode === "bracket") {
+    throw new Error("Unterminated bracket identifier in migration SQL");
+  }
   const trimmed = current.trim();
   if (trimmed) {
     statements.push(trimmed);

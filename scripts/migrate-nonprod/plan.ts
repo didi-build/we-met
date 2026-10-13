@@ -10,9 +10,12 @@ import {
 } from "./comment-body.mjs";
 import { hashFileContent, hashMigrationFiles } from "./hash.mjs";
 import { upsertMigrateNonprodComment } from "./gh-comment.mjs";
+import { findMigrateNonprodBotCommentBody } from "./gh-api-comments.mjs";
 import {
   checkAppliedFileImmutability,
+  decidePlanCommentState,
   findDisallowedMigrationFileChanges,
+  validateMigrationFilename,
 } from "./plan-lib.mjs";
 import { validatePrNumber } from "./validate.mjs";
 
@@ -109,25 +112,6 @@ function listMigrationPathsAtRef(repository: string, ref: string): string[] {
     .sort();
 }
 
-function findBotCommentBody(repository: string, prNumber: string): string | null {
-  const commentsRaw = execFileSync(
-    "gh",
-    ["api", "--paginate", `repos/${repository}/issues/${prNumber}/comments`],
-    { encoding: "utf8", env: process.env },
-  );
-  const commentsJson = JSON.parse(commentsRaw) as {
-    user?: { login?: string };
-    body?: string;
-  }[];
-  const existingComment = commentsJson.find(
-    (c) =>
-      c.user?.login === "github-actions[bot]" &&
-      typeof c.body === "string" &&
-      c.body.includes("<!-- we-met-migrate-nonprod -->"),
-  );
-  return existingComment?.body ?? null;
-}
-
 function postPlanFailure(
   repository: string,
   prNumber: string,
@@ -163,7 +147,7 @@ function main() {
       ? `${process.env.GITHUB_SERVER_URL}/${repository}/actions/runs/${process.env.GITHUB_RUN_ID}`
       : undefined;
 
-  const existingBody = findBotCommentBody(repository, prNumber);
+  const existingBody = findMigrateNonprodBotCommentBody(repository, prNumber);
   const preservedAppliedMarker = existingBody
     ? extractPreservedAppliedMarker(existingBody)
     : null;
@@ -229,6 +213,21 @@ function main() {
     setOutput("has_migrations", "false");
     setOutput("skip_apply", "true");
     return;
+  }
+
+  for (const change of migrationChanges) {
+    const nameCheck = validateMigrationFilename(change.filename);
+    if (!nameCheck.ok) {
+      postPlanFailure(
+        repository,
+        prNumber,
+        headSha,
+        placeholderHash,
+        nameCheck.message,
+        preservedAppliedMarker,
+        runUrl,
+      );
+    }
   }
 
   const migrationPaths = listMigrationPathsAtRef(repository, headSha);
@@ -304,8 +303,13 @@ function main() {
   setOutput("apply_files", filesToApply.map((f) => f.path).join(","));
 
   const appliedHash = existingBody ? parseAppliedMigrationHash(existingBody) : null;
+  const planDecision = decidePlanCommentState({
+    appliedHash,
+    migrationHash,
+    immutability: { ok: true },
+  });
 
-  if (appliedHash === migrationHash) {
+  if (planDecision.kind === "skipped") {
     console.log("Migration hash matches last successful apply; skipping approval.");
     setOutput("skip_apply", "true");
     const body = buildMigrateNonprodCommentBody({

@@ -128,7 +128,12 @@ GitHub blocks `pull_request_target` by default on public repositories from **202
 - `.github/workflows/privileged-change.yml` — privileged-change flag ([DIDI-593](https://linear.app/didi-build/issue/DIDI-593))
 - `.github/workflows/migrate-nonprod.yml` — phone-friendly non-prod migrations ([DIDI-592](https://linear.app/didi-build/issue/DIDI-592))
 
-Also allow **`workflow_dispatch`** on `migrate-nonprod.yml` for manual retries. Configure this under the repository **Actions** settings (workflow allowlist / fork PR workflow policy).
+Also allow **`workflow_dispatch`** on `migrate-nonprod.yml` for manual retries.
+
+In the repository go to **Settings → Actions → Policies**, create an **event policy** that allows **`pull_request_target`** (and **`workflow_dispatch`** for `migrate-nonprod.yml`), targeting these workflow files by path:
+
+- `.github/workflows/privileged-change.yml`
+- `.github/workflows/migrate-nonprod.yml`
 
 Add further permissions **only** when a **403** names them (Cloudflare 403 responses link to the required permission). **Never use Admin as the fix.**
 

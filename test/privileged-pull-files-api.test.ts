@@ -2,11 +2,31 @@ import { describe, expect, it } from "vitest";
 import {
   flattenPullFilesPayload,
   normalizePullFileEntry,
+  parseGhApiPaginatedSlurpedStdout,
   parsePullRequestFilesApiStdout,
   shouldFetchWorkflowFileContent,
 } from "../scripts/lib/privileged-pull-files-api.mjs";
 
 describe("privileged-pull-files-api (unit)", () => {
+  it("parses two-page slurped issue comments", () => {
+    const page1 = Array.from({ length: 100 }, (_, i) => ({
+      id: i + 1,
+      body: `comment ${i}`,
+      user: { login: "user" },
+    }));
+    const page2 = [
+      {
+        id: 101,
+        body: "<!-- we-met-migrate-nonprod -->",
+        user: { login: "github-actions[bot]" },
+      },
+    ];
+    const stdout = JSON.stringify([page1, page2]);
+    const flat = parseGhApiPaginatedSlurpedStdout(stdout);
+    expect(flat).toHaveLength(101);
+    expect(flat[100]).toEqual(page2[0]);
+  });
+
   it("parses pretty-printed single JSON array (whole-output parse)", () => {
     const stdout = `[
   { "filename": "a.txt", "status": "modified" },

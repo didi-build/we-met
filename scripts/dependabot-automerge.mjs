@@ -50,10 +50,6 @@ export function pickPrNumber(prNumbers) {
 }
 
 /**
- * @param {{ author: { login: string; is_bot?: boolean }; headRef: string; labels: string[] }} input
- * @returns {{ ok: true } | { ok: false; reason: string }}
- */
-/**
  * @param {string[]} changedFiles
  */
 export function dependabotTouchesProtectedWorkflow(changedFiles) {

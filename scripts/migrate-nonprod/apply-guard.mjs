@@ -18,3 +18,21 @@ export function validateApplyPrHead({ prState, prHeadSha, manifestHeadSha }) {
   }
   return { ok: true };
 }
+
+/**
+ * When apply cannot run because the PR moved, do not rewrite the PR comment.
+ *
+ * @param {{ ok: true } | { ok: false; reason: string }} headCheck
+ * @returns {{ proceed: true } | { proceed: false; updatePrComment: false; reason: string; exitCode: number }}
+ */
+export function resolveApplyHeadCheck(headCheck) {
+  if (headCheck.ok) {
+    return { proceed: true };
+  }
+  return {
+    proceed: false,
+    updatePrComment: false,
+    reason: headCheck.reason,
+    exitCode: 1,
+  };
+}
