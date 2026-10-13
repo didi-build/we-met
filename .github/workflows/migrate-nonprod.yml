@@ -34,6 +34,8 @@ jobs:
       cancel-in-progress: true
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version-file: .nvmrc
@@ -64,11 +66,19 @@ jobs:
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - name: Mask non-prod D1 database id
+        env:
+          WE_MET_D1_DATABASE_ID_NONPROD: ${{ vars.WE_MET_D1_DATABASE_ID_NONPROD }}
+        run: |
+          set -euo pipefail
+          echo "::add-mask::${WE_MET_D1_DATABASE_ID_NONPROD}"
       - name: Download migration artifact
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:

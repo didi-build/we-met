@@ -4,7 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { findBootstrapTokenViolations } from "../scripts/check-secret-usage.mjs";
+import {
+  findBootstrapTokenViolations,
+  findMigrateNonprodCredentialViolations,
+} from "../scripts/check-secret-usage.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const cliScript = join(root, "scripts/check-secret-usage.mjs");
@@ -35,6 +38,19 @@ describe("check-secret-usage (unit)", () => {
 
     writeFileSync(join(dir, "evil.yml"), "secrets.BOOTSTRAP_TOKEN\n");
     expect(findBootstrapTokenViolations(dir)).toEqual(["evil.yml"]);
+  });
+
+  it("allows migrate-nonprod secret only in migrate-nonprod.yml", () => {
+    const dir = mkdtempSync(join(tmpdir(), "secret-usage-migrate-"));
+    writeFileSync(
+      join(dir, "migrate-nonprod.yml"),
+      "environment: migrate-nonprod\nsecrets.CLOUDFLARE_API_TOKEN_MIGRATE_NONPROD\n",
+    );
+    writeFileSync(join(dir, "ci.yml"), "name: CI\n");
+    expect(findMigrateNonprodCredentialViolations(dir)).toEqual([]);
+
+    writeFileSync(join(dir, "leak.yml"), "migrate-nonprod\n");
+    expect(findMigrateNonprodCredentialViolations(dir)).toEqual(["leak.yml"]);
   });
 
   it("returns no violations when the workflows directory is missing", () => {

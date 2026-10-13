@@ -1,8 +1,15 @@
 import { appendFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { spawnSync } from "node:child_process";
-import { buildMigrateNonprodCommentBody } from "./comment-body.mjs";
+import { execFileSync, spawnSync } from "node:child_process";
+import {
+  buildMigrateNonprodCommentBody,
+  extractPreservedAppliedMarker,
+} from "./comment-body.mjs";
 import { upsertMigrateNonprodComment } from "./gh-comment.mjs";
+import { hashFileContent } from "./hash.mjs";
+import { validateApplyPrHead } from "./apply-guard.mjs";
+import { redactMigrationLog } from "./redact.mjs";
+import { validatePrNumber } from "./validate.mjs";
 
 const ARTIFACT_DIR = "migrate-nonprod-artifact";
 
@@ -29,23 +36,30 @@ function failWithComment(
   headSha: string,
   migrationHash: string,
   error: string,
+  preservedAppliedMarker: string | null,
   runUrl?: string,
 ) {
   const body = buildMigrateNonprodCommentBody({
     state: "failed",
     headSha,
     migrationHash,
-    error,
+    error: redactMigrationLog(error),
     runUrl,
+    preservedAppliedMarker,
   });
   upsertMigrateNonprodComment({ repository, prNumber, body });
-  console.error(error);
+  console.error(redactMigrationLog(error));
   process.exit(1);
 }
 
 function main() {
   const repository = requireEnv("GITHUB_REPOSITORY");
-  const prNumber = requireEnv("PR_NUMBER");
+  const prValidated = validatePrNumber(requireEnv("PR_NUMBER"));
+  if (!prValidated.ok) {
+    console.error(`migrate-nonprod apply: ${prValidated.message}`);
+    process.exit(1);
+  }
+  const prNumber = prValidated.prNumber;
   const runUrl =
     process.env.GITHUB_SERVER_URL && process.env.GITHUB_RUN_ID
       ? `${process.env.GITHUB_SERVER_URL}/${repository}/actions/runs/${process.env.GITHUB_RUN_ID}`
@@ -58,34 +72,53 @@ function main() {
     files: string[];
   };
 
+  const commentsRaw = execFileSync(
+    "gh",
+    ["api", "--paginate", `repos/${repository}/issues/${prNumber}/comments`],
+    { encoding: "utf8", env: process.env },
+  );
+  const commentsJson = JSON.parse(commentsRaw) as {
+    user?: { login?: string };
+    body?: string;
+  }[];
+  const existingComment = commentsJson.find(
+    (c) =>
+      c.user?.login === "github-actions[bot]" &&
+      typeof c.body === "string" &&
+      c.body.includes("<!-- we-met-migrate-nonprod -->"),
+  );
+  const preservedAppliedMarker = existingComment?.body
+    ? extractPreservedAppliedMarker(existingComment.body)
+    : null;
+
+  const prJson = execFileSync("gh", ["api", `repos/${repository}/pulls/${prNumber}`], {
+    encoding: "utf8",
+    env: process.env,
+  });
+  const pr = JSON.parse(prJson) as { state: string; head: { sha: string } };
+  const headCheck = validateApplyPrHead({
+    prState: pr.state,
+    prHeadSha: pr.head.sha,
+    manifestHeadSha: manifest.headSha,
+  });
+  if (!headCheck.ok) {
+    failWithComment(
+      repository,
+      prNumber,
+      manifest.headSha,
+      manifest.migrationHash,
+      headCheck.reason,
+      preservedAppliedMarker,
+      runUrl,
+    );
+  }
+
   writeSummary(
     `## Migrate non-prod D1 apply\n\n` +
       `Applying ${manifest.files.map((f) => `\`${f}\``).join(", ")} to **we-met-db-nonprod**.\n`,
   );
 
   const migrationsDir = join(ARTIFACT_DIR, "migrations");
-  const prep = spawnSync(
-    "node",
-    [
-      "scripts/prepare-wrangler-config.mjs",
-      "--target",
-      "d1-migrate-nonprod",
-      "--output",
-      "wrangler.d1-nonprod.ci.jsonc",
-    ],
-    { encoding: "utf8" },
-  );
-  if (prep.status !== 0) {
-    failWithComment(
-      repository,
-      prNumber,
-      manifest.headSha,
-      manifest.migrationHash,
-      prep.stderr || "prepare-wrangler-config failed",
-      runUrl,
-    );
-  }
-
   const apply = spawnSync(
     "node",
     [
@@ -94,25 +127,34 @@ function main() {
       "we-met-db-nonprod",
       "--migrations-dir",
       migrationsDir,
-      "--config",
-      "wrangler.d1-nonprod.ci.jsonc",
     ],
     { encoding: "utf8", stdio: "pipe" },
   );
 
   if (apply.status !== 0) {
-    const err = [apply.stdout, apply.stderr].filter(Boolean).join("\n");
+    const err = redactMigrationLog(
+      [apply.stdout, apply.stderr].filter(Boolean).join("\n") ||
+        "wrangler d1 migrations apply failed",
+    );
     failWithComment(
       repository,
       prNumber,
       manifest.headSha,
       manifest.migrationHash,
-      err || "wrangler d1 migrations apply failed",
+      err,
+      preservedAppliedMarker,
       runUrl,
     );
   }
 
-  writeSummary(`### Result\n\n\`\`\`\n${(apply.stdout || "OK").trim()}\n\`\`\`\n`);
+  const redactedOut = redactMigrationLog((apply.stdout || "OK").trim());
+  writeSummary(`### Result\n\n\`\`\`\n${redactedOut}\n\`\`\`\n`);
+
+  const fileHashes: Record<string, string> = {};
+  for (const path of manifest.files) {
+    const content = readFileSync(join(ARTIFACT_DIR, path), "utf8");
+    fileHashes[path] = hashFileContent(content);
+  }
 
   const appliedAt = new Date().toISOString();
   const body = buildMigrateNonprodCommentBody({
@@ -120,6 +162,7 @@ function main() {
     headSha: manifest.headSha,
     migrationHash: manifest.migrationHash,
     files: manifest.files,
+    fileHashes,
     appliedAt,
   });
   upsertMigrateNonprodComment({ repository, prNumber, body });

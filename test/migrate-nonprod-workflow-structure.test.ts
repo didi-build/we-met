@@ -54,6 +54,11 @@ describe("Migrate non-prod workflow structure (unit)", () => {
     expect(planSection).not.toContain("CLOUDFLARE_API_TOKEN_MIGRATE_NONPROD");
   });
 
+  it("checks out base ref with persist-credentials disabled on both jobs", () => {
+    const matches = workflow.match(/persist-credentials: false/g) ?? [];
+    expect(matches.length).toBeGreaterThanOrEqual(2);
+  });
+
   it("apply uses allowlisted apply-migrations script", () => {
     expect(workflow).toContain("migrate-nonprod/apply.ts");
     expect(workflow).toContain("WE_MET_D1_DATABASE_ID_NONPROD");

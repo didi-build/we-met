@@ -4,10 +4,17 @@ import { execFileSync } from "node:child_process";
 import { lintMigrationSql } from "../../src/migrations/expand-only-lint.ts";
 import {
   buildMigrateNonprodCommentBody,
+  extractPreservedAppliedMarker,
   parseAppliedMigrationHash,
+  parseAppliedStateMarker,
 } from "./comment-body.mjs";
-import { hashMigrationFiles } from "./hash.mjs";
+import { hashFileContent, hashMigrationFiles } from "./hash.mjs";
 import { upsertMigrateNonprodComment } from "./gh-comment.mjs";
+import {
+  checkAppliedFileImmutability,
+  findDisallowedMigrationFileChanges,
+} from "./plan-lib.mjs";
+import { validatePrNumber } from "./validate.mjs";
 
 const ARTIFACT_DIR = "migrate-nonprod-artifact";
 
@@ -102,13 +109,66 @@ function listMigrationPathsAtRef(repository: string, ref: string): string[] {
     .sort();
 }
 
+function findBotCommentBody(repository: string, prNumber: string): string | null {
+  const commentsRaw = execFileSync(
+    "gh",
+    ["api", "--paginate", `repos/${repository}/issues/${prNumber}/comments`],
+    { encoding: "utf8", env: process.env },
+  );
+  const commentsJson = JSON.parse(commentsRaw) as {
+    user?: { login?: string };
+    body?: string;
+  }[];
+  const existingComment = commentsJson.find(
+    (c) =>
+      c.user?.login === "github-actions[bot]" &&
+      typeof c.body === "string" &&
+      c.body.includes("<!-- we-met-migrate-nonprod -->"),
+  );
+  return existingComment?.body ?? null;
+}
+
+function postPlanFailure(
+  repository: string,
+  prNumber: string,
+  headSha: string,
+  migrationHash: string,
+  error: string,
+  preservedAppliedMarker: string | null,
+  runUrl?: string,
+) {
+  const body = buildMigrateNonprodCommentBody({
+    state: "failed",
+    headSha,
+    migrationHash,
+    error,
+    runUrl,
+    preservedAppliedMarker,
+  });
+  upsertMigrateNonprodComment({ repository, prNumber, body });
+  console.error(error);
+  process.exit(1);
+}
+
 function main() {
   const repository = requireEnv("GITHUB_REPOSITORY");
-  const prNumber = requireEnv("PR_NUMBER");
+  const prValidated = validatePrNumber(requireEnv("PR_NUMBER"));
+  if (!prValidated.ok) {
+    console.error(`migrate-nonprod plan: ${prValidated.message}`);
+    process.exit(1);
+  }
+  const prNumber = prValidated.prNumber;
   const runUrl =
     process.env.GITHUB_SERVER_URL && process.env.GITHUB_RUN_ID
       ? `${process.env.GITHUB_SERVER_URL}/${repository}/actions/runs/${process.env.GITHUB_RUN_ID}`
       : undefined;
+
+  const existingBody = findBotCommentBody(repository, prNumber);
+  const preservedAppliedMarker = existingBody
+    ? extractPreservedAppliedMarker(existingBody)
+    : null;
+  const appliedState = existingBody ? parseAppliedStateMarker(existingBody) : null;
+  const placeholderHash = "0".repeat(64);
 
   const pr = ghApiJson(`repos/${repository}/pulls/${prNumber}`) as {
     state: string;
@@ -123,8 +183,15 @@ function main() {
     return;
   }
   if (pr.head.repo.full_name !== repository) {
-    console.error("Fork PRs cannot migrate shared non-prod D1.");
-    process.exit(1);
+    postPlanFailure(
+      repository,
+      prNumber,
+      pr.head.sha,
+      placeholderHash,
+      "Fork PRs cannot migrate shared non-prod D1.",
+      preservedAppliedMarker,
+      runUrl,
+    );
   }
   if (pr.user.login === "dependabot[bot]") {
     console.log("Dependabot PRs are skipped.");
@@ -135,27 +202,33 @@ function main() {
 
   const headSha = pr.head.sha;
   const pullFiles = listPullFiles(repository, prNumber);
+
+  const disallowed = findDisallowedMigrationFileChanges(pullFiles);
+  if (disallowed.length > 0) {
+    const names = disallowed.map((f) => `${f.filename} (${f.status})`).join(", ");
+    postPlanFailure(
+      repository,
+      prNumber,
+      headSha,
+      placeholderHash,
+      `Refusing changed migration files (only new files allowed): ${names}`,
+      preservedAppliedMarker,
+      runUrl,
+    );
+  }
+
   const migrationChanges = pullFiles.filter(
     (f) =>
       f.filename.startsWith("migrations/") &&
       f.filename.endsWith(".sql") &&
-      (f.status === "added" || f.status === "modified"),
+      f.status === "added",
   );
 
   if (migrationChanges.length === 0) {
-    console.log("No added or modified migration files in this PR.");
+    console.log("No added migration files in this PR.");
     setOutput("has_migrations", "false");
     setOutput("skip_apply", "true");
     return;
-  }
-
-  for (const file of migrationChanges) {
-    if (file.status === "modified") {
-      console.error(
-        `Refusing modified migration ${file.filename}. Applied migrations are immutable; add a new migration file instead.`,
-      );
-      process.exit(1);
-    }
   }
 
   const migrationPaths = listMigrationPathsAtRef(repository, headSha);
@@ -165,13 +238,33 @@ function main() {
   }));
   const migrationHash = hashMigrationFiles(allMigrationFiles);
 
+  const immutability = checkAppliedFileImmutability(appliedState, allMigrationFiles);
+  if (!immutability.ok) {
+    postPlanFailure(
+      repository,
+      prNumber,
+      headSha,
+      migrationHash,
+      immutability.message,
+      preservedAppliedMarker,
+      runUrl,
+    );
+  }
+
   const filesToApply: { path: string; content: string }[] = [];
   for (const change of migrationChanges) {
     const content = fetchMigrationFile(repository, change.filename, headSha);
     const lint = lintMigrationSql(content);
     if (!lint.ok) {
-      console.error(`${change.filename}: ${lint.message}`);
-      process.exit(1);
+      postPlanFailure(
+        repository,
+        prNumber,
+        headSha,
+        migrationHash,
+        `${change.filename}: ${lint.message}`,
+        preservedAppliedMarker,
+        runUrl,
+      );
     }
     filesToApply.push({ path: change.filename, content });
   }
@@ -210,24 +303,7 @@ function main() {
   setOutput("migration_hash", migrationHash);
   setOutput("apply_files", filesToApply.map((f) => f.path).join(","));
 
-  const commentsRaw = execFileSync(
-    "gh",
-    ["api", "--paginate", `repos/${repository}/issues/${prNumber}/comments`],
-    { encoding: "utf8", env: process.env },
-  );
-  const commentsJson = JSON.parse(commentsRaw) as {
-    user?: { login?: string };
-    body?: string;
-  }[];
-  const existingComment = commentsJson.find(
-    (c) =>
-      c.user?.login === "github-actions[bot]" &&
-      typeof c.body === "string" &&
-      c.body.includes("<!-- we-met-migrate-nonprod -->"),
-  );
-  const appliedHash = existingComment?.body
-    ? parseAppliedMigrationHash(existingComment.body)
-    : null;
+  const appliedHash = existingBody ? parseAppliedMigrationHash(existingBody) : null;
 
   if (appliedHash === migrationHash) {
     console.log("Migration hash matches last successful apply; skipping approval.");
@@ -236,6 +312,7 @@ function main() {
       state: "skipped",
       headSha,
       migrationHash,
+      preservedAppliedMarker,
     });
     upsertMigrateNonprodComment({ repository, prNumber, body });
     return;
@@ -248,6 +325,7 @@ function main() {
     migrationHash,
     files: filesToApply.map((f) => f.path),
     runUrl,
+    preservedAppliedMarker,
   });
   upsertMigrateNonprodComment({ repository, prNumber, body });
 }

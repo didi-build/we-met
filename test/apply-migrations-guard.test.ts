@@ -34,6 +34,17 @@ describe("apply-migrations remote allowlist (unit)", () => {
     expect(result.stderr).toContain(`Refusing target "${PRODUCTION_DATABASE_ID}"`);
   });
 
+  it("rejects --config", () => {
+    const result = runScript([
+      "--remote",
+      "we-met-db-nonprod",
+      "--config",
+      "evil.jsonc",
+    ]);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("--config is not supported");
+  });
+
   it("rejects --remote with an unknown database name", () => {
     const result = runScript(["--remote", "some-other-db"]);
     expect(result.status).toBe(1);

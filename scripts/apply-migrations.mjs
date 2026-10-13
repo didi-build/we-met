@@ -26,7 +26,6 @@ const args = process.argv.slice(2);
 let mode = "local";
 let databaseName = null;
 let migrationsDir = null;
-let configPath = null;
 
 for (let i = 0; i < args.length; i++) {
   const arg = args[i];
@@ -41,11 +40,10 @@ for (let i = 0; i < args.length; i++) {
       process.exit(1);
     }
   } else if (arg === "--config") {
-    configPath = args[++i];
-    if (!configPath) {
-      console.error("--config requires a path");
-      process.exit(1);
-    }
+    console.error(
+      "--config is not supported; remote apply always uses the generated d1-migrate-nonprod wrangler config.",
+    );
+    process.exit(1);
   } else if (arg.startsWith("-")) {
     console.error(`Unknown option: ${arg}`);
     process.exit(1);
@@ -83,27 +81,22 @@ let wroteConfig = false;
 
 if (mode === "remote") {
   try {
-    if (configPath) {
-      configRel = configPath;
-      configAbs = resolve(configPath);
-    } else {
-      const prep = spawnSync(
-        "node",
-        [
-          "scripts/prepare-wrangler-config.mjs",
-          "--target",
-          "d1-migrate-nonprod",
-          "--output",
-          D1_CI_CONFIG_REL,
-        ],
-        { encoding: "utf8" },
-      );
-      if (prep.status !== 0) {
-        if (prep.stderr) process.stderr.write(prep.stderr);
-        process.exit(prep.status ?? 1);
-      }
-      wroteConfig = true;
+    const prep = spawnSync(
+      "node",
+      [
+        "scripts/prepare-wrangler-config.mjs",
+        "--target",
+        "d1-migrate-nonprod",
+        "--output",
+        D1_CI_CONFIG_REL,
+      ],
+      { encoding: "utf8" },
+    );
+    if (prep.status !== 0) {
+      if (prep.stderr) process.stderr.write(prep.stderr);
+      process.exit(prep.status ?? 1);
     }
+    wroteConfig = true;
     configFlag = ["-c", configRel];
   } catch (error) {
     console.error(error);

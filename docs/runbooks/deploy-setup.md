@@ -119,7 +119,16 @@ Cloudflare supports **resource-scoped Workers roles** ([Workers granular authori
 | --------------------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `we-met-ci-nonprod`         | `CLOUDFLARE_API_TOKEN_NONPROD`         | **Workers Editor**, scoped to Worker **`we-met`** only. No zone policy (previews do not touch `we-met.link`). No R2 or Queues permissions initially.                                                                                                                       |
 | `we-met-ci-production`      | `CLOUDFLARE_API_TOKEN_PRODUCTION`      | **Workers Editor** on **`we-met`**, plus account-level **D1 Edit** (dashboard **D1 Write**) for `wrangler d1 migrations apply`, plus a **third policy**: **Specified Domains** → `we-met.link` with **Workers Routes Write** and **Zone Read**. No R2 or Queues initially. |
-| `we-met-ci-migrate-nonprod` | `CLOUDFLARE_API_TOKEN_MIGRATE_NONPROD` | **D1 Edit** only (account-level; **UNVERIFIED** whether Cloudflare offers per-database scope). One-year expiry; calendar reminder.                                                                                                                                         |
+| `we-met-ci-migrate-nonprod` | `CLOUDFLARE_API_TOKEN_MIGRATE_NONPROD` | **D1 Edit** only (account-level). Verified **2026-10-13:** the Cloudflare token builder only offered account-level D1 (**Entire account**, **D1 Write** and **D1 Read**); no per-database scope was available. One-year expiry; calendar reminder.                         |
+
+### GitHub Actions policy (pull_request_target)
+
+GitHub blocks `pull_request_target` by default on public repositories from **2026-11-02**. Before that date, a maintainer should allow workflows that must run from trusted `main` code:
+
+- `.github/workflows/privileged-change.yml` — privileged-change flag ([DIDI-593](https://linear.app/didi-build/issue/DIDI-593))
+- `.github/workflows/migrate-nonprod.yml` — phone-friendly non-prod migrations ([DIDI-592](https://linear.app/didi-build/issue/DIDI-592))
+
+Also allow **`workflow_dispatch`** on `migrate-nonprod.yml` for manual retries. Configure this under the repository **Actions** settings (workflow allowlist / fork PR workflow policy).
 
 Add further permissions **only** when a **403** names them (Cloudflare 403 responses link to the required permission). **Never use Admin as the fix.**
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  dependabotTouchesProtectedWorkflow,
   evaluatePrJson,
   isCleanStatusError,
   isDependabotAuthor,
@@ -105,6 +106,20 @@ describe("dependabot-automerge (unit)", () => {
       if (!result.ok) {
         expect(result.reason).toContain("launchpad-dependabot-automerge");
       }
+    });
+
+    it("rejects PRs that touch migrate-nonprod.yml", () => {
+      const result = isEligible({
+        ...base,
+        changedFiles: [".github/workflows/migrate-nonprod.yml"],
+      });
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.reason).toContain("migrate-nonprod.yml");
+      }
+      expect(
+        dependabotTouchesProtectedWorkflow([".github/workflows/migrate-nonprod.yml"]),
+      ).toBe(true);
     });
   });
 

@@ -72,4 +72,44 @@ describe("lintMigrationSql (unit)", () => {
       message: "Migration file contains no SQL statements.",
     });
   });
+
+  it("does not split on semicolons inside block comments", () => {
+    const sql =
+      "CREATE TABLE IF NOT EXISTS t (id TEXT); /* DROP TABLE x; */ CREATE TABLE IF NOT EXISTS u (id TEXT);";
+    expect(lintMigrationSql(sql)).toEqual({ ok: true });
+  });
+
+  it("treats backslash before quote as literal inside strings", () => {
+    const sql = "CREATE TABLE IF NOT EXISTS t (note TEXT DEFAULT '\\';'); SELECT 1;";
+    const result = lintMigrationSql(sql);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.message).toContain("Statement 2");
+    }
+  });
+
+  it("handles doubled single quotes inside strings", () => {
+    const sql = "CREATE TABLE IF NOT EXISTS t (note TEXT DEFAULT 'it''s ok');";
+    expect(lintMigrationSql(sql)).toEqual({ ok: true });
+  });
+
+  it("rejects unterminated string literals", () => {
+    const result = lintMigrationSql(
+      "CREATE TABLE IF NOT EXISTS t (note TEXT DEFAULT 'oops",
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.message).toContain("Unterminated string");
+    }
+  });
+
+  it("does not treat semicolons inside block comments as statement boundaries", () => {
+    const sql =
+      "CREATE TABLE IF NOT EXISTS t (id TEXT); /* ; DROP TABLE secret; */ SELECT 1;";
+    const result = lintMigrationSql(sql);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.message).toContain("Statement 2");
+    }
+  });
 });
