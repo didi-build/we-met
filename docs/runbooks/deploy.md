@@ -8,6 +8,15 @@
 - Architecture/decision docs updated if bindings or seams changed.
 - Deploy must satisfy [deploy-time guards](../architecture/environments.md#deploy-time-guards) (`scripts/check-deploy-guards.mjs` in CI and `npm run deploy:guards` locally).
 
+## Privileged change flag (per pull request)
+
+- **Workflow:** [Privileged change](../../.github/workflows/privileged-change.yml) (`name: Privileged change`).
+- **Trigger:** `pull_request_target` (opened, reopened, synchronize, labeled, unlabeled). Runs from **`main`**; the PR cannot modify this workflow’s logic.
+- **Fork PRs:** skipped (`head.repo` must equal this repository). Forks do not get the comment, label, or status check from this workflow.
+- **What it does:** Lists changed files against trusted matchers in `scripts/lib/privileged-paths.mjs`, scans changed workflow files via the API, posts or updates a single PR comment (`<!-- we-met-privileged-change -->`), adds `privileged-change` while flagged, and sets commit status **`privileged-change`** (fails until a maintainer adds **`privileged-change-reviewed`** after review). New pushes after review remove `privileged-change-reviewed` and note that re-review is required.
+- **Maintainer setup (once):** After this workflow has run at least once on `main`, mark the **`privileged-change`** status check as **required** on `main` (branch protection or ruleset). Enable GitHub notifications for PR comments so you see the warning.
+- **Limitation:** This is a visible flag, not a cryptographic lock; anyone who can label the PR can add `privileged-change-reviewed`.
+
 ## Preview (per pull request)
 
 - **Workflow:** [Preview](../../.github/workflows/preview.yml) (`name: Preview`).

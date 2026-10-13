@@ -5,6 +5,14 @@ export function parseGhHttpStatus(stderr) {
 }
 
 /** @param {number | null} httpStatus @param {string} stderr */
+/**
+ * @param {string} stderr
+ * @returns {boolean}
+ */
+export function shouldIgnoreIssueLabelDeleteError(stderr) {
+  return parseGhHttpStatus(stderr) === 404;
+}
+
 export function branchProtectionReadFailureReason(httpStatus, stderr) {
   if (httpStatus === 404) {
     return "no branch protection configured (HTTP 404)";
