@@ -1,7 +1,12 @@
 import { appendFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { pickBaselineShaFromDeployments } from "./baseline.mjs";
-import { decideMigrationPlan, isMigrationSqlPath } from "./compare-migrations.mjs";
+import {
+  decideMigrationPlan,
+  isMigrationSqlPath,
+  normalizeCompareFiles,
+} from "./compare-migrations.mjs";
+import { mergeCompareApiPages } from "./compare-pages.mjs";
 import { formatMigrationIntroduction } from "./attribution.mjs";
 import { collectAdvisoryLintWarnings } from "./advisory-lint";
 import {
@@ -9,19 +14,18 @@ import {
   buildWarningAnnotation,
   formatMigrationSection,
 } from "./messages.mjs";
+import { executePlanSoftFail } from "./plan-soft-fail.mjs";
 import { ghApiCall } from "../lib/privileged-gh-api.mjs";
-import { parsePullRequestFilesApiStdout } from "../lib/privileged-pull-files-api.mjs";
-import { resolvePlanExitCode } from "./exit-code.mjs";
+import { emitWorkflowWarning } from "./workflow-output.mjs";
 
 type Deployment = { id: number; sha: string };
-type GhTree = { tree: { path: string; type: string }[] };
+type GhTree = { truncated?: boolean; tree: { path: string; type: string }[] };
 type GhContent = { content?: string; encoding?: string };
 
 function requireEnv(name: string): string {
   const value = process.env[name]?.trim();
   if (!value) {
-    console.error(`deploy-production plan: missing ${name}`);
-    process.exit(1);
+    throw new Error(`deploy-production plan: missing ${name}`);
   }
   return value;
 }
@@ -44,10 +48,6 @@ function writeSummary(text: string) {
     return;
   }
   appendFileSync(file, `${text}\n`);
-}
-
-function emitWorkflowWarning(message: string) {
-  console.log(`::warning::${message}`);
 }
 
 function decodeContent(entry: GhContent): string {
@@ -109,6 +109,9 @@ function listMigrationPathsAtRef(repository: string, ref: string): string[] {
   const tree = parseJson(
     ghApi(`repos/${repository}/git/trees/${ref}?recursive=1`),
   ) as GhTree;
+  if (tree.truncated) {
+    throw new Error("Git tree listing was truncated; cannot list all migration paths");
+  }
   return tree.tree
     .filter((entry) => entry.type === "blob" && isMigrationSqlPath(entry.path))
     .map((entry) => entry.path)
@@ -124,50 +127,21 @@ function fetchFileAtRef(repository: string, path: string, ref: string): string {
 }
 
 function fetchCompare(repository: string, base: string, head: string) {
-  const stdout = ghApiPaginateSlurp(`repos/${repository}/compare/${base}...${head}`);
-  const parsed = parseJson(stdout);
-  if (Array.isArray(parsed) && parsed.length > 0) {
-    const last = parsed[parsed.length - 1];
-    if (last && typeof last === "object") {
-      return last as {
-        status?: string;
-        ahead_by?: number;
-        behind_by?: number;
-        files?: unknown[];
-      };
-    }
+  const stdout = ghApiPaginateSlurp(
+    `repos/${repository}/compare/${base}...${head}?per_page=100`,
+  );
+  const merged = mergeCompareApiPages(parseJson(stdout));
+  if (!merged) {
+    return null;
   }
-  if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-    return parsed as {
-      status?: string;
-      ahead_by?: number;
-      behind_by?: number;
-      files?: unknown[];
-    };
-  }
-  return null;
-}
-
-function mergeCompareFiles(rawFiles: unknown[]) {
-  const rawByName = new Map<string, { previous_filename?: string }>();
-  for (const entry of rawFiles) {
-    if (entry && typeof entry === "object" && "filename" in entry) {
-      const filename = (entry as { filename: string }).filename;
-      rawByName.set(filename, {
-        previous_filename:
-          "previous_filename" in entry &&
-          typeof (entry as { previous_filename?: string }).previous_filename ===
-            "string"
-            ? (entry as { previous_filename: string }).previous_filename
-            : undefined,
-      });
-    }
-  }
-  const parsed = parsePullRequestFilesApiStdout(JSON.stringify(rawFiles));
-  return parsed.map((file) => ({
-    ...file,
-    previous_filename: rawByName.get(file.filename)?.previous_filename,
-  }));
+  const normalized = normalizeCompareFiles(merged.files);
+  return {
+    status: merged.status,
+    ahead_by: merged.ahead_by,
+    behind_by: merged.behind_by,
+    files: normalized,
+    totalFileCount: merged.totalFileCount,
+  };
 }
 
 function findIntroduction(repository: string, path: string, headSha: string) {
@@ -203,7 +177,7 @@ function findIntroduction(repository: string, path: string, headSha: string) {
   }
 }
 
-function main() {
+function runPlan() {
   const repository = requireEnv("GITHUB_REPOSITORY");
   const headSha = requireEnv("GITHUB_SHA");
 
@@ -216,33 +190,24 @@ function main() {
 
   const compare =
     baselineSha != null ? fetchCompare(repository, baselineSha, headSha) : null;
-  const compareForDecision =
-    compare != null
-      ? {
-          ...compare,
-          files: compare.files != null ? mergeCompareFiles(compare.files) : [],
-        }
-      : null;
 
   const plan = decideMigrationPlan({
     baselineSha,
-    compare: compareForDecision,
+    compare,
     allMigrationPathsAtHead,
   });
 
   const migrationSections: string[] = [];
   const pathsForAnnotation: string[] = [];
-  let lintWarningCount = 0;
+  /** @type {string[][]} */
+  const lintWarningsByMigration = [];
 
   for (const migration of plan.migrations) {
     const path = migration.path;
     pathsForAnnotation.push(path);
     const sql = fetchFileAtRef(repository, path, headSha);
     const lintWarnings = collectAdvisoryLintWarnings(path, sql);
-    lintWarningCount += lintWarnings.length;
-    for (const warning of lintWarnings) {
-      emitWorkflowWarning(warning);
-    }
+    lintWarningsByMigration.push(lintWarnings);
     migrationSections.push(
       formatMigrationSection({
         path,
@@ -255,6 +220,17 @@ function main() {
     );
   }
 
+  const annotation = buildWarningAnnotation({ migrationPaths: pathsForAnnotation });
+  if (annotation) {
+    emitWorkflowWarning(annotation);
+  }
+
+  for (const lintWarnings of lintWarningsByMigration) {
+    for (const warning of lintWarnings) {
+      emitWorkflowWarning(warning);
+    }
+  }
+
   const summary = buildPlanSummaryMarkdown({
     headSha,
     baselineSha,
@@ -263,13 +239,18 @@ function main() {
   });
   writeSummary(summary);
 
-  const annotation = buildWarningAnnotation({ migrationPaths: pathsForAnnotation });
-  if (annotation) {
-    emitWorkflowWarning(annotation);
-  }
-
   console.log("deploy-production plan: complete");
-  process.exit(resolvePlanExitCode({ lintWarningCount }));
+}
+
+function main() {
+  try {
+    runPlan();
+    process.exit(0);
+  } catch (error) {
+    const result = executePlanSoftFail(error);
+    writeSummary(result.summaryMarkdown);
+    process.exit(result.exitCode);
+  }
 }
 
 main();

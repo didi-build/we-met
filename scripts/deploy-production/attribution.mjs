@@ -18,7 +18,7 @@ export function formatMigrationIntroduction(input) {
       input.prTitle && input.prTitle.length > 0
         ? sanitizeExternalPlanText(input.prTitle)
         : "untitled";
-    return `Introduction: ${commit}, PR #${input.prNumber} (${title})`;
+    return `Last changed in: ${commit}, PR #${input.prNumber} (${title})`;
   }
-  return `Introduction: ${commit}, PR unknown`;
+  return `Last changed in: ${commit}, PR unknown`;
 }

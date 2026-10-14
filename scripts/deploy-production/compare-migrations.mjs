@@ -6,19 +6,14 @@ import { normalizePullFileEntry } from "../lib/privileged-pull-files-api.mjs";
  */
 export const GITHUB_COMPARE_CHANGED_FILES_CAP = 300;
 
-const MIGRATION_PREFIX = "migrations/";
-const MIGRATION_SUFFIX = ".sql";
+const MIGRATION_SQL_PATH_RE = /^migrations\/[^/]+\.sql$/;
 
 /**
  * @param {string} filename
  * @returns {boolean}
  */
 export function isMigrationSqlPath(filename) {
-  return (
-    filename.startsWith(MIGRATION_PREFIX) &&
-    filename.endsWith(MIGRATION_SUFFIX) &&
-    filename.length > MIGRATION_PREFIX.length + MIGRATION_SUFFIX.length - 1
-  );
+  return MIGRATION_SQL_PATH_RE.test(filename);
 }
 
 /**
@@ -116,7 +111,13 @@ export function allMigrationsAsListed(sortedPaths) {
 /**
  * @param {{
  *   baselineSha: string | null;
- *   compare: { status?: string; ahead_by?: number; behind_by?: number; files?: unknown[] } | null;
+ *   compare: {
+ *     status?: string;
+ *     ahead_by?: number;
+ *     behind_by?: number;
+ *     files?: { filename: string; status: string; previous_filename?: string }[];
+ *     totalFileCount?: number;
+ *   } | null;
  *   allMigrationPathsAtHead: string[];
  * }} input
  * @returns {CompareMigrationPlan | ListAllMigrationPlan}
@@ -141,9 +142,8 @@ export function decideMigrationPlan(input) {
     };
   }
 
-  const rawFiles = Array.isArray(compare.files) ? compare.files : [];
-  const fileCount = rawFiles.length;
-  const normalized = normalizeCompareFiles(rawFiles);
+  const normalized = Array.isArray(compare.files) ? compare.files : [];
+  const fileCount = compare.totalFileCount ?? normalized.length;
 
   if (!isCleanAheadCompare(compare)) {
     return {

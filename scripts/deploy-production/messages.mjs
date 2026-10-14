@@ -31,7 +31,7 @@ export function formatMigrationSection(entry) {
         : "**Listed**";
   const intro = entry.introduction
     ? sanitizeExternalPlanText(entry.introduction)
-    : "Introduction: unknown";
+    : "Last changed in: unknown";
   const lines = [`### \`${safePath}\``, "", `- ${changeLabel}`, `- ${intro}`];
   if (entry.previousPath) {
     lines.push(`- Previous path: \`${sanitizeExternalPlanText(entry.previousPath)}\``);
@@ -112,6 +112,56 @@ export function buildWarningAnnotation(input) {
   const n = migrationPaths.length;
   const noun = n === 1 ? "migration" : "migrations";
   return `This deploy includes ${n} ${noun}: ${safeNames}`;
+}
+
+/**
+ * @param {{ category: import("./failure-classification.mjs").PlanFailureCategory; detail: string }} input
+ * @returns {{ summaryMarkdown: string; warningAnnotation: string }}
+ */
+export function buildPlanFailureContent(input) {
+  const detail = sanitizeExternalPlanText(input.detail);
+  let headline;
+  let body;
+  if (input.category === "github_unavailable") {
+    headline = `PLAN UNAVAILABLE: GitHub API problem (${detail}).`;
+    body =
+      "This is not caused by our code. The plan will return on the next run. This does NOT mean there are no migrations: if you know this commit adds one, check migrations/ by hand.";
+  } else if (input.category === "access_or_config") {
+    headline = `PLAN FAILED: access or config problem (${detail}).`;
+    body = "Needs a fix. Check migrations/ by hand before approving.";
+  } else {
+    headline = `PLAN FAILED: bug in the plan job (${detail}).`;
+    body = "Needs a fix. Check migrations/ by hand before approving.";
+  }
+  const summaryMarkdown = [
+    "## Production D1 migration plan",
+    "",
+    `**${headline}**`,
+    "",
+    body,
+    "",
+    "_The deploy job is not blocked; production approval remains the gate._",
+  ].join("\n");
+  return { summaryMarkdown, warningAnnotation: headline };
+}
+
+/**
+ * @param {string} failedStepId
+ * @returns {{ summaryMarkdown: string; warningAnnotation: string }}
+ */
+export function buildPlanSetupFailureContent(failedStepId) {
+  const step = sanitizeExternalPlanText(failedStepId);
+  const headline = `PLAN FAILED: bug in the plan job (setup step ${step} failed).`;
+  const summaryMarkdown = [
+    "## Production D1 migration plan",
+    "",
+    `**${headline}**`,
+    "",
+    "The plan job could not start. Needs a fix. Check migrations/ by hand before approving.",
+    "",
+    "_The deploy job is not blocked; production approval remains the gate._",
+  ].join("\n");
+  return { summaryMarkdown, warningAnnotation: headline };
 }
 
 export { ADVISORY_LINT_NOTE, HONEST_LIMIT_NOTE };
