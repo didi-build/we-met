@@ -1,6 +1,9 @@
 import { appendFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { pickBaselineShaFromDeployments } from "./baseline.mjs";
+import {
+  pickBaselineShaFromDeployments,
+  sortDeploymentsNewestFirst,
+} from "./baseline.mjs";
 import {
   decideMigrationPlan,
   isMigrationSqlPath,
@@ -18,7 +21,7 @@ import { executePlanSoftFail } from "./plan-soft-fail.mjs";
 import { ghApiCall } from "../lib/privileged-gh-api.mjs";
 import { emitWorkflowWarning } from "./workflow-output.mjs";
 
-type Deployment = { id: number; sha: string };
+type Deployment = { id: number; sha: string; created_at?: string };
 type GhTree = { truncated?: boolean; tree: { path: string; type: string }[] };
 type GhContent = { content?: string; encoding?: string };
 
@@ -90,11 +93,13 @@ function listProductionDeployments(repository: string): Deployment[] {
         typeof row.id === "number" &&
         typeof row.sha === "string"
       ) {
-        deployments.push({ id: row.id, sha: row.sha });
+        const createdAt =
+          typeof row.created_at === "string" ? row.created_at : undefined;
+        deployments.push({ id: row.id, sha: row.sha, created_at: createdAt });
       }
     }
   }
-  return deployments;
+  return sortDeploymentsNewestFirst(deployments);
 }
 
 function latestDeploymentStatus(

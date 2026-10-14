@@ -5,6 +5,23 @@
  */
 
 /**
+ * UNVERIFIED: whether the GitHub deployments list API returns rows newest-first by default.
+ *
+ * @param {DeploymentRow[]} deployments
+ * @returns {DeploymentRow[]}
+ */
+export function sortDeploymentsNewestFirst(deployments) {
+  return [...deployments].sort((a, b) => {
+    const timeA = a.created_at ? Date.parse(a.created_at) : 0;
+    const timeB = b.created_at ? Date.parse(b.created_at) : 0;
+    if (timeB !== timeA) {
+      return timeB - timeA;
+    }
+    return b.id - a.id;
+  });
+}
+
+/**
  * @param {string | undefined | null} state
  * @returns {boolean}
  */
@@ -13,7 +30,7 @@ export function isSuccessfulDeploymentStatus(state) {
 }
 
 /**
- * Deployments must be ordered newest-first (API default when sorted by created_at desc).
+ * Deployments must be ordered newest-first (use {@link sortDeploymentsNewestFirst}).
  *
  * @param {DeploymentRow[]} deploymentsNewestFirst
  * @param {(deploymentId: number) => string | null | undefined} latestStatusForDeployment

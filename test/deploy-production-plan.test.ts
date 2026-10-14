@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   isSuccessfulDeploymentStatus,
   pickBaselineShaFromDeployments,
+  sortDeploymentsNewestFirst,
 } from "../scripts/deploy-production/baseline.mjs";
 import {
   collectComparePages,
@@ -85,6 +86,24 @@ describe("deploy-production baseline (unit)", () => {
   it("recognizes success status", () => {
     expect(isSuccessfulDeploymentStatus("success")).toBe(true);
     expect(isSuccessfulDeploymentStatus("failure")).toBe(false);
+  });
+
+  it("sorts oldest-first API order so newest successful deployment wins baseline", () => {
+    const oldestFirst = [
+      { id: 1, sha: "aaa", created_at: "2020-01-01T00:00:00Z" },
+      { id: 2, sha: "bbb", created_at: "2021-01-01T00:00:00Z" },
+      { id: 3, sha: "ccc", created_at: "2022-01-01T00:00:00Z" },
+    ];
+    const statuses: Record<number, string> = {
+      3: "failure",
+      2: "success",
+      1: "success",
+    };
+    const sorted = sortDeploymentsNewestFirst(oldestFirst);
+    expect(pickBaselineShaFromDeployments(sorted, (id) => statuses[id])).toBe("bbb");
+    expect(pickBaselineShaFromDeployments(oldestFirst, (id) => statuses[id])).toBe(
+      "aaa",
+    );
   });
 });
 
