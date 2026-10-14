@@ -1,7 +1,7 @@
 import { buildVisitorFollowUpEmail } from "@/email/format-visitor-follow-up";
 import {
-  errorCodeFromUnknown,
-  type FollowupEmailErrorCode,
+  followupEmailErrorLogFields,
+  type FollowupEmailErrorLogFields,
 } from "@/email/followup-email-error";
 import { createGmailEmailSender } from "@/email/gmail-sender";
 import { sanitizeEmailHeaderValue } from "@/email/mime-headers";
@@ -62,12 +62,12 @@ export type FollowupConsumerDeps = {
   logVisitorFollowupAttemptFailure(
     leadId: string,
     attempt: number,
-    errorCode: FollowupEmailErrorCode,
+    error: FollowupEmailErrorLogFields,
     willRetry: boolean,
   ): void;
   logVisitorFollowupPermanentFailure(
     leadId: string,
-    errorCode: FollowupEmailErrorCode,
+    error: FollowupEmailErrorLogFields,
   ): void;
   logMalformedVisitorFollowup(leadId: string | null): void;
   logUnsupportedType(typeLabel: string): void;
@@ -87,16 +87,21 @@ export function createFollowupConsumerDepsFromEnv(
       senderEmail: env.GMAIL_SENDER,
     }),
     assets: createReadOnlyConsumerAssets(env.WE_MET_ASSETS),
-    logVisitorFollowupAttemptFailure(leadId, attempt, errorCode, willRetry) {
+    logVisitorFollowupAttemptFailure(leadId, attempt, error, willRetry) {
       console.error("visitor_followup_attempt_failure", {
         leadId,
         attempt,
-        errorCode,
+        errorCode: error.code,
+        ...(error.secretName ? { secretName: error.secretName } : {}),
         willRetry,
       });
     },
-    logVisitorFollowupPermanentFailure(leadId, errorCode) {
-      console.error("visitor_followup_permanent_failure", { leadId, errorCode });
+    logVisitorFollowupPermanentFailure(leadId, error) {
+      console.error("visitor_followup_permanent_failure", {
+        leadId,
+        errorCode: error.code,
+        ...(error.secretName ? { secretName: error.secretName } : {}),
+      });
     },
     logMalformedVisitorFollowup(leadId) {
       console.error("visitor_followup_malformed", { leadId });
@@ -185,16 +190,16 @@ async function processQueueMessage(
     await sendVisitorFollowup(parsed, deps);
     message.ack();
   } catch (error) {
-    const errorCode = errorCodeFromUnknown(error);
+    const errorFields = followupEmailErrorLogFields(error);
     const willRetry = message.attempts < MAX_VISITOR_FOLLOWUP_ATTEMPTS;
     deps.logVisitorFollowupAttemptFailure(
       parsed.lead.leadId,
       message.attempts,
-      errorCode,
+      errorFields,
       willRetry,
     );
     if (!willRetry) {
-      deps.logVisitorFollowupPermanentFailure(parsed.lead.leadId, errorCode);
+      deps.logVisitorFollowupPermanentFailure(parsed.lead.leadId, errorFields);
       message.ack();
       return;
     }

@@ -105,6 +105,45 @@ describe("buildRawEmailMessage (unit)", () => {
     expect(mime).toContain(vcardB64.slice(0, 16));
   });
 
+  it("production-shaped mail has a single To address with no extra recipients", () => {
+    const raw = buildRawEmailMessage({
+      from: "sender@example.com",
+      to: "visitor@example.com",
+      subject: "Hello",
+      textPlain: "Body",
+      textHtml: "<p>Body</p>",
+    });
+    const mime = decodeRawEmailMessage(raw);
+    expect(headerValue(mime, "To")).toBe("visitor@example.com");
+    expect(headerLines(mime).filter((l) => l.startsWith("To:"))).toHaveLength(1);
+    expect(
+      headerLines(mime).filter((l) => l.toLowerCase().startsWith("cc:")),
+    ).toHaveLength(0);
+    expect(
+      headerLines(mime).filter((l) => l.toLowerCase().startsWith("bcc:")),
+    ).toHaveLength(0);
+  });
+
+  it("escapes quotes and backslashes in attachment filename parameters", () => {
+    const raw = buildRawEmailMessage({
+      ...baseEmail,
+      attachments: [
+        {
+          filename: 'weird"file\\name.vcf',
+          mimeType: "text/vcard",
+          body: "BEGIN:VCARD\nEND:VCARD\n",
+        },
+      ],
+    });
+    const mime = decodeRawEmailMessage(raw);
+    expect(mime).toContain('filename="weird\\"file\\\\name.vcf"');
+    expect(mime).toContain('name="weird\\"file\\\\name.vcf"');
+    const bccHeaders = headerLines(mime).filter((l) =>
+      l.toLowerCase().startsWith("bcc:"),
+    );
+    expect(bccHeaders).toHaveLength(0);
+  });
+
   it("does not allow header injection via subject, display name, or filename", () => {
     const raw = buildRawEmailMessage({
       ...baseEmail,

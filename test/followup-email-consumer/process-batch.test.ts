@@ -124,7 +124,7 @@ describe("processFollowupQueueBatch (unit)", () => {
     expect(deps.logVisitorFollowupAttemptFailure).toHaveBeenCalledWith(
       "lead-1",
       2,
-      "gmail_network_error",
+      { code: "gmail_network_error" },
       true,
     );
     expect(message.retry).toHaveBeenCalledOnce();
@@ -146,13 +146,12 @@ describe("processFollowupQueueBatch (unit)", () => {
     expect(deps.logVisitorFollowupAttemptFailure).toHaveBeenCalledWith(
       "lead-1",
       5,
-      "gmail_network_error",
+      { code: "gmail_network_error" },
       false,
     );
-    expect(deps.logVisitorFollowupPermanentFailure).toHaveBeenCalledWith(
-      "lead-1",
-      "gmail_network_error",
-    );
+    expect(deps.logVisitorFollowupPermanentFailure).toHaveBeenCalledWith("lead-1", {
+      code: "gmail_network_error",
+    });
     expect(message.ack).toHaveBeenCalledOnce();
     expect(message.retry).not.toHaveBeenCalled();
   });
@@ -167,7 +166,7 @@ describe("processFollowupQueueBatch (unit)", () => {
     expect(depsUnset.logVisitorFollowupAttemptFailure).toHaveBeenCalledWith(
       "lead-1",
       3,
-      "nonprod_mail_redirect_unset",
+      { code: "nonprod_mail_redirect_unset" },
       true,
     );
 
@@ -178,8 +177,32 @@ describe("processFollowupQueueBatch (unit)", () => {
     expect(msgFinal.ack).toHaveBeenCalledOnce();
     expect(depsFinal.logVisitorFollowupPermanentFailure).toHaveBeenCalledWith(
       "lead-1",
-      "nonprod_mail_redirect_unset",
+      { code: "nonprod_mail_redirect_unset" },
     );
+  });
+
+  it("production mode acks malformed comma-separated visitor email without sending", async () => {
+    const send = vi.fn(async () => {});
+    const message = createMessage(
+      visitorBody({
+        lead: {
+          ...visitorBody().lead,
+          email: "visitor@example.com, attacker@evil.com",
+        },
+      }),
+    );
+    const deps = createDeps({
+      weMetEnv: "production",
+      testMailTo: undefined,
+      emailSender: { send },
+    });
+
+    await processFollowupQueueBatch({ messages: [message] }, deps);
+
+    expect(send).not.toHaveBeenCalled();
+    expect(deps.logMalformedVisitorFollowup).toHaveBeenCalledWith("lead-1");
+    expect(message.ack).toHaveBeenCalledOnce();
+    expect(message.retry).not.toHaveBeenCalled();
   });
 
   it("redirects when lead.environment is production but consumer WE_MET_ENV is preview", async () => {

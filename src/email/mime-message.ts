@@ -32,6 +32,10 @@ function createMimeBoundary(): string {
   return `----=_Part_${crypto.randomUUID().replace(/-/g, "")}`;
 }
 
+function escapeMimeQuotedParameter(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
 function buildMultipartAlternative(
   boundary: string,
   textPlain: string,
@@ -57,7 +61,9 @@ function buildAttachmentPart(
   mixedBoundary: string,
   attachment: EmailAttachment,
 ): string {
-  const filename = sanitizeEmailHeaderValue(attachment.filename);
+  const filename = escapeMimeQuotedParameter(
+    sanitizeEmailHeaderValue(attachment.filename),
+  );
   const mimeType = sanitizeEmailHeaderValue(attachment.mimeType);
   return [
     `--${mixedBoundary}`,

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { errorCodeFromUnknown, FollowupEmailError } from "@/email/followup-email-error";
+import {
+  errorCodeFromUnknown,
+  followupEmailErrorLogFields,
+  FollowupEmailError,
+} from "@/email/followup-email-error";
 import { parseServiceAccountJson } from "@/email/gmail-sender";
 
 describe("FollowupEmailError (unit)", () => {
@@ -66,6 +70,27 @@ describe("FollowupEmailError (unit)", () => {
       }
     });
   }
+
+  it("followupEmailErrorLogFields includes secretName only for gmail_secret_missing", () => {
+    const missing = followupEmailErrorLogFields(
+      new FollowupEmailError("gmail_secret_missing", { secretName: "GMAIL_SENDER" }),
+    );
+    expect(missing).toEqual({
+      code: "gmail_secret_missing",
+      secretName: "GMAIL_SENDER",
+    });
+
+    const network = followupEmailErrorLogFields(
+      new FollowupEmailError("gmail_network_error"),
+    );
+    expect(network).toEqual({ code: "gmail_network_error" });
+    expect(network.secretName).toBeUndefined();
+
+    const invalidJson = followupEmailErrorLogFields(
+      new FollowupEmailError("gmail_invalid_service_account_json"),
+    );
+    expect(invalidJson.secretName).toBeUndefined();
+  });
 
   it("does not leak secret fragments from JSON.parse failures", () => {
     const secretFragment = "super-secret-private-key-material";

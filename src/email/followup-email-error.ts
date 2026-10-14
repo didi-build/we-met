@@ -22,8 +22,24 @@ export class FollowupEmailError extends Error {
 }
 
 export function errorCodeFromUnknown(error: unknown): FollowupEmailErrorCode {
+  return followupEmailErrorLogFields(error).code;
+}
+
+export type FollowupEmailErrorLogFields = {
+  code: FollowupEmailErrorCode;
+  secretName?: string;
+};
+
+/** Safe structured fields for consumer logs — never secret values. */
+export function followupEmailErrorLogFields(
+  error: unknown,
+): FollowupEmailErrorLogFields {
   if (error instanceof FollowupEmailError) {
-    return error.code;
+    const fields: FollowupEmailErrorLogFields = { code: error.code };
+    if (error.code === "gmail_secret_missing" && error.secretName) {
+      fields.secretName = error.secretName;
+    }
+    return fields;
   }
-  return "unknown";
+  return { code: "unknown" };
 }
