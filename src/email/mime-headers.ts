@@ -24,6 +24,10 @@ export function sanitizeEmailHeaderValue(value: string): string {
   return withoutControls.replace(/\s+/g, " ").trim();
 }
 
+function escapeQuotedDisplayName(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
 /** Build a RFC 5322 From header with optional display name (RFC 2047 when needed). */
 export function formatEmailFromHeader(email: string, displayName?: string): string {
   const sanitizedEmail = sanitizeEmailHeaderValue(email);
@@ -33,7 +37,7 @@ export function formatEmailFromHeader(email: string, displayName?: string): stri
   }
   const sanitizedName = sanitizeEmailHeaderValue(trimmedName);
   const encodedName = isAsciiOnly(sanitizedName)
-    ? `"${sanitizedName}"`
+    ? `"${escapeQuotedDisplayName(sanitizedName)}"`
     : `"=?UTF-8?B?${base64EncodeUtf8(sanitizedName)}?="`;
   return `${encodedName} <${sanitizedEmail}>`;
 }

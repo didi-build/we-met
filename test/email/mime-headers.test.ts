@@ -16,6 +16,12 @@ describe("mime headers (unit)", () => {
     );
   });
 
+  it("escapes quotes and backslashes in quoted display names", () => {
+    expect(formatEmailFromHeader("sender@example.com", 'Demo "Nick" \\ Co')).toBe(
+      '"Demo \\"Nick\\" \\\\ Co" <sender@example.com>',
+    );
+  });
+
   it("never places raw visitor injection into encoded subject", () => {
     const safe = sanitizeEmailHeaderValue("Nice\r\nBcc: bad@evil.com");
     const encoded = encodeEmailSubject(safe);

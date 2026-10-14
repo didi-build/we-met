@@ -1,4 +1,8 @@
 import { buildVisitorFollowUpEmail } from "@/email/format-visitor-follow-up";
+import {
+  errorCodeFromUnknown,
+  type FollowupEmailErrorCode,
+} from "@/email/followup-email-error";
 import { createGmailEmailSender } from "@/email/gmail-sender";
 import { sanitizeEmailHeaderValue } from "@/email/mime-headers";
 import { resolveEmailRecipient } from "@/email/recipient";
@@ -7,6 +11,8 @@ import {
   buildOwnerVCardAttachment,
   type ReadOnlyR2Assets,
 } from "@/followup-email-consumer/load-vcard-photo";
+import { createReadOnlyConsumerAssets } from "@/followup-email-consumer/r2-assets";
+import type { R2Bucket } from "@cloudflare/workers-types";
 import {
   followupEmailRetryDelaySeconds,
   MAX_VISITOR_FOLLOWUP_ATTEMPTS,
@@ -41,21 +47,28 @@ export type FollowupQueueBatch = {
 
 export type FollowupConsumerEnv = {
   WE_MET_ENV: string;
-  WE_MET_BASE_URL: string;
   GMAIL_SENDER: string;
   GMAIL_SERVICE_ACCOUNT_JSON: string;
   WE_MET_TEST_MAIL_TO?: string;
-  WE_MET_ASSETS: ReadOnlyR2Assets;
+  WE_MET_ASSETS: R2Bucket;
 };
 
 export type FollowupConsumerDeps = {
   weMetEnv: string;
-  baseUrl: string;
   gmailSender: string;
   testMailTo?: string;
   emailSender: EmailSender;
   assets: ReadOnlyR2Assets;
-  logVisitorFollowupPermanentFailure(leadId: string, errorType: string): void;
+  logVisitorFollowupAttemptFailure(
+    leadId: string,
+    attempt: number,
+    errorCode: FollowupEmailErrorCode,
+    willRetry: boolean,
+  ): void;
+  logVisitorFollowupPermanentFailure(
+    leadId: string,
+    errorCode: FollowupEmailErrorCode,
+  ): void;
   logMalformedVisitorFollowup(leadId: string | null): void;
   logUnsupportedType(typeLabel: string): void;
   logMissingPhoto(key: string): void;
@@ -67,16 +80,23 @@ export function createFollowupConsumerDepsFromEnv(
 ): FollowupConsumerDeps {
   return {
     weMetEnv: env.WE_MET_ENV,
-    baseUrl: env.WE_MET_BASE_URL,
     gmailSender: env.GMAIL_SENDER,
     testMailTo: env.WE_MET_TEST_MAIL_TO,
     emailSender: createGmailEmailSender({
       serviceAccountJson: env.GMAIL_SERVICE_ACCOUNT_JSON,
       senderEmail: env.GMAIL_SENDER,
     }),
-    assets: env.WE_MET_ASSETS,
-    logVisitorFollowupPermanentFailure(leadId, errorType) {
-      console.error("visitor_followup_permanent_failure", { leadId, errorType });
+    assets: createReadOnlyConsumerAssets(env.WE_MET_ASSETS),
+    logVisitorFollowupAttemptFailure(leadId, attempt, errorCode, willRetry) {
+      console.error("visitor_followup_attempt_failure", {
+        leadId,
+        attempt,
+        errorCode,
+        willRetry,
+      });
+    },
+    logVisitorFollowupPermanentFailure(leadId, errorCode) {
+      console.error("visitor_followup_permanent_failure", { leadId, errorCode });
     },
     logMalformedVisitorFollowup(leadId) {
       console.error("visitor_followup_malformed", { leadId });
@@ -109,8 +129,6 @@ async function sendVisitorFollowup(
   const content = buildVisitorFollowUpEmail({
     card: message.card,
     visitorName: message.lead.name,
-    visitorEmail: message.lead.email,
-    baseUrl: deps.baseUrl,
     nonProdVisitorEmailLabel: nonProdLabel,
   });
 
@@ -167,9 +185,16 @@ async function processQueueMessage(
     await sendVisitorFollowup(parsed, deps);
     message.ack();
   } catch (error) {
-    const errorType = error instanceof Error ? error.name || error.message : "unknown";
-    if (message.attempts >= MAX_VISITOR_FOLLOWUP_ATTEMPTS) {
-      deps.logVisitorFollowupPermanentFailure(parsed.lead.leadId, errorType);
+    const errorCode = errorCodeFromUnknown(error);
+    const willRetry = message.attempts < MAX_VISITOR_FOLLOWUP_ATTEMPTS;
+    deps.logVisitorFollowupAttemptFailure(
+      parsed.lead.leadId,
+      message.attempts,
+      errorCode,
+      willRetry,
+    );
+    if (!willRetry) {
+      deps.logVisitorFollowupPermanentFailure(parsed.lead.leadId, errorCode);
       message.ack();
       return;
     }

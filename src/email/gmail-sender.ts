@@ -1,4 +1,5 @@
 import { buildRawEmailMessage } from "@/email/mime-message";
+import { FollowupEmailError } from "@/email/followup-email-error";
 import type { EmailSender, OutboundEmail } from "@/email/types";
 
 const GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send";
@@ -8,6 +9,7 @@ const GMAIL_SEND_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages/
 export type GmailServiceAccountConfig = {
   serviceAccountJson: string;
   senderEmail: string;
+  fetchFn?: typeof fetch;
 };
 
 type ServiceAccountKey = {
@@ -57,32 +59,41 @@ async function signJwt(
   const encodedPayload = base64UrlEncode(JSON.stringify(payload));
   const signingInput = `${encodedHeader}.${encodedPayload}`;
 
-  const key = await crypto.subtle.importKey(
-    "pkcs8",
-    pemToPkcs8Der(privateKeyPem),
-    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
+  try {
+    const key = await crypto.subtle.importKey(
+      "pkcs8",
+      pemToPkcs8Der(privateKeyPem),
+      { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+      false,
+      ["sign"],
+    );
 
-  const signature = await crypto.subtle.sign(
-    "RSASSA-PKCS1-v1_5",
-    key,
-    new TextEncoder().encode(signingInput),
-  );
+    const signature = await crypto.subtle.sign(
+      "RSASSA-PKCS1-v1_5",
+      key,
+      new TextEncoder().encode(signingInput),
+    );
 
-  return `${signingInput}.${base64UrlEncode(new Uint8Array(signature))}`;
+    return `${signingInput}.${base64UrlEncode(new Uint8Array(signature))}`;
+  } catch {
+    throw new FollowupEmailError("gmail_invalid_service_account_json");
+  }
 }
 
 export function parseServiceAccountJson(raw: string): ServiceAccountKey {
-  const parsed = JSON.parse(raw) as unknown;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw) as unknown;
+  } catch {
+    throw new FollowupEmailError("gmail_invalid_service_account_json");
+  }
   if (
     !parsed ||
     typeof parsed !== "object" ||
     typeof (parsed as ServiceAccountKey).client_email !== "string" ||
     typeof (parsed as ServiceAccountKey).private_key !== "string"
   ) {
-    throw new Error("gmail_invalid_service_account_json");
+    throw new FollowupEmailError("gmail_invalid_service_account_json");
   }
   return parsed as ServiceAccountKey;
 }
@@ -91,9 +102,37 @@ export function resetGmailTokenCacheForTests(): void {
   tokenCache = null;
 }
 
+function requireGmailSecrets(config: GmailServiceAccountConfig): void {
+  if (!config.serviceAccountJson?.trim()) {
+    throw new FollowupEmailError("gmail_secret_missing", {
+      secretName: "GMAIL_SERVICE_ACCOUNT_JSON",
+    });
+  }
+  if (!config.senderEmail?.trim()) {
+    throw new FollowupEmailError("gmail_secret_missing", {
+      secretName: "GMAIL_SENDER",
+    });
+  }
+}
+
+async function fetchWithNetworkError(
+  fetchFn: typeof fetch,
+  input: string,
+  init?: RequestInit,
+): Promise<Response> {
+  try {
+    return await fetchFn(input, init);
+  } catch {
+    throw new FollowupEmailError("gmail_network_error");
+  }
+}
+
 export async function getGmailAccessToken(
   config: GmailServiceAccountConfig,
 ): Promise<string> {
+  requireGmailSecrets(config);
+  const fetchFn = config.fetchFn ?? fetch;
+
   const now = Date.now();
   if (tokenCache && tokenCache.expiresAtMs > now + 60_000) {
     return tokenCache.accessToken;
@@ -113,7 +152,7 @@ export async function getGmailAccessToken(
     account.private_key,
   );
 
-  const response = await fetch(TOKEN_AUDIENCE, {
+  const response = await fetchWithNetworkError(fetchFn, TOKEN_AUDIENCE, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -123,16 +162,21 @@ export async function getGmailAccessToken(
   });
 
   if (!response.ok) {
-    throw new Error(`gmail_token_http_${response.status}`);
+    throw new FollowupEmailError(`gmail_token_http_${response.status}`);
   }
 
-  const payload = (await response.json()) as {
-    access_token?: string;
-    expires_in?: number;
-  };
+  let payload: { access_token?: string; expires_in?: number };
+  try {
+    payload = (await response.json()) as {
+      access_token?: string;
+      expires_in?: number;
+    };
+  } catch {
+    throw new FollowupEmailError("unknown");
+  }
 
   if (!payload.access_token) {
-    throw new Error("gmail_token_missing_access_token");
+    throw new FollowupEmailError("gmail_token_missing_access_token");
   }
 
   const expiresInSec = payload.expires_in ?? 3600;
@@ -147,9 +191,11 @@ export async function getGmailAccessToken(
 export function createGmailEmailSender(config: GmailServiceAccountConfig): EmailSender {
   return {
     async send(message: OutboundEmail): Promise<void> {
+      requireGmailSecrets(config);
+      const fetchFn = config.fetchFn ?? fetch;
       const accessToken = await getGmailAccessToken(config);
       const raw = buildRawEmailMessage(message);
-      const response = await fetch(GMAIL_SEND_URL, {
+      const response = await fetchWithNetworkError(fetchFn, GMAIL_SEND_URL, {
         method: "POST",
         headers: {
           authorization: `Bearer ${accessToken}`,
@@ -159,7 +205,7 @@ export function createGmailEmailSender(config: GmailServiceAccountConfig): Email
       });
 
       if (!response.ok) {
-        throw new Error(`gmail_send_http_${response.status}`);
+        throw new FollowupEmailError(`gmail_send_http_${response.status}`);
       }
     },
   };

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CardEmailSnapshot } from "@/exchange/types";
+import { FollowupEmailError } from "@/email/followup-email-error";
 import {
   processFollowupQueueBatch,
   type FollowupConsumerDeps,
@@ -70,7 +71,6 @@ function createDeps(
 ): FollowupConsumerDeps {
   return {
     weMetEnv: "preview",
-    baseUrl: "https://we-met.link",
     gmailSender: "sender@example.com",
     testMailTo: "test-inbox@example.com",
     emailSender: { send: vi.fn(async () => {}) },
@@ -85,6 +85,7 @@ function createDeps(
         contentType: "image/jpeg",
       })),
     },
+    logVisitorFollowupAttemptFailure: vi.fn(),
     logVisitorFollowupPermanentFailure: vi.fn(),
     logMalformedVisitorFollowup: vi.fn(),
     logUnsupportedType: vi.fn(),
@@ -108,18 +109,24 @@ describe("processFollowupQueueBatch (unit)", () => {
     expect(message.retry).not.toHaveBeenCalled();
   });
 
-  it("retries on temporary visitor follow-up failure", async () => {
+  it("retries on temporary visitor follow-up failure and logs attempt", async () => {
     const message = createMessage(visitorBody(), { attempts: 2 });
     const deps = createDeps({
       emailSender: {
         send: vi.fn(async () => {
-          throw new Error("gmail_down");
+          throw new FollowupEmailError("gmail_network_error");
         }),
       },
     });
 
     await processFollowupQueueBatch({ messages: [message] }, deps);
 
+    expect(deps.logVisitorFollowupAttemptFailure).toHaveBeenCalledWith(
+      "lead-1",
+      2,
+      "gmail_network_error",
+      true,
+    );
     expect(message.retry).toHaveBeenCalledOnce();
     expect(message.ack).not.toHaveBeenCalled();
   });
@@ -129,19 +136,77 @@ describe("processFollowupQueueBatch (unit)", () => {
     const deps = createDeps({
       emailSender: {
         send: vi.fn(async () => {
-          throw new Error("gmail_down");
+          throw new FollowupEmailError("gmail_network_error");
         }),
       },
     });
 
     await processFollowupQueueBatch({ messages: [message] }, deps);
 
+    expect(deps.logVisitorFollowupAttemptFailure).toHaveBeenCalledWith(
+      "lead-1",
+      5,
+      "gmail_network_error",
+      false,
+    );
     expect(deps.logVisitorFollowupPermanentFailure).toHaveBeenCalledWith(
       "lead-1",
-      "Error",
+      "gmail_network_error",
     );
     expect(message.ack).toHaveBeenCalledOnce();
     expect(message.retry).not.toHaveBeenCalled();
+  });
+
+  it("never calls send when non-prod redirect is unset; retries then permanent failure", async () => {
+    const send = vi.fn(async () => {});
+    const depsUnset = createDeps({ testMailTo: undefined, emailSender: { send } });
+    const msgRetry = createMessage(visitorBody(), { attempts: 3 });
+    await processFollowupQueueBatch({ messages: [msgRetry] }, depsUnset);
+    expect(send).not.toHaveBeenCalled();
+    expect(msgRetry.retry).toHaveBeenCalledOnce();
+    expect(depsUnset.logVisitorFollowupAttemptFailure).toHaveBeenCalledWith(
+      "lead-1",
+      3,
+      "nonprod_mail_redirect_unset",
+      true,
+    );
+
+    const msgFinal = createMessage(visitorBody(), { attempts: 5 });
+    const depsFinal = createDeps({ testMailTo: "", emailSender: { send } });
+    await processFollowupQueueBatch({ messages: [msgFinal] }, depsFinal);
+    expect(send).not.toHaveBeenCalled();
+    expect(msgFinal.ack).toHaveBeenCalledOnce();
+    expect(depsFinal.logVisitorFollowupPermanentFailure).toHaveBeenCalledWith(
+      "lead-1",
+      "nonprod_mail_redirect_unset",
+    );
+  });
+
+  it("redirects when lead.environment is production but consumer WE_MET_ENV is preview", async () => {
+    const message = createMessage(
+      visitorBody({
+        lead: {
+          ...visitorBody().lead,
+          environment: "production",
+          isTestLead: false,
+        },
+      }),
+    );
+    const deps = createDeps({ weMetEnv: "preview" });
+    await processFollowupQueueBatch({ messages: [message] }, deps);
+    const sent = vi.mocked(deps.emailSender.send).mock.calls[0][0];
+    expect(sent.to).toBe("test-inbox@example.com");
+    expect(sent.subject).toContain("visitor@example.com");
+  });
+
+  it("production consumer sends to visitor without test label in subject", async () => {
+    const message = createMessage(visitorBody());
+    const deps = createDeps({ weMetEnv: "production", testMailTo: undefined });
+    await processFollowupQueueBatch({ messages: [message] }, deps);
+    const sent = vi.mocked(deps.emailSender.send).mock.calls[0][0];
+    expect(sent.to).toBe("visitor@example.com");
+    expect(sent.subject).not.toContain("[we-met test");
+    expect(sent.textPlain).not.toContain("Test delivery (visitor typed)");
   });
 
   it("acks malformed visitor_followup messages", async () => {

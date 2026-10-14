@@ -36,11 +36,11 @@ const card: CardEmailSnapshot = {
   },
 };
 
-function collectEmailSourceFiles(dir: string, out: string[] = []): string[] {
+function collectTsSourceFiles(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name);
     if (entry.isDirectory()) {
-      collectEmailSourceFiles(path, out);
+      collectTsSourceFiles(path, out);
     } else if (entry.name.endsWith(".ts")) {
       out.push(path);
     }
@@ -53,8 +53,6 @@ describe("format visitor follow-up email (unit)", () => {
     const content = buildVisitorFollowUpEmail({
       card,
       visitorName: "Alex O'Neill",
-      visitorEmail: "alex@example.com",
-      baseUrl: "https://we-met.link",
     });
     expect(content.textPlain).toContain("Hi Alex,");
     expect(content.textPlain).not.toContain("{firstName}");
@@ -65,8 +63,6 @@ describe("format visitor follow-up email (unit)", () => {
     const content = buildVisitorFollowUpEmail({
       card,
       visitorName: "Alex",
-      visitorEmail: "alex@example.com",
-      baseUrl: "https://we-met.link",
     });
     expect(content.textPlain).toContain("https://example.com/book");
     expect(content.textHtml).toContain("https://example.com/book");
@@ -78,8 +74,6 @@ describe("format visitor follow-up email (unit)", () => {
     const content = buildVisitorFollowUpEmail({
       card,
       visitorName: "Alex",
-      visitorEmail: "visitor@example.com",
-      baseUrl: "https://we-met.link",
       nonProdVisitorEmailLabel: "visitor@example.com",
     });
     expect(content.textPlain).toContain("visitor@example.com");
@@ -115,11 +109,17 @@ describe("format visitor follow-up email (unit)", () => {
     expect(encoded).toMatch(/^=\?UTF-8\?B\?/);
   });
 
-  it("does not hardcode didi.build in email module sources", () => {
-    const files = collectEmailSourceFiles(join(process.cwd(), "src/email"));
-    for (const file of files) {
-      const source = readFileSync(file, "utf8");
-      expect(source).not.toContain("didi.build");
+  it("does not hardcode didi.build in email or consumer sources", () => {
+    const dirs = [
+      join(process.cwd(), "src/email"),
+      join(process.cwd(), "src/followup-email-consumer"),
+      join(process.cwd(), "workers"),
+    ];
+    for (const dir of dirs) {
+      for (const file of collectTsSourceFiles(dir)) {
+        const source = readFileSync(file, "utf8");
+        expect(source).not.toContain("didi.build");
+      }
     }
   });
 });

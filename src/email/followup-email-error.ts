@@ -1,0 +1,29 @@
+export type FollowupEmailErrorCode =
+  | "gmail_secret_missing"
+  | "gmail_invalid_service_account_json"
+  | `gmail_token_http_${number}`
+  | "gmail_token_missing_access_token"
+  | `gmail_send_http_${number}`
+  | "gmail_network_error"
+  | "nonprod_mail_redirect_unset"
+  | "unknown";
+
+export class FollowupEmailError extends Error {
+  readonly code: FollowupEmailErrorCode;
+  /** Set only for gmail_secret_missing — secret name, never a value. */
+  readonly secretName?: string;
+
+  constructor(code: FollowupEmailErrorCode, options?: { secretName?: string }) {
+    super(code);
+    this.name = "FollowupEmailError";
+    this.code = code;
+    this.secretName = options?.secretName;
+  }
+}
+
+export function errorCodeFromUnknown(error: unknown): FollowupEmailErrorCode {
+  if (error instanceof FollowupEmailError) {
+    return error.code;
+  }
+  return "unknown";
+}

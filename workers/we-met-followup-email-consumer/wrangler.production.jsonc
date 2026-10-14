@@ -6,7 +6,6 @@
   "compatibility_flags": ["global_fetch_strictly_public"],
   "vars": {
     "WE_MET_ENV": "production",
-    "WE_MET_BASE_URL": "https://we-met.link",
   },
   "r2_buckets": [
     {

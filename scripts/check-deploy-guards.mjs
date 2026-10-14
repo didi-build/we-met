@@ -202,7 +202,26 @@ function checkPreviewBlock(previews) {
   );
 }
 
+const ALLOWED_CONSUMER_VAR_KEYS = new Set(["WE_MET_ENV"]);
+
+function checkConsumerVarsAllowlist(config) {
+  const vars = config.vars ?? {};
+  for (const key of Object.keys(vars)) {
+    if (!ALLOWED_CONSUMER_VAR_KEYS.has(key)) {
+      fail(
+        `consumer vars may only contain ${[...ALLOWED_CONSUMER_VAR_KEYS].join(", ")}; found "${key}"`,
+      );
+    }
+  }
+  if (Object.prototype.hasOwnProperty.call(vars, "WE_MET_TEST_MAIL_TO")) {
+    fail(
+      "non-prod consumer must not declare WE_MET_TEST_MAIL_TO in wrangler vars (secret only)",
+    );
+  }
+}
+
 function checkConsumerNonprod(config) {
+  checkConsumerVarsAllowlist(config);
   if (config.name !== NONPROD_RESOURCE_MARKERS.consumerWorkerName) {
     fail(
       `non-prod consumer Worker name must be "${NONPROD_RESOURCE_MARKERS.consumerWorkerName}"`,
@@ -220,11 +239,6 @@ function checkConsumerNonprod(config) {
     if (strings.includes(marker)) {
       fail(`non-prod consumer config references production resource "${marker}"`);
     }
-  }
-  if (strings.some((s) => s.includes("WE_MET_TEST_MAIL_TO"))) {
-    fail(
-      "non-prod consumer must not declare WE_MET_TEST_MAIL_TO in wrangler vars (secret only)",
-    );
   }
   const consumers = config.queues?.consumers ?? [];
   if (consumers.length !== 1 || consumers[0].queue !== NONPROD_RESOURCE_MARKERS.queue) {
@@ -246,6 +260,7 @@ function checkConsumerNonprod(config) {
 }
 
 function checkConsumerProduction(config) {
+  checkConsumerVarsAllowlist(config);
   if (config.name !== "we-met-followup-email-consumer") {
     fail('production consumer Worker name must be "we-met-followup-email-consumer"');
   }

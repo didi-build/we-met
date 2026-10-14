@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  NonProdMailRedirectUnsetError,
-  resolveEmailRecipient,
-} from "@/email/recipient";
+import { FollowupEmailError } from "@/email/followup-email-error";
+import { resolveEmailRecipient } from "@/email/recipient";
 
 describe("resolveEmailRecipient (unit)", () => {
   const cases = [
@@ -40,7 +38,7 @@ describe("resolveEmailRecipient (unit)", () => {
       weMetEnv: "preview",
       visitorEmail: "visitor@example.com",
       testMailTo: "",
-      throws: NonProdMailRedirectUnsetError,
+      throws: FollowupEmailError,
     },
     {
       name: "ignores misleading production-like env strings",

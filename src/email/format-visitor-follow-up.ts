@@ -11,8 +11,6 @@ export type VisitorFollowUpEmailContent = {
 export type BuildVisitorFollowUpEmailInput = {
   card: CardEmailSnapshot;
   visitorName: string;
-  visitorEmail: string;
-  baseUrl: string;
   /** When set, the visitor address is shown in subject/body only (non-prod redirect). */
   nonProdVisitorEmailLabel?: string;
 };
