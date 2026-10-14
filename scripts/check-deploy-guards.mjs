@@ -13,6 +13,11 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { parseJsonc } from "./lib/parse-jsonc.mjs";
 import {
+  FOLLOWUP_RETRY_BASE_DELAY_SECONDS,
+  followupRetryWindowFitsBudget,
+  MAX_VISITOR_FOLLOWUP_ATTEMPTS,
+} from "./lib/queue-retry-policy.mjs";
+import {
   NONPROD_RESOURCE_MARKERS,
   PRODUCTION_RESOURCE_MARKERS,
 } from "./lib/wrangler-placeholders.mjs";
@@ -203,6 +208,40 @@ function checkPreviewBlock(previews) {
 }
 
 const ALLOWED_CONSUMER_VAR_KEYS = new Set(["WE_MET_ENV"]);
+const CONSUMER_D1_BINDING = "WE_MET_DB";
+
+function checkConsumerQueueConsumerSettings(consumerRow) {
+  if (consumerRow.dead_letter_queue) {
+    fail("consumer must not configure dead_letter_queue");
+  }
+  if (consumerRow.max_retries !== MAX_VISITOR_FOLLOWUP_ATTEMPTS) {
+    fail(
+      `consumer max_retries must be ${MAX_VISITOR_FOLLOWUP_ATTEMPTS} (matches code attempt limit)`,
+    );
+  }
+  if (consumerRow.retry_delay !== FOLLOWUP_RETRY_BASE_DELAY_SECONDS) {
+    fail(
+      `consumer retry_delay must be ${FOLLOWUP_RETRY_BASE_DELAY_SECONDS} (matches code base delay)`,
+    );
+  }
+  if (!followupRetryWindowFitsBudget()) {
+    fail("consumer retry window exceeds retention budget");
+  }
+}
+
+function checkConsumerD1Binding(config, expectedDatabaseName) {
+  const rows = config.d1_databases ?? [];
+  if (rows.length !== 1) {
+    fail("consumer must bind exactly one D1 database");
+  }
+  const row = rows[0];
+  if (row.binding !== CONSUMER_D1_BINDING) {
+    fail(`consumer D1 binding must be "${CONSUMER_D1_BINDING}"`);
+  }
+  if (row.database_name !== expectedDatabaseName) {
+    fail(`consumer D1 database_name must be "${expectedDatabaseName}"`);
+  }
+}
 
 function checkConsumerVarsAllowlist(config) {
   const vars = config.vars ?? {};
@@ -244,6 +283,7 @@ function checkConsumerNonprod(config) {
   if (consumers.length !== 1 || consumers[0].queue !== NONPROD_RESOURCE_MARKERS.queue) {
     fail("non-prod consumer must consume we-met-followup-email-nonprod only");
   }
+  checkConsumerQueueConsumerSettings(consumers[0]);
   const buckets = config.r2_buckets ?? [];
   if (
     buckets.length !== 1 ||
@@ -251,12 +291,7 @@ function checkConsumerNonprod(config) {
   ) {
     fail("non-prod consumer R2 bucket binding");
   }
-  if (consumers[0].max_retries !== 5) {
-    fail("non-prod consumer max_retries must be 5");
-  }
-  if ((config.d1_databases ?? []).length > 0) {
-    fail("consumer Worker must not bind D1");
-  }
+  checkConsumerD1Binding(config, NONPROD_RESOURCE_MARKERS.d1Name);
 }
 
 function checkConsumerProduction(config) {
@@ -287,6 +322,7 @@ function checkConsumerProduction(config) {
   ) {
     fail("production consumer must consume we-met-followup-email only");
   }
+  checkConsumerQueueConsumerSettings(consumers[0]);
   const buckets = config.r2_buckets ?? [];
   if (
     buckets.length !== 1 ||
@@ -294,12 +330,7 @@ function checkConsumerProduction(config) {
   ) {
     fail("production consumer R2 bucket binding");
   }
-  if (consumers[0].max_retries !== 5) {
-    fail("production consumer max_retries must be 5");
-  }
-  if ((config.d1_databases ?? []).length > 0) {
-    fail("consumer Worker must not bind D1");
-  }
+  checkConsumerD1Binding(config, PRODUCTION_RESOURCE_MARKERS.d1Name);
 }
 
 function checkProductionBlock(config) {

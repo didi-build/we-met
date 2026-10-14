@@ -75,4 +75,41 @@ describe("prepare-wrangler-config (unit)", () => {
     const resolvedMigrations = resolve(dirname(output), migrationsDir);
     expect(existsSync(resolvedMigrations)).toBe(true);
   });
+
+  it("substitutes production D1 ID in consumer-production config", () => {
+    const output = resolve(
+      "workers/we-met-followup-email-consumer/wrangler.production.test.ci.jsonc",
+    );
+    testOutputs.push(output);
+    const result = runPrepare("consumer-production", output, {
+      WE_MET_D1_DATABASE_ID_PRODUCTION: "11111111-1111-1111-1111-111111111111",
+    });
+    expect(result.status).toBe(0);
+    const text = readFileSync(output, "utf8");
+    expect(text).toContain("11111111-1111-1111-1111-111111111111");
+    expect(text).not.toContain(D1_PLACEHOLDER_PRODUCTION);
+  });
+
+  it("substitutes non-prod D1 ID in consumer-nonprod config", () => {
+    const output = resolve(
+      "workers/we-met-followup-email-consumer/wrangler.nonprod.test.ci.jsonc",
+    );
+    testOutputs.push(output);
+    const result = runPrepare("consumer-nonprod", output, {
+      WE_MET_D1_DATABASE_ID_NONPROD: "22222222-2222-2222-2222-222222222222",
+    });
+    expect(result.status).toBe(0);
+    const text = readFileSync(output, "utf8");
+    expect(text).toContain("22222222-2222-2222-2222-222222222222");
+    expect(text).not.toContain(D1_PLACEHOLDER_NONPROD);
+  });
+
+  it("fails consumer-nonprod prepare when output is outside the consumer directory", () => {
+    const output = join(tmpdir(), "wrangler.consumer.jsonc");
+    const result = runPrepare("consumer-nonprod", output, {
+      WE_MET_D1_DATABASE_ID_NONPROD: "22222222-2222-2222-2222-222222222222",
+    });
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("next to");
+  });
 });

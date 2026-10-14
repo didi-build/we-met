@@ -2,6 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 import type { CardEmailSnapshot } from "@/exchange/types";
 import { FollowupEmailError } from "@/email/followup-email-error";
 import {
+  followupEmailRetryDelaySeconds,
+  MAX_VISITOR_FOLLOWUP_ATTEMPTS,
+} from "@/followup-email-consumer/retry";
+import { followupRetryWindowSecondsThroughAttempt } from "../../scripts/lib/queue-retry-policy.mjs";
+import {
   processFollowupQueueBatch,
   type FollowupConsumerDeps,
   type FollowupQueueMessage,
@@ -129,10 +134,41 @@ describe("processFollowupQueueBatch (unit)", () => {
     );
     expect(message.retry).toHaveBeenCalledOnce();
     expect(message.ack).not.toHaveBeenCalled();
+    expect(message.retry).toHaveBeenCalledWith({
+      delaySeconds: followupEmailRetryDelaySeconds(2),
+    });
+  });
+
+  it("schedules the expected retry delay for attempts 1 through 29", async () => {
+    const expectedFirstEight = [30, 60, 120, 240, 480, 960, 1800, 1800];
+    for (let attempt = 1; attempt <= 29; attempt++) {
+      const message = createMessage(visitorBody(), { attempts: attempt });
+      const deps = createDeps({
+        emailSender: {
+          send: vi.fn(async () => {
+            throw new FollowupEmailError("gmail_network_error");
+          }),
+        },
+      });
+      await processFollowupQueueBatch({ messages: [message] }, deps);
+      if (attempt < MAX_VISITOR_FOLLOWUP_ATTEMPTS) {
+        expect(message.retry).toHaveBeenCalledWith({
+          delaySeconds: followupEmailRetryDelaySeconds(attempt),
+        });
+      }
+      if (attempt <= expectedFirstEight.length) {
+        expect(followupEmailRetryDelaySeconds(attempt)).toBe(
+          expectedFirstEight[attempt - 1],
+        );
+      }
+    }
+    expect(followupRetryWindowSecondsThroughAttempt(29)).toBe(43_290);
   });
 
   it("logs and acks after max visitor follow-up attempts", async () => {
-    const message = createMessage(visitorBody(), { attempts: 5 });
+    const message = createMessage(visitorBody(), {
+      attempts: MAX_VISITOR_FOLLOWUP_ATTEMPTS,
+    });
     const deps = createDeps({
       emailSender: {
         send: vi.fn(async () => {
@@ -145,7 +181,7 @@ describe("processFollowupQueueBatch (unit)", () => {
 
     expect(deps.logVisitorFollowupAttemptFailure).toHaveBeenCalledWith(
       "lead-1",
-      5,
+      MAX_VISITOR_FOLLOWUP_ATTEMPTS,
       { code: "gmail_network_error" },
       false,
     );
@@ -170,7 +206,9 @@ describe("processFollowupQueueBatch (unit)", () => {
       true,
     );
 
-    const msgFinal = createMessage(visitorBody(), { attempts: 5 });
+    const msgFinal = createMessage(visitorBody(), {
+      attempts: MAX_VISITOR_FOLLOWUP_ATTEMPTS,
+    });
     const depsFinal = createDeps({ testMailTo: "", emailSender: { send } });
     await processFollowupQueueBatch({ messages: [msgFinal] }, depsFinal);
     expect(send).not.toHaveBeenCalled();

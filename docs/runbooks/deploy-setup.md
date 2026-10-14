@@ -115,11 +115,12 @@ Create these **after** the proof deploy (the `we-met` Worker and `we-met.link` r
 
 Cloudflare supports **resource-scoped Workers roles** ([Workers granular authorization](https://blog.cloudflare.com/workers-granular-authorization), September 2026): **Editor** on a single Worker can deploy without creating or deleting resources. Because `wrangler.jsonc` attaches **`we-met.link` as a custom domain**, every production CI deploy re-sends that route — the production token needs a **zone** policy on `we-met.link` (see table and [0017](../decisions/0017-cloudflare-api-credentials.md)). Legacy **Workers Scripts Edit** maps to **Editor** in Cloudflare’s migration table (no published deprecation date). **D1 / R2 / KV resource-level token scoping is not available yet** — those permissions remain account-level.
 
-| Token name (dashboard)      | GitHub secret                          | Scopes (verified **2026-10-11** where noted)                                                                                                                                                                                                                               |
-| --------------------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `we-met-ci-nonprod`         | `CLOUDFLARE_API_TOKEN_NONPROD`         | **Workers Editor**, scoped to Worker **`we-met`** only. No zone policy (previews do not touch `we-met.link`). No R2 or Queues permissions initially.                                                                                                                       |
-| `we-met-ci-production`      | `CLOUDFLARE_API_TOKEN_PRODUCTION`      | **Workers Editor** on **`we-met`**, plus account-level **D1 Edit** (dashboard **D1 Write**) for `wrangler d1 migrations apply`, plus a **third policy**: **Specified Domains** → `we-met.link` with **Workers Routes Write** and **Zone Read**. No R2 or Queues initially. |
-| `we-met-ci-migrate-nonprod` | `CLOUDFLARE_API_TOKEN_MIGRATE_NONPROD` | **D1 Edit** only (account-level). Verified **2026-10-13:** the Cloudflare token builder only offered account-level D1 (**Entire account**, **D1 Write** and **D1 Read**); no per-database scope was available. One-year expiry; calendar reminder.                         |
+| Token name (dashboard)      | GitHub secret                              | Scopes (verified **2026-10-11** where noted)                                                                                                                                                                                                                               |
+| --------------------------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `we-met-ci-nonprod`         | `CLOUDFLARE_API_TOKEN_NONPROD`             | **Workers Editor**, scoped to Worker **`we-met`** only. No zone policy (previews do not touch `we-met.link`). No R2 or Queues permissions initially.                                                                                                                       |
+| `we-met-ci-production`      | `CLOUDFLARE_API_TOKEN_PRODUCTION`          | **Workers Editor** on **`we-met`**, plus account-level **D1 Edit** (dashboard **D1 Write**) for `wrangler d1 migrations apply`, plus a **third policy**: **Specified Domains** → `we-met.link` with **Workers Routes Write** and **Zone Read**. No R2 or Queues initially. |
+| `we-met-ci-consumer`        | `CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION` | **Workers Editor** on **`we-met-followup-email-consumer`** only. Stored only on the GitHub **`production`** environment. Do not widen `we-met-ci-production`.                                                                                                              |
+| `we-met-ci-migrate-nonprod` | `CLOUDFLARE_API_TOKEN_MIGRATE_NONPROD`     | **D1 Edit** only (account-level). Verified **2026-10-13:** the Cloudflare token builder only offered account-level D1 (**Entire account**, **D1 Write** and **D1 Read**); no per-database scope was available. One-year expiry; calendar reminder.                         |
 
 ### GitHub Actions policy (pull_request_target)
 
@@ -165,18 +166,25 @@ Cloudflare supports **resource-scoped Workers roles** ([Workers granular authori
 
 Add further Cloudflare token permissions **only** when a **403** names them (Cloudflare 403 responses link to the required permission). **Never use Admin as the fix.**
 
-The **non-prod follow-up email consumer** ([DIDI-577](https://linear.app/didi-build/issue/DIDI-577)) deploys **by hand** after that PR merges. **Production** consumer first deploy and CI are [DIDI-599](https://linear.app/didi-build/issue/DIDI-599) — do not extend production GitHub workflows yet.
+The **non-prod follow-up email consumer** ([DIDI-577](https://linear.app/didi-build/issue/DIDI-577)) deploys **by hand**. The **production** consumer is **hand-deployed once** on `main`, then ongoing deploys run from **Deploy production** ([DIDI-599](https://linear.app/didi-build/issue/DIDI-599)) — see [first-deploy checklist](#production-follow-up-email-consumer-first-deploy-didi-599).
 
 Details and caveats: [0017](../decisions/0017-cloudflare-api-credentials.md).
 
 ### Non-prod follow-up email consumer (manual, after DIDI-577)
 
-Use **`npx wrangler login`** (OAuth). From the repo root:
+Use **`npx wrangler login`** (OAuth). From the repo root. **Never** export `WE_MET_D1_DATABASE_ID_PRODUCTION` in this shell.
 
 ```bash
-npm run deploy:guards   # includes consumer-nonprod guards
+export WE_MET_D1_DATABASE_ID_NONPROD='<nonprod-db-uuid>'
+node scripts/prepare-wrangler-config.mjs \
+  --target consumer-nonprod \
+  --output workers/we-met-followup-email-consumer/wrangler.nonprod.ci.jsonc
+npm run deploy:guards   # includes consumer-nonprod guards on committed configs
+node scripts/check-deploy-guards.mjs \
+  --target consumer-nonprod \
+  --config workers/we-met-followup-email-consumer/wrangler.nonprod.ci.jsonc
 npm run worker:consumer-dry-run:nonprod
-npx wrangler deploy --config workers/we-met-followup-email-consumer/wrangler.nonprod.jsonc
+npx wrangler deploy --config workers/we-met-followup-email-consumer/wrangler.nonprod.ci.jsonc
 ```
 
 **Order matters:** deploy the consumer **first** so the Worker exists, then set secrets **immediately** afterward. The first deploy attaches the consumer to `we-met-followup-email-nonprod`, which **starts draining the queue immediately**; queued messages retry, but do not leave the Worker without secrets for long.
@@ -193,7 +201,24 @@ Use the **file redirect** for `GMAIL_SERVICE_ACCOUNT_JSON` so a multi-line priva
 
 `WE_MET_TEST_MAIL_TO` is **non-prod only** (never on the production consumer). Confirm binding names with `npx wrangler versions view <version-id> --name we-met-followup-email-consumer-nonprod`.
 
-**Retries:** visitor follow-up uses `max_retries: 5` with backoff (about **7.5 minutes** between first attempt and permanent failure). A longer Gmail outage or a missing secret drops the visitor email with only log lines (`visitor_followup_attempt_failure` / `visitor_followup_permanent_failure` — see [environments.md](../architecture/environments.md)). **UNVERIFIED:** queue discard after `max_retries` without a dead-letter queue ([DIDI-599](https://linear.app/didi-build/issue/DIDI-599), [DIDI-586](https://linear.app/didi-build/issue/DIDI-586)).
+**Retries:** visitor follow-up uses `max_retries: 30` with exponential backoff capped at 30 minutes (~**12 hours** worst-case delay before permanent failure — see [environments.md](../architecture/environments.md)). Unsupported queue types retry on the same schedule until Cloudflare deletes them at the limit. A longer Gmail outage or a missing secret drops the visitor email with only log lines (`visitor_followup_attempt_failure` / `visitor_followup_permanent_failure`).
+
+### Production follow-up email consumer (first deploy, DIDI-599)
+
+A Worker-scoped **`we-met-ci-consumer`** token cannot be created until Worker **`we-met-followup-email-consumer`** exists. **Hand-deploy the production consumer once** on `main` before creating that token or approving the first post-merge **Deploy production** run that includes the consumer CI step.
+
+The first deploy **attaches the consumer to the production queue** and **starts draining** it (messages from the last **24 hours** may be processed). Set Gmail secrets **immediately** after that deploy; without them, sends fail and retry for about **12 hours**.
+
+**Maintainer checklist (names only, in order):**
+
+1. Merge PR #18; **Deploy production** on `main` starts and waits at approval — **do not approve yet**.
+2. On `main`, export **`WE_MET_D1_DATABASE_ID_PRODUCTION`** (never **`WE_MET_D1_DATABASE_ID_NONPROD`** in this shell). Run `node scripts/prepare-wrangler-config.mjs --target consumer-production --output workers/we-met-followup-email-consumer/wrangler.production.ci.jsonc`, then `node scripts/check-deploy-guards.mjs --target consumer-production --config workers/we-met-followup-email-consumer/wrangler.production.ci.jsonc`, then `npx wrangler login`, then `npx wrangler deploy --config workers/we-met-followup-email-consumer/wrangler.production.ci.jsonc`.
+3. Immediately `npx wrangler secret put GMAIL_SERVICE_ACCOUNT_JSON` and `npx wrangler secret put GMAIL_SENDER` with `--name we-met-followup-email-consumer`; then `npx wrangler secret list --name we-met-followup-email-consumer` must show **exactly** those two names and **never** `WE_MET_TEST_MAIL_TO`.
+4. Create dashboard token **`we-met-ci-consumer`** scoped to the now-existing Worker and add GitHub secret **`CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION`** on the **`production`** environment.
+5. Approve the waiting **Deploy production** run.
+6. One dated test submission to the maintainer's own address ([test-leads.md](./test-leads.md)).
+
+**Recovery:** if the consumer deploy step fails after the app deploy succeeded, re-run the **full** Deploy production job after fixing the error ([deploy.md](./deploy.md)).
 
 Smoke test: [test-leads.md](./test-leads.md) (exchange on a PR preview → mail at `WE_MET_TEST_MAIL_TO`).
 
@@ -215,7 +240,7 @@ After PR #3 merged (**2026-10-11**), the first GitHub Actions runs (Wrangler **4
    - **Variables:** `WE_MET_D1_DATABASE_ID_NONPROD`, `WE_MET_TURNSTILE_SITE_KEY_NONPROD` (widget **we-met nonprod**)
 2. Create the **`production`** environment with yourself as a required reviewer. Under **Deployment branches**, choose **Selected branches** and allow **`main` only**.
 3. **Repository secret:** `CLOUDFLARE_ACCOUNT_ID` only (used by both workflows).
-4. **`production` environment secret:** `CLOUDFLARE_API_TOKEN_PRODUCTION` (value from `we-met-ci-production`).
+4. **`production` environment secrets:** `CLOUDFLARE_API_TOKEN_PRODUCTION` (value from `we-met-ci-production`); `CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION` (value from `we-met-ci-consumer`).
 5. **`production` environment variables:** `WE_MET_D1_DATABASE_ID_PRODUCTION`, `WE_MET_TURNSTILE_SITE_KEY_PRODUCTION` (widget **we-met production**).
 6. Create the **`migrate-nonprod`** environment with yourself as required reviewer. **Deployment branches:** **`main` only**. Turn **Prevent self-review** **off** (you are the only reviewer; runs you push must still be approvable). Add:
    - **Secret:** `CLOUDFLARE_API_TOKEN_MIGRATE_NONPROD` (from `we-met-ci-migrate-nonprod`; **never** as a repository or organization secret)

@@ -38,6 +38,16 @@ export const privilegedPathMatchers = [
     test: (filename) => /^wrangler[^/]*\.jsonc$/.test(filename),
   },
   {
+    id: "consumer-wrangler-config",
+    test: (filename) =>
+      filename.startsWith("workers/we-met-followup-email-consumer/wrangler") &&
+      filename.endsWith(".jsonc"),
+  },
+  {
+    id: "queue-retry-policy",
+    test: (filename) => filename === "scripts/lib/queue-retry-policy.mjs",
+  },
+  {
     id: "open-next-config",
     test: (filename) => /^open-next\.config\./.test(filename),
   },
