@@ -38,6 +38,7 @@
     "scripts/lib/repo-settings-target.mjs",
     "src/**/*.ts",
     "src/**/*.tsx",
+    "workers/**/*.ts",
     "test/**/*.ts",
     "vitest.config.ts",
     ".next/types/**/*.ts"

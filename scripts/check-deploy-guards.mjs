@@ -5,6 +5,8 @@
  * Usage:
  *   node scripts/check-deploy-guards.mjs --target preview --config wrangler.jsonc
  *   node scripts/check-deploy-guards.mjs --target production --config wrangler.jsonc
+ *   node scripts/check-deploy-guards.mjs --target consumer-nonprod --config workers/we-met-followup-email-consumer/wrangler.nonprod.jsonc
+ *   node scripts/check-deploy-guards.mjs --target consumer-production --config workers/we-met-followup-email-consumer/wrangler.production.jsonc
  *   node scripts/check-deploy-guards.mjs --mail-safety-config config/nonprod-mail-safety.json
  */
 import { readFileSync } from "node:fs";
@@ -17,7 +19,7 @@ import {
 
 function usage() {
   console.error(
-    "Usage: check-deploy-guards.mjs --target <preview|production> --config <path> [--mail-safety-config <path>]",
+    "Usage: check-deploy-guards.mjs --target <preview|production|consumer-nonprod|consumer-production> --config <path> [--mail-safety-config <path>]",
   );
   process.exit(1);
 }
@@ -200,6 +202,91 @@ function checkPreviewBlock(previews) {
   );
 }
 
+function checkConsumerNonprod(config) {
+  if (config.name !== NONPROD_RESOURCE_MARKERS.consumerWorkerName) {
+    fail(
+      `non-prod consumer Worker name must be "${NONPROD_RESOURCE_MARKERS.consumerWorkerName}"`,
+    );
+  }
+  if (config.vars?.WE_MET_ENV === "production") {
+    fail("non-prod consumer WE_MET_ENV must not be production");
+  }
+  const strings = collectStrings(config);
+  for (const marker of [
+    PRODUCTION_RESOURCE_MARKERS.queue,
+    PRODUCTION_RESOURCE_MARKERS.r2Bucket,
+    PRODUCTION_RESOURCE_MARKERS.d1Name,
+  ]) {
+    if (strings.includes(marker)) {
+      fail(`non-prod consumer config references production resource "${marker}"`);
+    }
+  }
+  if (strings.some((s) => s.includes("WE_MET_TEST_MAIL_TO"))) {
+    fail(
+      "non-prod consumer must not declare WE_MET_TEST_MAIL_TO in wrangler vars (secret only)",
+    );
+  }
+  const consumers = config.queues?.consumers ?? [];
+  if (consumers.length !== 1 || consumers[0].queue !== NONPROD_RESOURCE_MARKERS.queue) {
+    fail("non-prod consumer must consume we-met-followup-email-nonprod only");
+  }
+  const buckets = config.r2_buckets ?? [];
+  if (
+    buckets.length !== 1 ||
+    buckets[0].bucket_name !== NONPROD_RESOURCE_MARKERS.r2Bucket
+  ) {
+    fail("non-prod consumer R2 bucket binding");
+  }
+  if (consumers[0].max_retries !== 5) {
+    fail("non-prod consumer max_retries must be 5");
+  }
+  if ((config.d1_databases ?? []).length > 0) {
+    fail("consumer Worker must not bind D1");
+  }
+}
+
+function checkConsumerProduction(config) {
+  if (config.name !== "we-met-followup-email-consumer") {
+    fail('production consumer Worker name must be "we-met-followup-email-consumer"');
+  }
+  if (config.vars?.WE_MET_ENV !== "production") {
+    fail('production consumer WE_MET_ENV must be "production"');
+  }
+  const strings = collectStrings(config);
+  if (strings.some((s) => s.includes("WE_MET_TEST_MAIL_TO"))) {
+    fail("production consumer must not reference WE_MET_TEST_MAIL_TO");
+  }
+  for (const marker of [
+    NONPROD_RESOURCE_MARKERS.queue,
+    NONPROD_RESOURCE_MARKERS.r2Bucket,
+    NONPROD_RESOURCE_MARKERS.d1Name,
+  ]) {
+    if (strings.includes(marker)) {
+      fail(`production consumer config references non-prod resource "${marker}"`);
+    }
+  }
+  const consumers = config.queues?.consumers ?? [];
+  if (
+    consumers.length !== 1 ||
+    consumers[0].queue !== PRODUCTION_RESOURCE_MARKERS.queue
+  ) {
+    fail("production consumer must consume we-met-followup-email only");
+  }
+  const buckets = config.r2_buckets ?? [];
+  if (
+    buckets.length !== 1 ||
+    buckets[0].bucket_name !== PRODUCTION_RESOURCE_MARKERS.r2Bucket
+  ) {
+    fail("production consumer R2 bucket binding");
+  }
+  if (consumers[0].max_retries !== 5) {
+    fail("production consumer max_retries must be 5");
+  }
+  if ((config.d1_databases ?? []).length > 0) {
+    fail("consumer Worker must not bind D1");
+  }
+}
+
 function checkProductionBlock(config) {
   if (config.name !== PRODUCTION_RESOURCE_MARKERS.workerName) {
     fail(`production Worker name must be "${PRODUCTION_RESOURCE_MARKERS.workerName}"`);
@@ -252,12 +339,29 @@ function main() {
   const config = parseJsonc(readFileSync(configPath, "utf8"));
 
   checkNonprodMailSafety(mailSafetyConfigPath);
-  checkWranglerDomainSettings(config);
-  checkDistinctD1Ids(config);
+
+  const isConsumerTarget =
+    target === "consumer-nonprod" || target === "consumer-production";
+  if (!isConsumerTarget) {
+    checkWranglerDomainSettings(config);
+    checkDistinctD1Ids(config);
+  }
 
   if (target === "preview") {
     checkPreviewBlock(config.previews);
     console.log("deploy-time guards passed (preview)");
+    return;
+  }
+
+  if (target === "consumer-nonprod") {
+    checkConsumerNonprod(config);
+    console.log("deploy-time guards passed (consumer-nonprod)");
+    return;
+  }
+
+  if (target === "consumer-production") {
+    checkConsumerProduction(config);
+    console.log("deploy-time guards passed (consumer-production)");
     return;
   }
 
