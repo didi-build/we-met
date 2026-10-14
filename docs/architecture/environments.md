@@ -80,7 +80,18 @@ Lead sink destinations (Linear project IDs, owner email addresses, etc.) live in
 | `WE_MET_EXCHANGE_RATE_LIMITER` | Namespace id **2002**     | Namespace id **2001**              |
 | `IMAGES`                       | Cloudflare Images binding | Same (image ingestion)             |
 
-The consumer Worker registers on the queue in **its own** Wrangler config; it is not an app Worker binding. Consumer binds read-only **`WE_MET_ASSETS`** only ([0016](../decisions/0016-queue-message-snapshot.md)).
+The follow-up email consumer is a **separate Worker** (not the OpenNext `we-met` bundle) with configs under `workers/we-met-followup-email-consumer/` ([0021](../decisions/0021-followup-email-consumer-worker.md)):
+
+| Worker name                              | Queue consumed                  | R2 bucket (`WE_MET_ASSETS`) |
+| ---------------------------------------- | ------------------------------- | --------------------------- |
+| `we-met-followup-email-consumer-nonprod` | `we-met-followup-email-nonprod` | `we-met-assets-nonprod`     |
+| `we-met-followup-email-consumer`         | `we-met-followup-email`         | `we-met-assets`             |
+
+The consumer registers on the queue in **its own** Wrangler config; it is not an app Worker binding. It has **no D1**. R2 bindings cannot be read-only in Cloudflare; the consumer code **only calls `get`** on `WE_MET_ASSETS` ([0016](../decisions/0016-queue-message-snapshot.md)).
+
+**Consumer mail safety:** redirect and fail-closed behavior use the consumer’s own `vars.WE_MET_ENV` and the secret `WE_MET_TEST_MAIL_TO` (non-prod only). Queue fields such as `lead.environment` are ignored for recipient selection.
+
+**Consumer queue handling (step 1):** processes `visitor_followup` only. `lead_sink_record` and `lead_sink_append_details` (and any unknown `type`) **retry** until Cloudflare discards them — they are not acked. Malformed `visitor_followup` bodies are logged and acked. Visitor follow-up send failures retry with backoff up to **5** attempts (`max_retries: 5` in Wrangler), then log (lead id + error type only) and ack.
 
 **GitHub Actions secrets and variables**
 

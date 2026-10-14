@@ -165,9 +165,31 @@ Cloudflare supports **resource-scoped Workers roles** ([Workers granular authori
 
 Add further Cloudflare token permissions **only** when a **403** names them (Cloudflare 403 responses link to the required permission). **Never use Admin as the fix.**
 
-The **consumer Worker** ([DIDI-577](https://linear.app/didi-build/issue/DIDI-577)) is a separate script: the maintainer must create that Worker first (outside this runbook’s proof deploy). CI will need either a dedicated scoped token for that Worker or additional scopes on a token — decide when the consumer ships.
+The **non-prod follow-up email consumer** ([DIDI-577](https://linear.app/didi-build/issue/DIDI-577)) deploys **by hand** after that PR merges. **Production** consumer first deploy and CI are [DIDI-599](https://linear.app/didi-build/issue/DIDI-599) — do not extend production GitHub workflows yet.
 
 Details and caveats: [0017](../decisions/0017-cloudflare-api-credentials.md).
+
+### Non-prod follow-up email consumer (manual, after DIDI-577)
+
+Use **`npx wrangler login`** (OAuth). From the repo root:
+
+```bash
+npm run deploy:guards   # includes consumer-nonprod guards
+npm run worker:consumer-dry-run:nonprod
+npx wrangler deploy --config workers/we-met-followup-email-consumer/wrangler.nonprod.jsonc
+```
+
+**Order matters:** the first deploy attaches the consumer to `we-met-followup-email-nonprod`, which **starts draining the queue immediately**. Set secrets **back to back** before or immediately after deploy (queued messages retry, but do not leave the Worker without secrets):
+
+```bash
+npx wrangler secret put GMAIL_SERVICE_ACCOUNT_JSON --name we-met-followup-email-consumer-nonprod
+npx wrangler secret put GMAIL_SENDER --name we-met-followup-email-consumer-nonprod
+npx wrangler secret put WE_MET_TEST_MAIL_TO --name we-met-followup-email-consumer-nonprod
+```
+
+`WE_MET_TEST_MAIL_TO` is **non-prod only** (never on the production consumer). Confirm binding names with `npx wrangler versions view <version-id> --name we-met-followup-email-consumer-nonprod`.
+
+Smoke test: [test-leads.md](./test-leads.md) (exchange on a PR preview → mail at `WE_MET_TEST_MAIL_TO`).
 
 ### First CI run results
 
