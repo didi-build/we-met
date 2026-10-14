@@ -327,4 +327,40 @@ describe("check-deploy-guards (unit)", () => {
       expect(result.stderr).toContain(message);
     });
   }
+
+  const CONSUMER_NONPROD =
+    "workers/we-met-followup-email-consumer/wrangler.nonprod.jsonc";
+
+  it("passes consumer-nonprod guards on committed config", () => {
+    const result = runGuards("consumer-nonprod", CONSUMER_NONPROD);
+    expect(result.status).toBe(0);
+  });
+
+  it("fails consumer-nonprod when vars contain WE_MET_TEST_MAIL_TO key", () => {
+    const dir = mkdtempSync(join(tmpdir(), "we-met-consumer-guards-"));
+    tempDirs.push(dir);
+    const base = readFileSync(CONSUMER_NONPROD, "utf8");
+    const config = parseJsonc(base) as Record<string, unknown>;
+    const vars = config.vars as Record<string, string>;
+    vars.WE_MET_TEST_MAIL_TO = "inbox@example.com";
+    const path = join(dir, "wrangler.jsonc");
+    writeFileSync(path, JSON.stringify(config, null, 2), "utf8");
+    const result = runGuards("consumer-nonprod", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(/WE_MET_TEST_MAIL_TO|consumer vars may only/);
+  });
+
+  it("fails consumer-nonprod when vars contain disallowed keys", () => {
+    const dir = mkdtempSync(join(tmpdir(), "we-met-consumer-guards-"));
+    tempDirs.push(dir);
+    const base = readFileSync(CONSUMER_NONPROD, "utf8");
+    const config = parseJsonc(base) as Record<string, unknown>;
+    const vars = config.vars as Record<string, string>;
+    vars.WE_MET_BASE_URL = "https://we-met.link";
+    const path = join(dir, "wrangler.jsonc");
+    writeFileSync(path, JSON.stringify(config, null, 2), "utf8");
+    const result = runGuards("consumer-nonprod", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("consumer vars may only");
+  });
 });

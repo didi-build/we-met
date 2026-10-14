@@ -9,14 +9,16 @@
     "node": ">=22"
   },
   "scripts": {
-    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run theme-colors && npm run build && npm run worker:dry-run && npm run worker:dry-run:generated && npm run deploy:guards && npm run secrets && npm run secret-usage && npm run actions-policy-workflows && npm run placeholders && npm run attribution",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run theme-colors && npm run build && npm run worker:dry-run && npm run worker:dry-run:generated && npm run worker:consumer-dry-run:nonprod && npm run worker:consumer-dry-run:production && npm run deploy:guards && npm run secrets && npm run secret-usage && npm run actions-policy-workflows && npm run placeholders && npm run attribution",
     "theme-colors": "node scripts/check-theme-colors.mjs",
     "dev": "next dev --turbopack",
     "next:build": "next build",
     "build": "opennextjs-cloudflare build",
     "worker:dry-run": "wrangler deploy --dry-run",
     "worker:dry-run:generated": "node scripts/dry-run-generated-config.mjs",
-    "deploy:guards": "node scripts/check-deploy-guards.mjs --target preview --config wrangler.jsonc && node scripts/check-deploy-guards.mjs --target production --config wrangler.jsonc",
+    "worker:consumer-dry-run:nonprod": "wrangler deploy --dry-run --config workers/we-met-followup-email-consumer/wrangler.nonprod.jsonc",
+    "worker:consumer-dry-run:production": "wrangler deploy --dry-run --config workers/we-met-followup-email-consumer/wrangler.production.jsonc",
+    "deploy:guards": "node scripts/check-deploy-guards.mjs --target preview --config wrangler.jsonc && node scripts/check-deploy-guards.mjs --target production --config wrangler.jsonc && node scripts/check-deploy-guards.mjs --target consumer-nonprod --config workers/we-met-followup-email-consumer/wrangler.nonprod.jsonc && node scripts/check-deploy-guards.mjs --target consumer-production --config workers/we-met-followup-email-consumer/wrangler.production.jsonc",
     "db:migrate": "node scripts/apply-migrations.mjs --local",
     "db:migrate:remote": "node scripts/apply-migrations.mjs --remote we-met-db-nonprod",
     "cards:load": "tsx scripts/load-cards.ts",

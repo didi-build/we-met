@@ -1,0 +1,27 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "we-met-followup-email-consumer-nonprod",
+  "main": "index.ts",
+  "compatibility_date": "2026-09-24",
+  "compatibility_flags": ["global_fetch_strictly_public"],
+  "vars": {
+    "WE_MET_ENV": "preview",
+  },
+  "r2_buckets": [
+    {
+      "binding": "WE_MET_ASSETS",
+      "bucket_name": "we-met-assets-nonprod",
+    },
+  ],
+  "queues": {
+    "consumers": [
+      {
+        "queue": "we-met-followup-email-nonprod",
+        "max_batch_size": 5,
+        "max_batch_timeout": 30,
+        "max_retries": 5,
+        "retry_delay": 30,
+      },
+    ],
+  },
+}
