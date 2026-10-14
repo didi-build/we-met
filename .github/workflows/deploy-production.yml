@@ -23,19 +23,41 @@ jobs:
       contents: read
       deployments: read
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - id: checkout
+        continue-on-error: true
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - id: setup-node
+        continue-on-error: true
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version-file: .nvmrc
           cache: npm
-      - run: npm ci
+      - id: npm-ci
+        continue-on-error: true
+        run: npm ci
       - name: Plan production D1 migrations
+        if: >-
+          steps.checkout.outcome == 'success' &&
+          steps.setup-node.outcome == 'success' &&
+          steps.npm-ci.outcome == 'success'
         env:
+          GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_SHA: ${{ github.sha }}
         run: npx tsx scripts/deploy-production/plan.ts
+      - name: Report plan job setup failure
+        if: >-
+          always() && (
+          steps.checkout.outcome == 'failure' ||
+          steps.setup-node.outcome == 'failure' ||
+          steps.npm-ci.outcome == 'failure')
+        env:
+          CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
+          SETUP_NODE_OUTCOME: ${{ steps.setup-node.outcome }}
+          NPM_CI_OUTCOME: ${{ steps.npm-ci.outcome }}
+        run: node scripts/deploy-production/report-setup-failure.mjs
 
   deploy:
     needs: plan

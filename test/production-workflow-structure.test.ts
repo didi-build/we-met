@@ -110,6 +110,23 @@ describe("Deploy production workflow structure (unit)", () => {
     expect(planSection).not.toContain("wrangler");
   });
 
+  it("plan job passes GH_TOKEN from github.token on the plan step", () => {
+    const planSection = workflow.match(/^  plan:[\s\S]*?(?=^  deploy:)/m)?.[0] ?? "";
+    expect(planSection).toContain("GH_TOKEN: ${{ github.token }}");
+    expect(planSection).not.toContain("secrets.GITHUB_TOKEN");
+  });
+
+  it("handles setup failures with continue-on-error and a setup failure reporter", () => {
+    const planSection = workflow.match(/^  plan:[\s\S]*?(?=^  deploy:)/m)?.[0] ?? "";
+    expect(planSection).toContain("id: checkout");
+    expect(planSection).toContain("id: setup-node");
+    expect(planSection).toContain("id: npm-ci");
+    expect(planSection).toContain("continue-on-error: true");
+    expect(planSection).toContain("steps.npm-ci.outcome == 'success'");
+    expect(planSection).toContain("report-setup-failure.mjs");
+    expect(planSection).toContain("CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}");
+  });
+
   it("does not reference non-prod Cloudflare token, D1 variable, or preview Turnstile variable", () => {
     expect(workflow).not.toContain("CLOUDFLARE_API_TOKEN_NONPROD");
     expect(workflow).not.toContain("WE_MET_D1_DATABASE_ID_NONPROD");
