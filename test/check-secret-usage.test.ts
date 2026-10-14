@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   findBootstrapTokenViolations,
+  findConsumerProductionCredentialViolations,
   findMigrateNonprodCredentialViolations,
 } from "../scripts/check-secret-usage.mjs";
 
@@ -38,6 +39,19 @@ describe("check-secret-usage (unit)", () => {
 
     writeFileSync(join(dir, "evil.yml"), "secrets.BOOTSTRAP_TOKEN\n");
     expect(findBootstrapTokenViolations(dir)).toEqual(["evil.yml"]);
+  });
+
+  it("allows consumer production token only in deploy-production.yml", () => {
+    const dir = mkdtempSync(join(tmpdir(), "secret-usage-consumer-"));
+    writeFileSync(
+      join(dir, "deploy-production.yml"),
+      "secrets.CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION\n",
+    );
+    writeFileSync(join(dir, "ci.yml"), "name: CI\n");
+    expect(findConsumerProductionCredentialViolations(dir)).toEqual([]);
+
+    writeFileSync(join(dir, "leak.yml"), "CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION\n");
+    expect(findConsumerProductionCredentialViolations(dir)).toEqual(["leak.yml"]);
   });
 
   it("allows migrate-nonprod secret only in migrate-nonprod.yml", () => {

@@ -6,8 +6,11 @@
  *   node scripts/prepare-wrangler-config.mjs --target production --output wrangler.ci.jsonc
  *   node scripts/prepare-wrangler-config.mjs --target preview --output wrangler.ci.jsonc
  *   node scripts/prepare-wrangler-config.mjs --target d1-migrate-nonprod --output wrangler.d1-nonprod.ci.jsonc
+ *   node scripts/prepare-wrangler-config.mjs --target consumer-production --output workers/we-met-followup-email-consumer/wrangler.production.ci.jsonc
+ *   node scripts/prepare-wrangler-config.mjs --target consumer-nonprod --output workers/we-met-followup-email-consumer/wrangler.nonprod.ci.jsonc
  *
- * Output must be a file in the repository root (see assertOutputInRepoRoot).
+ * App/preview output must be a file in the repository root (see assertOutputInRepoRoot).
+ * Consumer outputs are written next to the source config under workers/we-met-followup-email-consumer/.
  *
  * Environment:
  *   WE_MET_D1_DATABASE_ID_PRODUCTION — required for --target production
@@ -15,7 +18,7 @@
  *     optional for production (non-prod placeholder may remain in previews block)
  */
 import { readFileSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { assertOutputInRepoRoot } from "./lib/assert-repo-root-output.mjs";
 import { parseJsonc } from "./lib/parse-jsonc.mjs";
 import {
@@ -24,12 +27,23 @@ import {
 } from "./lib/wrangler-placeholders.mjs";
 
 const SOURCE = resolve("wrangler.jsonc");
+const CONSUMER_DIR = resolve("workers/we-met-followup-email-consumer");
+const CONSUMER_SOURCE_PRODUCTION = resolve(CONSUMER_DIR, "wrangler.production.jsonc");
+const CONSUMER_SOURCE_NONPROD = resolve(CONSUMER_DIR, "wrangler.nonprod.jsonc");
 
 function usage() {
   console.error(
-    "Usage: prepare-wrangler-config.mjs --target <production|preview|d1-migrate-nonprod> --output <path>",
+    "Usage: prepare-wrangler-config.mjs --target <production|preview|d1-migrate-nonprod|consumer-production|consumer-nonprod> --output <path>",
   );
   process.exit(1);
+}
+
+function assertConsumerOutputBesideSource(outputPath, sourcePath) {
+  const resolved = resolve(outputPath);
+  if (dirname(resolved) !== dirname(sourcePath)) {
+    console.error(`Consumer output must sit next to ${sourcePath} (got ${resolved}).`);
+    process.exit(1);
+  }
 }
 
 function parseArgs(argv) {
@@ -89,9 +103,28 @@ function buildD1MigrateNonprodConfig(config, nonprodId) {
   };
 }
 
+function prepareConsumerConfig(sourcePath, outputPath, { productionId, nonprodId }) {
+  assertConsumerOutputBesideSource(outputPath, sourcePath);
+  const sourceText = readFileSync(sourcePath, "utf8");
+  const text = replaceD1Ids(sourceText, { productionId, nonprodId });
+  if (productionId && text.includes(D1_PLACEHOLDER_PRODUCTION)) {
+    console.error("Failed to substitute production D1 database_id in consumer config.");
+    process.exit(1);
+  }
+  if (nonprodId && text.includes(D1_PLACEHOLDER_NONPROD)) {
+    console.error("Failed to substitute non-prod D1 database_id in consumer config.");
+    process.exit(1);
+  }
+  writeFileSync(outputPath, text, "utf8");
+}
+
 function main() {
   const { target, output } = parseArgs(process.argv.slice(2));
-  assertOutputInRepoRoot(output);
+  const isConsumerTarget =
+    target === "consumer-production" || target === "consumer-nonprod";
+  if (!isConsumerTarget) {
+    assertOutputInRepoRoot(output);
+  }
   const sourceText = readFileSync(SOURCE, "utf8");
   const config = parseJsonc(sourceText);
 
@@ -135,6 +168,18 @@ function main() {
     const nonprodId = requireEnv("WE_MET_D1_DATABASE_ID_NONPROD");
     const minimal = buildD1MigrateNonprodConfig(config, nonprodId);
     writeFileSync(output, `${JSON.stringify(minimal, null, 2)}\n`, "utf8");
+    return;
+  }
+
+  if (target === "consumer-production") {
+    const productionId = requireEnv("WE_MET_D1_DATABASE_ID_PRODUCTION");
+    prepareConsumerConfig(CONSUMER_SOURCE_PRODUCTION, output, { productionId });
+    return;
+  }
+
+  if (target === "consumer-nonprod") {
+    const nonprodId = requireEnv("WE_MET_D1_DATABASE_ID_NONPROD");
+    prepareConsumerConfig(CONSUMER_SOURCE_NONPROD, output, { nonprodId });
     return;
   }
 

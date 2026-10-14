@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { parseJsonc } from "../scripts/lib/parse-jsonc.mjs";
+import { MAX_VISITOR_FOLLOWUP_ATTEMPTS } from "../scripts/lib/queue-retry-policy.mjs";
 import {
   NONPROD_RESOURCE_MARKERS,
   PRODUCTION_RESOURCE_MARKERS,
@@ -66,12 +67,25 @@ describe("follow-up email consumer wrangler configs (unit)", () => {
     expect(Object.keys(production.vars as object).sort()).toEqual(["WE_MET_ENV"]);
   });
 
-  it("sets max_retries on queue consumers", () => {
+  it("sets max_retries on queue consumers to match the shared attempt limit", () => {
     const nonprodConsumer = (nonprod.queues as { consumers: { max_retries: number }[] })
       .consumers[0];
     const prodConsumer = (production.queues as { consumers: { max_retries: number }[] })
       .consumers[0];
-    expect(nonprodConsumer.max_retries).toBe(5);
-    expect(prodConsumer.max_retries).toBe(5);
+    expect(nonprodConsumer.max_retries).toBe(MAX_VISITOR_FOLLOWUP_ATTEMPTS);
+    expect(prodConsumer.max_retries).toBe(MAX_VISITOR_FOLLOWUP_ATTEMPTS);
+  });
+
+  it("binds WE_MET_DB to the environment database name", () => {
+    const nonprodD1 = (
+      nonprod.d1_databases as { binding: string; database_name: string }[]
+    )[0];
+    const prodD1 = (
+      production.d1_databases as { binding: string; database_name: string }[]
+    )[0];
+    expect(nonprodD1.binding).toBe("WE_MET_DB");
+    expect(nonprodD1.database_name).toBe(NONPROD_RESOURCE_MARKERS.d1Name);
+    expect(prodD1.binding).toBe("WE_MET_DB");
+    expect(prodD1.database_name).toBe(PRODUCTION_RESOURCE_MARKERS.d1Name);
   });
 });

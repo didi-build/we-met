@@ -2,17 +2,18 @@
 
 - **Status:** accepted
 - **Date:** 2026-10-14
+- **Updates:** 2026-10-15 (DIDI-599) — D1 binding for future ledger; production consumer CI
 
 ## Context
 
-The OpenNext app Worker `we-met` enqueues follow-up jobs but must not send mail inline. Step 1 needs a queue consumer that sends visitor follow-up email with a vCard attachment via Gmail, without D1 or duplicating card lookup ([0016](./0016-queue-message-snapshot.md), [DIDI-577](https://linear.app/didi-build/issue/DIDI-577)).
+The OpenNext app Worker `we-met` enqueues follow-up jobs but must not send mail inline. Step 1 needs a queue consumer that sends visitor follow-up email with a vCard attachment via Gmail, without duplicating card lookup at send time ([0016](./0016-queue-message-snapshot.md), [DIDI-577](https://linear.app/didi-build/issue/DIDI-577)).
 
 ## Decision
 
 - **Two consumer Workers** (one queue consumer each): `we-met-followup-email-consumer-nonprod` and `we-met-followup-email-consumer`, with Wrangler configs in `workers/we-met-followup-email-consumer/`.
 - **Shared code** lives under `src/email/` (sender interface + Gmail implementation) and `src/followup-email-consumer/` (queue batch logic). The OpenNext bundle does not import the consumer entrypoint.
-- **No D1** on the consumer. **R2:** bind `WE_MET_ASSETS`; enforce read-only in code (`get` only).
-- **Non-prod deploy** is manual after merge; **production** consumer CI is deferred to [DIDI-599](https://linear.app/didi-build/issue/DIDI-599).
+- **D1:** each consumer binds **`WE_MET_DB`** to the matching environment database (`we-met-db-nonprod` / `we-met-db`). **No migrations and no runtime D1 use** until the metadata-only delivery ledger ([DIDI-586](https://linear.app/didi-build/issue/DIDI-586)). **R2:** bind `WE_MET_ASSETS`; enforce read-only in code (`get` only).
+- **Non-prod deploy** is manual after merge; **production** consumer deploy runs in the approved **Deploy production** workflow ([DIDI-599](https://linear.app/didi-build/issue/DIDI-599)).
 
 ## Reasons
 
@@ -23,4 +24,4 @@ The OpenNext app Worker `we-met` enqueues follow-up jobs but must not send mail 
 ## Consequences
 
 - `npm run check` dry-runs both consumer configs and `deploy:guards` validates them.
-- Operators follow [deploy-setup.md](../runbooks/deploy-setup.md#non-prod-follow-up-email-consumer-manual-after-didi-577) for the first non-prod consumer deploy.
+- Operators follow [deploy-setup.md](../runbooks/deploy-setup.md#non-prod-follow-up-email-consumer-manual-after-didi-577) for the non-prod consumer; production consumer steps are in [deploy.md](../runbooks/deploy.md).

@@ -38,8 +38,9 @@
 - **Concurrent runs (UNVERIFIED):** The workflow uses run-level concurrency `deploy-production` with `cancel-in-progress: false`, so a second run likely **waits** until the first run finishes (or is rejected/fails) before its plan job starts; GitHub may also replace an older pending run with a newer one. Do not assume two plan jobs overlap while a deploy is still awaiting approval. When an earlier deploy was **rejected or failed**, the baseline stays at the last **success**, so a later run’s plan can still list migrations that were part of the failed attempt (cumulative vs last success).
 - **Gated deploy job:** The **`deploy`** job `needs: plan`, uses the GitHub **`production`** environment, and **waits for a required reviewer** before running. Its steps are unchanged.
 - **Who:** Users with approval on the `production` environment.
-- **Order (deploy job):** Substitute D1 IDs → deploy-time guards → require production Turnstile site key → OpenNext build → **production D1 migrations** → `opennextjs-cloudflare deploy` (with `wrangler.ci.jsonc`).
-- **Touches:** Worker **`we-met`** on **`we-met.link`**; `we-met-db`; `we-met-assets`; `we-met-followup-email`; `we-met-followup-email-consumer`; rate limiter namespace **2002**; Turnstile widget **we-met production**; visitor follow-up mail via Gmail API (consumer [DIDI-577](https://linear.app/didi-build/issue/DIDI-577)).
+- **Order (deploy job):** Substitute D1 IDs → deploy-time guards → require production Turnstile site key → OpenNext build → **production D1 migrations** → `opennextjs-cloudflare deploy` (with `wrangler.ci.jsonc`) → prepare production consumer config → consumer deploy-time guards → **`wrangler deploy`** for **`we-met-followup-email-consumer`** (with `wrangler.production.ci.jsonc`).
+- **Touches:** Worker **`we-met`** on **`we-met.link`**; `we-met-db`; `we-met-assets`; `we-met-followup-email`; **`we-met-followup-email-consumer`**; rate limiter namespace **2002**; Turnstile widget **we-met production**; visitor follow-up mail via Gmail API (consumer [DIDI-577](https://linear.app/didi-build/issue/DIDI-577)).
+- **Failure mode:** If the app deploy succeeds but the **consumer** deploy fails, production **`we-met`** stays on the new version while the follow-up queue may still lack a healthy consumer. Recovery: fix the failure and **re-run the full Deploy production job** (still requires `production` approval); the job re-runs app migrations, app deploy, and consumer deploy together.
 - **Manual re-run:** Actions → **Deploy production** → Re-run failed jobs (still requires `production` approval when the environment is used).
 
 ## Local / operator commands
@@ -68,16 +69,17 @@ CI Cloudflare tokens use **Workers Editor** scoped to Worker **`we-met`** ([0017
 
 **Troubleshooting:** `The zone "we-met.link" does not exist on your account [code: 10084]` during production deploy means the CI token lacks zone access on `we-met.link`; see [0017](../decisions/0017-cloudflare-api-credentials.md#token-scoping-cloudflare-2026).
 
-| Name                                   | Where                                                 | Used by                                                         |
-| -------------------------------------- | ----------------------------------------------------- | --------------------------------------------------------------- |
-| `CLOUDFLARE_ACCOUNT_ID`                | Repository secret                                     | Preview and production workflows                                |
-| `CLOUDFLARE_API_TOKEN_NONPROD`         | `preview` environment secret                          | Preview workflow                                                |
-| `CLOUDFLARE_API_TOKEN_MIGRATE_NONPROD` | `migrate-nonprod` environment secret                  | Migrate non-prod D1 workflow (D1 only; names only here)         |
-| `WE_MET_D1_DATABASE_ID_NONPROD`        | `preview` and `migrate-nonprod` environment variables | Preview workflow, migrate workflow, `db:migrate:remote` (local) |
-| `WE_MET_TURNSTILE_SITE_KEY_NONPROD`    | `preview` environment variable                        | Preview build                                                   |
-| `CLOUDFLARE_API_TOKEN_PRODUCTION`      | `production` environment secret                       | Production deploy only                                          |
-| `WE_MET_D1_DATABASE_ID_PRODUCTION`     | `production` environment variable                     | Production deploy (`prepare` needs only this D1)                |
-| `WE_MET_TURNSTILE_SITE_KEY_PRODUCTION` | `production` environment variable                     | Production build                                                |
+| Name                                       | Where                                                 | Used by                                                         |
+| ------------------------------------------ | ----------------------------------------------------- | --------------------------------------------------------------- |
+| `CLOUDFLARE_ACCOUNT_ID`                    | Repository secret                                     | Preview and production workflows                                |
+| `CLOUDFLARE_API_TOKEN_NONPROD`             | `preview` environment secret                          | Preview workflow                                                |
+| `CLOUDFLARE_API_TOKEN_MIGRATE_NONPROD`     | `migrate-nonprod` environment secret                  | Migrate non-prod D1 workflow (D1 only; names only here)         |
+| `WE_MET_D1_DATABASE_ID_NONPROD`            | `preview` and `migrate-nonprod` environment variables | Preview workflow, migrate workflow, `db:migrate:remote` (local) |
+| `WE_MET_TURNSTILE_SITE_KEY_NONPROD`        | `preview` environment variable                        | Preview build                                                   |
+| `CLOUDFLARE_API_TOKEN_PRODUCTION`          | `production` environment secret                       | Production app deploy and D1 migrations only                    |
+| `CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION` | `production` environment secret                       | Production follow-up email consumer deploy only                 |
+| `WE_MET_D1_DATABASE_ID_PRODUCTION`         | `production` environment variable                     | Production deploy (`prepare` needs only this D1)                |
+| `WE_MET_TURNSTILE_SITE_KEY_PRODUCTION`     | `production` environment variable                     | Production build                                                |
 
 Worker secrets (`WE_MET_TOKEN_SECRET`, `TURNSTILE_SECRET_KEY`): set during the maintainer proof deploy in [deploy-setup.md](./deploy-setup.md) (`wrangler login`, then `wrangler secret put` / `wrangler preview base-config secret put`).
 

@@ -13,6 +13,14 @@ describe("privileged-paths (table)", () => {
     { path: "scripts/dry-run-generated-config.mjs", privileged: true },
     { path: "wrangler.jsonc", privileged: true },
     { path: "wrangler.ci.jsonc", privileged: true },
+    {
+      path: "workers/we-met-followup-email-consumer/wrangler.production.jsonc",
+      privileged: true,
+    },
+    {
+      path: "workers/we-met-followup-email-consumer/wrangler.nonprod.jsonc",
+      privileged: true,
+    },
     { path: "open-next.config.ts", privileged: true },
     { path: "migrations/0001_init.sql", privileged: true },
     { path: "scripts/privileged-change-github.mjs", privileged: true },
@@ -42,6 +50,7 @@ describe("privileged-paths (table)", () => {
       "deploy-prepare-wrangler",
       "deploy-dry-run-generated",
       "wrangler-config",
+      "consumer-wrangler-config",
       "open-next-config",
       "migrations",
       "privileged-change-scripts",

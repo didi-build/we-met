@@ -130,10 +130,27 @@ describe("Deploy production workflow structure (unit)", () => {
     expect(planSection).not.toContain("id-token: write");
   });
 
-  it("deploy job needs plan and keeps steps, environment, and secrets unchanged", () => {
+  it("deploy job needs plan and keeps the original app deploy steps unchanged as a prefix", () => {
     const deploySection = workflow.match(/^  deploy:[\s\S]*$/m)?.[0] ?? "";
     expect(deploySection).toMatch(/needs:\s*plan/);
     expect(deploySection).toContain(EXPECTED_DEPLOY_STEPS_BLOCK);
+  });
+
+  it("deploy job appends production follow-up email consumer steps after the app deploy", () => {
+    const deploySection = workflow.match(/^  deploy:[\s\S]*$/m)?.[0] ?? "";
+    expect(deploySection).toContain("Prepare follow-up email consumer Wrangler config");
+    expect(deploySection).toContain("--target consumer-production");
+    expect(deploySection).toContain("wrangler.production.ci.jsonc");
+    expect(deploySection).toContain("Deploy-time guards (production consumer)");
+    expect(deploySection).toContain("Deploy follow-up email consumer to production");
+    expect(deploySection).toContain("CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION");
+    expect(deploySection).not.toContain("WE_MET_TEST_MAIL_TO");
+    const appDeployIdx = deploySection.indexOf("opennextjs-cloudflare deploy");
+    const consumerPrepareIdx = deploySection.indexOf(
+      "Prepare follow-up email consumer",
+    );
+    expect(appDeployIdx).toBeGreaterThan(-1);
+    expect(consumerPrepareIdx).toBeGreaterThan(appDeployIdx);
   });
 
   it("plan job uses only pinned actions/* SHAs", () => {
@@ -212,6 +229,13 @@ describe("Deploy production workflow structure (unit)", () => {
     expect(workflow).not.toContain("CLOUDFLARE_API_TOKEN_NONPROD");
     expect(workflow).not.toContain("WE_MET_D1_DATABASE_ID_NONPROD");
     expect(workflow).not.toContain("WE_MET_TURNSTILE_SITE_KEY_NONPROD");
+  });
+
+  it("uses the consumer production token only for the consumer wrangler deploy step", () => {
+    const deploySection = workflow.match(/^  deploy:[\s\S]*$/m)?.[0] ?? "";
+    const matches =
+      deploySection.match(/CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION/g) ?? [];
+    expect(matches.length).toBe(1);
   });
 });
 

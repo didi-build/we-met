@@ -330,9 +330,30 @@ describe("check-deploy-guards (unit)", () => {
 
   const CONSUMER_NONPROD =
     "workers/we-met-followup-email-consumer/wrangler.nonprod.jsonc";
+  const CONSUMER_PRODUCTION =
+    "workers/we-met-followup-email-consumer/wrangler.production.jsonc";
+
+  function writeTempConsumerConfig(
+    sourcePath: string,
+    mutator: (config: Record<string, unknown>) => void,
+  ) {
+    const dir = mkdtempSync(join(tmpdir(), "we-met-consumer-guards-"));
+    tempDirs.push(dir);
+    const base = readFileSync(sourcePath, "utf8");
+    const config = parseJsonc(base) as Record<string, unknown>;
+    mutator(config);
+    const path = join(dir, "wrangler.jsonc");
+    writeFileSync(path, JSON.stringify(config, null, 2), "utf8");
+    return path;
+  }
 
   it("passes consumer-nonprod guards on committed config", () => {
     const result = runGuards("consumer-nonprod", CONSUMER_NONPROD);
+    expect(result.status).toBe(0);
+  });
+
+  it("passes consumer-production guards on committed config", () => {
+    const result = runGuards("consumer-production", CONSUMER_PRODUCTION);
     expect(result.status).toBe(0);
   });
 
@@ -362,5 +383,104 @@ describe("check-deploy-guards (unit)", () => {
     const result = runGuards("consumer-nonprod", path);
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("consumer vars may only");
+  });
+
+  it("fails consumer-nonprod when D1 bindings are missing", () => {
+    const path = writeTempConsumerConfig(CONSUMER_NONPROD, (config) => {
+      delete config.d1_databases;
+    });
+    const result = runGuards("consumer-nonprod", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("exactly one D1");
+  });
+
+  it("fails consumer-nonprod when two D1 bindings are present", () => {
+    const path = writeTempConsumerConfig(CONSUMER_NONPROD, (config) => {
+      const rows = config.d1_databases as Record<string, unknown>[];
+      config.d1_databases = [...rows, { ...rows[0] }];
+    });
+    const result = runGuards("consumer-nonprod", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("exactly one D1");
+  });
+
+  it("fails consumer-nonprod when D1 database_name is wrong", () => {
+    const path = writeTempConsumerConfig(CONSUMER_NONPROD, (config) => {
+      const rows = config.d1_databases as { database_name: string }[];
+      rows[0].database_name = "we-met-db";
+    });
+    const result = runGuards("consumer-nonprod", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(/database_name|production resource/);
+  });
+
+  it("fails consumer-production when D1 references non-prod database name", () => {
+    const path = writeTempConsumerConfig(CONSUMER_PRODUCTION, (config) => {
+      const rows = config.d1_databases as { database_name: string }[];
+      rows[0].database_name = "we-met-db-nonprod";
+    });
+    const result = runGuards("consumer-production", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(/database_name|non-prod resource/);
+  });
+
+  it("fails consumer-nonprod when dead_letter_queue is set", () => {
+    const path = writeTempConsumerConfig(CONSUMER_NONPROD, (config) => {
+      const consumers = (config.queues as { consumers: Record<string, unknown>[] })
+        .consumers;
+      consumers[0].dead_letter_queue = "dlq";
+    });
+    const result = runGuards("consumer-nonprod", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("dead_letter_queue");
+  });
+
+  it("fails consumer-nonprod when max_retries does not match code", () => {
+    const path = writeTempConsumerConfig(CONSUMER_NONPROD, (config) => {
+      const consumers = (config.queues as { consumers: { max_retries: number }[] })
+        .consumers;
+      consumers[0].max_retries = 5;
+    });
+    const result = runGuards("consumer-nonprod", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("max_retries");
+  });
+
+  it("fails consumer-nonprod when retry_delay does not match code", () => {
+    const path = writeTempConsumerConfig(CONSUMER_NONPROD, (config) => {
+      const consumers = (config.queues as { consumers: { retry_delay: number }[] })
+        .consumers;
+      consumers[0].retry_delay = 60;
+    });
+    const result = runGuards("consumer-nonprod", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("retry_delay");
+  });
+
+  it("fails consumer-nonprod when retry window exceeds retention budget", () => {
+    const path = writeTempConsumerConfig(CONSUMER_NONPROD, () => {});
+    const result = spawnSync(
+      "node",
+      [SCRIPT, "--target", "consumer-nonprod", "--config", path],
+      {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          WE_MET_GUARD_RETRY_RETENTION_BUDGET_SECONDS: "1000",
+        },
+      },
+    );
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("retention budget");
+  });
+
+  it("fails consumer-production when config references WE_MET_TEST_MAIL_TO", () => {
+    const path = writeTempConsumerConfig(CONSUMER_PRODUCTION, (config) => {
+      const vars = config.vars as Record<string, string>;
+      vars.WE_MET_TEST_MAIL_TO = "inbox@example.com";
+    });
+    const result = runGuards("consumer-production", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(/WE_MET_TEST_MAIL_TO|consumer vars may only/);
   });
 });
