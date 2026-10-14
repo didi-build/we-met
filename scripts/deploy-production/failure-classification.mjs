@@ -1,5 +1,4 @@
 import { parseGhHttpStatus } from "../lib/gh-api-errors.mjs";
-import { sanitizeExternalPlanText } from "./messages.mjs";
 
 const DETAIL_MAX_LENGTH = 200;
 
