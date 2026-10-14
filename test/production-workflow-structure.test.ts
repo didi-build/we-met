@@ -4,6 +4,57 @@ import { describe, expect, it } from "vitest";
 
 const WORKFLOWS_DIR = ".github/workflows";
 
+function extractPlanJobSection(workflow: string): string {
+  return workflow.match(/^  plan:[\s\S]*?(?=^  deploy:)/m)?.[0] ?? "";
+}
+
+type PlanStepBlock = { id?: string; name?: string; block: string };
+
+function splitPlanJobSteps(planSection: string): PlanStepBlock[] {
+  const stepsMarker = "    steps:\n";
+  const stepsIdx = planSection.indexOf(stepsMarker);
+  if (stepsIdx === -1) {
+    return [];
+  }
+  const afterSteps = planSection.slice(stepsIdx + stepsMarker.length);
+  const blocks: string[] = [];
+  let current: string[] = [];
+  for (const line of afterSteps.split("\n")) {
+    if (/^      - /.test(line)) {
+      if (current.length > 0) {
+        blocks.push(current.join("\n"));
+      }
+      current = [line];
+    } else if (current.length > 0) {
+      current.push(line);
+    }
+  }
+  if (current.length > 0) {
+    blocks.push(current.join("\n"));
+  }
+  return blocks.map((block) => {
+    const id = block.match(/^      - id: (\S+)/)?.[1];
+    const name = block.match(/^      - name: (.+)/)?.[1]?.trim();
+    return { id, name, block };
+  });
+}
+
+function planStepById(steps: PlanStepBlock[], id: string): PlanStepBlock {
+  const step = steps.find((s) => s.id === id);
+  if (!step) {
+    throw new Error(`plan job step id ${id} not found`);
+  }
+  return step;
+}
+
+function planStepByName(steps: PlanStepBlock[], name: string): PlanStepBlock {
+  const step = steps.find((s) => s.name === name);
+  if (!step) {
+    throw new Error(`plan job step name ${name} not found`);
+  }
+  return step;
+}
+
 /** Deploy job steps as of DIDI-595 (must stay unchanged aside from `needs: plan`). */
 const EXPECTED_DEPLOY_STEPS_BLOCK = `    steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -70,7 +121,7 @@ describe("Deploy production workflow structure (unit)", () => {
   });
 
   it("plan job has no environment, no secrets, and minimal permissions", () => {
-    const planSection = workflow.match(/^  plan:[\s\S]*?(?=^  deploy:)/m)?.[0] ?? "";
+    const planSection = extractPlanJobSection(workflow);
     expect(planSection).not.toMatch(/^\s+environment:/m);
     expect(planSection).not.toContain("secrets.");
     expect(planSection).toContain("contents: read");
@@ -86,7 +137,7 @@ describe("Deploy production workflow structure (unit)", () => {
   });
 
   it("plan job uses only pinned actions/* SHAs", () => {
-    const planSection = workflow.match(/^  plan:[\s\S]*?(?=^  deploy:)/m)?.[0] ?? "";
+    const planSection = extractPlanJobSection(workflow);
     const usesLines = planSection.match(/uses:\s+[^\n]+/g) ?? [];
     expect(usesLines.length).toBeGreaterThan(0);
     for (const line of usesLines) {
@@ -96,7 +147,7 @@ describe("Deploy production workflow structure (unit)", () => {
   });
 
   it("plan job does not interpolate user-derived values into run scripts", () => {
-    const planSection = workflow.match(/^  plan:[\s\S]*?(?=^  deploy:)/m)?.[0] ?? "";
+    const planSection = extractPlanJobSection(workflow);
     const runBlocks = planSection.match(/run:\s*[^\n]+/g) ?? [];
     for (const block of runBlocks) {
       expect(block).not.toMatch(/\$\{\{\s*github\.event\./);
@@ -104,56 +155,57 @@ describe("Deploy production workflow structure (unit)", () => {
   });
 
   it("plan job runs deploy-production plan script", () => {
-    const planSection = workflow.match(/^  plan:[\s\S]*?(?=^  deploy:)/m)?.[0] ?? "";
+    const planSection = extractPlanJobSection(workflow);
     expect(planSection).toContain("deploy-production/plan.ts");
     expect(planSection).not.toContain("CLOUDFLARE_API_TOKEN_PRODUCTION");
     expect(planSection).not.toContain("wrangler");
   });
 
   it("plan job passes GH_TOKEN from github.token on the plan step", () => {
-    const planSection = workflow.match(/^  plan:[\s\S]*?(?=^  deploy:)/m)?.[0] ?? "";
+    const planSection = extractPlanJobSection(workflow);
     expect(planSection).toContain("GH_TOKEN: ${{ github.token }}");
     expect(planSection).not.toContain("secrets.GITHUB_TOKEN");
   });
 
-  it("handles setup failures with continue-on-error and a setup failure reporter", () => {
-    const planSection = workflow.match(/^  plan:[\s\S]*?(?=^  deploy:)/m)?.[0] ?? "";
-    expect(planSection).toContain("id: checkout");
-    expect(planSection).toContain("id: setup-node");
-    expect(planSection).toContain("id: npm-ci");
-    expect(planSection).toContain("continue-on-error: true");
-    expect(planSection).toContain("steps.npm-ci.outcome == 'success'");
-    expect(planSection).toContain("report-setup-failure.mjs");
-    expect(planSection).toContain("CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}");
-    expect(planSection).toContain(
-      "PLAN_STEP_OUTCOME: ${{ steps.plan-script.outcome }}",
-    );
-    expect(planSection).toContain("steps.plan-script.outcome == 'failure'");
-  });
+  it("plan job steps use continue-on-error, timeouts, and setup failure reporter", () => {
+    const planSection = extractPlanJobSection(workflow);
+    const steps = splitPlanJobSteps(planSection);
 
-  it("plan script step uses continue-on-error and a timeout", () => {
-    const planSection = workflow.match(/^  plan:[\s\S]*?(?=^  deploy:)/m)?.[0] ?? "";
-    expect(planSection).toContain("id: plan-script");
-    expect(planSection).toMatch(/id: plan-script[\s\S]*?continue-on-error: true/);
-    expect(planSection).toContain("timeout-minutes: 5");
-  });
+    const checkout = planStepById(steps, "checkout");
+    expect(checkout.block).toContain("continue-on-error: true");
+    expect(checkout.block).toContain("timeout-minutes: 2");
 
-  it("includes a fixed-text checkout fallback when checkout fails", () => {
-    const planSection = workflow.match(/^  plan:[\s\S]*?(?=^  deploy:)/m)?.[0] ?? "";
-    expect(planSection).toContain("Plan checkout fallback notice");
-    expect(planSection).toContain("steps.checkout.outcome == 'failure'");
-    expect(planSection).toContain(
+    const setupNode = planStepById(steps, "setup-node");
+    expect(setupNode.block).toContain("continue-on-error: true");
+    expect(setupNode.block).toContain("timeout-minutes: 2");
+
+    const npmCi = planStepById(steps, "npm-ci");
+    expect(npmCi.block).toContain("continue-on-error: true");
+    expect(npmCi.block).toContain("timeout-minutes: 5");
+
+    const planScript = planStepById(steps, "plan-script");
+    expect(planScript.block).toContain("continue-on-error: true");
+    expect(planScript.block).toContain("timeout-minutes: 5");
+
+    const fallback = planStepByName(steps, "Plan checkout fallback notice");
+    expect(fallback.block).toContain("continue-on-error: true");
+    expect(fallback.block).toContain("steps.checkout.outcome == 'failure'");
+    expect(fallback.block).toContain(
       "PLAN FAILED: checkout failed before the plan could run",
     );
-    const fallbackRun =
-      planSection.match(
-        /Plan checkout fallback notice[\s\S]*?run: \|([\s\S]*?)(?=\n      - id:)/,
-      )?.[1] ?? "";
+    const fallbackRun = fallback.block.match(/run: \|([\s\S]*)/)?.[1] ?? "";
     expect(fallbackRun).not.toContain("${{");
-    expect(planSection).toContain("continue-on-error: true");
-    expect(
-      planSection.match(/Report plan job setup failure[\s\S]*continue-on-error: true/),
-    ).not.toBeNull();
+
+    const reporter = planStepByName(steps, "Report plan job setup failure");
+    expect(reporter.block).toContain("continue-on-error: true");
+    expect(reporter.block).toContain("report-setup-failure.mjs");
+    expect(reporter.block).toContain("CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}");
+    expect(reporter.block).toContain(
+      "PLAN_STEP_OUTCOME: ${{ steps.plan-script.outcome }}",
+    );
+    expect(reporter.block).toContain("steps.plan-script.outcome == 'failure'");
+
+    expect(planSection).toContain("steps.npm-ci.outcome == 'success'");
   });
 
   it("does not reference non-prod Cloudflare token, D1 variable, or preview Turnstile variable", () => {
