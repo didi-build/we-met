@@ -95,14 +95,14 @@ The consumer registers on the queue in **its own** Wrangler config; it is not an
 
 **Consumer logs (debugging live mail):**
 
-| Event                                | Fields                                        |
-| ------------------------------------ | --------------------------------------------- |
-| `visitor_followup_attempt_failure`   | `leadId`, `attempt`, `errorCode`, `willRetry` |
-| `visitor_followup_permanent_failure` | `leadId`, `errorCode`                         |
-| `visitor_followup_malformed`         | `leadId` (may be null)                        |
-| `followup_unsupported_queue_type`    | `typeLabel`                                   |
-| `followup_vcard_photo_missing`       | `photoKey`                                    |
-| `followup_vcard_photo_not_jpeg`      | `photoKey`                                    |
+| Event                                | Fields                                                                                                 |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| `visitor_followup_attempt_failure`   | `leadId`, `attempt`, `errorCode`, `willRetry`; `secretName` when `errorCode` is `gmail_secret_missing` |
+| `visitor_followup_permanent_failure` | `leadId`, `errorCode`; `secretName` when `errorCode` is `gmail_secret_missing`                         |
+| `visitor_followup_malformed`         | `leadId` (may be null)                                                                                 |
+| `followup_unsupported_queue_type`    | `typeLabel`                                                                                            |
+| `followup_vcard_photo_missing`       | `photoKey`                                                                                             |
+| `followup_vcard_photo_not_jpeg`      | `photoKey`                                                                                             |
 
 **Consumer `errorCode` values (no raw exception text):** `gmail_secret_missing`, `gmail_invalid_service_account_json`, `gmail_token_http_<status>`, `gmail_token_missing_access_token`, `gmail_send_http_<status>`, `gmail_network_error`, `nonprod_mail_redirect_unset`, `unknown`. For `gmail_secret_missing`, logs include `secretName` (e.g. `GMAIL_SENDER`) — never a secret value.
 
