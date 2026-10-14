@@ -47,7 +47,7 @@ Preview deployments receive **ASSETS**, **IMAGES** (when `previews.images` is se
 - `previews.vars.WE_MET_ENV` is not `preview`, or top-level `WE_MET_ENV` is not `production` when checking production.
 - Top-level production bindings (D1, R2, queue, rate limiter) do not match production resource names.
 - Preview and top-level `database_id` values are identical (including after CI substitution).
-- `config/nonprod-mail-safety.json` is missing, invalid, or does not **fail closed** when `WE_MET_TEST_MAIL_TO` is unset (spec file only until the consumer Worker ships in [DIDI-577](https://linear.app/didi-build/issue/DIDI-577)).
+- `config/nonprod-mail-safety.json` is missing, invalid, or does not **fail closed** when `WE_MET_TEST_MAIL_TO` is unset (spec mirrored by the non-prod consumer Worker in [DIDI-577](https://linear.app/didi-build/issue/DIDI-577)).
 
 Production deploys use the GitHub **`production`** environment (required reviewers); that gate is enforced by workflow structure tests, not by this script.
 

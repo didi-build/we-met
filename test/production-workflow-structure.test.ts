@@ -55,6 +55,121 @@ function planStepByName(steps: PlanStepBlock[], name: string): PlanStepBlock {
   return step;
 }
 
+type DeployStepBlock = { name: string | null; block: string };
+
+function extractDeployJobSection(workflow: string): string {
+  return workflow.match(/^  deploy:[\s\S]*$/m)?.[0] ?? "";
+}
+
+/** Split deploy job YAML steps (named steps and uses/run-only steps). */
+function splitDeployJobSteps(deploySection: string): DeployStepBlock[] {
+  const stepsMarker = "    steps:\n";
+  const stepsIdx = deploySection.indexOf(stepsMarker);
+  if (stepsIdx === -1) {
+    return [];
+  }
+  const afterSteps = deploySection.slice(stepsIdx + stepsMarker.length);
+  const blocks: string[] = [];
+  let current: string[] = [];
+  for (const line of afterSteps.split("\n")) {
+    if (/^      - /.test(line)) {
+      if (current.length > 0) {
+        blocks.push(current.join("\n"));
+      }
+      current = [line];
+    } else if (current.length > 0) {
+      current.push(line);
+    }
+  }
+  if (current.length > 0) {
+    blocks.push(current.join("\n"));
+  }
+  return blocks.map((block) => {
+    const name = block.match(/^      - name: (.+)/)?.[1]?.trim() ?? null;
+    return { name, block };
+  });
+}
+
+function deployStepByName(steps: DeployStepBlock[], name: string): DeployStepBlock {
+  const step = steps.find((s) => s.name === name);
+  if (!step) {
+    throw new Error(`deploy job step named "${name}" not found`);
+  }
+  return step;
+}
+
+const CONSUMER_DEPLOY_STEP_NAME = "Deploy follow-up email consumer to production";
+const CONSUMER_PREPARE_STEP_NAME =
+  "Prepare follow-up email consumer Wrangler config (production D1 ID)";
+const CONSUMER_GUARDS_STEP_NAME = "Deploy-time guards (production consumer)";
+const MIGRATIONS_STEP_NAME = "Apply production D1 migrations";
+const APP_DEPLOY_STEP_NAME = "Deploy Worker to production";
+
+/**
+ * Asserts Cloudflare token secrets are wired to the correct deploy job steps.
+ * @throws if any assertion fails (Vitest expect errors).
+ */
+function assertDeployJobCloudflareTokenIsolation(deploySection: string): void {
+  const steps = splitDeployJobSteps(deploySection);
+  if (steps.length === 0) {
+    throw new Error("deploy job has no parseable steps");
+  }
+
+  const consumerDeploy = deployStepByName(steps, CONSUMER_DEPLOY_STEP_NAME);
+  if (
+    !consumerDeploy.block.includes(
+      "CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION }}",
+    )
+  ) {
+    throw new Error(
+      `${CONSUMER_DEPLOY_STEP_NAME} must set CLOUDFLARE_API_TOKEN to CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION`,
+    );
+  }
+  if (consumerDeploy.block.includes("CLOUDFLARE_API_TOKEN_PRODUCTION")) {
+    throw new Error(
+      `${CONSUMER_DEPLOY_STEP_NAME} must not reference CLOUDFLARE_API_TOKEN_PRODUCTION`,
+    );
+  }
+
+  for (const step of steps) {
+    if (step.name === CONSUMER_DEPLOY_STEP_NAME) continue;
+    if (step.block.includes("CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION")) {
+      throw new Error(
+        `step "${step.name ?? "(unnamed)"}" must not reference CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION`,
+      );
+    }
+  }
+
+  const migrations = deployStepByName(steps, MIGRATIONS_STEP_NAME);
+  const appDeploy = deployStepByName(steps, APP_DEPLOY_STEP_NAME);
+  if (!migrations.block.includes("CLOUDFLARE_API_TOKEN_PRODUCTION")) {
+    throw new Error(`${MIGRATIONS_STEP_NAME} must use CLOUDFLARE_API_TOKEN_PRODUCTION`);
+  }
+  if (migrations.block.includes("CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION")) {
+    throw new Error(`${MIGRATIONS_STEP_NAME} must not use the consumer token`);
+  }
+  if (!appDeploy.block.includes("CLOUDFLARE_API_TOKEN_PRODUCTION")) {
+    throw new Error(`${APP_DEPLOY_STEP_NAME} must use CLOUDFLARE_API_TOKEN_PRODUCTION`);
+  }
+  if (appDeploy.block.includes("CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION")) {
+    throw new Error(`${APP_DEPLOY_STEP_NAME} must not use the consumer token`);
+  }
+
+  const consumerPrepare = deployStepByName(steps, CONSUMER_PREPARE_STEP_NAME);
+  const consumerGuards = deployStepByName(steps, CONSUMER_GUARDS_STEP_NAME);
+  if (consumerPrepare.block.includes("secrets.")) {
+    throw new Error(`${CONSUMER_PREPARE_STEP_NAME} must not reference secrets.*`);
+  }
+  if (consumerGuards.block.includes("secrets.")) {
+    throw new Error(`${CONSUMER_GUARDS_STEP_NAME} must not reference secrets.*`);
+  }
+  if (!consumerPrepare.block.includes("vars.WE_MET_D1_DATABASE_ID_PRODUCTION")) {
+    throw new Error(
+      `${CONSUMER_PREPARE_STEP_NAME} must use vars.WE_MET_D1_DATABASE_ID_PRODUCTION`,
+    );
+  }
+}
+
 /** Deploy job steps as of DIDI-595 (must stay unchanged aside from `needs: plan`). */
 const EXPECTED_DEPLOY_STEPS_BLOCK = `    steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -252,11 +367,29 @@ describe("Deploy production workflow structure (unit)", () => {
     expect(workflow).not.toContain("WE_MET_TURNSTILE_SITE_KEY_NONPROD");
   });
 
-  it("uses the consumer production token only for the consumer wrangler deploy step", () => {
-    const deploySection = workflow.match(/^  deploy:[\s\S]*$/m)?.[0] ?? "";
-    const matches =
-      deploySection.match(/CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION/g) ?? [];
-    expect(matches.length).toBe(1);
+  it("isolates Cloudflare API tokens across deploy job steps", () => {
+    assertDeployJobCloudflareTokenIsolation(extractDeployJobSection(workflow));
+  });
+
+  it("token isolation self-check rejects consumer token on the app deploy step", () => {
+    const steps = splitDeployJobSteps(extractDeployJobSection(workflow));
+    const appIdx = steps.findIndex((s) => s.name === APP_DEPLOY_STEP_NAME);
+    expect(appIdx).toBeGreaterThan(-1);
+    const mutated = steps.map((step, index) =>
+      index === appIdx
+        ? {
+            ...step,
+            block: step.block.replaceAll(
+              "CLOUDFLARE_API_TOKEN_PRODUCTION",
+              "CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION",
+            ),
+          }
+        : step,
+    );
+    const fakeSection = `    steps:\n${mutated.map((s) => s.block).join("\n")}`;
+    expect(() => assertDeployJobCloudflareTokenIsolation(fakeSection)).toThrow(
+      APP_DEPLOY_STEP_NAME,
+    );
   });
 });
 

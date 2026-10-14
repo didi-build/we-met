@@ -166,7 +166,7 @@ Cloudflare supports **resource-scoped Workers roles** ([Workers granular authori
 
 Add further Cloudflare token permissions **only** when a **403** names them (Cloudflare 403 responses link to the required permission). **Never use Admin as the fix.**
 
-The **non-prod follow-up email consumer** ([DIDI-577](https://linear.app/didi-build/issue/DIDI-577)) deploys **by hand**. The **production** consumer deploys from the **Deploy production** workflow after merge ([DIDI-599](https://linear.app/didi-build/issue/DIDI-599)).
+The **non-prod follow-up email consumer** ([DIDI-577](https://linear.app/didi-build/issue/DIDI-577)) deploys **by hand**. The **production** consumer is **hand-deployed once** on `main`, then ongoing deploys run from **Deploy production** ([DIDI-599](https://linear.app/didi-build/issue/DIDI-599)) — see [first-deploy checklist](#production-follow-up-email-consumer-first-deploy-didi-599).
 
 Details and caveats: [0017](../decisions/0017-cloudflare-api-credentials.md).
 
