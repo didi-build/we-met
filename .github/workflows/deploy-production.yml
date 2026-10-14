@@ -37,7 +37,24 @@ jobs:
       - id: npm-ci
         continue-on-error: true
         run: npm ci
-      - name: Plan production D1 migrations
+      - name: Plan checkout fallback notice
+        if: always() && steps.checkout.outcome == 'failure'
+        continue-on-error: true
+        run: |
+          echo "::warning::PLAN FAILED: checkout failed before the plan could run. Check migrations/ by hand before approving."
+          {
+            echo "## Production D1 migration plan"
+            echo ""
+            echo "**PLAN FAILED: checkout failed before the plan could run.**"
+            echo ""
+            echo "Check migrations/ by hand before approving."
+            echo ""
+            echo "_The deploy job is not blocked; production approval remains the gate._"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - id: plan-script
+        name: Plan production D1 migrations
+        continue-on-error: true
+        timeout-minutes: 5
         if: >-
           steps.checkout.outcome == 'success' &&
           steps.setup-node.outcome == 'success' &&
@@ -48,15 +65,18 @@ jobs:
           GITHUB_SHA: ${{ github.sha }}
         run: npx tsx scripts/deploy-production/plan.ts
       - name: Report plan job setup failure
+        continue-on-error: true
         if: >-
           always() && (
           steps.checkout.outcome == 'failure' ||
           steps.setup-node.outcome == 'failure' ||
-          steps.npm-ci.outcome == 'failure')
+          steps.npm-ci.outcome == 'failure' ||
+          steps.plan-script.outcome == 'failure')
         env:
           CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
           SETUP_NODE_OUTCOME: ${{ steps.setup-node.outcome }}
           NPM_CI_OUTCOME: ${{ steps.npm-ci.outcome }}
+          PLAN_STEP_OUTCOME: ${{ steps.plan-script.outcome }}
         run: node scripts/deploy-production/report-setup-failure.mjs
 
   deploy:

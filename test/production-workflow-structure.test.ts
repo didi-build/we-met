@@ -125,6 +125,35 @@ describe("Deploy production workflow structure (unit)", () => {
     expect(planSection).toContain("steps.npm-ci.outcome == 'success'");
     expect(planSection).toContain("report-setup-failure.mjs");
     expect(planSection).toContain("CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}");
+    expect(planSection).toContain(
+      "PLAN_STEP_OUTCOME: ${{ steps.plan-script.outcome }}",
+    );
+    expect(planSection).toContain("steps.plan-script.outcome == 'failure'");
+  });
+
+  it("plan script step uses continue-on-error and a timeout", () => {
+    const planSection = workflow.match(/^  plan:[\s\S]*?(?=^  deploy:)/m)?.[0] ?? "";
+    expect(planSection).toContain("id: plan-script");
+    expect(planSection).toMatch(/id: plan-script[\s\S]*?continue-on-error: true/);
+    expect(planSection).toContain("timeout-minutes: 5");
+  });
+
+  it("includes a fixed-text checkout fallback when checkout fails", () => {
+    const planSection = workflow.match(/^  plan:[\s\S]*?(?=^  deploy:)/m)?.[0] ?? "";
+    expect(planSection).toContain("Plan checkout fallback notice");
+    expect(planSection).toContain("steps.checkout.outcome == 'failure'");
+    expect(planSection).toContain(
+      "PLAN FAILED: checkout failed before the plan could run",
+    );
+    const fallbackRun =
+      planSection.match(
+        /Plan checkout fallback notice[\s\S]*?run: \|([\s\S]*?)(?=\n      - id:)/,
+      )?.[1] ?? "";
+    expect(fallbackRun).not.toContain("${{");
+    expect(planSection).toContain("continue-on-error: true");
+    expect(
+      planSection.match(/Report plan job setup failure[\s\S]*continue-on-error: true/),
+    ).not.toBeNull();
   });
 
   it("does not reference non-prod Cloudflare token, D1 variable, or preview Turnstile variable", () => {
