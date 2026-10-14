@@ -38,4 +38,9 @@ Previews use the **same** Worker name (`we-met`) as production. The non-prod tok
 
 **Editor** scoped to Worker **`we-met`** is sufficient to **create and delete** `pr-<n>` preview instances in CI (`wrangler preview` / `preview delete`); closing or merging the first preview PR deleted preview `pr-3` successfully (verified **2026-10-11**). Wrangler may print a harmless open-beta warning for `preview delete`. If a future workflow returns **403**, grant the permission named in the error — never **Admin**.
 
-**Production follow-up email consumer token (DIDI-599):** dashboard name **`we-met-ci-consumer-production`**, GitHub secret **`CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION`** on the **`production`** environment only. **Workers Editor** scoped to Worker **`we-met-followup-email-consumer`** only — do **not** widen **`we-met-ci-production`**. Add Queues or D1 permissions only if deploy returns a named 403.
+**Production follow-up email consumer token (DIDI-599):** dashboard name **`we-met-ci-consumer-production`**, GitHub secret **`CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION`** on the **`production`** environment only. Use **two** token policies — do **not** widen **`we-met-ci-production`**:
+
+1. **Workers Editor** scoped to Worker **`we-met-followup-email-consumer`** only.
+2. Account-level **Queues Edit** (dashboard label **Queues**, permission **Edit**). Wrangler lists queues during deploy; the first production consumer deploy in CI (**2026-10-14**) failed at the consumer step with `Authentication error [code: 10000]` on the queues list call until **Queues Edit** was added.
+
+**Observed (2026-10-14):** a consumer deploy that includes a D1 binding did **not** require a D1 permission on this token. **Not tested:** whether **Queues Edit** is the minimal queue permission (vs a narrower scope if Cloudflare adds one).
