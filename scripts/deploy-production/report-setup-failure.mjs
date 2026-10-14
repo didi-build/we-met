@@ -1,7 +1,10 @@
 import { appendFileSync } from "node:fs";
-import { executePlanSetupSoftFail } from "./plan-soft-fail.mjs";
+import {
+  executePlanSetupSoftFail,
+  executePlanStepCrashSoftFail,
+} from "./plan-soft-fail.mjs";
 
-function pickFailedStep() {
+function pickFailedSetupStep() {
   const order = [
     ["checkout", process.env.CHECKOUT_OUTCOME],
     ["setup-node", process.env.SETUP_NODE_OUTCOME],
@@ -12,11 +15,17 @@ function pickFailedStep() {
       return id;
     }
   }
-  return "unknown";
+  return null;
 }
 
-const failedStep = pickFailedStep();
-const result = executePlanSetupSoftFail(failedStep);
+let result;
+if (process.env.PLAN_STEP_OUTCOME === "failure") {
+  result = executePlanStepCrashSoftFail();
+} else {
+  const failedStep = pickFailedSetupStep() ?? "unknown";
+  result = executePlanSetupSoftFail(failedStep);
+}
+
 const summaryFile = process.env.GITHUB_STEP_SUMMARY;
 if (summaryFile) {
   appendFileSync(summaryFile, `${result.summaryMarkdown}\n`);

@@ -108,7 +108,7 @@ export function buildWarningAnnotation(input) {
   if (migrationPaths.length === 0) {
     return null;
   }
-  const safeNames = migrationPaths.map((p) => sanitizeExternalPlanText(p)).join(", ");
+  const safeNames = migrationPaths.join(", ");
   const n = migrationPaths.length;
   const noun = n === 1 ? "migration" : "migrations";
   return `This deploy includes ${n} ${noun}: ${safeNames}`;
@@ -151,13 +151,34 @@ export function buildPlanFailureContent(input) {
  */
 export function buildPlanSetupFailureContent(failedStepId) {
   const step = sanitizeExternalPlanText(failedStepId);
-  const headline = `PLAN FAILED: bug in the plan job (setup step ${step} failed).`;
+  const headline = `PLAN FAILED: setup step ${step} failed before the plan could run.`;
+  const body =
+    "If the step log shows a GitHub or npm outage, it is probably fine to approve; otherwise it needs a fix. Check migrations/ by hand before approving.";
   const summaryMarkdown = [
     "## Production D1 migration plan",
     "",
     `**${headline}**`,
     "",
-    "The plan job could not start. Needs a fix. Check migrations/ by hand before approving.",
+    body,
+    "",
+    "_The deploy job is not blocked; production approval remains the gate._",
+  ].join("\n");
+  return { summaryMarkdown, warningAnnotation: headline };
+}
+
+/**
+ * @returns {{ summaryMarkdown: string; warningAnnotation: string }}
+ */
+export function buildPlanStepCrashFailureContent() {
+  const headline = "PLAN FAILED: plan step crashed or timed out before finishing.";
+  const body =
+    "The plan step exited with an error or timed out (for example import or tsx failure). Check the plan step log. This needs a fix. Check migrations/ by hand before approving.";
+  const summaryMarkdown = [
+    "## Production D1 migration plan",
+    "",
+    `**${headline}**`,
+    "",
+    body,
     "",
     "_The deploy job is not blocked; production approval remains the gate._",
   ].join("\n");

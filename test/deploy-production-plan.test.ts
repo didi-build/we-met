@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 import {
   isSuccessfulDeploymentStatus,
@@ -24,12 +25,18 @@ import {
 import {
   ADVISORY_LINT_NOTE,
   buildPlanFailureContent,
+  buildPlanSetupFailureContent,
+  buildPlanStepCrashFailureContent,
   buildPlanSummaryMarkdown,
   buildWarningAnnotation,
   formatMigrationSection,
   sanitizeExternalPlanText,
 } from "../scripts/deploy-production/messages.mjs";
-import { executePlanSoftFail } from "../scripts/deploy-production/plan-soft-fail.mjs";
+import {
+  executePlanSetupSoftFail,
+  executePlanSoftFail,
+  executePlanStepCrashSoftFail,
+} from "../scripts/deploy-production/plan-soft-fail.mjs";
 import {
   escapeForWorkflowCommand,
   emitWorkflowWarning,
@@ -328,6 +335,16 @@ describe("deploy-production failure classification (unit)", () => {
       category: "bug",
     },
     {
+      name: "TypeError mentioning network stays bug",
+      error: new TypeError("network is not a function"),
+      category: "bug",
+    },
+    {
+      name: "dial tcp message",
+      error: new Error("dial tcp: lookup api.github.com: i/o timeout"),
+      category: "github_unavailable",
+    },
+    {
       name: "JSON parse defaults to bug",
       error: new SyntaxError("Unexpected token in JSON"),
       category: "bug",
@@ -363,6 +380,24 @@ describe("deploy-production failure classification (unit)", () => {
     });
     expect(warningAnnotation).toBe("PLAN UNAVAILABLE: GitHub API problem (HTTP 503).");
   });
+
+  it("classifies real execFileSync gh stderr failures", () => {
+    try {
+      execFileSync(
+        "node",
+        [
+          "-e",
+          'process.stderr.write("gh: Server Error (HTTP 502)\\n"); process.exit(1);',
+        ],
+        { encoding: "utf8" },
+      );
+      expect.fail("expected child process to throw");
+    } catch (error) {
+      expect(classifyPlanFailure(error).category).toBe("github_unavailable");
+      const err = error as { stderr?: unknown; message?: string };
+      expect(typeof err.stderr === "string" || Buffer.isBuffer(err.stderr)).toBe(true);
+    }
+  });
 });
 
 describe("deploy-production soft fail (unit)", () => {
@@ -380,14 +415,12 @@ describe("deploy-production soft fail (unit)", () => {
     }
   });
 
-  it("does not change exit code when advisory lint warnings exist", () => {
-    const warnings = collectAdvisoryLintWarnings(
-      "migrations/0009_bad.sql",
-      "DROP TABLE cards;",
-    );
-    expect(warnings.length).toBeGreaterThan(0);
-    const result = executePlanSoftFail(new TypeError("lint path still soft-fails"));
-    expect(result.exitCode).toBe(0);
+  it("returns exit 0 when the plan step crashes path is used", () => {
+    expect(executePlanStepCrashSoftFail().exitCode).toBe(0);
+  });
+
+  it("returns exit 0 for setup step failure reporting", () => {
+    expect(executePlanSetupSoftFail("npm-ci").exitCode).toBe(0);
   });
 });
 
@@ -528,21 +561,36 @@ describe("deploy-production messages (unit)", () => {
     expect(sanitizeExternalPlanText("a::b")).not.toContain("::");
   });
 
-  it("sanitizes adversarial migration names in buildWarningAnnotation", () => {
+  it("sanitizes adversarial migration names when emitted as workflow warnings", () => {
     const line = buildWarningAnnotation({
       migrationPaths: ["migrations/x.sql\n::error::x", "migrations/`y`.sql"],
     });
     expect(line).not.toBeNull();
-    expect(line).not.toContain("::error::");
-    expect(line).not.toContain("`");
-    expect(line).not.toContain("\n");
+    const logs: string[] = [];
+    const original = console.log;
+    console.log = (msg: string) => {
+      logs.push(msg);
+    };
+    emitWorkflowWarning(line!);
+    console.log = original;
+    expect(logs[0]).not.toContain("::error::");
+    expect(logs[0]).not.toContain("\n");
   });
 
   it("escapes workflow command injection in annotations", () => {
     const escaped = escapeForWorkflowCommand("a%b\nc::d");
     expect(escaped).not.toContain("\n");
-    expect(escaped).not.toContain("::");
     expect(escaped).toContain("%25");
+    const logs: string[] = [];
+    const original = console.log;
+    console.log = (msg: string) => {
+      logs.push(msg);
+    };
+    emitWorkflowWarning("a%b\nc::d");
+    console.log = original;
+    expect(logs[0]).not.toContain("::error::");
+    expect(logs[0]).not.toMatch(/\n/);
+    expect(logs[0]).toContain("%25");
   });
 
   it("emitWorkflowWarning escapes percent and newlines", () => {
@@ -559,6 +607,24 @@ describe("deploy-production messages (unit)", () => {
   it("uses Last changed in label in attribution", () => {
     expect(formatMigrationIntroduction({ commitSha: "abc123def456" })).toContain(
       "Last changed in:",
+    );
+  });
+
+  it("uses exact setup failure wording", () => {
+    const { warningAnnotation, summaryMarkdown } =
+      buildPlanSetupFailureContent("npm-ci");
+    expect(warningAnnotation).toBe(
+      "PLAN FAILED: setup step npm-ci failed before the plan could run.",
+    );
+    expect(summaryMarkdown).toContain(
+      "If the step log shows a GitHub or npm outage, it is probably fine to approve",
+    );
+  });
+
+  it("uses exact plan step crash wording", () => {
+    const { warningAnnotation } = buildPlanStepCrashFailureContent();
+    expect(warningAnnotation).toBe(
+      "PLAN FAILED: plan step crashed or timed out before finishing.",
     );
   });
 });

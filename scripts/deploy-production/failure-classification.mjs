@@ -11,6 +11,26 @@ const NETWORK_ERROR_CODES = new Set([
   "EAI_AGAIN",
 ]);
 
+const GH_NETWORK_MESSAGE_RE =
+  /dial tcp|i\/o timeout|connection reset|TLS handshake timeout|socket hang up/i;
+
+/**
+ * @param {unknown} chunk
+ * @returns {string}
+ */
+function stringifyDiagnosticChunk(chunk) {
+  if (typeof chunk === "string") {
+    return chunk;
+  }
+  if (chunk != null && typeof chunk === "object" && "toString" in chunk) {
+    const text = chunk.toString();
+    if (typeof text === "string") {
+      return text;
+    }
+  }
+  return "";
+}
+
 /**
  * @param {unknown} error
  * @returns {string}
@@ -19,8 +39,8 @@ export function errorToDiagnosticText(error) {
   /** @type {string[]} */
   const parts = [];
   if (error && typeof error === "object") {
-    if ("stderr" in error && typeof error.stderr === "string" && error.stderr) {
-      parts.push(error.stderr);
+    if ("stderr" in error && error.stderr) {
+      parts.push(stringifyDiagnosticChunk(error.stderr));
     }
     if ("message" in error && typeof error.message === "string" && error.message) {
       parts.push(error.message);
@@ -32,12 +52,11 @@ export function errorToDiagnosticText(error) {
 }
 
 /**
- * @param {string} text
+ * @param {unknown} error
  * @returns {number | null}
  */
 export function extractHttpStatusFromError(error) {
-  const text = errorToDiagnosticText(error);
-  return parseGhHttpStatus(text);
+  return parseGhHttpStatus(errorToDiagnosticText(error));
 }
 
 /**
@@ -73,6 +92,7 @@ export function isAccessOrConfigHttpError(text, httpStatus) {
 }
 
 /**
+ * @param {unknown} error
  * @param {string} text
  * @param {number | null} httpStatus
  * @returns {boolean}
@@ -90,7 +110,7 @@ export function isGitHubUnavailableError(error, text, httpStatus) {
       return true;
     }
   }
-  if (/timeout|network|socket hang up/i.test(text)) {
+  if (GH_NETWORK_MESSAGE_RE.test(text)) {
     return true;
   }
   return false;
@@ -108,7 +128,6 @@ export function shortenFailureDetail(raw) {
   if (!detail) {
     detail = "unknown error";
   }
-  detail = sanitizeExternalPlanText(detail);
   if (detail.length > DETAIL_MAX_LENGTH) {
     detail = `${detail.slice(0, DETAIL_MAX_LENGTH - 1)}…`;
   }
@@ -126,7 +145,7 @@ export function shortenFailureDetail(raw) {
  */
 export function classifyPlanFailure(error) {
   const text = errorToDiagnosticText(error);
-  const httpStatus = parseGhHttpStatus(text);
+  const httpStatus = extractHttpStatusFromError(error);
 
   if (isGitHubUnavailableError(error, text, httpStatus)) {
     return {

@@ -50,6 +50,16 @@ function writeSummary(text: string) {
   appendFileSync(file, `${text}\n`);
 }
 
+function writeSummarySafely(text: string) {
+  try {
+    writeSummary(text);
+  } catch (summaryError) {
+    console.error(
+      summaryError instanceof Error ? summaryError.message : String(summaryError),
+    );
+  }
+}
+
 function decodeContent(entry: GhContent): string {
   if (!entry.content || entry.encoding !== "base64") {
     throw new Error("Unexpected contents API response");
@@ -248,7 +258,7 @@ function main() {
     process.exit(0);
   } catch (error) {
     const result = executePlanSoftFail(error);
-    writeSummary(result.summaryMarkdown);
+    writeSummarySafely(result.summaryMarkdown);
     process.exit(result.exitCode);
   }
 }
