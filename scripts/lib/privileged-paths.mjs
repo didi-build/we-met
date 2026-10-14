@@ -44,6 +44,10 @@ export const privilegedPathMatchers = [
       filename.endsWith(".jsonc"),
   },
   {
+    id: "queue-retry-policy",
+    test: (filename) => filename === "scripts/lib/queue-retry-policy.mjs",
+  },
+  {
     id: "open-next-config",
     test: (filename) => /^open-next\.config\./.test(filename),
   },

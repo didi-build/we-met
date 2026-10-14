@@ -14,8 +14,7 @@ import { resolve } from "node:path";
 import { parseJsonc } from "./lib/parse-jsonc.mjs";
 import {
   FOLLOWUP_RETRY_BASE_DELAY_SECONDS,
-  followupRetryTotalWindowSeconds,
-  FOLLOWUP_RETRY_RETENTION_BUDGET_SECONDS,
+  followupRetryWindowFitsBudget,
   MAX_VISITOR_FOLLOWUP_ATTEMPTS,
 } from "./lib/queue-retry-policy.mjs";
 import {
@@ -225,14 +224,8 @@ function checkConsumerQueueConsumerSettings(consumerRow) {
       `consumer retry_delay must be ${FOLLOWUP_RETRY_BASE_DELAY_SECONDS} (matches code base delay)`,
     );
   }
-  const windowSeconds = followupRetryTotalWindowSeconds();
-  const retentionBudget = process.env.WE_MET_GUARD_RETRY_RETENTION_BUDGET_SECONDS
-    ? Number(process.env.WE_MET_GUARD_RETRY_RETENTION_BUDGET_SECONDS)
-    : FOLLOWUP_RETRY_RETENTION_BUDGET_SECONDS;
-  if (windowSeconds > retentionBudget) {
-    fail(
-      `consumer retry window (${windowSeconds}s) exceeds retention budget (${retentionBudget}s)`,
-    );
+  if (!followupRetryWindowFitsBudget()) {
+    fail("consumer retry window exceeds retention budget");
   }
 }
 

@@ -73,6 +73,19 @@ const EXPECTED_DEPLOY_STEPS_BLOCK = `    steps:
             --output wrangler.ci.jsonc
       - name: Deploy-time guards (production)
         run: node scripts/check-deploy-guards.mjs --target production --config wrangler.ci.jsonc
+      - name: Prepare follow-up email consumer Wrangler config (production D1 ID)
+        env:
+          WE_MET_D1_DATABASE_ID_PRODUCTION: \${{ vars.WE_MET_D1_DATABASE_ID_PRODUCTION }}
+        run: |
+          set -euo pipefail
+          node scripts/prepare-wrangler-config.mjs \\
+            --target consumer-production \\
+            --output workers/we-met-followup-email-consumer/wrangler.production.ci.jsonc
+      - name: Deploy-time guards (production consumer)
+        run: |
+          node scripts/check-deploy-guards.mjs \\
+            --target consumer-production \\
+            --config workers/we-met-followup-email-consumer/wrangler.production.ci.jsonc
       - name: Require production Turnstile site key
         env:
           NEXT_PUBLIC_TURNSTILE_SITE_KEY: \${{ vars.WE_MET_TURNSTILE_SITE_KEY_PRODUCTION }}
@@ -136,21 +149,29 @@ describe("Deploy production workflow structure (unit)", () => {
     expect(deploySection).toContain(EXPECTED_DEPLOY_STEPS_BLOCK);
   });
 
-  it("deploy job appends production follow-up email consumer steps after the app deploy", () => {
+  it("runs consumer prepare and guards before app build or deploy", () => {
     const deploySection = workflow.match(/^  deploy:[\s\S]*$/m)?.[0] ?? "";
-    expect(deploySection).toContain("Prepare follow-up email consumer Wrangler config");
-    expect(deploySection).toContain("--target consumer-production");
-    expect(deploySection).toContain("wrangler.production.ci.jsonc");
-    expect(deploySection).toContain("Deploy-time guards (production consumer)");
-    expect(deploySection).toContain("Deploy follow-up email consumer to production");
-    expect(deploySection).toContain("CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION");
-    expect(deploySection).not.toContain("WE_MET_TEST_MAIL_TO");
-    const appDeployIdx = deploySection.indexOf("opennextjs-cloudflare deploy");
+    const productionGuardsIdx = deploySection.indexOf(
+      "Deploy-time guards (production)",
+    );
     const consumerPrepareIdx = deploySection.indexOf(
       "Prepare follow-up email consumer",
     );
-    expect(appDeployIdx).toBeGreaterThan(-1);
-    expect(consumerPrepareIdx).toBeGreaterThan(appDeployIdx);
+    const consumerGuardsIdx = deploySection.indexOf(
+      "Deploy-time guards (production consumer)",
+    );
+    const turnstileIdx = deploySection.indexOf("Require production Turnstile site key");
+    const appDeployIdx = deploySection.indexOf("opennextjs-cloudflare deploy");
+    const consumerDeployIdx = deploySection.indexOf(
+      "Deploy follow-up email consumer to production",
+    );
+    expect(productionGuardsIdx).toBeGreaterThan(-1);
+    expect(consumerPrepareIdx).toBeGreaterThan(productionGuardsIdx);
+    expect(consumerGuardsIdx).toBeGreaterThan(consumerPrepareIdx);
+    expect(turnstileIdx).toBeGreaterThan(consumerGuardsIdx);
+    expect(appDeployIdx).toBeGreaterThan(turnstileIdx);
+    expect(consumerDeployIdx).toBeGreaterThan(appDeployIdx);
+    expect(deploySection).not.toContain("WE_MET_TEST_MAIL_TO");
   });
 
   it("plan job uses only pinned actions/* SHAs", () => {

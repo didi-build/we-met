@@ -457,23 +457,6 @@ describe("check-deploy-guards (unit)", () => {
     expect(result.stderr).toContain("retry_delay");
   });
 
-  it("fails consumer-nonprod when retry window exceeds retention budget", () => {
-    const path = writeTempConsumerConfig(CONSUMER_NONPROD, () => {});
-    const result = spawnSync(
-      "node",
-      [SCRIPT, "--target", "consumer-nonprod", "--config", path],
-      {
-        encoding: "utf8",
-        env: {
-          ...process.env,
-          WE_MET_GUARD_RETRY_RETENTION_BUDGET_SECONDS: "1000",
-        },
-      },
-    );
-    expect(result.status).toBe(1);
-    expect(result.stderr).toContain("retention budget");
-  });
-
   it("fails consumer-production when config references WE_MET_TEST_MAIL_TO", () => {
     const path = writeTempConsumerConfig(CONSUMER_PRODUCTION, (config) => {
       const vars = config.vars as Record<string, string>;

@@ -205,17 +205,17 @@ Use the **file redirect** for `GMAIL_SERVICE_ACCOUNT_JSON` so a multi-line priva
 
 ### Production follow-up email consumer (first deploy, DIDI-599)
 
-**Before the first approved production deploy:** create dashboard token **`we-met-ci-consumer`** and add GitHub secret **`CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION`** on the **`production`** environment (names only — do not widen `we-met-ci-production`).
+A Worker-scoped **`we-met-ci-consumer`** token cannot be created until Worker **`we-met-followup-email-consumer`** exists. **Hand-deploy the production consumer once** on `main` before creating that token or approving the first post-merge **Deploy production** run that includes the consumer CI step.
 
-**First deploy order:** the consumer **attaches to the production queue** on its first deploy and **starts draining** it (messages from the last **24 hours** may be processed). Without Gmail secrets, sends fail and retry for about **12 hours** — set production secrets **immediately** after the first deploy.
+The first deploy **attaches the consumer to the production queue** and **starts draining** it (messages from the last **24 hours** may be processed). Set Gmail secrets **immediately** after that deploy; without them, sends fail and retry for about **12 hours**.
 
 **Maintainer checklist (names only, in order):**
 
-1. Create **`we-met-ci-consumer`** and add **`CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION`** to GitHub **`production`** (before approving deploy).
-2. Approve **Deploy production** on `main`.
-3. `npx wrangler secret put GMAIL_SERVICE_ACCOUNT_JSON --name we-met-followup-email-consumer`
-4. `npx wrangler secret put GMAIL_SENDER --name we-met-followup-email-consumer`
-5. `npx wrangler secret list --name we-met-followup-email-consumer` — must show **exactly** `GMAIL_SERVICE_ACCOUNT_JSON` and `GMAIL_SENDER`; **never** `WE_MET_TEST_MAIL_TO`.
+1. Merge PR #18; **Deploy production** on `main` starts and waits at approval — **do not approve yet**.
+2. On `main`, export **`WE_MET_D1_DATABASE_ID_PRODUCTION`** (never **`WE_MET_D1_DATABASE_ID_NONPROD`** in this shell). Run `node scripts/prepare-wrangler-config.mjs --target consumer-production --output workers/we-met-followup-email-consumer/wrangler.production.ci.jsonc`, then `node scripts/check-deploy-guards.mjs --target consumer-production --config workers/we-met-followup-email-consumer/wrangler.production.ci.jsonc`, then `npx wrangler login`, then `npx wrangler deploy --config workers/we-met-followup-email-consumer/wrangler.production.ci.jsonc`.
+3. Immediately `npx wrangler secret put GMAIL_SERVICE_ACCOUNT_JSON` and `npx wrangler secret put GMAIL_SENDER` with `--name we-met-followup-email-consumer`; then `npx wrangler secret list --name we-met-followup-email-consumer` must show **exactly** those two names and **never** `WE_MET_TEST_MAIL_TO`.
+4. Create dashboard token **`we-met-ci-consumer`** scoped to the now-existing Worker and add GitHub secret **`CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION`** on the **`production`** environment.
+5. Approve the waiting **Deploy production** run.
 6. One dated test submission to the maintainer's own address ([test-leads.md](./test-leads.md)).
 
 **Recovery:** if the consumer deploy step fails after the app deploy succeeded, re-run the **full** Deploy production job after fixing the error ([deploy.md](./deploy.md)).

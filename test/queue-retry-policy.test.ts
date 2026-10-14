@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   followupEmailRetryDelaySeconds,
   followupRetryTotalWindowSeconds,
+  followupRetryWindowFitsBudget,
   followupRetryWindowSecondsThroughAttempt,
+  FOLLOWUP_RETRY_RETENTION_BUDGET_SECONDS,
   MAX_VISITOR_FOLLOWUP_ATTEMPTS,
 } from "../scripts/lib/queue-retry-policy.mjs";
 
@@ -22,5 +24,23 @@ describe("queue-retry-policy (unit)", () => {
   it("keeps total window under the retention budget", () => {
     expect(followupRetryTotalWindowSeconds()).toBeLessThan(72_000);
     expect(MAX_VISITOR_FOLLOWUP_ATTEMPTS).toBe(30);
+  });
+
+  it("followupRetryWindowFitsBudget rejects non-finite or non-positive budgets", () => {
+    expect(followupRetryWindowFitsBudget(Number.NaN)).toBe(false);
+    expect(followupRetryWindowFitsBudget(0)).toBe(false);
+    expect(followupRetryWindowFitsBudget(-1)).toBe(false);
+  });
+
+  it("followupRetryWindowFitsBudget passes at the exact window and default constant", () => {
+    expect(followupRetryWindowFitsBudget(43_290)).toBe(true);
+    expect(followupRetryWindowFitsBudget(FOLLOWUP_RETRY_RETENTION_BUDGET_SECONDS)).toBe(
+      true,
+    );
+    expect(followupRetryWindowFitsBudget()).toBe(true);
+  });
+
+  it("followupRetryWindowFitsBudget fails when budget is below the window", () => {
+    expect(followupRetryWindowFitsBudget(1000)).toBe(false);
   });
 });

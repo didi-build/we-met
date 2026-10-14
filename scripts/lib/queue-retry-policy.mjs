@@ -34,3 +34,16 @@ export function followupRetryWindowSecondsThroughAttempt(lastAttemptWithDelay) {
 export function followupRetryTotalWindowSeconds() {
   return followupRetryWindowSecondsThroughAttempt(MAX_VISITOR_FOLLOWUP_ATTEMPTS - 1);
 }
+
+/**
+ * @param {number} [budgetSeconds]
+ * @returns {boolean}
+ */
+export function followupRetryWindowFitsBudget(
+  budgetSeconds = FOLLOWUP_RETRY_RETENTION_BUDGET_SECONDS,
+) {
+  if (!Number.isFinite(budgetSeconds) || budgetSeconds <= 0) {
+    return false;
+  }
+  return followupRetryTotalWindowSeconds() <= budgetSeconds;
+}
