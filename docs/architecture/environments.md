@@ -58,7 +58,7 @@ Values live in GitHub Environments, the Cloudflare dashboard, or local `.env`. *
 | Name                             | Where used                  | Notes                                                                                                                                                                                                                                                                                                                    |
 | -------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `WE_MET_ENV`                     | App Worker, consumer        | `local` \| `preview` \| `production`                                                                                                                                                                                                                                                                                     |
-| `WE_MET_BASE_URL`                | App Worker, consumer        | Email links and footers. Previews: `https://we-met.link` in the `previews` block                                                                                                                                                                                                                                         |
+| `WE_MET_BASE_URL`                | App Worker                  | Email links and footers. Previews: `https://we-met.link` in the `previews` block. **Not** on the follow-up email consumer (step 1 follow-up copy has no base-URL links).                                                                                                                                                 |
 | `WE_MET_PREVIEW_HOST_SUFFIX`     | App Worker                  | **Previews only** (`previews.vars`): hostname suffix for PR preview URLs (e.g. `-we-met.<account>.workers.dev`). Top-level production value is `""`. Used by card lookup to treat preview hosts as card-serving. Update when the account workers.dev subdomain changes ([deploy-setup.md](../runbooks/deploy-setup.md)). |
 | `WE_MET_TOKEN_SECRET`            | App Worker                  | Signs the details-step token                                                                                                                                                                                                                                                                                             |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Build time (browser bundle) | Public; only `NEXT_PUBLIC_*` vars reach the client                                                                                                                                                                                                                                                                       |
@@ -91,7 +91,22 @@ The consumer registers on the queue in **its own** Wrangler config; it is not an
 
 **Consumer mail safety:** redirect and fail-closed behavior use the consumer’s own `vars.WE_MET_ENV` and the secret `WE_MET_TEST_MAIL_TO` (non-prod only). Queue fields such as `lead.environment` are ignored for recipient selection.
 
-**Consumer queue handling (step 1):** processes `visitor_followup` only. `lead_sink_record` and `lead_sink_append_details` (and any unknown `type`) **retry** until Cloudflare discards them — they are not acked. Malformed `visitor_followup` bodies are logged and acked. Visitor follow-up send failures retry with backoff up to **5** attempts (`max_retries: 5` in Wrangler), then log (lead id + error type only) and ack.
+**Consumer queue handling (step 1):** processes `visitor_followup` only. `lead_sink_record` and `lead_sink_append_details` (and any unknown `type`) **retry** until Cloudflare discards them — they are not acked. Malformed `visitor_followup` bodies are logged and acked. Visitor follow-up send failures retry with exponential backoff (30s, 60s, 120s, 240s between attempts — about **7.5 minutes** total for five attempts). After the fifth failed attempt the consumer logs a permanent failure (`leadId`, `errorCode` only — no visitor name, email, or phone) and **acks** the message. **UNVERIFIED:** whether Cloudflare discards messages after `max_retries` without a dead-letter queue unless one is configured ([DIDI-599](https://linear.app/didi-build/issue/DIDI-599), [DIDI-586](https://linear.app/didi-build/issue/DIDI-586)).
+
+**Consumer logs (debugging live mail):**
+
+| Event                                | Fields                                        |
+| ------------------------------------ | --------------------------------------------- |
+| `visitor_followup_attempt_failure`   | `leadId`, `attempt`, `errorCode`, `willRetry` |
+| `visitor_followup_permanent_failure` | `leadId`, `errorCode`                         |
+| `visitor_followup_malformed`         | `leadId` (may be null)                        |
+| `followup_unsupported_queue_type`    | `typeLabel`                                   |
+| `followup_vcard_photo_missing`       | `photoKey`                                    |
+| `followup_vcard_photo_not_jpeg`      | `photoKey`                                    |
+
+**Consumer `errorCode` values (no raw exception text):** `gmail_secret_missing`, `gmail_invalid_service_account_json`, `gmail_token_http_<status>`, `gmail_token_missing_access_token`, `gmail_send_http_<status>`, `gmail_network_error`, `nonprod_mail_redirect_unset`, `unknown`. For `gmail_secret_missing`, logs include `secretName` (e.g. `GMAIL_SENDER`) — never a secret value.
+
+**Consumer Wrangler `vars` allowlist:** `WE_MET_ENV` only. `WE_MET_TEST_MAIL_TO` must be a **secret**, not a var.
 
 **GitHub Actions secrets and variables**
 

@@ -179,15 +179,21 @@ npm run worker:consumer-dry-run:nonprod
 npx wrangler deploy --config workers/we-met-followup-email-consumer/wrangler.nonprod.jsonc
 ```
 
-**Order matters:** the first deploy attaches the consumer to `we-met-followup-email-nonprod`, which **starts draining the queue immediately**. Set secrets **back to back** before or immediately after deploy (queued messages retry, but do not leave the Worker without secrets):
+**Order matters:** deploy the consumer **first** so the Worker exists, then set secrets **immediately** afterward. The first deploy attaches the consumer to `we-met-followup-email-nonprod`, which **starts draining the queue immediately**; queued messages retry, but do not leave the Worker without secrets for long.
+
+**UNVERIFIED:** whether `wrangler secret put` against a Worker name that has never been deployed creates the Worker or fails until the first deploy.
 
 ```bash
-npx wrangler secret put GMAIL_SERVICE_ACCOUNT_JSON --name we-met-followup-email-consumer-nonprod
+npx wrangler secret put GMAIL_SERVICE_ACCOUNT_JSON --name we-met-followup-email-consumer-nonprod < /path/to/key.json
 npx wrangler secret put GMAIL_SENDER --name we-met-followup-email-consumer-nonprod
 npx wrangler secret put WE_MET_TEST_MAIL_TO --name we-met-followup-email-consumer-nonprod
 ```
 
+Use the **file redirect** for `GMAIL_SERVICE_ACCOUNT_JSON` so a multi-line private key is never pasted into the terminal (Git Bash example above). **Never** commit or paste the JSON key into chat or the repo.
+
 `WE_MET_TEST_MAIL_TO` is **non-prod only** (never on the production consumer). Confirm binding names with `npx wrangler versions view <version-id> --name we-met-followup-email-consumer-nonprod`.
+
+**Retries:** visitor follow-up uses `max_retries: 5` with backoff (about **7.5 minutes** between first attempt and permanent failure). A longer Gmail outage or a missing secret drops the visitor email with only log lines (`visitor_followup_attempt_failure` / `visitor_followup_permanent_failure` — see [environments.md](../architecture/environments.md)). **UNVERIFIED:** queue discard after `max_retries` without a dead-letter queue ([DIDI-599](https://linear.app/didi-build/issue/DIDI-599), [DIDI-586](https://linear.app/didi-build/issue/DIDI-586)).
 
 Smoke test: [test-leads.md](./test-leads.md) (exchange on a PR preview → mail at `WE_MET_TEST_MAIL_TO`).
 
