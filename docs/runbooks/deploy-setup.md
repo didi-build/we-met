@@ -238,7 +238,7 @@ After PR #3 merged (**2026-10-11**), the first GitHub Actions runs (Wrangler **4
 After the production follow-up email consumer shipped (**2026-10-14**), the first **Deploy production** run that included the consumer CI step showed:
 
 7. **Production consumer deploy (first attempt failed):** `wrangler deploy` for **`we-met-followup-email-consumer`** failed listing queues with `Authentication error [code: 10000]` — token **`we-met-ci-consumer-production`** had **Workers Editor** on the consumer only, no queue permission.
-8. **Production consumer deploy (after token fix):** adding account-level **Queues Edit** to the same dashboard token and re-running the job succeeded. **D1 Edit** was not required for this deploy despite a D1 binding on the consumer config. Gmail secrets set before the first hand deploy were still present after the CI redeploy.
+8. **Production consumer deploy (after token fix):** adding account-level **Queues Edit** to the same dashboard token and re-running the job succeeded. **D1 Edit** was not required for this deploy despite a D1 binding on the consumer config. Gmail secrets set right after the hand deploy were still present after the CI redeploy.
 
 ## 3. GitHub secrets and variables
 
