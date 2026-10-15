@@ -28,6 +28,8 @@ export type HiCardPresentationProps = {
   preview?: boolean;
   /** Chips and About “Show more”; when false, links render as non-navigating spans. */
   interactive?: boolean;
+  /** Editor preview placeholder; not persisted on the card record. */
+  greetingOverride?: string;
   /** Fixed-height slot (landing phone); uses design 390px top card margin. */
   embedded?: boolean;
   exchangeButtonRef?: Ref<HTMLButtonElement>;
@@ -59,11 +61,12 @@ export function HiCardPresentation({
   ctaRef,
   onOpenExchange,
   thanksLine,
+  greetingOverride,
 }: HiCardPresentationProps) {
   const { copy, pageCopy } = card;
   const flags = cardContentFlags(card);
   const initials = cardInitials(card.name);
-  const greeting = cardGreeting(card.name);
+  const greeting = greetingOverride ?? cardGreeting(card.name);
   const [photoBroken, setPhotoBroken] = useState(false);
   const showPhoto = flags.hasPhoto && Boolean(photoUrl) && !photoBroken;
 

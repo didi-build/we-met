@@ -2,7 +2,7 @@ import type { CardRecord } from "@/card-data/types";
 import type { EditorCard } from "@/app-api/types";
 import { previewCardShell } from "@/lib/app-editor/preview-card-shell";
 
-/** Builds a CardRecord for HiPageClient preview from editor draft values. */
+/** Builds a CardRecord for the editor live preview from draft values. */
 export function editorCardToPreviewRecord(
   draft: EditorCard,
   slugFallback = "preview",

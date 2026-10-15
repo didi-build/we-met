@@ -1,7 +1,7 @@
 "use client";
 
 import type { EditorCard } from "@/app-api/types";
-import { HiPageClient } from "@/components/hi/HiPageClient";
+import { HiCardPresentation } from "@/components/hi/HiCardPresentation";
 import { MirroredThemeProvider } from "@/components/theme/ThemeProvider";
 import { editorCardToPreviewRecord } from "@/lib/app-editor/draft-to-preview-card";
 import { useMemo } from "react";
@@ -12,10 +12,15 @@ type AppCardPreviewProps = {
   draft: EditorCard;
 };
 
-/** Live card preview: read-only, no navigation or exchange. */
+const PREVIEW_GREETING_PLACEHOLDER = "Your name here";
+
+/** Live card preview: exchange inert; chips and About expand; no navigation (inert shell). */
 export function AppCardPreview({ theme, draft }: AppCardPreviewProps) {
   const previewRecord = useMemo(() => editorCardToPreviewRecord(draft), [draft]);
   const photoUrl = draft.photo || null;
+  const greetingOverride = !draft.name.trim()
+    ? PREVIEW_GREETING_PLACEHOLDER
+    : undefined;
 
   return (
     <MirroredThemeProvider theme={theme}>
@@ -25,7 +30,14 @@ export function AppCardPreview({ theme, draft }: AppCardPreviewProps) {
         aria-label="Card preview (read-only)"
         data-testid="app-card-preview-inert"
       >
-        <HiPageClient card={previewRecord} photoUrl={photoUrl} preview />
+        <HiCardPresentation
+          card={previewRecord}
+          photoUrl={photoUrl}
+          plan="free"
+          preview
+          interactive
+          greetingOverride={greetingOverride}
+        />
       </div>
     </MirroredThemeProvider>
   );

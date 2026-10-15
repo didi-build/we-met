@@ -2,9 +2,9 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { HiPageClient } from "@/components/hi/HiPageClient";
-import { ThemeProvider } from "@/components/theme/ThemeProvider";
-import { previewCardShell } from "@/lib/app-editor/preview-card-shell";
+import { AppCardPreview } from "@/components/app/editor/AppCardPreview";
+import { emptyEditorCard } from "@/app-api/stub-api";
+import { AppThemeProvider } from "@/components/app/AppThemeProvider";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -55,16 +55,14 @@ afterEach(() => {
   cleanup();
 });
 
-describe("HiPageClient preview", () => {
-  it("shows placeholder name when preview and name is empty", () => {
-    const card = {
-      ...previewCardShell("preview", ""),
-      role: undefined,
-    };
+describe("App editor card preview greeting", () => {
+  it("shows placeholder name when draft name is empty", () => {
     render(
-      <ThemeProvider>
-        <HiPageClient card={card} photoUrl={null} preview />
-      </ThemeProvider>,
+      <AppThemeProvider>
+        <div className="ap">
+          <AppCardPreview theme="light" draft={emptyEditorCard()} />
+        </div>
+      </AppThemeProvider>,
     );
     expect(screen.getByText("Your name here")).toBeTruthy();
   });
