@@ -7,13 +7,14 @@ export type FollowupEmailErrorCode =
   | "gmail_network_error"
   | "nonprod_mail_redirect_unset"
   | "owner_from_email_missing"
+  | "from_display_name_missing"
   | "malformed_sink_email_config"
   | "invalid_rfc5322_message_id"
   | "unknown";
 
 export class FollowupEmailError extends Error {
   readonly code: FollowupEmailErrorCode;
-  /** Set only for gmail_secret_missing — secret name, never a value. */
+  /** Set for secret-related error codes — secret name, never a value. */
   readonly secretName?: string;
 
   constructor(code: FollowupEmailErrorCode, options?: { secretName?: string }) {
@@ -41,7 +42,8 @@ export function followupEmailErrorLogFields(
     const fields: FollowupEmailErrorLogFields = { code: error.code };
     if (
       (error.code === "gmail_secret_missing" ||
-        error.code === "owner_from_email_missing") &&
+        error.code === "owner_from_email_missing" ||
+        error.code === "from_display_name_missing") &&
       error.secretName
     ) {
       fields.secretName = error.secretName;

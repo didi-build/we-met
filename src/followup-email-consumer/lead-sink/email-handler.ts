@@ -3,8 +3,8 @@ import {
   buildOwnerLeadAppendMessageId,
   buildOwnerLeadRecordEmail,
   buildOwnerLeadRecordMessageId,
-  WE_MET_OWNER_EMAIL_DISPLAY_NAME,
 } from "@/email/format-owner-lead-email";
+import { resolveFromDisplayName } from "@/email/from-display-name";
 import { resolveOwnerFromEmail } from "@/email/owner-from";
 import { parseEmailSinkConfig } from "@/email/parse-email-sink-config";
 import { resolveSinkEmailRecipient } from "@/email/recipient";
@@ -21,6 +21,7 @@ export type EmailLeadSinkHandlerDeps = {
   weMetEnv: string;
   testMailTo?: string;
   ownerFromEmail?: string;
+  fromDisplayName?: string;
   emailSender: EmailSender;
   ledger: ConsumerLeadDeliveryLedger;
   logMalformedLeadSink(leadId: string): void;
@@ -106,6 +107,7 @@ export function createEmailLeadSinkHandler(
       }
 
       const ownerFrom = resolveOwnerFromEmail(deps.ownerFromEmail);
+      const fromDisplayName = resolveFromDisplayName(deps.fromDisplayName);
       const recipient = resolveSinkEmailRecipient({
         weMetEnv: deps.weMetEnv,
         sinkDestinationEmail: sinkConfig.to,
@@ -131,7 +133,7 @@ export function createEmailLeadSinkHandler(
 
       const sendResult = await deps.emailSender.send({
         from: ownerFrom,
-        fromDisplayName: WE_MET_OWNER_EMAIL_DISPLAY_NAME,
+        fromDisplayName,
         to: recipient.to,
         replyTo: sanitizeEmailHeaderValue(message.lead.email),
         subject: content.subject,
@@ -162,6 +164,7 @@ export function createEmailLeadSinkHandler(
       }
 
       const ownerFrom = resolveOwnerFromEmail(deps.ownerFromEmail);
+      const fromDisplayName = resolveFromDisplayName(deps.fromDisplayName);
       const recipient = resolveSinkEmailRecipient({
         weMetEnv: deps.weMetEnv,
         sinkDestinationEmail: sinkConfig.to,
@@ -207,7 +210,7 @@ export function createEmailLeadSinkHandler(
 
       const sendResult = await deps.emailSender.send({
         from: ownerFrom,
-        fromDisplayName: WE_MET_OWNER_EMAIL_DISPLAY_NAME,
+        fromDisplayName,
         to: recipient.to,
         replyTo: sanitizeEmailHeaderValue(message.lead.email),
         subject: content.subject,
