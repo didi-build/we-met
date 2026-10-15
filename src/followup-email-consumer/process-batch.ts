@@ -5,6 +5,7 @@ import {
 } from "@/email/followup-email-error";
 import { createGmailEmailSender } from "@/email/gmail-sender";
 import { sanitizeEmailHeaderValue } from "@/email/mime-headers";
+import { resolveFromDisplayName } from "@/email/from-display-name";
 import { resolveOwnerFromEmail } from "@/email/owner-from";
 import { resolveEmailRecipient } from "@/email/recipient";
 import type { EmailSender } from "@/email/types";
@@ -50,6 +51,7 @@ export type FollowupConsumerEnv = {
   GMAIL_SERVICE_ACCOUNT_JSON: string;
   WE_MET_TEST_MAIL_TO?: string;
   WE_MET_OWNER_FROM_EMAIL?: string;
+  WE_MET_FROM_DISPLAY_NAME?: string;
   WE_MET_ASSETS: R2Bucket;
   WE_MET_DB: D1Database;
 };
@@ -100,6 +102,7 @@ export type FollowupConsumerDeps = {
   >;
   ledger: import("@/followup-email-consumer/lead-delivery-ledger").ConsumerLeadDeliveryLedger;
   ownerFromEmail?: string;
+  fromDisplayName?: string;
   now: () => Date;
 };
 
@@ -193,12 +196,14 @@ export function createFollowupConsumerDepsFromEnv(
     logLeadSinkLedgerMarkFailed,
     ledger,
     ownerFromEmail: env.WE_MET_OWNER_FROM_EMAIL,
+    fromDisplayName: env.WE_MET_FROM_DISPLAY_NAME,
     now,
     sinkHandlers: createLeadSinkHandlerRegistry({
       email: createEmailLeadSinkHandler({
         weMetEnv: env.WE_MET_ENV,
         testMailTo: env.WE_MET_TEST_MAIL_TO,
         ownerFromEmail: env.WE_MET_OWNER_FROM_EMAIL,
+        fromDisplayName: env.WE_MET_FROM_DISPLAY_NAME,
         emailSender,
         ledger,
         logMalformedLeadSink(leadId) {
@@ -217,6 +222,7 @@ async function sendVisitorFollowup(
   deps: FollowupConsumerDeps,
 ): Promise<void> {
   const ownerFrom = resolveOwnerFromEmail(deps.ownerFromEmail);
+  const fromDisplayName = resolveFromDisplayName(deps.fromDisplayName);
   const recipient = resolveEmailRecipient({
     weMetEnv: deps.weMetEnv,
     visitorEmail: message.lead.email,
@@ -241,7 +247,7 @@ async function sendVisitorFollowup(
 
   await deps.emailSender.send({
     from: ownerFrom,
-    fromDisplayName: message.card.pageCopy.emailFromName,
+    fromDisplayName,
     to: recipient.to,
     replyTo: sanitizeEmailHeaderValue(message.card.email),
     subject: content.subject,

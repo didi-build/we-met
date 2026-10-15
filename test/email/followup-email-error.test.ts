@@ -71,13 +71,23 @@ describe("FollowupEmailError (unit)", () => {
     });
   }
 
-  it("followupEmailErrorLogFields includes secretName only for gmail_secret_missing", () => {
+  it("followupEmailErrorLogFields includes secretName for secret-related codes", () => {
     const missing = followupEmailErrorLogFields(
       new FollowupEmailError("gmail_secret_missing", { secretName: "GMAIL_SENDER" }),
     );
     expect(missing).toEqual({
       code: "gmail_secret_missing",
       secretName: "GMAIL_SENDER",
+    });
+
+    const fromDisplay = followupEmailErrorLogFields(
+      new FollowupEmailError("from_display_name_missing", {
+        secretName: "WE_MET_FROM_DISPLAY_NAME",
+      }),
+    );
+    expect(fromDisplay).toEqual({
+      code: "from_display_name_missing",
+      secretName: "WE_MET_FROM_DISPLAY_NAME",
     });
 
     const network = followupEmailErrorLogFields(

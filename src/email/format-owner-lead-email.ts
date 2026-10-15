@@ -1,8 +1,6 @@
 import { escapeHtml, escapePlainTextForEmail } from "@/email/escape";
 import { sanitizeEmailHeaderValue } from "@/email/mime-headers";
 
-export const WE_MET_OWNER_EMAIL_DISPLAY_NAME = "We Met";
-
 export function formatReceivedAtToronto(iso: string): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Toronto",

@@ -195,8 +195,11 @@ npx wrangler deploy --config workers/we-met-followup-email-consumer/wrangler.non
 npx wrangler secret put GMAIL_SERVICE_ACCOUNT_JSON --name we-met-followup-email-consumer-nonprod < /path/to/key.json
 npx wrangler secret put GMAIL_SENDER --name we-met-followup-email-consumer-nonprod
 npx wrangler secret put WE_MET_OWNER_FROM_EMAIL --name we-met-followup-email-consumer-nonprod
+npx wrangler secret put WE_MET_FROM_DISPLAY_NAME --name we-met-followup-email-consumer-nonprod
 npx wrangler secret put WE_MET_TEST_MAIL_TO --name we-met-followup-email-consumer-nonprod
 ```
+
+**Deploy order (`WE_MET_FROM_DISPLAY_NAME`):** set `WE_MET_FROM_DISPLAY_NAME` on **both** consumers (`we-met-followup-email-consumer-nonprod` and `we-met-followup-email-consumer`) **before** deploying consumer code that requires it. A missing or invalid value fails closed; visitor follow-ups and owner sink mail retry until the secret is set or attempts are exhausted.
 
 Use the **file redirect** for `GMAIL_SERVICE_ACCOUNT_JSON` so a multi-line private key is never pasted into the terminal (Git Bash example above). **Never** commit or paste the JSON key into chat or the repo.
 
@@ -214,7 +217,7 @@ The first deploy **attaches the consumer to the production queue** and **starts 
 
 1. Merge PR #18; **Deploy production** on `main` starts and waits at approval — **do not approve yet**.
 2. On `main`, export **`WE_MET_D1_DATABASE_ID_PRODUCTION`** (never **`WE_MET_D1_DATABASE_ID_NONPROD`** in this shell). Run `node scripts/prepare-wrangler-config.mjs --target consumer-production --output workers/we-met-followup-email-consumer/wrangler.production.ci.jsonc`, then `node scripts/check-deploy-guards.mjs --target consumer-production --config workers/we-met-followup-email-consumer/wrangler.production.ci.jsonc`, then `npx wrangler login`, then `npx wrangler deploy --config workers/we-met-followup-email-consumer/wrangler.production.ci.jsonc`.
-3. Immediately `npx wrangler secret put GMAIL_SERVICE_ACCOUNT_JSON`, `npx wrangler secret put GMAIL_SENDER`, and `npx wrangler secret put WE_MET_OWNER_FROM_EMAIL` with `--name we-met-followup-email-consumer`; then `npx wrangler secret list --name we-met-followup-email-consumer` must show **exactly** those three names and **never** `WE_MET_TEST_MAIL_TO`.
+3. Immediately `npx wrangler secret put GMAIL_SERVICE_ACCOUNT_JSON`, `npx wrangler secret put GMAIL_SENDER`, `npx wrangler secret put WE_MET_OWNER_FROM_EMAIL`, and `npx wrangler secret put WE_MET_FROM_DISPLAY_NAME` with `--name we-met-followup-email-consumer`; then `npx wrangler secret list --name we-met-followup-email-consumer` must show **exactly** those four names and **never** `WE_MET_TEST_MAIL_TO`.
 4. Create dashboard token **`we-met-ci-consumer-production`** with **Workers Editor** on Worker **`we-met-followup-email-consumer`** only and account-level **Queues Edit**; add GitHub secret **`CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION`** on the **`production`** environment.
 5. Approve the waiting **Deploy production** run.
 6. One dated test submission to the maintainer's own address ([test-leads.md](./test-leads.md)).

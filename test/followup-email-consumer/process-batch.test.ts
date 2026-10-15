@@ -74,6 +74,8 @@ function createMessage(
   };
 }
 
+const PLATFORM_FROM_DISPLAY_NAME = "Diadem at We Met";
+
 function createDeps(
   overrides: Partial<FollowupConsumerDeps> = {},
   ledgerArg?: MemoryConsumerLeadDeliveryLedger,
@@ -89,6 +91,10 @@ function createDeps(
     "testMailTo" in overrides ? overrides.testMailTo : "test-inbox@example.com";
   const ownerFromEmail =
     "ownerFromEmail" in overrides ? overrides.ownerFromEmail : "hello@we-met.link";
+  const fromDisplayName =
+    "fromDisplayName" in overrides
+      ? overrides.fromDisplayName
+      : PLATFORM_FROM_DISPLAY_NAME;
   const logLedgerRowMissing = vi.fn();
   const logLedgerUpdateFailed = vi.fn();
   const logMalformedLeadSinkForHandler = vi.fn();
@@ -99,6 +105,7 @@ function createDeps(
         weMetEnv,
         testMailTo,
         ownerFromEmail,
+        fromDisplayName,
         emailSender,
         ledger,
         logMalformedLeadSink: logMalformedLeadSinkForHandler,
@@ -112,6 +119,7 @@ function createDeps(
     weMetEnv,
     testMailTo,
     ownerFromEmail,
+    fromDisplayName,
     emailSender,
     ledger,
     sinkHandlers,
@@ -169,7 +177,7 @@ describe("processFollowupQueueBatch (unit)", () => {
     const sent = vi.mocked(deps.emailSender.send).mock.calls[0][0];
     expect(sent.to).toBe("test-inbox@example.com");
     expect(sent.from).toBe("hello@we-met.link");
-    expect(sent.fromDisplayName).toBe("Demo at Example");
+    expect(sent.fromDisplayName).toBe(PLATFORM_FROM_DISPLAY_NAME);
     expect(sent.replyTo).toBe("owner@example.com");
     expect(message.ack).toHaveBeenCalledOnce();
     expect(message.retry).not.toHaveBeenCalled();
@@ -251,6 +259,33 @@ describe("processFollowupQueueBatch (unit)", () => {
     });
     expect(message.ack).toHaveBeenCalledOnce();
     expect(message.retry).not.toHaveBeenCalled();
+  });
+
+  it("never calls send when WE_MET_FROM_DISPLAY_NAME is unset; retries then permanent failure", async () => {
+    const send = vi.fn(async () => ({ messageId: null, threadId: null }));
+    const depsUnset = createDeps({ fromDisplayName: undefined, emailSender: { send } });
+    const msgRetry = createMessage(visitorBody(), { attempts: 3 });
+    await processFollowupQueueBatch({ messages: [msgRetry] }, depsUnset);
+    expect(send).not.toHaveBeenCalled();
+    expect(msgRetry.retry).toHaveBeenCalledOnce();
+    expect(depsUnset.logVisitorFollowupAttemptFailure).toHaveBeenCalledWith(
+      "lead-1",
+      3,
+      { code: "from_display_name_missing", secretName: "WE_MET_FROM_DISPLAY_NAME" },
+      true,
+    );
+
+    const msgFinal = createMessage(visitorBody(), {
+      attempts: MAX_VISITOR_FOLLOWUP_ATTEMPTS,
+    });
+    const depsFinal = createDeps({ fromDisplayName: "", emailSender: { send } });
+    await processFollowupQueueBatch({ messages: [msgFinal] }, depsFinal);
+    expect(send).not.toHaveBeenCalled();
+    expect(msgFinal.ack).toHaveBeenCalledOnce();
+    expect(depsFinal.logVisitorFollowupPermanentFailure).toHaveBeenCalledWith(
+      "lead-1",
+      { code: "from_display_name_missing", secretName: "WE_MET_FROM_DISPLAY_NAME" },
+    );
   });
 
   it("never calls send when WE_MET_OWNER_FROM_EMAIL is unset; retries then permanent failure", async () => {
@@ -431,7 +466,7 @@ describe("processFollowupQueueBatch (unit)", () => {
     const sent = vi.mocked(deps.emailSender.send).mock.calls[0][0];
     expect(sent.to).toBe("test-inbox@example.com");
     expect(sent.from).toBe("hello@we-met.link");
-    expect(sent.fromDisplayName).toBe("We Met");
+    expect(sent.fromDisplayName).toBe(PLATFORM_FROM_DISPLAY_NAME);
     expect(message.ack).toHaveBeenCalledOnce();
     expect(message.retry).not.toHaveBeenCalled();
   });
@@ -573,6 +608,29 @@ describe("processFollowupQueueBatch (unit)", () => {
 
     expect(send).not.toHaveBeenCalled();
     expect(message.retry).toHaveBeenCalledOnce();
+  });
+
+  it("never sends sink email when WE_MET_FROM_DISPLAY_NAME is missing", async () => {
+    const ledger = new MemoryConsumerLeadDeliveryLedger();
+    ledger.seedQueued("lead-1", "sink-1", "record");
+    const send = vi.fn(async () => ({ messageId: "g1", threadId: "t1" }));
+    const message = createMessage(sinkRecordBody(), { attempts: 3 });
+    const deps = createDeps(
+      { fromDisplayName: undefined, emailSender: { send } },
+      ledger,
+    );
+
+    await processFollowupQueueBatch({ messages: [message] }, deps);
+
+    expect(send).not.toHaveBeenCalled();
+    expect(message.retry).toHaveBeenCalledOnce();
+    expect(deps.logLeadSinkAttemptFailure).toHaveBeenCalledWith(
+      "lead-1",
+      "sink-1",
+      3,
+      { code: "from_display_name_missing", secretName: "WE_MET_FROM_DISPLAY_NAME" },
+      true,
+    );
   });
 
   it("fails closed for sinks when non-prod redirect is unset", async () => {
