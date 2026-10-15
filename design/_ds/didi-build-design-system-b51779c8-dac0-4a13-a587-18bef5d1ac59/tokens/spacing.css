@@ -1,0 +1,18 @@
+:root{
+  --container:1168px;
+  --gutter:clamp(20px,5cqi,48px);/* @kind spacing */
+  --section-y:clamp(56px,9cqi,112px);/* @kind spacing */
+  --hero-top:clamp(40px,8cqi,104px);/* @kind spacing */
+  --hero-bottom:clamp(64px,9cqi,120px);/* @kind spacing */
+  --column-gap:clamp(40px,6cqi,80px);/* @kind spacing */
+  --block-gap:clamp(36px,5cqi,56px);/* @kind spacing */
+  --panel-pad:clamp(28px,5cqi,64px);
+
+  --space-4:4px;--space-6:6px;--space-8:8px;--space-10:10px;--space-12:12px;--space-14:14px;--space-16:16px;
+  --space-20:20px;--space-24:24px;--space-28:28px;--space-32:32px;--space-36:36px;--space-48:48px;--space-64:64px;
+
+  --radius-sm:8px;--radius-field:12px;--radius-alert:14px;--radius-card:24px;--radius-pill:999px;
+
+  --hit-min:44px;--control-md:48px;--field-h:52px;--control-lg:56px;
+  --rule-strong:2px;--rule:1px;--outline-w:1.5px;
+}

@@ -1,0 +1,5 @@
+:root{
+  --dur-fast:.15s;/* @kind other */--dur-base:.2s;/* @kind other */--dur-icon:.25s;/* @kind other */--dur-disclose:.3s;/* @kind other */--dur-leaf:.8s;/* @kind other */--dur-stem:1.9s;/* @kind other */
+  --ease-standard:cubic-bezier(.4,0,.2,1);/* @kind other */
+  --ease-leaf:cubic-bezier(.3,1.35,.5,1);/* @kind other */
+}

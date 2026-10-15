@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Contact card</title>
+<link rel="stylesheet" href="_ds/didi-build-design-system-b51779c8-dac0-4a13-a587-18bef5d1ac59/tokens/fonts.css">
+<link rel="stylesheet" href="_ds/didi-build-design-system-b51779c8-dac0-4a13-a587-18bef5d1ac59/tokens/colors.css">
+<link rel="stylesheet" href="_ds/didi-build-design-system-b51779c8-dac0-4a13-a587-18bef5d1ac59/tokens/typography.css">
+<link rel="stylesheet" href="_ds/didi-build-design-system-b51779c8-dac0-4a13-a587-18bef5d1ac59/tokens/spacing.css">
+<link rel="stylesheet" href="_ds/didi-build-design-system-b51779c8-dac0-4a13-a587-18bef5d1ac59/tokens/motion.css">
+<link rel="stylesheet" href="_ds/didi-build-design-system-b51779c8-dac0-4a13-a587-18bef5d1ac59/tokens/base.css">
+<link rel="stylesheet" href="_ds/didi-build-design-system-b51779c8-dac0-4a13-a587-18bef5d1ac59/styles.css">
+<script src="_ds/didi-build-design-system-b51779c8-dac0-4a13-a587-18bef5d1ac59/_ds_bundle.js"></script>
+<style>
+html,body{margin:0;padding:0}
+a{color:var(--ink)}a:hover{color:var(--ink-muted)}
+a:focus-visible,button:focus-visible,select:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+@keyframes hiSheetIn{from{transform:translateY(100%)}to{transform:none}}
+@keyframes hiSheetOut{from{transform:none}to{transform:translateY(100%)}}
+@keyframes hiScrimIn{from{opacity:0}to{opacity:1}}
+@keyframes hiScrimOut{from{opacity:1}to{opacity:0}}
+@keyframes hiRise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes hiFadeOut{from{opacity:1;transform:none}to{opacity:0;transform:translateY(-8px)}}
+@keyframes hiFade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</helmet>
+<div data-theme="{{ theme }}" data-palette="{{ palette }}" ref="{{ rootRef }}" data-screen-label="Card" style="color-scheme:{{ theme }};position:relative;min-height:100svh;background:var(--bg);color:var(--ink);font-family:var(--font-sans);container-type:inline-size;overflow:hidden;isolation:isolate">
+  <div aria-hidden="true" style="position:absolute;z-index:-1;top:-200px;left:50%;transform:translateX(-50%);width:520px;height:420px;border-radius:50%;background:radial-gradient(closest-side,var(--accent-soft),transparent);pointer-events:none"></div>
+
+  <sc-if value="{{ bnTop }}" hint-placeholder-val="{{ false }}">
+    <a href="https://wemet.didi.build" target="_blank" rel="noopener" style="display:flex;justify-content:center;align-items:center;gap:8px;min-height:44px;padding:0 16px;background:var(--ink);color:var(--bg);font:500 14px/1.3 var(--font-sans);text-decoration:none" style-hover="color:var(--bg);text-decoration:underline;text-underline-offset:3px"><span style="font-weight:700">We Met</span><span aria-hidden="true" style="width:3px;height:3px;border-radius:50%;background:currentColor"></span><span>Get your own card for free</span><span aria-hidden="true" style="display:flex">{{ bnArrow }}</span></a>
+  </sc-if>
+  <main style="max-width:420px;margin:0 auto;min-height:100svh;box-sizing:border-box;padding:16px 24px 20px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:48px">
+    <div style="width:100%;display:flex;flex-direction:column;align-items:center;gap:24px">
+      <sc-if value="{{ hasCard }}" hint-placeholder-val="{{ true }}">
+      <section aria-label="About" style="position:relative;margin-top:{{ cardMt }};width:100%;box-sizing:border-box;text-align:left;display:flex;flex-direction:column;gap:24px;padding:28px 24px;border-radius:24px;background:var(--surface);border:1px solid var(--line)">
+        <div style="display:flex;flex-direction:column;gap:24px;margin-top:-96px">
+          <section aria-label="{{ name }}" style="display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center">
+            <sc-if value="{{ hasPhoto }}" hint-placeholder-val="{{ true }}"><img ref="{{ photoRef }}" alt="{{ name }}" width="136" height="136" style="flex:none;display:block;width:136px;height:136px;border-radius:50%;object-fit:cover;background:var(--surface-2);box-shadow:0 0 0 6px var(--bg)"></img></sc-if>
+        <sc-if value="{{ noPhoto }}" hint-placeholder-val="{{ false }}"><div aria-hidden="true" style="flex:none;display:flex;align-items:center;justify-content:center;width:136px;height:136px;box-sizing:border-box;border-radius:50%;background:var(--surface-2);border:1px solid var(--line);font:600 44px/1 var(--font-sans);letter-spacing:-0.02em;color:var(--ink);box-shadow:0 0 0 6px var(--bg)">{{ initials }}</div></sc-if>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0">
+          <p style="margin:0;font-weight:600;font-size:1.75rem;line-height:1.15;color:var(--accent-text);letter-spacing:-0.03em">{{ greeting }}</p>
+          <sc-if value="{{ hasRole }}" hint-placeholder-val="{{ true }}"><p style="margin:0;font-size:15px;line-height:1.45;color:var(--ink-muted);font-weight:500;text-wrap:balance">{{ role }}</p></sc-if>
+        </div>
+          </section>
+          <section ref="{{ ctaRef }}" aria-label="Exchange contacts" style="display:flex;flex-direction:column;gap:4px;margin-top:-4px">
+            <div style="position:relative;isolation:isolate">
+                <span ref="{{ fxRingRef }}" aria-hidden="true" style="position:absolute;inset:0;z-index:-1;border-radius:999px;pointer-events:none"></span>
+                <x-import component-from-global-scope="DidiBuildDesignSystem_b51779.Button" variant="primary" size="lg" on-click="{{ openExchange }}" dc-props="{{ fullWidth }}" hint-size="100%,56px">Exchange contact</x-import>
+              </div>
+        <sc-if value="{{ hasFallback }}" hint-placeholder-val="{{ true }}">
+          <a href="{{ fallbackUrl }}" target="_blank" rel="noopener" style="align-self:center;display:inline-flex;align-items:center;min-height:44px;padding:0 8px;font-size:15px;font-weight:500;color:var(--ink-muted);text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px" style-hover="color:var(--ink)">{{ fallbackLabel }}</a>
+        </sc-if>
+        <sc-if value="{{ showThanks }}" hint-placeholder-val="{{ false }}">
+          <p role="status" style="margin:4px 0 0;font-size:15px;line-height:1.5;color:var(--accent-text);font-weight:500;text-align:center;animation:hiFade .25s ease-out">Thanks, {{ firstName }}. Talk soon.</p>
+        </sc-if>
+          </section>
+          <div aria-hidden="true" style="height:1px;background:var(--line)"></div>
+        </div>
+        <sc-if value="{{ hasAbout }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <h2 style="margin:0;font-weight:600;font-size:1.375rem;line-height:1.15;letter-spacing:-0.02em">{{ aboutTitle }}</h2>
+          <p style="margin:0;font-size:17px;line-height:1.6;color:var(--ink-muted);text-wrap:pretty">{{ aboutFirst }}</p>
+          <sc-if value="{{ aboutOpen }}" hint-placeholder-val="{{ false }}">
+            <sc-for list="{{ aboutRest }}" as="p" hint-placeholder-count="0">
+              <p style="margin:0;font-size:17px;line-height:1.6;color:var(--ink-muted);text-wrap:pretty;animation:hiFade .25s ease-out">{{ p }}</p>
+            </sc-for>
+          </sc-if>
+          <sc-if value="{{ showMoreBtn }}" hint-placeholder-val="{{ false }}"><button type="button" aria-expanded="{{ aboutOpenStr }}" onClick="{{ toggleAbout }}" style="align-self:flex-start;display:inline-flex;align-items:center;gap:6px;min-height:44px;margin:-8px 0 -8px;padding:0;border:0;background:transparent;color:var(--accent-text);font:600 15px var(--font-sans);text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px;cursor:pointer" style-hover="color:var(--ink-muted)">{{ moreLabel }}</button></sc-if>
+        </div>
+        </sc-if>
+        <sc-if value="{{ hasServices }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;flex-direction:column;gap:14px;padding-top:{{ svcPad }};border-top:{{ svcBorder }}">
+          <h3 style="margin:0;font-weight:600;font-size:1.375rem;line-height:1.15;letter-spacing:-0.02em">{{ servicesTitle }}</h3>
+          <div ref="{{ chipRootRef }}" style="position:relative">
+            <ul style="margin:0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:0 8px">
+              <sc-for list="{{ chipList }}" as="c" hint-placeholder-count="5">
+                <li style="display:flex">
+                  <button type="button" data-chip-btn="1" ref="{{ c.btnRef }}" aria-expanded="{{ c.expanded }}" aria-controls="chip-pop" onClick="{{ c.onClick }}" onPointerDown="{{ c.onDown }}" onPointerUp="{{ chipClearPress }}" onPointerCancel="{{ chipClearPress }}" onPointerEnter="{{ c.onEnter }}" onPointerLeave="{{ c.onLeave }}" style="display:flex;align-items:center;margin:0;padding:6px 0;border:0;border-radius:999px;background:transparent;color:inherit;font:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent">
+                    <span ref="{{ c.pillRef }}" style="position:relative;display:inline-flex;align-items:center;gap:6px;min-height:32px;box-sizing:border-box;padding:0 10px 0 12px;border-radius:999px;background:{{ c.bg }};color:{{ c.fg }};font:500 14px/1.5 var(--font-sans);white-space:nowrap;transition:background-color 120ms cubic-bezier(.4,0,.2,1),color 120ms cubic-bezier(.4,0,.2,1)">
+                      <span>{{ c.label }}</span>
+                      <span ref="{{ c.iconRef }}" aria-hidden="true" style="display:flex;align-items:center;justify-content:center;width:14px;height:14px;color:{{ c.ic }};transform:{{ c.rot }};transition:transform 120ms cubic-bezier(.4,0,.2,1),color 120ms cubic-bezier(.4,0,.2,1)">
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 2.5v11M2.5 8h11"></path></svg>
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              </sc-for>
+            </ul>
+            <sc-if value="{{ chipPopOpen }}" hint-placeholder-val="{{ false }}">
+              <div ref="{{ chipPopRef }}" id="chip-pop" role="note" style="position:absolute;z-index:5;left:{{ chipPopLeft }};top:{{ chipPopTop }};width:{{ chipPopW }};visibility:{{ chipPopVis }};box-sizing:border-box;padding:14px 16px 15px;border-radius:14px;background:{{ chipPopBg }};color:var(--ink);border:1px solid var(--line);box-shadow:{{ chipPopShadow }};text-align:left">
+                <span aria-hidden="true" style="position:absolute;left:{{ chipArrLeft }};top:{{ chipArrTop }};bottom:{{ chipArrBottom }};width:12px;height:12px;box-sizing:border-box;background:{{ chipPopBg }};border-top:{{ chipArrBT }};border-left:{{ chipArrBL }};border-right:{{ chipArrBR }};border-bottom:{{ chipArrBB }};transform:rotate(45deg)"></span>
+                <p style="position:relative;margin:0 0 4px;font:600 15px/1.35 var(--font-sans);color:var(--accent-text)">{{ chipPopTitle }}</p>
+                <p style="position:relative;margin:0;font:400 15px/1.5 var(--font-sans);color:var(--ink-muted);text-wrap:pretty">{{ chipPopBody }}</p>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+        </sc-if>
+        <sc-if value="{{ hasLinks }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;flex-direction:column;gap:14px;padding-top:{{ linksPad }};border-top:0">
+          
+            <div style="display:flex;flex-direction:column;gap:12px">
+              
+              <sc-if value="{{ hasSocialLinks }}" hint-placeholder-val="{{ true }}">
+                <ul style="margin:0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end">
+                  <sc-for list="{{ socialLinks }}" as="l" hint-placeholder-count="2">
+                    <li><a href="{{ l.href }}" target="{{ l.target }}" rel="noopener" aria-label="{{ l.label }}" title="{{ l.label }}" style="display:flex;align-items:center;justify-content:center;width:44px;height:44px;box-sizing:border-box;border-radius:999px;border:1px solid var(--line);color:var(--ink);text-decoration:none;transition:background-color 120ms,color 120ms" style-hover="background:var(--ink);color:var(--bg)">{{ l.iconLg }}</a></li>
+                  </sc-for>
+                </ul>
+              </sc-if>
+            </div>
+        </div>
+        </sc-if>
+      </section>
+      </sc-if>
+    </div>
+
+    <nav aria-label="Elsewhere" style="margin-top:auto">
+      <ul style="margin:0;padding:0;list-style:none;display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:2px">
+        <li style="padding-left:8px;font-size:15px;font-weight:500;color:var(--ink-muted)">Powered by</li>
+        <li><a href="https://wemet.didi.build" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 8px;border-radius:999px;font-size:15px;font-weight:500;color:var(--ink-muted);text-decoration:none" style-hover="color:var(--ink);background:var(--surface-2)">We Met</a></li>
+        <li aria-hidden="true" style="width:3px;height:3px;border-radius:50%;background:var(--line-strong)"></li>
+        <li><a href="https://didi.build" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 8px;border-radius:999px;font-size:15px;font-weight:500;color:var(--ink-muted);text-decoration:none" style-hover="color:var(--ink);background:var(--surface-2)">
+          <x-import component-from-global-scope="DidiBuildDesignSystem_b51779.LeafMark" size="{{ 12 }}" hint-size="12px,12px"></x-import>Didi Build</a></li>
+        <li><button type="button" role="switch" aria-checked="{{ isDark }}" aria-label="Dark mode" onClick="{{ toggleTheme }}" style="display:flex;align-items:center;justify-content:center;width:52px;min-height:44px;padding:0;border:0;border-radius:999px;background:transparent;cursor:pointer">
+          <span aria-hidden="true" style="position:relative;display:block;width:44px;height:26px;border-radius:999px;background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--line-strong);transition:background var(--dur-fast)">
+            <span style="position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:var(--ink);color:var(--bg);display:flex;align-items:center;justify-content:center;transform:{{ knobX }};transition:transform var(--dur-base,.2s) ease">
+              <sc-if value="{{ darkOn }}" hint-placeholder-val="{{ false }}">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 019.5 4a8 8 0 1010.5 10.5z"></path></svg>
+              </sc-if>
+              <sc-if value="{{ lightOn }}" hint-placeholder-val="{{ true }}">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>
+              </sc-if>
+            </span>
+          </span>
+        </button></li>
+      </ul>
+    </nav>
+  </main>
+  <sc-if value="{{ bnBand }}" hint-placeholder-val="{{ false }}">
+    <a href="https://wemet.didi.build" target="_blank" rel="noopener" style="display:flex;justify-content:center;background:var(--ink);color:var(--bg);text-decoration:none" style-hover="color:var(--bg)">
+      <span style="width:100%;max-width:420px;box-sizing:border-box;padding:24px 24px calc(24px + env(safe-area-inset-bottom));display:flex;align-items:center;justify-content:space-between;gap:16px">
+        <span style="display:flex;flex-direction:column;gap:2px;text-align:left">
+          <span style="font:700 13px/1.3 var(--font-sans);letter-spacing:0.01em;color:color-mix(in oklch, var(--bg) 72%, var(--ink))">We Met</span>
+          <span style="font:600 19px/1.25 var(--font-sans);letter-spacing:-0.015em;text-wrap:balance">Get your own card for free</span>
+        </span>
+        <span style="flex:none;display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 16px;border-radius:999px;background:var(--bg);color:var(--ink);font:600 15px/1 var(--font-sans)">Start{{ bnArrow }}</span>
+      </span>
+    </a>
+  </sc-if>
+
+  <sc-if value="{{ barOn }}" hint-placeholder-val="{{ false }}">
+    <div aria-hidden="{{ barHidden }}" style="position:fixed;top:0;left:0;right:0;z-index:10;display:flex;justify-content:center;background:var(--bg);border-bottom:1px solid var(--line);transform:{{ barY }};visibility:{{ barVis }};transition:{{ barTrans }}">
+      <div style="width:100%;max-width:420px;box-sizing:border-box;padding:10px 16px 10px 20px;display:flex;align-items:center;gap:12px">
+        <sc-if value="{{ hasPhoto }}" hint-placeholder-val="{{ true }}"><img ref="{{ barPhotoRef }}" alt="{{ name }}" width="36" height="36" style="flex:none;display:block;width:36px;height:36px;border-radius:50%;object-fit:cover;background:var(--surface-2)"></img></sc-if>
+        <sc-if value="{{ noPhoto }}" hint-placeholder-val="{{ false }}"><div aria-hidden="true" style="flex:none;display:flex;align-items:center;justify-content:center;width:36px;height:36px;box-sizing:border-box;border-radius:50%;background:var(--surface-2);border:1px solid var(--line);font:600 12px/1 var(--font-sans);letter-spacing:-0.02em;color:var(--ink)">{{ initials }}</div></sc-if>
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;text-align:left">
+          <span style="font:600 15px/1.3 var(--font-sans);color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ name }}</span>
+          <sc-if value="{{ hasRole }}" hint-placeholder-val="{{ true }}"><span style="font:500 13px/1.35 var(--font-sans);color:var(--ink-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ role }}</span></sc-if>
+        </div>
+        <div style="flex:none;position:relative;isolation:isolate;display:flex"><span ref="{{ fxBarRingRef }}" aria-hidden="true" style="position:absolute;inset:0;z-index:-1;border-radius:999px;pointer-events:none"></span><x-import component-from-global-scope="DidiBuildDesignSystem_b51779.Button" variant="primary" size="sm" on-click="{{ openExchange }}" hint-size="96px,40px">Exchange</x-import></div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ sheetOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;inset:0;z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-top:24px;box-sizing:border-box">
+      <div aria-hidden="true" onClick="{{ closeSheet }}" style="position:absolute;inset:0;background:oklch(0.1 0 0 / 0.6);animation:{{ scrimAnim }}"></div>
+      <div role="dialog" aria-modal="true" aria-labelledby="sheet-title" data-screen-label="{{ sheetLabel }}" style="position:relative;box-sizing:border-box;width:100%;max-width:520px;max-height:100%;border-radius:24px 24px 0 0;background:var(--bg);color:var(--ink);overflow-y:auto;overscroll-behavior:contain;will-change:transform;animation:{{ sheetAnim }}">
+        <div style="max-width:420px;margin:0 auto;box-sizing:border-box;padding:0 24px 28px;display:flex;flex-direction:column;gap:8px">
+          <div onPointerDown="{{ dragStart }}" style="position:sticky;top:0;z-index:2;display:flex;flex-direction:column;margin:0 -24px;padding:0 24px;background:var(--bg);touch-action:none;cursor:grab;user-select:none">
+            <div aria-hidden="true" style="display:flex;justify-content:center;padding-top:10px;padding-bottom:2px"><span style="display:block;width:40px;height:5px;border-radius:999px;background:var(--line-strong)"></span></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 0 10px">
+              <sc-if value="{{ isExchange }}" hint-placeholder-val="{{ true }}">
+                <h1 id="sheet-title" style="margin:0;font-weight:600;font-size:1.375rem;line-height:1.2;letter-spacing:-0.02em">Let's stay in touch</h1>
+              </sc-if>
+              <sc-if value="{{ isDetails }}" hint-placeholder-val="{{ false }}">
+                <h1 id="sheet-title" style="margin:0;min-width:0;font-weight:600;font-size:1.25rem;line-height:1.25;letter-spacing:-0.02em;text-wrap:balance">Nice to meet you, {{ firstName }}&nbsp;👋</h1>
+              </sc-if>
+              <button type="button" aria-label="Close" onClick="{{ closeSheet }}" style="flex:none;display:flex;align-items:center;justify-content:center;width:44px;height:44px;margin-right:-10px;padding:0;border:0;border-radius:999px;background:transparent;color:var(--ink);cursor:pointer;transition:background var(--dur-fast)" style-hover="background:var(--surface-2)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+            </div>
+          </div>
+
+          <sc-if value="{{ isExchange }}" hint-placeholder-val="{{ true }}">
+            <form onSubmit="{{ submitExchange }}" noValidate="{{ true }}" style="display:flex;flex-direction:column;gap:20px;animation:{{ exchangeAnim }}">
+              <div style="display:flex;flex-direction:column;gap:12px;animation:hiRise .45s cubic-bezier(.2,.7,.2,1) 200ms both">
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <label for="x-name" style="display:flex;flex-direction:column;gap:2px;padding:10px 16px 11px;border-radius:var(--radius-field);border:{{ bb.name }};box-shadow:{{ bs.name }};background:{{ bg.name }};cursor:text;transition:border-color var(--dur-fast),box-shadow var(--dur-fast),background var(--dur-fast)">
+                  <span style="display:flex;gap:6px;align-items:baseline;font-size:13px;font-weight:500;line-height:1.3;color:{{ lc.name }};transition:color var(--dur-fast)">Full name</span>
+                  <input id="x-name" type="text" inputMode="text" autoComplete="name" value="{{ visitorName }}" onChange="{{ onName }}" onFocus="{{ fo.name }}" onBlur="{{ blurField }}" style="display:block;width:100%;box-sizing:border-box;min-width:0;margin:0;padding:0;border:0;outline:none;background:transparent;color:var(--ink);font:400 17px/1.4 var(--font-sans)"></input>
+                </label>
+                <sc-if value="{{ er.name }}" hint-placeholder-val="{{ false }}"><p style="margin:0;font-size:var(--size-label);font-weight:500;color:var(--error);display:flex;gap:6px"><span aria-hidden="true">!</span>{{ er.name }}</p></sc-if>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <label for="x-email" style="display:flex;flex-direction:column;gap:2px;padding:10px 16px 11px;border-radius:var(--radius-field);border:{{ bb.email }};box-shadow:{{ bs.email }};background:{{ bg.email }};cursor:text;transition:border-color var(--dur-fast),box-shadow var(--dur-fast),background var(--dur-fast)">
+                  <span style="display:flex;gap:6px;align-items:baseline;font-size:13px;font-weight:500;line-height:1.3;color:{{ lc.email }};transition:color var(--dur-fast)">Email</span>
+                  <input id="x-email" type="email" inputMode="email" autoComplete="email" value="{{ visitorEmail }}" onChange="{{ onEmail }}" onFocus="{{ fo.email }}" onBlur="{{ blurField }}" style="display:block;width:100%;box-sizing:border-box;min-width:0;margin:0;padding:0;border:0;outline:none;background:transparent;color:var(--ink);font:400 17px/1.4 var(--font-sans)"></input>
+                </label>
+                <sc-if value="{{ er.email }}" hint-placeholder-val="{{ false }}"><p style="margin:0;font-size:var(--size-label);font-weight:500;color:var(--error);display:flex;gap:6px"><span aria-hidden="true">!</span>{{ er.email }}</p></sc-if>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <label for="x-phone" style="display:flex;flex-direction:column;gap:2px;padding:10px 16px 11px;border-radius:var(--radius-field);border:{{ bb.phone }};box-shadow:{{ bs.phone }};background:{{ bg.phone }};cursor:text;transition:border-color var(--dur-fast),box-shadow var(--dur-fast),background var(--dur-fast)">
+                  <span style="display:flex;gap:6px;align-items:baseline;font-size:13px;font-weight:500;line-height:1.3;color:{{ lc.phone }};transition:color var(--dur-fast)">Phone<span style="font-weight:400;color:var(--ink-muted)">(optional)</span></span>
+                  <div style="display:flex;align-items:center;gap:10px">
+                    <select aria-label="Country code" value="{{ country }}" onChange="{{ onCountry }}" onFocus="{{ fo.phone }}" onBlur="{{ blurField }}" style="flex:none;margin:0;padding:0 4px 0 0;border:0;outline:none;background:transparent;color:var(--ink);font:500 17px/1.4 var(--font-sans);cursor:pointer">
+                      <sc-for list="{{ countries }}" as="c" hint-placeholder-count="1"><option value="{{ c.code }}" style="background:var(--surface);color:var(--ink)">{{ c.label }}</option></sc-for>
+                    </select>
+                    <input id="x-phone" type="tel" inputMode="tel" autoComplete="tel-national" value="{{ phoneNum }}" onChange="{{ onPhone }}" onFocus="{{ fo.phone }}" onBlur="{{ blurField }}" style="display:block;width:100%;box-sizing:border-box;min-width:0;margin:0;padding:0;border:0;outline:none;background:transparent;color:var(--ink);font:400 17px/1.4 var(--font-sans);flex:1"></input>
+                  </div>
+                </label>
+              </div>
+              </div>
+              <div style="animation:hiRise .45s cubic-bezier(.2,.7,.2,1) 260ms both"><x-import component-from-global-scope="DidiBuildDesignSystem_b51779.Button" variant="primary" size="lg" type="submit" dc-props="{{ fullWidth }}" hint-size="100%,56px">Exchange contact</x-import></div>
+            </form>
+          </sc-if>
+
+          <sc-if value="{{ isDetails }}" hint-placeholder-val="{{ false }}">
+            <form onSubmit="{{ saveDetails }}" style="display:flex;flex-direction:column;gap:20px">
+              <p style="margin:0;font-size:17px;line-height:1.6;color:var(--ink-muted);text-wrap:pretty;animation:hiRise .45s cubic-bezier(.2,.7,.2,1) 0ms both">Add a few details to help me remember you.</p>
+              <div style="display:flex;flex-direction:column;gap:12px;animation:hiRise .45s cubic-bezier(.2,.7,.2,1) 70ms both">
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <label for="d-job" style="display:flex;flex-direction:column;gap:2px;padding:10px 16px 11px;border-radius:var(--radius-field);border:{{ bb.jobTitle }};box-shadow:{{ bs.jobTitle }};background:{{ bg.jobTitle }};cursor:text;transition:border-color var(--dur-fast),box-shadow var(--dur-fast),background var(--dur-fast)">
+                  <span style="display:flex;gap:6px;align-items:baseline;font-size:13px;font-weight:500;line-height:1.3;color:{{ lc.jobTitle }};transition:color var(--dur-fast)">Job title</span>
+                  <input id="d-job" type="text" inputMode="text" autoComplete="organization-title" value="{{ jobTitle }}" onChange="{{ onJobTitle }}" onFocus="{{ fo.jobTitle }}" onBlur="{{ blurField }}" style="display:block;width:100%;box-sizing:border-box;min-width:0;margin:0;padding:0;border:0;outline:none;background:transparent;color:var(--ink);font:400 17px/1.4 var(--font-sans)"></input>
+                </label>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <label for="d-company" style="display:flex;flex-direction:column;gap:2px;padding:10px 16px 11px;border-radius:var(--radius-field);border:{{ bb.company }};box-shadow:{{ bs.company }};background:{{ bg.company }};cursor:text;transition:border-color var(--dur-fast),box-shadow var(--dur-fast),background var(--dur-fast)">
+                  <span style="display:flex;gap:6px;align-items:baseline;font-size:13px;font-weight:500;line-height:1.3;color:{{ lc.company }};transition:color var(--dur-fast)">Company</span>
+                  <input id="d-company" type="text" inputMode="text" autoComplete="organization" value="{{ company }}" onChange="{{ onCompany }}" onFocus="{{ fo.company }}" onBlur="{{ blurField }}" style="display:block;width:100%;box-sizing:border-box;min-width:0;margin:0;padding:0;border:0;outline:none;background:transparent;color:var(--ink);font:400 17px/1.4 var(--font-sans)"></input>
+                </label>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <label for="d-note" style="display:flex;flex-direction:column;gap:2px;padding:10px 16px 11px;border-radius:var(--radius-field);border:{{ bb.note }};box-shadow:{{ bs.note }};background:{{ bg.note }};cursor:text;transition:border-color var(--dur-fast),box-shadow var(--dur-fast),background var(--dur-fast)">
+                  <span style="display:flex;gap:6px;align-items:baseline;font-size:13px;font-weight:500;line-height:1.3;color:{{ lc.note }};transition:color var(--dur-fast)">Note</span>
+                  <textarea id="d-note" rows="3" placeholder="Where we met, what you're working on" value="{{ note }}" onChange="{{ onNote }}" onFocus="{{ fo.note }}" onBlur="{{ blurField }}" style="display:block;width:100%;box-sizing:border-box;min-width:0;margin:0;padding:0;border:0;outline:none;background:transparent;color:var(--ink);font:400 17px/1.4 var(--font-sans);resize:none"></textarea>
+                </label>
+              </div>
+              </div>
+              <div style="animation:hiRise .45s cubic-bezier(.2,.7,.2,1) 140ms both"><x-import component-from-global-scope="DidiBuildDesignSystem_b51779.Button" variant="primary" size="lg" type="submit" dc-props="{{ fullWidth }}" hint-size="100%,56px">Save details</x-import></div>
+            </form>
+          </sc-if>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:390,&quot;height&quot;:844},&quot;palette&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;mono&quot;,&quot;green&quot;,&quot;blue&quot;],&quot;default&quot;:&quot;mono&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Theme&quot;},&quot;plan&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;free&quot;,&quot;pro&quot;],&quot;default&quot;:&quot;free&quot;,&quot;tsType&quot;:&quot;'free' | 'pro'&quot;,&quot;section&quot;:&quot;Plan&quot;},&quot;stickyBar&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Layout&quot;},&quot;palettesUrl&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;palettes.json&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Theme&quot;},&quot;dataUrl&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;card.json&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Data&quot;},&quot;onSubmit&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;(type: 'exchange' | 'details', data: object) => void&quot;}}">
+class Component extends DCLogic {
+  state = {
+    theme: (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light',
+    data: null, barShown: false, aboutOpen: false, focus: null,
+    chipOpen: -1, chipPos: null, chipPressed: -1, chipHover: -1, chipHintSpent: false,
+    screen: null, closing: false, dragClosed: false, swapping: false, tried: false, connected: false,
+    name: '', email: '', country: 'CA', phone: '',
+    jobTitle: '', company: '', note: ''
+  };
+  countries = [
+    { code: 'CA', dial: '+1', label: 'CA +1' },
+    { code: 'US', dial: '+1', label: 'US +1' },
+    { code: 'GB', dial: '+44', label: 'UK +44' },
+    { code: 'AU', dial: '+61', label: 'AU +61' },
+    { code: 'IN', dial: '+91', label: 'IN +91' },
+    { code: 'EG', dial: '+20', label: 'EG +20' },
+    { code: 'FR', dial: '+33', label: 'FR +33' },
+    { code: 'DE', dial: '+49', label: 'DE +49' }
+  ];
+  fieldKeys = ['name', 'email', 'phone', 'jobTitle', 'company', 'note'];
+  p(k) { const v = this.props[k]; if (v !== undefined && v !== null) return v; const d = this.state.data; return d ? d[k] : undefined; }
+  loadData() {
+    fetch(this.props.dataUrl ?? 'card.json').then((r) => r.json()).then((data) => this.setState({ data })).catch((e) => { console.warn('[card] data failed to load', e); this.setState({ data: {} }); });
+  }
+  services() { const v = this.p('services'); return Array.isArray(v) ? v.filter((x) => x && x.label) : []; }
+  chipPillEls = []; chipIconEls = []; chipBtnEls = []; chipAnims = []; _ch = [];
+  chipH(i) {
+    if (!this._ch[i]) this._ch[i] = {
+      btnRef: (el) => { this.chipBtnEls[i] = el; },
+      pillRef: (el) => { this.chipPillEls[i] = el; },
+      iconRef: (el) => { this.chipIconEls[i] = el; },
+      onClick: () => this.chipToggle(i),
+      onDown: () => this.setState({ chipPressed: i }),
+      onEnter: (e) => { if (e.pointerType === 'mouse') this.setState({ chipHover: i }); },
+      onLeave: () => this.setState({ chipHover: -1, chipPressed: -1 })
+    };
+    return this._ch[i];
+  }
+  chipRootRef = (el) => {
+    this.chipRoot = el;
+    if (el && this.chipMounted && !this.chipHintPlayed && !this.chipIO) this.chipObserve();
+  };
+  chipPopRef = (el) => { this.chipPop = el; };
+  rootRef = (el) => { this.rootEl = el; this.applyPalette(); };
+  palette() { return this.urlParam('palette') ?? this.props.palette ?? 'mono'; }
+  loadPalettes() {
+    fetch(this.props.palettesUrl ?? 'palettes.json').then((r) => r.json()).then((j) => { this.palettes = j; this.applyPalette(); }).catch((e) => console.warn('[card] palettes failed to load', e));
+  }
+  applyPalette() {
+    const el = this.rootEl, all = this.palettes;
+    if (!el || !all) return;
+    const set = all[this.palette()] || all.mono || all[Object.keys(all)[0]];
+    const vars = set && set[this.state.theme];
+    if (!vars) return;
+    const key = this.palette() + ':' + this.state.theme;
+    if (this._palKey === key && el.style.getPropertyValue('--bg')) return;
+    this._palKey = key;
+    (this._palVars || []).forEach((k) => el.style.removeProperty('--' + k));
+    this._palVars = Object.keys(vars);
+    for (const k of this._palVars) el.style.setProperty('--' + k, vars[k]);
+  }
+  photoRef = (el) => { this.photoEl = el; this.syncPhoto(); };
+  barPhotoRef = (el) => { this.barPhotoEl = el; this.syncPhoto(); };
+  syncPhoto() { const src = String(this.p('photo') || '').trim(); for (const el of [this.photoEl, this.barPhotoEl]) if (el && src && el.getAttribute('src') !== src) el.setAttribute('src', src); }
+  ctaRef = (el) => { this.ctaEl = el; };
+  fx(key, el, frames, opts) {
+    this._fx = this._fx || {};
+    if (this._fx[key]) { this._fx[key].cancel(); this._fx[key] = null; }
+    if (!el || !el.animate) return;
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    this._fx[key] = el.animate(frames, Object.assign({ iterations: Infinity, easing: 'linear' }, opts));
+  }
+  fxRingRef = (el) => this.fx('ring', el, [{ boxShadow: '0 0 0 0 color-mix(in oklch, var(--accent) 40%, transparent)', offset: 0 }, { boxShadow: '0 0 0 12px color-mix(in oklch, var(--accent) 0%, transparent)', easing: 'cubic-bezier(0,0,.2,1)', offset: 0.5 }, { boxShadow: '0 0 0 12px transparent', offset: 1 }], { duration: 2600, delay: 400 });
+  fxBarRingRef = (el) => this.fx('barRing', el, [{ boxShadow: '0 0 0 0 color-mix(in oklch, var(--accent) 40%, transparent)', offset: 0 }, { boxShadow: '0 0 0 8px color-mix(in oklch, var(--accent) 0%, transparent)', easing: 'cubic-bezier(0,0,.2,1)', offset: 0.5 }, { boxShadow: '0 0 0 8px transparent', offset: 1 }], { duration: 2600, delay: 400 });
+  urlParam(k) { try { return new URLSearchParams(window.location.search).get(k); } catch (e) { return null; } }
+  plan() { return this.urlParam('plan') ?? this.props.plan ?? 'free'; }
+  barEnabled() { const v = this.urlParam('bar') ?? this.props.stickyBar; return !(v === false || v === '0' || v === 'false'); }
+  onScroll = () => { if (!this._raf) this._raf = requestAnimationFrame(this.scrollTick); };
+  scrollTick = () => {
+    this._raf = null;
+    const past = !!(this.ctaEl && this.ctaEl.getBoundingClientRect().top < 0);
+    if (past !== this.state.barShown) this.setState({ barShown: past });
+  };
+  chipClearPress = () => this.setState({ chipPressed: -1 });
+  chipObserve() {
+    if (!window.IntersectionObserver || !this.chipRoot) return;
+    this.chipIO = new IntersectionObserver((es) => {
+      if (es.some((e) => e.isIntersecting)) { this.chipIO.disconnect(); this.chipIO = null; this.chipPlayHint(); }
+    }, { threshold: 0.6 });
+    this.chipIO.observe(this.chipRoot);
+  }
+  chipMount() {
+    this.chipMounted = true;
+    this.chipReduced = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    try { if (localStorage.getItem('card-chips-opened') === '1') this.setState({ chipHintSpent: true }); } catch (e) {}
+    document.addEventListener('pointerdown', this.chipDocDown, true);
+    document.addEventListener('keydown', this.chipKey);
+    window.addEventListener('scroll', this.chipScroll, true);
+    window.addEventListener('resize', this.chipReposition);
+    this.chipObserve();
+  }
+  chipUnmount() {
+    document.removeEventListener('pointerdown', this.chipDocDown, true);
+    document.removeEventListener('keydown', this.chipKey);
+    window.removeEventListener('scroll', this.chipScroll, true);
+    window.removeEventListener('resize', this.chipReposition);
+    if (this.chipIO) this.chipIO.disconnect();
+    this.chipStopHint();
+  }
+  chipUpdate() {
+    const s = this.state;
+    if (s.chipOpen >= 0 && !s.chipPos) this.chipMeasure();
+    else if (s.chipPos && this.chipPop && !this.chipFaded) {
+      this.chipFaded = true;
+      if (!this.chipReduced) this.chipPop.animate([{ opacity: 0, transform: 'translateY(' + (s.chipPos.above ? 4 : -4) + 'px)' }, { opacity: 1, transform: 'none' }], { duration: 120, easing: 'cubic-bezier(0,0,.2,1)' });
+    }
+  }
+  chipReposition = () => { if (this.state.chipOpen >= 0 && !this.chipClosing) { this.chipPosKey = null; this.chipMeasure(); } };
+  chipMeasure() {
+    const chip = this.chipPillEls[this.state.chipOpen], pop = this.chipPop, root = this.chipRoot;
+    if (!chip || !pop || !root) return;
+    const r = root.getBoundingClientRect();
+    const vw = document.documentElement.clientWidth, vh = window.innerHeight, M = 16, G = 10;
+    const w = Math.min(280, vw - M * 2);
+    pop.style.width = w + 'px';
+    const h = pop.offsetHeight, c = chip.getBoundingClientRect(), cx = c.left + c.width / 2;
+    const left = Math.max(M, Math.min(cx - w / 2, vw - M - w));
+    const above = !(c.bottom + G + h <= vh - M) && (c.top - G - h >= M);
+    const top = above ? c.top - G - h : c.bottom + G;
+    const arrowX = Math.max(20, Math.min(cx - left, w - 20));
+    const pos = { left: Math.round(left - r.left), top: Math.round(top - r.top), w: Math.round(w), above, arrowX: Math.round(arrowX) };
+    const key = JSON.stringify(pos);
+    if (key !== this.chipPosKey || !this.state.chipPos) { this.chipPosKey = key; this.setState({ chipPos: pos }); }
+  }
+  chipToggle(i) {
+    if (this.state.chipOpen === i) return this.chipClose(false);
+    this.chipStopHint();
+    if (this.chipCloseAnim) { this.chipCloseAnim.cancel(); this.chipCloseAnim = null; }
+    this.chipClosing = false; this.chipFaded = false; this.chipPosKey = null;
+    this.setState({ chipOpen: i, chipPos: null, chipHintSpent: true });
+    try { localStorage.setItem('card-chips-opened', '1'); } catch (e) {}
+  }
+  chipClose(focusChip) {
+    const i = this.state.chipOpen;
+    if (i < 0 || this.chipClosing) return;
+    this.chipClosing = true;
+    const done = () => {
+      this.chipClosing = false; this.chipCloseAnim = null; this.chipPosKey = null;
+      this.setState({ chipOpen: -1, chipPos: null });
+      if (focusChip && this.chipBtnEls[i]) this.chipBtnEls[i].focus();
+    };
+    if (this.chipPop && !this.chipReduced) {
+      this.chipCloseAnim = this.chipPop.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 120, easing: 'cubic-bezier(.4,0,1,1)', fill: 'forwards' });
+      this.chipCloseAnim.onfinish = done;
+    } else done();
+  }
+  chipDocDown = (e) => {
+    if (this.state.chipOpen < 0) return;
+    const t = e.target;
+    if (this.chipPop && this.chipPop.contains(t)) return;
+    if (t.closest && t.closest('[data-chip-btn]')) return;
+    this.chipClose(false);
+  };
+  chipKey = (e) => { if (e.key === 'Escape' && this.state.chipOpen >= 0 && !this.state.screen) this.chipClose(true); };
+  chipScroll = (e) => { if (this.state.chipOpen >= 0 && !(this.chipPop && this.chipPop.contains(e.target))) this.chipClose(false); };
+  chipPlayHint() {
+    if (this.chipReduced || this.state.chipHintSpent || this.chipHintPlayed) return;
+    this.chipHintPlayed = true;
+    this.chipIconEls.forEach((el, i) => {
+      if (!el) return;
+      this.chipAnims.push(el.animate([{ transform: 'rotate(0deg) scale(1)' }, { transform: 'rotate(90deg) scale(1.3)', offset: 0.5 }, { transform: 'rotate(180deg) scale(1)' }], { duration: 600, delay: 200 + i * 70, easing: 'cubic-bezier(.4,0,.2,1)' }));
+    });
+  }
+  chipStopHint() { this.chipAnims.forEach((a) => a.cancel()); this.chipAnims = []; }
+  chipVals() {
+    const s = this.state, dark = s.theme === 'dark', pos = s.chipPos, items = this.services();
+    const chipList = items.map((it, i) => {
+      const open = s.chipOpen === i, pr = s.chipPressed === i, hv = s.chipHover === i;
+      let bg = pr ? 'color-mix(in oklch, var(--accent-soft), var(--ink) 12%)' : hv ? 'color-mix(in oklch, var(--accent-soft), var(--ink) 6%)' : 'var(--accent-soft)';
+      let fg = 'var(--ink)', ic = 'var(--ink-muted)', rot = 'none';
+      if (open) { bg = pr ? 'var(--accent-hover)' : 'var(--accent)'; fg = ic = 'var(--accent-ink)'; rot = 'rotate(45deg)'; }
+      const h = this.chipH(i);
+      return { label: it.label, bg, fg, ic, rot, expanded: open ? 'true' : 'false', btnRef: h.btnRef, pillRef: h.pillRef, iconRef: h.iconRef, onClick: h.onClick, onDown: h.onDown, onEnter: h.onEnter, onLeave: h.onLeave };
+    });
+    const item = items[s.chipOpen] || items[0] || { label: '', description: '' };
+    const above = !!(pos && pos.above), bd = '1px solid var(--line)';
+    return {
+      chipList, chipRootRef: this.chipRootRef, chipPopRef: this.chipPopRef, chipClearPress: this.chipClearPress,
+      chipPopOpen: s.chipOpen >= 0 && s.chipOpen < items.length, chipPopVis: pos ? 'visible' : 'hidden',
+      chipPopLeft: (pos ? pos.left : 0) + 'px', chipPopTop: (pos ? pos.top : 0) + 'px', chipPopW: (pos ? pos.w : 280) + 'px',
+      chipPopBg: dark ? 'var(--surface-2)' : 'var(--surface)',
+      chipPopShadow: dark ? '0 18px 36px -14px oklch(0 0 0 / 0.7), 0 2px 8px oklch(0 0 0 / 0.3)' : '0 14px 30px -12px oklch(0.2 0 0 / 0.25), 0 2px 6px oklch(0.2 0 0 / 0.08)',
+      chipArrLeft: ((pos ? pos.arrowX : 40) - 6) + 'px',
+      chipArrTop: above ? 'auto' : '-6px', chipArrBottom: above ? '-6px' : 'auto',
+      chipArrBT: above ? '0' : bd, chipArrBL: above ? '0' : bd, chipArrBR: above ? bd : '0', chipArrBB: above ? bd : '0',
+      chipPopTitle: item.label, chipPopBody: item.description || ''
+    };
+  }
+  svg(size, kids, fill) {
+    const E = React.createElement;
+    return E('svg', { width: size, height: size, viewBox: '0 0 24 24', fill: fill ? 'currentColor' : 'none', stroke: fill ? 'none' : 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' }, ...kids.map((k, i) => E(k[0], Object.assign({ key: i }, k[1]))));
+  }
+  icon(t, size) {
+    const P = (d) => ['path', { d }];
+    const brands = {
+      linkedin: 'M20.45 20.45h-3.56v-5.57c0-1.33-.02-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.35V9h3.41v1.56h.05c.48-.88 1.64-1.8 3.37-1.8 3.6 0 4.27 2.37 4.27 5.46v6.23zM5.34 7.43a2.06 2.06 0 110-4.13 2.06 2.06 0 010 4.13zM7.12 20.45H3.56V9h3.56v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.73v20.54C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.73V1.73C24 .77 23.2 0 22.22 0z',
+      github: 'M12 .3a12 12 0 00-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.07 1.83 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 016 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 011.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0012 .3',
+      x: 'M18.24 2.25h3.31l-7.23 8.26 8.5 11.24h-6.66l-5.21-6.82-5.97 6.82H1.68l7.73-8.84L1.25 2.25h6.83l4.71 6.23zm-1.16 17.52h1.83L7.08 4.13H5.12z'
+    };
+    if (brands[t]) return this.svg(size, [P(brands[t])], true);
+    const outline = {
+      email: [['rect', { x: 2, y: 4, width: 20, height: 16, rx: 2 }], P('M22 7l-10 6L2 7')],
+      website: [['circle', { cx: 12, cy: 12, r: 10 }], P('M2 12h20M12 2a15 15 0 010 20M12 2a15 15 0 000 20')],
+      instagram: [['rect', { x: 2, y: 2, width: 20, height: 20, rx: 5 }], ['circle', { cx: 12, cy: 12, r: 4 }], P('M17.5 6.5h.01')],
+      portfolio: [['rect', { x: 2, y: 7, width: 20, height: 14, rx: 2 }], P('M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2')],
+      project: [P('M12 2l9 5-9 5-9-5 9-5z'), P('M3 12l9 5 9-5M3 17l9 5 9-5')]
+    };
+    return this.svg(size, outline[t] || [P('M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71'), P('M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71')]);
+  }
+  linkVals() {
+    const v = this.p('links'), social = ['website', 'linkedin', 'github', 'x', 'instagram'];
+    if (!this._arrow) this._arrow = this.svg(14, [['path', { d: 'M7 17L17 7M8 7h9v9' }]]);
+    return (Array.isArray(v) ? v : []).filter((l) => l && l.url).map((l, i) => {
+      const t = (l.type || 'website').toLowerCase(), email = t === 'email';
+      const href = email && !/^mailto:/i.test(l.url) ? 'mailto:' + l.url : l.url;
+      const domain = l.url.replace(/^(https?:\/\/|mailto:)(www\.)?/i, '').replace(/\/$/, '');
+      return {
+        href, target: email ? '_self' : '_blank', label: l.label || domain,
+        domain: (l.label || domain).toLowerCase() === domain.toLowerCase() ? '' : domain,
+        isSocial: social.includes(t), rowBorder: i ? '1px solid var(--line)' : '0',
+        icon: this.icon(t, 18), iconLg: this.icon(t, 18), arrow: this._arrow
+      };
+    });
+  }
+  componentDidMount() {
+    try { const t = localStorage.getItem('card-theme'); if (t === 'light' || t === 'dark') this.setState({ theme: t }); } catch (e) {}
+    this.chipMount();
+    this.loadPalettes();
+    this.loadData();
+    window.addEventListener('scroll', this.onScroll, { passive: true });
+    window.addEventListener('resize', this.onScroll);
+  }
+  componentDidUpdate() {
+    const s = this.state.screen;
+    if (this._lastScreen !== s) { this._lastScreen = s; document.body.style.overflow = s ? 'hidden' : ''; }
+    this.chipUpdate();
+    this.syncPhoto();
+    this.applyPalette();
+  }
+  componentWillUnmount() { window.removeEventListener('scroll', this.onScroll); window.removeEventListener('resize', this.onScroll); cancelAnimationFrame(this._raf); this.chipUnmount(); this.dragEnd(); document.body.style.overflow = ''; clearTimeout(this._ct); clearTimeout(this._st); }
+  errors() {
+    const s = this.state;
+    if (!s.tried) return {};
+    const e = {};
+    if (!s.name.trim()) e.name = 'Add your name so I know who you are.';
+    if (!s.email.trim()) e.email = 'Add your email so I can reach you.';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.email.trim())) e.email = "That email doesn't look quite right. Check for a typo?";
+    return e;
+  }
+  send(type, data) {
+    // Hook a backend here. Fires immediately on tap.
+    if (typeof this.props.onSubmit === 'function') this.props.onSubmit(type, data);
+    else console.log('[card] ' + type, data);
+  }
+  openExchange = () => this.chipClose(false) || this.setState({ screen: this.state.connected ? 'details' : 'exchange' });
+  closeSheet = () => {
+    if (this.state.closing) return;
+    this.setState({ closing: true });
+    clearTimeout(this._ct);
+    this._ct = setTimeout(() => this.setState({ screen: null, closing: false, swapping: false }), 300);
+  };
+  submitExchange = (ev) => {
+    ev.preventDefault();
+    this.setState({ tried: true }, () => {
+      const e = this.errors();
+      if (e.name || e.email) return;
+      const s = this.state, c = this.countries.find(x => x.code === s.country);
+      this.send('exchange', { name: s.name.trim(), email: s.email.trim(), phone: s.phone.trim() ? c.dial + ' ' + s.phone.trim() : '' });
+      this.setState({ connected: true, swapping: true });
+      clearTimeout(this._st);
+      this._st = setTimeout(() => this.setState({ screen: 'details', swapping: false }), 200);
+    });
+  };
+  saveDetails = (ev) => {
+    ev.preventDefault();
+    const s = this.state;
+    this.send('details', { email: s.email.trim(), jobTitle: s.jobTitle.trim(), company: s.company.trim(), note: s.note.trim() });
+    this.closeSheet();
+  };
+  field = (k) => (ev) => this.setState({ [k]: ev.target.value });
+  onName = this.field('name'); onEmail = this.field('email'); onCountry = this.field('country'); onPhone = this.field('phone');
+  onJobTitle = this.field('jobTitle'); onCompany = this.field('company'); onNote = this.field('note');
+  focusFns = Object.fromEntries(this.fieldKeys.map(k => [k, () => this.setState({ focus: k })]));
+  blurField = () => this.setState({ focus: null });
+  toggleTheme = () => {
+    const theme = this.state.theme === 'dark' ? 'light' : 'dark';
+    try { localStorage.setItem('card-theme', theme); } catch (e) {}
+    this.setState({ theme });
+  };
+  dragStart = (e) => {
+    if (this.state.closing || this._drag) return;
+    if ((e.button && e.button > 0) || e.target.closest('button')) return;
+    const panel = e.currentTarget.closest('[role="dialog"]');
+    this._drag = { panel, scrim: panel.previousElementSibling, y0: e.clientY, dy: 0, h: panel.offsetHeight, active: false, samples: [[performance.now(), e.clientY]] };
+    window.addEventListener('pointermove', this.dragMove);
+    window.addEventListener('pointerup', this.dragEnd);
+    window.addEventListener('pointercancel', this.dragEnd);
+  };
+  dragMove = (e) => {
+    const d = this._drag; if (!d) return;
+    let dy = e.clientY - d.y0;
+    if (!d.active) {
+      if (Math.abs(dy) < 3) return;
+      d.active = true;
+      for (const el of [d.panel, d.scrim]) { el.style.animation = 'none'; el.style.transition = 'none'; }
+    }
+    if (dy < 0) dy = -Math.min(28, Math.pow(-dy, 0.65));
+    d.dy = dy;
+    d.panel.style.transform = 'translateY(' + dy + 'px)';
+    d.scrim.style.opacity = String(Math.max(0, 1 - Math.max(0, dy) / d.h));
+    const now = performance.now();
+    d.samples.push([now, e.clientY]);
+    while (d.samples.length > 2 && now - d.samples[0][0] > 90) d.samples.shift();
+    e.preventDefault();
+  };
+  dragEnd = () => {
+    window.removeEventListener('pointermove', this.dragMove);
+    window.removeEventListener('pointerup', this.dragEnd);
+    window.removeEventListener('pointercancel', this.dragEnd);
+    const d = this._drag; this._drag = null;
+    if (!d || !d.active) return;
+    const now = performance.now();
+    const recent = d.samples.filter(p => now - p[0] <= 90);
+    let v = 0;
+    if (recent.length >= 2 && now - recent[recent.length - 1][0] <= 60) {
+      const a = recent[0], b = recent[recent.length - 1];
+      v = (b[1] - a[1]) / Math.max(1, b[0] - a[0]);
+    }
+    if (d.dy > d.h * 0.32 || (v > 0.45 && d.dy > 16)) {
+      const dur = Math.round(Math.max(150, Math.min(280, (d.h - d.dy) / Math.max(v, 1.4))));
+      d.panel.style.transition = 'transform ' + dur + 'ms cubic-bezier(.2,.6,.35,1)';
+      d.scrim.style.transition = 'opacity ' + dur + 'ms ease-out';
+      d.panel.style.transform = 'translateY(100%)';
+      d.scrim.style.opacity = '0';
+      this.setState({ closing: true, dragClosed: true });
+      clearTimeout(this._ct);
+      this._ct = setTimeout(() => this.setState({ screen: null, closing: false, swapping: false, dragClosed: false }), dur);
+    } else {
+      d.panel.style.transition = 'transform .42s cubic-bezier(.2,1.35,.4,1)';
+      d.scrim.style.transition = 'opacity .25s ease-out';
+      d.panel.style.transform = 'translateY(0)';
+      d.scrim.style.opacity = '1';
+    }
+  };
+  fieldVals(e) {
+    const bb = {}, bs = {}, bg = {}, lc = {};
+    for (const k of this.fieldKeys) {
+      const on = this.state.focus === k, bad = !!e[k];
+      bb[k] = '1px solid ' + (on ? 'var(--accent)' : bad ? 'var(--error)' : 'transparent');
+      bs[k] = on ? '0 0 0 1px var(--accent)' : 'none';
+      bg[k] = on ? 'var(--surface)' : 'var(--surface-2)';
+      lc[k] = on ? 'var(--accent-text)' : bad ? 'var(--error)' : 'var(--ink-muted)';
+    }
+    return { bb, bs, bg, lc };
+  }
+  renderVals() {
+    const s = this.state, e = this.errors(), screen = s.screen;
+    const anim = s.dragClosed ? null : s.closing;
+    const ownerName = String(this.p('name') || '').trim();
+    const first = ownerName.split(/\s+/)[0] || '';
+    const initials = ownerName.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('');
+    const photo = String(this.p('photo') || '').trim();
+    const role = String(this.p('role') || '').trim();
+    const fallbackUrl = String(this.p('fallbackUrl') || '').trim();
+    const aboutRaw = this.p('about');
+    const about = (Array.isArray(aboutRaw) ? aboutRaw : String(aboutRaw || '').split(/\n\s*\n/)).map((x) => String(x).trim()).filter(Boolean);
+    const services = this.services();
+    const barUp = s.barShown && !screen;
+    const free = this.plan() === 'free';
+    if (!this._bnArrow) this._bnArrow = this.svg(16, [['path', { d: 'M5 12h14M13 6l6 6-6 6' }]]);
+    const hasAbout = about.length > 0, hasServices = services.length > 0, linkList = this.linkVals(), hasLinks = linkList.length > 0;
+    return {
+      theme: s.theme,
+      palette: this.palette(), rootRef: this.rootRef,
+      toggleTheme: this.toggleTheme,
+      darkOn: s.theme === 'dark',
+      lightOn: s.theme !== 'dark',
+      isDark: s.theme === 'dark' ? 'true' : 'false',
+      knobX: s.theme === 'dark' ? 'translateX(18px)' : 'translateX(0)',
+      name: ownerName, greeting: first ? "I'm " + first : ownerName, initials,
+      photoRef: this.photoRef, barPhotoRef: this.barPhotoRef, ctaRef: this.ctaRef,
+      cardMt: '84px',
+      fxRingRef: this.fxRingRef, fxBarRingRef: this.fxBarRingRef,
+      bnTop: free, bnBand: free, bnArrow: this._bnArrow,
+      barOn: this.barEnabled() && !!s.data, barHidden: barUp ? 'false' : 'true',
+      barY: barUp ? 'none' : 'translateY(-101%)', barVis: barUp ? 'visible' : 'hidden',
+      barTrans: barUp ? 'transform .28s cubic-bezier(.2,.7,.2,1)' : 'transform .2s ease-in, visibility 0s linear .2s',
+      hasPhoto: !!photo, noPhoto: !!s.data && !photo,
+      role, hasRole: !!role,
+      fallbackUrl, hasFallback: !!fallbackUrl, fallbackLabel: this.p('fallbackLabel') || 'Book a time',
+      aboutTitle: this.p('aboutTitle'), servicesTitle: this.p('servicesTitle'),
+      hasCard: true, hasLinks,
+      socialLinks: linkList.filter((l) => l.isSocial), hasSocialLinks: linkList.some((l) => l.isSocial),
+      linksPad: hasAbout || hasServices ? '16px' : '0',  hasAbout, hasServices,
+      aboutFirst: about[0] || '', aboutRest: about.slice(1),
+      showMoreBtn: about.length > 1, moreLabel: s.aboutOpen ? 'Show less' : 'Show more',
+      svcPad: hasAbout ? '24px' : '0', svcBorder: hasAbout ? '1px solid var(--line)' : '0',
+      linkList,
+      openExchange: this.openExchange,
+      showThanks: s.connected && !screen,
+      firstName: s.name.trim().split(/\s+/)[0] || 'there',
+      aboutOpen: s.aboutOpen, aboutOpenStr: s.aboutOpen ? 'true' : 'false',
+      toggleAbout: () => this.setState({ aboutOpen: !this.state.aboutOpen }),
+      sheetOpen: !!screen,
+      sheetLabel: screen === 'details' ? 'Add details' : 'Exchange form',
+      isExchange: screen === 'exchange',
+      isDetails: screen === 'details',
+      sheetAnim: anim === null ? 'none' : anim ? 'hiSheetOut .3s cubic-bezier(.4,0,1,1) forwards' : 'hiSheetIn .5s cubic-bezier(.32,.72,0,1) both',
+      scrimAnim: anim === null ? 'none' : anim ? 'hiScrimOut .3s ease-in forwards' : 'hiScrimIn .3s ease-out both',
+      exchangeAnim: s.swapping ? 'hiFadeOut .2s ease-in forwards' : 'none',
+      closeSheet: this.closeSheet,
+      dragStart: this.dragStart,
+      submitExchange: this.submitExchange,
+      saveDetails: this.saveDetails,
+      ...this.fieldVals(e),
+      ...this.chipVals(),
+      fo: this.focusFns, blurField: this.blurField,
+      er: { name: e.name || '', email: e.email || '' },
+      visitorName: s.name, visitorEmail: s.email, phoneNum: s.phone, country: s.country, countries: this.countries,
+      jobTitle: s.jobTitle, company: s.company, note: s.note,
+      onName: this.onName, onEmail: this.onEmail, onCountry: this.onCountry, onPhone: this.onPhone,
+      onJobTitle: this.onJobTitle, onCompany: this.onCompany, onNote: this.onNote,
+      fullWidth: { style: { width: '100%', justifyContent: 'center', boxSizing: 'border-box' } }
+    };
+  }
+}
+</script>
+</body>
+</html>

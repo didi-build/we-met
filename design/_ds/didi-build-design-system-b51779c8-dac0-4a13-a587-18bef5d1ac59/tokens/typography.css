@@ -1,0 +1,27 @@
+/* Fluid sizes use container query units (cqi). Put container-type:inline-size on the page root;
+   without a container, cqi falls back to the viewport. */
+:root{
+  --font-sans:Figtree,system-ui,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,monospace;
+  --weight-regular:400;--weight-medium:500;--weight-semibold:600;--weight-bold:700;
+
+  --type-display-size:clamp(2.2rem,1.1rem + 4.2cqi,4.25rem);/* @kind other */--type-display-lh:1.06;--type-display-tracking:-0.03em;
+  --type-display-sub-scale:0.56em;--type-display-sub-lh:1.2;
+  --type-feature-size:clamp(1.9rem,1.2rem + 2.6cqi,3.25rem);/* @kind other */--type-feature-lh:1.1;--type-feature-tracking:-0.025em;
+  --type-section-size:clamp(1.75rem,1.2rem + 2cqi,2.75rem);/* @kind other */--type-section-lh:1.15;--type-section-tracking:-0.022em;
+  --type-numeral-size:clamp(2.5rem,2rem + 2cqi,3.5rem);/* @kind other */--type-numeral-tracking:-0.03em;
+  --type-statement-size:clamp(1.4rem,1.1rem + 1cqi,1.75rem);/* @kind other */--type-statement-lh:1.25;
+  --type-card-title-size:1.25rem;--type-card-title-lh:1.3;
+  --type-question-size:1.125rem;--type-question-lh:1.4;
+  --type-lead-size:clamp(1.0625rem,1rem + .35cqi,1.25rem);/* @kind other */--type-lead-lh:1.55;
+
+  --size-body:17px;--lh-body:1.6;/* @kind other */
+  --size-body-sm:16px;
+  --size-label:15px;
+  --size-caption:14px;
+  --size-badge:13px;
+  --size-wordmark:19px;
+  --size-mono:12px;
+
+  --measure-body:46ch;--measure-lead:40ch;--measure-answer:62ch;
+}

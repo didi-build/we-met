@@ -1,0 +1,9 @@
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-sans);font-size:var(--size-body);line-height:var(--lh-body);-webkit-font-smoothing:antialiased}
+a{color:var(--accent-text);text-underline-offset:3px;text-decoration-thickness:1.5px}
+a:hover{color:var(--ink)}
+:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+input:focus-visible,textarea:focus-visible{outline:none}
+::placeholder{color:var(--ink-muted);opacity:.75}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
