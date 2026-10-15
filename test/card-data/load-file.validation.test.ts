@@ -29,12 +29,18 @@ describe("parseCardsLoadFile validation (unit)", () => {
     );
   });
 
-  it("falls back unknown variant to mono", () => {
-    const raw = cloneLoadFile();
-    const card = (raw.cards as Record<string, unknown>[])[0];
-    card.variant = "purple";
-    const parsed = parseCardsLoadFile(raw);
-    expect(parsed.cards[0].variant).toBe("mono");
+  it("rejects blue variant", () => {
+    expectReject((raw) => {
+      const card = (raw.cards as Record<string, unknown>[])[0];
+      card.variant = "blue";
+    }, /blue.*not storable/i);
+  });
+
+  it("rejects unknown variant", () => {
+    expectReject((raw) => {
+      const card = (raw.cards as Record<string, unknown>[])[0];
+      card.variant = "purple";
+    }, /Invalid variant: purple/);
   });
 
   const cases: {

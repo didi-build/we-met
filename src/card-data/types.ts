@@ -1,4 +1,8 @@
-export type BrandVariant = "green" | "mono" | "blue";
+/** Values storable in D1 `cards.variant` (see migrations/0001). */
+export type BrandVariant = "green" | "mono";
+
+/** CSS `data-palette` values (includes blue for generated tokens; not loadable as variant yet). */
+export type CardPalette = "green" | "mono" | "blue";
 
 export type CardPlan = "free" | "pro";
 

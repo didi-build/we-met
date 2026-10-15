@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { normalizeBrandVariant } from "@/card-data/normalize-variant";
+import { parseCardsLoadFile } from "@/card-data/load-file";
+import { exampleLoadRaw } from "../helpers/example-card";
 import {
   cardContentFlags,
   cardGreeting,
@@ -25,9 +27,21 @@ describe("card content helpers (unit)", () => {
     expect(cardGreeting("Didi Shoukralla")).toBe("I'm Didi");
   });
 
-  it("normalizes unknown variant to mono", () => {
-    expect(normalizeBrandVariant("blue")).toBe("blue");
+  it("normalizes unknown stored variant to mono at render", () => {
     expect(normalizeBrandVariant("nope")).toBe("mono");
+    expect(normalizeBrandVariant("blue")).toBe("mono");
+  });
+
+  it("loads mono and green variants from the example file", () => {
+    const green = parseCardsLoadFile(exampleLoadRaw());
+    expect(green.cards[0].variant).toBe("green");
+
+    const monoRaw = JSON.parse(JSON.stringify(exampleLoadRaw())) as {
+      cards: Record<string, unknown>[];
+    };
+    monoRaw.cards[0].variant = "mono";
+    const mono = parseCardsLoadFile(monoRaw);
+    expect(mono.cards[0].variant).toBe("mono");
   });
 
   it("flags optional sections from example card", () => {

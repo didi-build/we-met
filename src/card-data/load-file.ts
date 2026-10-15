@@ -8,7 +8,7 @@ import {
 import { assertNoControlCharacters } from "@/card-data/load-sql";
 import { parseLeadSinkConfig } from "@/card-data/lead-sink-registry";
 import { registerBuiltInLeadSinkKinds } from "@/card-data/register-lead-sink-kinds";
-import { normalizeBrandVariant } from "@/card-data/normalize-variant";
+import { parseCardVariantForLoad } from "@/card-data/normalize-variant";
 import { assertValidSlug, isValidSlug } from "@/card-data/slug";
 import type {
   CardCopy,
@@ -622,10 +622,7 @@ function parseCard(raw: unknown, seenSinkIds: Set<string>): CardLoadInput {
   const slug = requireNonWhitespaceString(raw.slug, "slug", 64);
   assertValidSlug(slug);
   const variantRaw = requireNonWhitespaceString(raw.variant, "variant", 16);
-  const variant = normalizeBrandVariant(variantRaw);
-  if (variantRaw !== variant && variantRaw !== "mono") {
-    // unknown variants fall back to mono without error (per ticket)
-  }
+  const variant = parseCardVariantForLoad(variantRaw);
 
   let plan: CardPlan = "free";
   if (raw.plan !== undefined) {
