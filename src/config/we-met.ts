@@ -46,3 +46,20 @@ export function absoluteUrl(baseUrl: string, path: string): string {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
   return `${origin}${normalizedPath}`;
 }
+
+/** Authenticated app host for a card-site base URL (e.g. `https://we-met.link` → `app.we-met.link`). */
+export function appHostForBaseUrl(baseUrl: string): string {
+  const cardHost = baseUrlHostname(baseUrl);
+  return `app.${cardHost}`;
+}
+
+export function appBaseUrl(baseUrl: string): string {
+  const url = new URL(baseUrl);
+  url.hostname = appHostForBaseUrl(baseUrl);
+  return url.origin;
+}
+
+export function isAppServingHost(hostname: string, config: WeMetHostConfig): boolean {
+  const host = hostname.toLowerCase().split(":")[0] ?? "";
+  return host === appHostForBaseUrl(config.baseUrl);
+}

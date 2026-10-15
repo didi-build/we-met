@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { isCardServingHost } from "@/config/we-met";
+import {
+  appBaseUrl,
+  appHostForBaseUrl,
+  isAppServingHost,
+  isCardServingHost,
+} from "@/config/we-met";
 
 const PREVIEW_SUFFIX = "-we-met.diademshoukralla.workers.dev";
 
@@ -45,5 +50,18 @@ describe("isCardServingHost (unit)", () => {
   it("rejects we-met.link lookalikes", () => {
     expect(isCardServingHost("not-we-met.link", productionConfig)).toBe(false);
     expect(isCardServingHost("we-met.link.evil.com", productionConfig)).toBe(false);
+  });
+});
+
+describe("app host helpers (unit)", () => {
+  it("derives app.we-met.link from the card base URL", () => {
+    expect(appHostForBaseUrl("https://we-met.link")).toBe("app.we-met.link");
+    expect(appBaseUrl("https://we-met.link")).toBe("https://app.we-met.link");
+  });
+
+  it("recognises the production app host only", () => {
+    expect(isAppServingHost("app.we-met.link", productionConfig)).toBe(true);
+    expect(isAppServingHost("we-met.link", productionConfig)).toBe(false);
+    expect(isAppServingHost("app.evil.com", productionConfig)).toBe(false);
   });
 });

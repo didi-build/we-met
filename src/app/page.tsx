@@ -1,8 +1,24 @@
-export default function HomePage() {
+import { LandingHome } from "@/components/landing/LandingHome";
+import { LandingShell } from "@/components/landing/LandingShell";
+import { resolveLandingMetadata } from "@/lib/landing/metadata";
+import { readLandingHostConfig } from "@/lib/landing/server-config";
+import { resolveLandingUrls } from "@/lib/landing/urls";
+import type { Metadata } from "next";
+
+export const dynamic = "force-dynamic";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const config = await readLandingHostConfig();
+  return resolveLandingMetadata(config);
+}
+
+export default async function HomePage() {
+  const config = await readLandingHostConfig();
+  const urls = resolveLandingUrls(config);
+
   return (
-    <main className="mx-auto flex min-h-dvh max-w-lg flex-col justify-center px-6 py-12">
-      <h1 className="text-2xl font-semibold tracking-tight">We Met</h1>
-      <p className="mt-2 text-ink-muted">Placeholder landing page.</p>
-    </main>
+    <LandingShell>
+      <LandingHome urls={urls} getStartedLabel="Get started" />
+    </LandingShell>
   );
 }
