@@ -7,11 +7,14 @@ import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { HOW_IT_WORKS_STEPS } from "@/components/landing/how-it-works-steps";
 import { resolveLandingUrls } from "@/lib/landing/urls";
 
-const urls = resolveLandingUrls({
-  baseUrl: "https://we-met.link",
-  previewHostSuffix: "-we-met.example.workers.dev",
-  weMetEnv: "production",
-});
+const urls = resolveLandingUrls(
+  {
+    baseUrl: "https://we-met.link",
+    previewHostSuffix: "-we-met.example.workers.dev",
+    weMetEnv: "production",
+  },
+  "https://we-met.link",
+);
 
 beforeEach(() => {
   vi.stubGlobal(

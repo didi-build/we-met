@@ -8,21 +8,21 @@ import { LandingFooter } from "@/components/landing/LandingFooter";
 import { LandingHome } from "@/components/landing/LandingHome";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { resolvePrivacyMetadata, resolveTermsMetadata } from "@/lib/landing/metadata";
-import { resolveLandingUrls } from "@/lib/landing/urls";
+import { resolveLandingBrowseOrigin, resolveLandingUrls } from "@/lib/landing/urls";
 
+const previewHost = "pr-42-we-met.example.workers.dev";
 const previewConfig = {
-  baseUrl: "https://pr-42-we-met.example.workers.dev",
+  baseUrl: "https://we-met.link",
   previewHostSuffix: "-we-met.example.workers.dev",
   weMetEnv: "preview",
 };
 
-const urls = resolveLandingUrls(previewConfig);
-
-const productionCardUrls = resolveLandingUrls({
-  baseUrl: "https://we-met.link",
-  previewHostSuffix: previewConfig.previewHostSuffix,
-  weMetEnv: "production",
-});
+const previewBrowseOrigin = resolveLandingBrowseOrigin(
+  previewConfig,
+  previewHost,
+  "https",
+);
+const urls = resolveLandingUrls(previewConfig, previewBrowseOrigin);
 
 const PRIVACY_H2 = [
   "Who we are",
@@ -107,11 +107,9 @@ describe("privacy and terms pages (unit)", () => {
     expect(screen.getByText("Last updated: October 2026")).toBeTruthy();
   });
 
-  it("resolveLandingUrls returns card-site absolute privacy and terms URLs", () => {
-    expect(urls.privacy).toBe(`${previewConfig.baseUrl}/privacy`);
-    expect(urls.terms).toBe(`${previewConfig.baseUrl}/terms`);
-    expect(productionCardUrls.privacy).toBe("https://we-met.link/privacy");
-    expect(productionCardUrls.terms).toBe("https://we-met.link/terms");
+  it("resolveLandingUrls returns preview browse-origin privacy and terms URLs", () => {
+    expect(urls.privacy).toBe(`https://${previewHost}/privacy`);
+    expect(urls.terms).toBe(`https://${previewHost}/terms`);
   });
 
   it("sets privacy and terms metadata from base URL config", () => {
@@ -138,8 +136,8 @@ describe("landing privacy section and footer (unit)", () => {
     const nav = screen.getByRole("navigation", { name: "Legal" });
     const privacy = within(nav).getByRole("link", { name: "Privacy" });
     const terms = within(nav).getByRole("link", { name: "Terms" });
-    expect(privacy.getAttribute("href")).toBe(`${previewConfig.baseUrl}/privacy`);
-    expect(terms.getAttribute("href")).toBe(`${previewConfig.baseUrl}/terms`);
+    expect(privacy.getAttribute("href")).toBe(`https://${previewHost}/privacy`);
+    expect(terms.getAttribute("href")).toBe(`https://${previewHost}/terms`);
     expect(privacy.getAttribute("href")).not.toBe("/privacy");
     expect(terms.getAttribute("href")).not.toBe("/terms");
   });

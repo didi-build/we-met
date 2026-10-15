@@ -3,7 +3,10 @@ import { LandingHeader } from "@/components/landing/LandingHeader";
 import { LandingShell } from "@/components/landing/LandingShell";
 import { TermsPolicyContent } from "@/components/landing/TermsPolicyContent";
 import { resolveTermsMetadata } from "@/lib/landing/metadata";
-import { readLandingHostConfig } from "@/lib/landing/server-config";
+import {
+  readLandingBrowseOrigin,
+  readLandingHostConfig,
+} from "@/lib/landing/server-config";
 import { resolveLandingUrls } from "@/lib/landing/urls";
 import type { Metadata } from "next";
 
@@ -16,7 +19,8 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function TermsPage() {
   const config = await readLandingHostConfig();
-  const urls = resolveLandingUrls(config);
+  const browseOrigin = await readLandingBrowseOrigin(config);
+  const urls = resolveLandingUrls(config, browseOrigin);
 
   return (
     <LandingShell>
