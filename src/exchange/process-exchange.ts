@@ -82,7 +82,7 @@ export async function processExchange(
 
   const leadId = deps.createLeadId();
   const lead = buildVisitorLead(input, leadId, deps.environment, deps.now());
-  const cardSnapshot = buildCardEmailSnapshot(card);
+  const cardSnapshot = buildCardEmailSnapshot(card, deps.baseUrl);
 
   const sinkDispatchDeps: LeadSinkDispatchDeps = {
     producer: deps.leadSinkQueue,

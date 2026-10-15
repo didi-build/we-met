@@ -188,56 +188,43 @@ describe("HiWhatIDoChips", () => {
     });
 
     it("plays the hint once when the row becomes visible", async () => {
-      renderChips();
+      const { container } = renderChips();
       expect(ioCallback).not.toBeNull();
       ioCallback!(
         [{ isIntersecting: true } as IntersectionObserverEntry],
         {} as IntersectionObserver,
       );
       await waitFor(() => {
-        expect(HTMLElement.prototype.animate).toHaveBeenCalled();
+        const hinted = container.querySelectorAll(".animate-hi-hint");
+        expect(hinted.length).toBe(chips.length);
       });
-      const hintCalls = vi
-        .mocked(HTMLElement.prototype.animate)
-        .mock.calls.filter((args) => {
-          const opts = args[1] as KeyframeAnimationOptions | undefined;
-          return opts && typeof opts.delay === "number" && opts.delay >= 200;
-        });
-      expect(hintCalls.length).toBe(chips.length);
     });
 
     it("cancels the hint when a chip opens", async () => {
-      const cancel = vi.fn();
-      HTMLElement.prototype.animate = vi.fn(function () {
-        return {
-          cancel,
-          onfinish: null,
-          finished: Promise.resolve(),
-        } as unknown as Animation;
-      });
       const { container } = renderChips();
       ioCallback!(
         [{ isIntersecting: true } as IntersectionObserverEntry],
         {} as IntersectionObserver,
       );
+      await waitFor(() => {
+        expect(container.querySelectorAll(".animate-hi-hint").length).toBe(
+          chips.length,
+        );
+      });
       fireEvent.click(chipButton(chips[0].label, container));
-      await waitFor(() => expect(cancel).toHaveBeenCalled());
+      await waitFor(() => {
+        expect(container.querySelectorAll(".animate-hi-hint").length).toBe(0);
+      });
     });
 
-    it("does not play when didi-chips-opened is stored", () => {
+    it("does not play when card-chips-opened is stored", () => {
       localStorage.setItem(CHIPS_OPENED_STORAGE_KEY, "1");
-      renderChips();
+      const { container } = renderChips();
       ioCallback!(
         [{ isIntersecting: true } as IntersectionObserverEntry],
         {} as IntersectionObserver,
       );
-      const hintCalls = vi
-        .mocked(HTMLElement.prototype.animate)
-        .mock.calls.filter((args) => {
-          const opts = args[1] as KeyframeAnimationOptions | undefined;
-          return opts && typeof opts.delay === "number" && opts.delay >= 200;
-        });
-      expect(hintCalls).toHaveLength(0);
+      expect(container.querySelectorAll(".animate-hi-hint")).toHaveLength(0);
     });
 
     it("skips the hint with prefers-reduced-motion", () => {

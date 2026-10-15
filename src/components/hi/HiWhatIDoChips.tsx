@@ -83,6 +83,11 @@ export function HiWhatIDoChips({ chips }: HiWhatIDoChipsProps) {
   const [renderOpen, setRenderOpen] = useState(false);
 
   const stopHint = useCallback(() => {
+    iconRefs.current.forEach((el) => {
+      if (!el) return;
+      el.classList.remove("animate-hi-hint");
+      el.style.animationDelay = "";
+    });
     hintAnimsRef.current.forEach((a) => a.cancel());
     hintAnimsRef.current = [];
   }, []);
@@ -186,19 +191,14 @@ export function HiWhatIDoChips({ chips }: HiWhatIDoChipsProps) {
     hintPlayedRef.current = true;
     iconRefs.current.forEach((el, i) => {
       if (!el) return;
-      const anim = el.animate(
-        [
-          { transform: "rotate(0deg) scale(1)" },
-          { transform: "rotate(90deg) scale(1.3)", offset: 0.5 },
-          { transform: "rotate(180deg) scale(1)" },
-        ],
-        {
-          duration: 600,
-          delay: 200 + i * 70,
-          easing: "cubic-bezier(.4,0,.2,1)",
-        },
-      );
-      hintAnimsRef.current.push(anim);
+      el.style.animationDelay = `${200 + i * 70}ms`;
+      el.classList.add("animate-hi-hint");
+      const onEnd = () => {
+        el.classList.remove("animate-hi-hint");
+        el.style.animationDelay = "";
+        el.removeEventListener("animationend", onEnd);
+      };
+      el.addEventListener("animationend", onEnd);
     });
   }, [hintSpent]);
 

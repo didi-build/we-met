@@ -7,5 +7,5 @@ test-results/
 package-lock.json
 design/
 design/Hi.dc.html
-# Generated from design/palettes.json (npm run theme-palettes)
+# Hand-written mono palette tokens (design/card/card.css)
 src/theme/tokens/

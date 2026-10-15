@@ -1,6 +1,4 @@
 const ALLOWLIST = new Set([
-  "src/theme/tokens/green.light.css",
-  "src/theme/tokens/green.dark.css",
   "src/components/hi/icons/HiCardIcons.tsx",
   "design/Hi.dc.html",
 ]);
@@ -218,9 +216,6 @@ function isAllowlisted(rel) {
     return true;
   }
   if (rel.startsWith("src/theme/tokens/") && rel.endsWith(".css")) {
-    return true;
-  }
-  if (rel === "scripts/generate-card-palette-css.mjs") {
     return true;
   }
   return false;
