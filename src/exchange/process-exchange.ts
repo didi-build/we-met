@@ -2,8 +2,11 @@ import type { CardRecord, LeadSinkRecord } from "@/card-data/types";
 import { buildCardEmailSnapshot } from "@/exchange/card-snapshot";
 import {
   dispatchLeadOnExchange,
+  type LeadDeliveryDispatchLogger,
+  type LeadSinkDispatchDeps,
   type LeadSinkDispatchLogger,
 } from "@/exchange/lead-sink/dispatcher";
+import type { LeadDeliveryLedger } from "@/lead-delivery-ledger/types";
 import type {
   FollowupEmailQueueProducer,
   LeadSinkQueueProducer,
@@ -19,11 +22,14 @@ export type ProcessExchangeDeps = {
   rateLimiter: ExchangeRateLimiter;
   followupQueue: FollowupEmailQueueProducer;
   leadSinkQueue: LeadSinkQueueProducer;
+  deliveryLedger: LeadDeliveryLedger;
+  deliveryLogger: LeadDeliveryDispatchLogger;
   tokenSecret: string;
   environment: string;
   clientIp: string;
   leadSinkLogger: LeadSinkDispatchLogger;
   createLeadId: () => string;
+  createLedgerId: () => string;
   now: () => Date;
 };
 
@@ -76,14 +82,16 @@ export async function processExchange(
   const lead = buildVisitorLead(input, leadId, deps.environment, deps.now());
   const cardSnapshot = buildCardEmailSnapshot(card);
 
-  await dispatchLeadOnExchange(
-    sinks,
-    lead,
-    card.id,
-    card.slug,
-    deps.leadSinkQueue,
-    deps.leadSinkLogger,
-  );
+  const sinkDispatchDeps: LeadSinkDispatchDeps = {
+    producer: deps.leadSinkQueue,
+    sinkLogger: deps.leadSinkLogger,
+    ledger: deps.deliveryLedger,
+    deliveryLogger: deps.deliveryLogger,
+    now: deps.now,
+    createLedgerId: deps.createLedgerId,
+  };
+
+  await dispatchLeadOnExchange(sinks, lead, card.id, card.slug, sinkDispatchDeps);
 
   try {
     await deps.followupQueue.enqueueVisitorFollowup({

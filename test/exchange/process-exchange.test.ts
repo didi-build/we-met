@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { MemoryCardRepository } from "@/card-data/memory-repository";
+import { MemoryLeadDeliveryLedger } from "@/lead-delivery-ledger/memory-repository";
 import { exampleCardInput } from "../helpers/example-card";
 import { processExchange } from "@/exchange/process-exchange";
 import type { ProcessExchangeDeps } from "@/exchange/process-exchange";
@@ -26,6 +27,7 @@ function createDeps(
 } {
   const followupMessages: unknown[] = [];
   const sinkMessages: unknown[] = [];
+  const deliveryLedger = overrides.deliveryLedger ?? new MemoryLeadDeliveryLedger();
   const deps: ProcessExchangeDeps = {
     turnstile: { verify: async () => ({ success: true }) },
     rateLimiter: { check: async () => ({ allowed: true }) },
@@ -43,7 +45,13 @@ function createDeps(
     environment: "local",
     clientIp: "203.0.113.1",
     leadSinkLogger: { logSinkEnqueueFailure: vi.fn() },
+    deliveryLedger,
+    deliveryLogger: {
+      logLedgerWriteFailed: vi.fn(),
+      logLedgerEnqueueFailed: vi.fn(),
+    },
     createLeadId: () => "lead-1",
+    createLedgerId: () => "ledger-1",
     now: () => new Date("2026-10-12T12:00:00.000Z"),
     ...overrides,
   };
