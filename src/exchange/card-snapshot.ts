@@ -8,12 +8,8 @@ export function buildCardEmailSnapshot(card: CardRecord): CardEmailSnapshot {
     email: card.email,
     photoKey: card.photoKey,
     contact: card.contact,
-    links: card.links,
     pageCopy: {
       emailFromName: card.pageCopy.emailFromName,
-    },
-    copy: {
-      followUpEmail: card.copy.followUpEmail,
     },
   };
 }

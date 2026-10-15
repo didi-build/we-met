@@ -1,0 +1,13 @@
+{{#if test_sink}}Test delivery (sink destination): {{test_sink}}
+
+{{/if}}New lead
+
+{{lead_name}}
+{{lead_email}}
+
+Phone:     {{#if lead_phone}}{{lead_phone}}{{else}}-{{/if}}
+Source:    Business card ({{card_url}})
+Received:  {{received_at}}
+
+--
+Sent by We Met because someone exchanged contact details on your card.

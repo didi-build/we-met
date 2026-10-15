@@ -1,5 +1,12 @@
-import { escapeHtml, escapePlainTextForEmail } from "@/email/escape";
+import {
+  cardUrlDisplay,
+  formatLeadReceivedAt,
+  leadFirstNameFromFullName,
+  leadPhoneTel,
+} from "@/email/email-template-vars";
 import { sanitizeEmailHeaderValue } from "@/email/mime-headers";
+import { renderEmailTemplate } from "@/email/template-renderer";
+import { ownerDetailsUpdateTemplates, ownerNewLeadTemplates } from "@/email/templates";
 
 export function formatReceivedAtToronto(iso: string): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -46,23 +53,37 @@ export type OwnerLeadAppendEmailInput = {
   jobTitle: string | null;
   company: string | null;
   note: string | null;
-  sourceUrl: string;
-  detailsSubmittedAtIso: string;
   nonProdSinkDestinationLabel?: string;
 };
 
-function nonProdBodyLines(sinkDestinationLabel: string): string[] {
-  const label = escapePlainTextForEmail(sinkDestinationLabel);
-  return [`Test delivery (sink destination): ${label}`, ""];
+function recordTemplateData(
+  input: OwnerLeadRecordEmailInput,
+): Record<string, string | undefined> {
+  const phone = input.phone?.trim() ?? "";
+  return {
+    lead_name: input.name,
+    lead_email: input.email,
+    lead_phone: phone || undefined,
+    lead_phone_tel: phone ? leadPhoneTel(phone) : undefined,
+    card_url: input.sourceUrl,
+    card_url_display: cardUrlDisplay(input.sourceUrl),
+    received_at: formatLeadReceivedAt(input.receivedAtIso),
+    test_sink: input.nonProdSinkDestinationLabel,
+  };
 }
 
-function sourcePlain(sourceUrl: string): string {
-  return `Source: Business card, ${escapePlainTextForEmail(sourceUrl)}`;
-}
-
-function sourceHtml(sourceUrl: string): string {
-  const url = escapeHtml(sourceUrl);
-  return `<p><strong>Source:</strong> Business card, <a href="${url}">${url}</a></p>`;
+function appendTemplateData(
+  input: OwnerLeadAppendEmailInput,
+): Record<string, string | undefined> {
+  return {
+    lead_name: input.name,
+    lead_first_name: leadFirstNameFromFullName(input.name),
+    lead_email: input.email,
+    job_title: input.jobTitle?.trim() || undefined,
+    company: input.company?.trim() || undefined,
+    note: input.note?.trim() || undefined,
+    test_sink: input.nonProdSinkDestinationLabel,
+  };
 }
 
 export function buildOwnerLeadRecordEmail(input: OwnerLeadRecordEmailInput): {
@@ -74,47 +95,16 @@ export function buildOwnerLeadRecordEmail(input: OwnerLeadRecordEmailInput): {
     input.name,
     input.nonProdSinkDestinationLabel,
   );
-  const namePlain = escapePlainTextForEmail(input.name);
-  const emailPlain = escapePlainTextForEmail(input.email);
-  const phonePlain = escapePlainTextForEmail(input.phone?.trim() ? input.phone : "—");
-  const receivedPlain = escapePlainTextForEmail(
-    formatReceivedAtToronto(input.receivedAtIso),
-  );
-
-  const nonProdPlain = input.nonProdSinkDestinationLabel
-    ? nonProdBodyLines(input.nonProdSinkDestinationLabel)
-    : [];
-
-  const textPlain = [
-    ...nonProdPlain,
-    `Name: ${namePlain}`,
-    `Email: ${emailPlain}`,
-    `Phone: ${phonePlain}`,
-    sourcePlain(input.sourceUrl),
-    `Received: ${receivedPlain} (America/Toronto)`,
-  ].join("\n");
-
-  const nameHtml = escapeHtml(input.name);
-  const emailHtml = escapeHtml(input.email);
-  const phoneHtml = escapeHtml(input.phone?.trim() ? input.phone : "—");
-  const receivedHtml = escapeHtml(formatReceivedAtToronto(input.receivedAtIso));
-
-  const nonProdHtml = input.nonProdSinkDestinationLabel
-    ? `<p>Test delivery (sink destination): ${escapeHtml(input.nonProdSinkDestinationLabel)}</p>`
-    : "";
-
-  const textHtml = [
-    nonProdHtml,
-    `<p><strong>Name:</strong> ${nameHtml}</p>`,
-    `<p><strong>Email:</strong> <a href="mailto:${emailHtml}">${emailHtml}</a></p>`,
-    `<p><strong>Phone:</strong> ${phoneHtml}</p>`,
-    sourceHtml(input.sourceUrl),
-    `<p><strong>Received:</strong> ${receivedHtml} (America/Toronto)</p>`,
-  ]
-    .filter(Boolean)
-    .join("\n");
-
-  return { subject: subjects.record, textPlain, textHtml };
+  const data = recordTemplateData(input);
+  return {
+    subject: subjects.record,
+    textPlain: renderEmailTemplate(ownerNewLeadTemplates.text, data, {
+      html: false,
+    }),
+    textHtml: renderEmailTemplate(ownerNewLeadTemplates.html, data, {
+      html: true,
+    }),
+  };
 }
 
 export function buildOwnerLeadAppendEmail(input: OwnerLeadAppendEmailInput): {
@@ -126,58 +116,15 @@ export function buildOwnerLeadAppendEmail(input: OwnerLeadAppendEmailInput): {
     input.name,
     input.nonProdSinkDestinationLabel,
   );
-
-  const lines: string[] = [];
-  if (input.nonProdSinkDestinationLabel) {
-    lines.push(...nonProdBodyLines(input.nonProdSinkDestinationLabel));
-  }
-  lines.push(`Lead: ${escapePlainTextForEmail(input.name)}`);
-  lines.push(`Email: ${escapePlainTextForEmail(input.email)}`);
-  if (input.jobTitle?.trim()) {
-    lines.push(`Job title: ${escapePlainTextForEmail(input.jobTitle.trim())}`);
-  }
-  if (input.company?.trim()) {
-    lines.push(`Company: ${escapePlainTextForEmail(input.company.trim())}`);
-  }
-  if (input.note?.trim()) {
-    lines.push(`Note: ${escapePlainTextForEmail(input.note.trim())}`);
-  }
-  lines.push(sourcePlain(input.sourceUrl));
-  const submittedPlain = escapePlainTextForEmail(
-    formatReceivedAtToronto(input.detailsSubmittedAtIso),
-  );
-  lines.push(`Submitted: ${submittedPlain} (America/Toronto)`);
-
-  const parts: string[] = [];
-  if (input.nonProdSinkDestinationLabel) {
-    parts.push(
-      `<p>Test delivery (sink destination): ${escapeHtml(input.nonProdSinkDestinationLabel)}</p>`,
-    );
-  }
-  parts.push(`<p><strong>Lead:</strong> ${escapeHtml(input.name)}</p>`);
-  parts.push(
-    `<p><strong>Email:</strong> <a href="mailto:${escapeHtml(input.email)}">${escapeHtml(input.email)}</a></p>`,
-  );
-  if (input.jobTitle?.trim()) {
-    parts.push(
-      `<p><strong>Job title:</strong> ${escapeHtml(input.jobTitle.trim())}</p>`,
-    );
-  }
-  if (input.company?.trim()) {
-    parts.push(`<p><strong>Company:</strong> ${escapeHtml(input.company.trim())}</p>`);
-  }
-  if (input.note?.trim()) {
-    parts.push(`<p><strong>Note:</strong> ${escapeHtml(input.note.trim())}</p>`);
-  }
-  parts.push(sourceHtml(input.sourceUrl));
-  parts.push(
-    `<p><strong>Submitted:</strong> ${escapeHtml(formatReceivedAtToronto(input.detailsSubmittedAtIso))} (America/Toronto)</p>`,
-  );
-
+  const data = appendTemplateData(input);
   return {
     subject: subjects.append,
-    textPlain: lines.join("\n"),
-    textHtml: parts.join("\n"),
+    textPlain: renderEmailTemplate(ownerDetailsUpdateTemplates.text, data, {
+      html: false,
+    }),
+    textHtml: renderEmailTemplate(ownerDetailsUpdateTemplates.html, data, {
+      html: true,
+    }),
   };
 }
 

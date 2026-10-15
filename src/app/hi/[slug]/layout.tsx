@@ -13,12 +13,14 @@ export default async function HiCardLayout({ children, params }: LayoutProps) {
 
   return (
     <ThemeProvider>
-      <a
-        href={card.links.bookingUrl}
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-pill focus:bg-accent focus:px-4 focus:py-2.5 focus:text-accent-ink"
-      >
-        {hiUiA11y.skipToBooking}
-      </a>
+      {card.links.bookingUrl ? (
+        <a
+          href={card.links.bookingUrl}
+          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-pill focus:bg-accent focus:px-4 focus:py-2.5 focus:text-accent-ink"
+        >
+          {hiUiA11y.skipToBooking}
+        </a>
+      ) : null}
       {children}
     </ThemeProvider>
   );

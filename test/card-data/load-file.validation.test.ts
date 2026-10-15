@@ -207,14 +207,13 @@ describe("parseCardsLoadFile validation (unit)", () => {
       pattern: /chips must have at least/,
     },
     {
-      label: "empty bodyParagraphs",
+      label: "bookLink without bookingUrl",
       mutate: (raw) => {
         const card = (raw.cards as Record<string, unknown>[])[0];
-        const followUp = (card.copy as { followUpEmail: Record<string, unknown> })
-          .followUpEmail;
-        followUp.bodyParagraphs = [];
+        const links = card.links as Record<string, unknown>;
+        delete links.bookingUrl;
       },
-      pattern: /bodyParagraphs must have at least/,
+      pattern: /links\.bookingUrl is required when pageCopy\.bookLink/,
     },
   ];
 
