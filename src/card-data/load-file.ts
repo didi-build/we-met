@@ -743,6 +743,12 @@ function parseLeadSinkEntry(
       `Card "${slug}" leadSinks[${index}].id must match ${LEAD_SINK_ID_PATTERN}`,
     );
   }
+  const requiredIdPrefix = `${slug}-`;
+  if (!id.startsWith(requiredIdPrefix)) {
+    throw new Error(
+      `Card "${slug}" leadSinks[${index}].id must start with "${requiredIdPrefix}"`,
+    );
+  }
   if (seenSinkIds.has(id)) {
     throw new Error(`Duplicate lead sink id "${id}" in load file`);
   }
@@ -764,10 +770,27 @@ function parseLeadSinkEntry(
   return { id, kind, enabled, config };
 }
 
+function loadFileHasEmailSink(loadFile: CardsLoadFile): boolean {
+  for (const card of loadFile.cards) {
+    if (!card.leadSinks) {
+      continue;
+    }
+    for (const sink of card.leadSinks) {
+      if (sink.kind === "email") {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 export function validateNonProdEmailSinkDestinations(
   loadFile: CardsLoadFile,
   testMailTo: string,
 ): void {
+  if (!loadFileHasEmailSink(loadFile)) {
+    return;
+  }
   const expected = testMailTo.trim();
   if (!expected) {
     throw new Error("WE_MET_TEST_MAIL_TO must be set for non-prod remote load");

@@ -15,8 +15,8 @@ Prints `OK: <n> cards, <m> hostnames` and exits 0 when the JSON matches the sche
 
 - **Path:** `data/cards.local.json` (copy from `data/cards.example.json` and edit).
 - **Shape:** each card has `slug`, `variant`, `displayName`, `email`, `photoKey`, `links` (`bookingUrl` + `footer[]`), `pageCopy` (six strings), `contact` (vCard fields + `urls[]`), and `copy` (thanks/exchange/about/follow-up email strings). See [0010](../decisions/0010-card-data-d1-and-load-script.md).
-- **Optional `leadSinks` per card:** array of `{ "id", "kind", "enabled"?, "config" }`. Stable **`id`** (`^[a-z0-9][a-z0-9-]{0,62}$`, unique in the file). **`kind: "email"`** → `config: { "to": "<address>" }` only. Caps: **10** sinks and **5** email sinks per card ([0022](../decisions/0022-lead-delivery-ledger.md)). If **`leadSinks` is omitted** for a card, existing sink rows for that card are left unchanged. If **`leadSinks` is present** (even `[]`), the load reconciles: upsert listed ids and **delete** other sinks for that card.
-- **Non-prod remote load:** every email sink `config.to` must equal **`WE_MET_TEST_MAIL_TO`** (same value as the non-prod consumer secret). Export that variable before `npm run cards:load -- --remote`.
+- **Optional `leadSinks` per card:** array of `{ "id", "kind", "enabled"?, "config" }`. Stable **`id`** (`^[a-z0-9][a-z0-9-]{0,62}$`, unique in the file, must start with **`{slug}-`** so ids cannot collide across cards). **`kind: "email"`** → `config: { "to": "<address>" }` only. Caps: **10** sinks and **5** email sinks per card ([0022](../decisions/0022-lead-delivery-ledger.md)). If **`leadSinks` is omitted** for a card, existing sink rows for that card are left unchanged. If **`leadSinks` is present** (even `[]`), the load reconciles: upsert listed ids and **delete** other sinks for that card.
+- **Non-prod remote load:** when the file includes at least one **email** sink (enabled or disabled), every email sink `config.to` must equal **`WE_MET_TEST_MAIL_TO`** (same value as the non-prod consumer secret). Export that variable before `npm run cards:load -- --remote`. Loads with **no** email sinks do not require `WE_MET_TEST_MAIL_TO`.
 - **Production:** do **not** load email sinks until the follow-up consumer delivers them (DIDI-586 PR4).
 
 Example `leadSinks` on a card (use your test inbox for non-prod):
@@ -24,7 +24,7 @@ Example `leadSinks` on a card (use your test inbox for non-prod):
 ```json
 "leadSinks": [
   {
-    "id": "owner-inbox",
+    "id": "demo-owner-inbox",
     "kind": "email",
     "enabled": true,
     "config": { "to": "your-test-inbox@example.com" }
