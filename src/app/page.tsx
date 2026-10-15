@@ -5,13 +5,15 @@ import { readLandingHostConfig } from "@/lib/landing/server-config";
 import { resolveLandingUrls } from "@/lib/landing/urls";
 import type { Metadata } from "next";
 
-export function generateMetadata(): Metadata {
-  const config = readLandingHostConfig();
+export const dynamic = "force-dynamic";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const config = await readLandingHostConfig();
   return resolveLandingMetadata(config);
 }
 
-export default function HomePage() {
-  const config = readLandingHostConfig();
+export default async function HomePage() {
+  const config = await readLandingHostConfig();
   const urls = resolveLandingUrls(config);
 
   return (

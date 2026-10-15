@@ -5,10 +5,12 @@ import { readLandingHostConfig } from "@/lib/landing/server-config";
 import { resolveLandingUrls } from "@/lib/landing/urls";
 import type { Metadata } from "next";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = resolveAppComingSoonMetadata();
 
-export default function AppComingSoonPage() {
-  const config = readLandingHostConfig();
+export default async function AppComingSoonPage() {
+  const config = await readLandingHostConfig();
   const urls = resolveLandingUrls(config);
 
   return (

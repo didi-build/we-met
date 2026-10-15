@@ -300,7 +300,7 @@
   transform-origin: 0 0;
 }
 
-/* Static fallback inside the slot (shown when the design-only iframe is absent). Mirrors the top of the card at 390px. */
+/* Static fallback inside the slot. Mirrors the top of the card at 390px. */
 .lp-fb {
   position: absolute;
   inset: 0;

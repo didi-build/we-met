@@ -1,5 +1,6 @@
 "use client";
 
+import { HOW_IT_WORKS_INTERSECTION_OPTIONS } from "@/components/landing/how-it-works-observer";
 import { HOW_IT_WORKS_STEPS } from "@/components/landing/how-it-works-steps";
 import { useEffect, useRef, useState } from "react";
 
@@ -11,17 +12,14 @@ export function HowItWorksSection() {
     const steps = stepRefs.current.filter(Boolean) as HTMLLIElement[];
     if (steps.length === 0) return;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            const index = steps.indexOf(entry.target as HTMLLIElement);
-            if (index >= 0) setActiveStep(index);
-          }
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) {
+          const index = steps.indexOf(entry.target as HTMLLIElement);
+          if (index >= 0) setActiveStep(index);
         }
-      },
-      { root: null, rootMargin: "-50% 0px -50% 0px", threshold: 0 },
-    );
+      }
+    }, HOW_IT_WORKS_INTERSECTION_OPTIONS);
 
     for (const step of steps) observer.observe(step);
     return () => observer.disconnect();
