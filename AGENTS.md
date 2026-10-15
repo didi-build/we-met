@@ -94,3 +94,10 @@ Do not break these; each links to the canonical doc.
 | `npm run init-project`                       | Replace `{{…}}` placeholders after creating a repo from Launchpad                                                                                                          |
 | `npm run repo-settings`                      | Dry-run, `--apply`, or `--verify` recommended GitHub repo settings                                                                                                         |
 | `npm run verify-action-pins`                 | Verify each pinned action SHA matches its version comment (`# vX.Y.Z`)                                                                                                     |
+
+## Cursor Cloud specific instructions
+
+- Node.js 22 (`.nvmrc`) and `npm ci` are the install. No extra system packages.
+- Local dev uses two gitignored files. `.dev.vars` (from `.dev.vars.example`) sets `WE_MET_ENV=local` and `WE_MET_TOKEN_SECRET` for Wrangler bindings. `.env.local` sets `WE_MET_ENV=local` and `WE_MET_BASE_URL=https://we-met.link` so Next.js middleware can read them from `process.env`. For the exchange widget, set `NEXT_PUBLIC_TURNSTILE_SITE_KEY` to Cloudflare’s published always-pass site key `1x00000000000000000000AA`. With `WE_MET_ENV=local`, server-side Turnstile verification always passes.
+- Before `/hi/didi` can return 200, run `npm run db:migrate` and `npm run cards:load -- --file data/cards.example.json`. See [card loading](docs/runbooks/card-loading.md).
+- `npm run dev` serves the app on port 3000. `npm run check` is the full local gate, including the OpenNext build and Wrangler dry-runs.
