@@ -93,10 +93,10 @@ function HiFloatingField({
     <div className="flex flex-col gap-1.5">
       <label
         htmlFor={id}
-        className={`flex cursor-text flex-col gap-0.5 rounded-md border px-4 py-2.5 transition-colors ${border} ${bg}`}
+        className={`flex cursor-text flex-col gap-0.5 rounded-md border px-4 py-2.5 transition-[border-color,box-shadow,background-color] duration-[var(--dur-fast)] ${border} ${bg}`}
       >
         <span
-          className={`flex items-baseline gap-1.5 text-[13px] font-medium leading-snug ${labelColor}`}
+          className={`flex items-baseline gap-1.5 text-[13px] font-medium leading-snug transition-colors duration-[var(--dur-fast)] ${labelColor}`}
         >
           {label}
           {optionalHint && (
@@ -162,6 +162,7 @@ export function HiExchangeSheet({
   const turnstileWaitTimeoutRef = useRef<number | null>(null);
 
   const [step, setStep] = useState<SheetStep>(initialStep);
+  const [stepSwapping, setStepSwapping] = useState(false);
   const [closing, setClosing] = useState(false);
   const [triedExchange, setTriedExchange] = useState(false);
   const [focusField, setFocusField] = useState<FieldKey | null>(null);
@@ -203,6 +204,7 @@ export function HiExchangeSheet({
       return;
     }
     setStep(initialStep);
+    setStepSwapping(false);
     setExchangeFailureAlert(null);
     setTurnstileError(undefined);
     setDetailsSaved(false);
@@ -332,7 +334,15 @@ export function HiExchangeSheet({
     const nextFirstName = firstNameFromName(name);
     setToken(result.token);
     onExchangeSuccess(nextFirstName, result.token);
-    setStep("details");
+    if (prefersReducedMotion()) {
+      setStep("details");
+      return;
+    }
+    setStepSwapping(true);
+    window.setTimeout(() => {
+      setStepSwapping(false);
+      setStep("details");
+    }, 200);
   };
 
   const onSubmitExchange = (event: React.FormEvent) => {
@@ -529,7 +539,7 @@ export function HiExchangeSheet({
                 type="button"
                 aria-label={copy.closeLabel}
                 onClick={() => animateClose()}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-pill border-0 bg-transparent text-ink hover:bg-surface-2"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-pill border-0 bg-transparent text-ink transition-colors duration-[var(--dur-fast)] hover:bg-surface-2"
               >
                 <svg
                   aria-hidden
@@ -561,7 +571,7 @@ export function HiExchangeSheet({
               onSubmit={onSubmitExchange}
               noValidate
               aria-label={copy.exchangeFormAriaLabel}
-              className="flex flex-col gap-5"
+              className={`flex flex-col gap-5 ${stepSwapping ? "animate-hi-fade-out" : ""}`}
             >
               <input
                 type="text"
@@ -574,7 +584,7 @@ export function HiExchangeSheet({
                 className="pointer-events-none absolute h-0 w-0 opacity-0"
               />
 
-              <div className="flex flex-col gap-3">
+              <div className="animate-hi-rise hi-rise-delay-200 flex flex-col gap-3">
                 <HiFloatingField
                   id={`${formId}-name`}
                   label={copy.nameLabel}
@@ -693,7 +703,7 @@ export function HiExchangeSheet({
                 />
               )}
 
-              <div className="flex flex-col gap-2">
+              <div className="animate-hi-rise hi-rise-delay-260 flex flex-col gap-2">
                 <Button
                   type="submit"
                   disabled={exchangePending}
@@ -714,7 +724,7 @@ export function HiExchangeSheet({
               aria-label={copy.detailsFormAriaLabel}
               className="flex flex-col gap-5"
             >
-              <p className="m-0 text-[17px] leading-relaxed text-ink-muted text-pretty">
+              <p className="animate-hi-rise hi-rise-delay-0 m-0 text-[17px] leading-relaxed text-ink-muted text-pretty">
                 {copy.detailsIntro}
               </p>
               {detailsSaved && (
@@ -722,7 +732,7 @@ export function HiExchangeSheet({
                   {copy.detailsSaved}
                 </p>
               )}
-              <div className="flex flex-col gap-3">
+              <div className="animate-hi-rise hi-rise-delay-70 flex flex-col gap-3">
                 <HiFloatingField
                   id={`${formId}-job`}
                   label={copy.jobTitleLabel}
@@ -779,15 +789,17 @@ export function HiExchangeSheet({
                   />
                 </HiFloatingField>
               </div>
-              <Button
-                type="submit"
-                disabled={detailsPending}
-                aria-busy={detailsPending}
-                className={`min-h-14 w-full gap-2 ${detailsPending ? "opacity-80" : ""}`}
-              >
-                {detailsPending && <PendingSpinner />}
-                {detailsPending ? copy.pendingDetails : copy.submitDetails}
-              </Button>
+              <div className="animate-hi-rise hi-rise-delay-140">
+                <Button
+                  type="submit"
+                  disabled={detailsPending}
+                  aria-busy={detailsPending}
+                  className={`min-h-14 w-full gap-2 ${detailsPending ? "opacity-80" : ""}`}
+                >
+                  {detailsPending && <PendingSpinner />}
+                  {detailsPending ? copy.pendingDetails : copy.submitDetails}
+                </Button>
+              </div>
             </form>
           )}
         </div>

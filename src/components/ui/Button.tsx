@@ -4,7 +4,7 @@ import { forwardRef, type ComponentProps, type Ref } from "react";
 type Variant = "primary" | "outline";
 
 const base =
-  "inline-flex min-h-11 items-center justify-center gap-3 whitespace-nowrap rounded-pill px-7 font-semibold transition-colors focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-accent";
+  "inline-flex min-h-11 items-center justify-center gap-3 whitespace-nowrap rounded-pill px-7 font-semibold transition-[background-color,color] duration-[120ms] ease-[cubic-bezier(.4,0,.2,1)] focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-accent";
 
 const variants: Record<Variant, string> = {
   primary:
