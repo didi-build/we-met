@@ -12,6 +12,7 @@ describe("hi card globals.css (regression)", () => {
       /button:not\(:disabled\):not\(\[aria-busy="true"\]\)[\s\S]*cursor:\s*pointer/,
     );
     expect(css).toMatch(/select:not\(:disabled\)[\s\S]*cursor:\s*pointer/);
+    expect(css).toMatch(/\[role="switch"\][\s\S]*cursor:\s*pointer/);
   });
 
   it("keeps hi-card link hover overrides for social and attribution links", () => {
