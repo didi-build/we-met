@@ -2,6 +2,7 @@ const ALLOWLIST = new Set([
   "src/theme/tokens/green.light.css",
   "src/theme/tokens/green.dark.css",
   "design/Hi.dc.html",
+  "src/email/templates/generated.ts",
 ]);
 
 const SKIP_DIRS = new Set([
