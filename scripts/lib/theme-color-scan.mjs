@@ -1,4 +1,5 @@
 const ALLOWLIST = new Set([
+  "src/components/app/icons/AppIcons.tsx",
   "src/components/hi/icons/HiCardIcons.tsx",
   "design/Hi.dc.html",
   "src/email/templates/generated.ts",

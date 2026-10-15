@@ -15,6 +15,11 @@ describe("hi card globals.css (regression)", () => {
     expect(css).toMatch(/\[role="switch"\][\s\S]*cursor:\s*pointer/);
   });
 
+  it("sets ink strip links to background token for contrast on bg-ink", () => {
+    expect(css).toMatch(/\.hi-card-page a\.bg-ink[\s\S]*color:\s*var\(--bg\)/);
+    expect(css).toContain(".hi-card-page a.hi-link-strip.bg-ink");
+  });
+
   it("keeps hi-card link hover overrides for social and attribution links", () => {
     expect(css).toContain(".hi-card-page a.hi-link-social:hover");
     expect(css).toMatch(

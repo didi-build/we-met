@@ -10,4 +10,7 @@ export const CARD_FIELD_LIMITS = {
   serviceDescription: 220,
   alternateLabel: 60,
   publicUrlMaxLength: 2048,
+  slugMin: 3,
+  slugMax: 40,
+  photoMaxBytes: 5 * 1024 * 1024,
 } as const;

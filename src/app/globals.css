@@ -122,16 +122,20 @@ textarea {
   text-underline-offset: 3px;
 }
 
-a.bg-accent,
-a.bg-accent:hover {
+.hi-card-page a.bg-accent,
+.hi-card-page a.bg-accent:hover {
   color: var(--accent-ink);
   text-decoration: none;
 }
 
-a.bg-ink,
-a.bg-ink:hover {
+.hi-card-page a.bg-ink,
+.hi-card-page a.bg-ink:hover {
   color: var(--bg);
   text-decoration: none;
+}
+
+.hi-card-page a.hi-link-strip.bg-ink {
+  color: var(--bg);
 }
 
 :focus-visible {
