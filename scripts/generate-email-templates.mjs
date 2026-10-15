@@ -4,7 +4,7 @@
  * Run after editing *.html / *.txt under src/email/templates/.
  */
 import { readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -34,12 +34,20 @@ export function buildGeneratedEmailTemplatesSource() {
   return `${lines.join("\n")}\n`;
 }
 
-const stdoutOnly = process.argv.includes("--stdout");
-
-if (stdoutOnly) {
-  process.stdout.write(buildGeneratedEmailTemplatesSource());
-} else {
+function runCli() {
+  if (process.argv.includes("--stdout")) {
+    process.stdout.write(buildGeneratedEmailTemplatesSource());
+    return;
+  }
   const outPath = join(templateDir, "generated.ts");
   writeFileSync(outPath, buildGeneratedEmailTemplatesSource(), "utf8");
   console.log(`Wrote ${outPath}`);
+}
+
+const isMain =
+  process.argv[1] !== undefined &&
+  resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  runCli();
 }

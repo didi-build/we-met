@@ -10,13 +10,6 @@
     "WE_MET_ENV": "production",
     "WE_MET_BASE_URL": "https://we-met.link",
   },
-  "rules": [
-    {
-      "type": "Text",
-      "globs": ["**/*.html", "**/*.txt"],
-      "fallthrough": true,
-    },
-  ],
   "d1_databases": [
     {
       "binding": "WE_MET_DB",
