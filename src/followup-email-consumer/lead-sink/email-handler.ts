@@ -5,12 +5,12 @@ import {
   buildOwnerLeadRecordMessageId,
 } from "@/email/format-owner-lead-email";
 import { resolveFromDisplayName } from "@/email/from-display-name";
+import { FollowupEmailError } from "@/email/followup-email-error";
 import { resolveOwnerFromEmail } from "@/email/owner-from";
 import { parseEmailSinkConfig } from "@/email/parse-email-sink-config";
 import { resolveSinkEmailRecipient } from "@/email/recipient";
 import { sanitizeEmailHeaderValue } from "@/email/mime-headers";
 import type { EmailSender } from "@/email/types";
-import type { ConsumerLeadDeliveryLedger } from "@/followup-email-consumer/lead-delivery-ledger";
 import type {
   LeadSinkHandler,
   ParsedLeadSinkAppendMessage,
@@ -23,91 +23,33 @@ export type EmailLeadSinkHandlerDeps = {
   ownerFromEmail?: string;
   fromDisplayName?: string;
   emailSender: EmailSender;
-  ledger: ConsumerLeadDeliveryLedger;
   logMalformedLeadSink(leadId: string): void;
-  logLedgerRowMissing(leadId: string, sinkId: string): void;
-  logLedgerUpdateFailed(leadId: string, sinkId: string, errorCode: string): void;
-  now: () => Date;
 };
+
+function emailExternalRef(
+  gmailMessageId: string | null,
+  gmailThreadId: string | null,
+): string {
+  return JSON.stringify({
+    gmailMessageId,
+    gmailThreadId,
+  });
+}
 
 export function createEmailLeadSinkHandler(
   deps: EmailLeadSinkHandlerDeps,
 ): LeadSinkHandler {
-  async function ensureQueuedRow(
-    leadId: string,
-    sinkId: string,
-    phase: "record" | "append",
-  ): Promise<"proceed" | "skip" | "missing"> {
-    const row = await deps.ledger.findRow(leadId, sinkId, phase);
-    if (!row) {
-      deps.logLedgerRowMissing(leadId, sinkId);
-      return "missing";
-    }
-    if (row.status === "sent" || row.status === "failed") {
-      return "skip";
-    }
-    return "proceed";
-  }
-
-  async function failMalformedEmailConfig(
-    leadId: string,
-    sinkId: string,
-    phase: "record" | "append",
-  ): Promise<void> {
-    deps.logMalformedLeadSink(leadId);
-    try {
-      await deps.ledger.markFailed({
-        leadId,
-        sinkId,
-        phase,
-        errorCode: "malformed_sink_email_config",
-        updatedAt: deps.now().toISOString(),
-      });
-    } catch {
-      // Best-effort.
-    }
-  }
-
-  async function afterSendMarkSent(
-    leadId: string,
-    sinkId: string,
-    phase: "record" | "append",
-    gmailMessageId: string | null,
-    gmailThreadId: string | null,
-  ): Promise<void> {
-    const sentAt = deps.now().toISOString();
-    try {
-      const updated = await deps.ledger.markSent({
-        leadId,
-        sinkId,
-        phase,
-        sentAt,
-        gmailMessageId,
-        gmailThreadId,
-      });
-      if (!updated) {
-        deps.logLedgerUpdateFailed(leadId, sinkId, "ledger_update_failed");
-      }
-    } catch {
-      deps.logLedgerUpdateFailed(leadId, sinkId, "ledger_update_failed");
-    }
-  }
-
   return {
-    async handleRecord(message: ParsedLeadSinkRecordMessage) {
+    appendRequiresRecord: false,
+
+    async deliverRecord(message: ParsedLeadSinkRecordMessage) {
       const sinkConfig = parseEmailSinkConfig(message.sinkConfig);
       if (!sinkConfig) {
-        await failMalformedEmailConfig(message.lead.leadId, message.sinkId, "record");
-        return;
-      }
-
-      const gate = await ensureQueuedRow(message.lead.leadId, message.sinkId, "record");
-      if (gate !== "proceed") {
-        return;
+        deps.logMalformedLeadSink(message.lead.leadId);
+        throw new FollowupEmailError("malformed_sink_email_config");
       }
 
       const ownerFrom = resolveOwnerFromEmail(deps.ownerFromEmail);
-      const fromDisplayName = resolveFromDisplayName(deps.fromDisplayName);
       const recipient = resolveSinkEmailRecipient({
         weMetEnv: deps.weMetEnv,
         sinkDestinationEmail: sinkConfig.to,
@@ -131,6 +73,7 @@ export function createEmailLeadSinkHandler(
         ownerFrom,
       );
 
+      const fromDisplayName = resolveFromDisplayName(deps.fromDisplayName);
       const sendResult = await deps.emailSender.send({
         from: ownerFrom,
         fromDisplayName,
@@ -142,29 +85,19 @@ export function createEmailLeadSinkHandler(
         messageId,
       });
 
-      await afterSendMarkSent(
-        message.lead.leadId,
-        message.sinkId,
-        "record",
-        sendResult.messageId,
-        sendResult.threadId,
-      );
+      return {
+        externalRef: emailExternalRef(sendResult.messageId, sendResult.threadId),
+      };
     },
 
-    async handleAppend(message: ParsedLeadSinkAppendMessage) {
+    async deliverAppend(message: ParsedLeadSinkAppendMessage, ctx) {
       const sinkConfig = parseEmailSinkConfig(message.sinkConfig);
       if (!sinkConfig) {
-        await failMalformedEmailConfig(message.lead.leadId, message.sinkId, "append");
-        return;
-      }
-
-      const gate = await ensureQueuedRow(message.lead.leadId, message.sinkId, "append");
-      if (gate !== "proceed") {
-        return;
+        deps.logMalformedLeadSink(message.lead.leadId);
+        throw new FollowupEmailError("malformed_sink_email_config");
       }
 
       const ownerFrom = resolveOwnerFromEmail(deps.ownerFromEmail);
-      const fromDisplayName = resolveFromDisplayName(deps.fromDisplayName);
       const recipient = resolveSinkEmailRecipient({
         weMetEnv: deps.weMetEnv,
         sinkDestinationEmail: sinkConfig.to,
@@ -184,13 +117,8 @@ export function createEmailLeadSinkHandler(
         nonProdSinkDestinationLabel: nonProdLabel,
       });
 
-      const recordRow = await deps.ledger.findRow(
-        message.lead.leadId,
-        message.sinkId,
-        "record",
-      );
       const recordMessageId =
-        recordRow?.status === "sent"
+        ctx.recordRef !== null
           ? buildOwnerLeadRecordMessageId(
               message.lead.leadId,
               message.sinkId,
@@ -198,8 +126,8 @@ export function createEmailLeadSinkHandler(
             )
           : undefined;
       const threadId =
-        recordRow?.status === "sent"
-          ? (recordRow.gmailThreadId ?? undefined)
+        ctx.recordRef !== null && typeof ctx.recordRef.gmailThreadId === "string"
+          ? ctx.recordRef.gmailThreadId
           : undefined;
 
       const appendMessageId = buildOwnerLeadAppendMessageId(
@@ -208,6 +136,7 @@ export function createEmailLeadSinkHandler(
         ownerFrom,
       );
 
+      const fromDisplayName = resolveFromDisplayName(deps.fromDisplayName);
       const sendResult = await deps.emailSender.send({
         from: ownerFrom,
         fromDisplayName,
@@ -223,13 +152,9 @@ export function createEmailLeadSinkHandler(
         ...(threadId ? { threadId } : {}),
       });
 
-      await afterSendMarkSent(
-        message.lead.leadId,
-        message.sinkId,
-        "append",
-        sendResult.messageId,
-        sendResult.threadId,
-      );
+      return {
+        externalRef: emailExternalRef(sendResult.messageId, sendResult.threadId),
+      };
     },
   };
 }

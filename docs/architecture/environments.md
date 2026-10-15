@@ -108,14 +108,15 @@ The consumer registers on the queue in **its own** Wrangler config; it is not an
 | `lead_sink_attempt_failure`          | `leadId`, `sinkId`, `attempt`, `errorCode`, `willRetry`; `secretName` when applicable                                                                              |
 | `lead_sink_permanent_failure`        | `leadId`, `sinkId`, `errorCode`; `secretName` when applicable                                                                                                      |
 | `lead_sink_malformed`                | `leadId` (may be null)                                                                                                                                             |
+| `lead_sink_append_deferred`          | `leadId`, `sinkId`, `attempt`                                                                                                                                      |
 | `ledger_row_missing`                 | `leadId`, `sinkId`                                                                                                                                                 |
-| `ledger_update_failed`               | `leadId`, `sinkId`, `errorCode`                                                                                                                                    |
+| `ledger_update_failed`               | `leadId`, `sinkId`, `errorCode` (includes `external_ref_invalid`)                                                                                                  |
 | `lead_sink_ledger_record_failed`     | `leadId`, `sinkId`, `errorCode`                                                                                                                                    |
 | `lead_sink_ledger_mark_failed`       | `leadId`, `sinkId`, `errorCode`                                                                                                                                    |
 
 **Consumer secrets (follow-up Workers):** `GMAIL_SERVICE_ACCOUNT_JSON`, `GMAIL_SENDER`, `WE_MET_OWNER_FROM_EMAIL`, `WE_MET_FROM_DISPLAY_NAME` on **both** consumers; **`WE_MET_TEST_MAIL_TO`** on **non-prod only** (five secret names on non-prod, four on production).
 
-**Consumer `errorCode` values (no raw exception text):** `gmail_secret_missing`, `gmail_invalid_service_account_json`, `gmail_token_http_<status>`, `gmail_token_missing_access_token`, `gmail_send_http_<status>`, `gmail_network_error`, `nonprod_mail_redirect_unset`, `owner_from_email_missing`, `from_display_name_missing`, `malformed_sink_email_config`, `invalid_rfc5322_message_id`, `unknown`. For `gmail_secret_missing`, `owner_from_email_missing`, and `from_display_name_missing`, logs include `secretName` — never a secret value.
+**Consumer `errorCode` values (no raw exception text):** `gmail_secret_missing`, `gmail_invalid_service_account_json`, `gmail_token_http_<status>`, `gmail_token_missing_access_token`, `gmail_send_http_<status>`, `gmail_network_error`, `nonprod_mail_redirect_unset`, `owner_from_email_missing`, `from_display_name_missing`, `malformed_sink_email_config`, `record_unavailable`, `invalid_rfc5322_message_id`, `unknown`. Ledger update failures may log `ledger_update_failed` with `external_ref_invalid`. For `gmail_secret_missing`, `owner_from_email_missing`, and `from_display_name_missing`, logs include `secretName` — never a secret value.
 
 **Consumer Wrangler `vars` allowlist:** `WE_MET_ENV` only. `WE_MET_TEST_MAIL_TO` must be a **secret**, not a var.
 

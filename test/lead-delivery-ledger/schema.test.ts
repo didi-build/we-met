@@ -9,6 +9,7 @@ describe("lead_delivery_ledger schema (unit)", () => {
         "card_id",
         "created_at",
         "error_code",
+        "external_ref",
         "gmail_message_id",
         "gmail_thread_id",
         "id",

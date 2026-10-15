@@ -96,6 +96,7 @@ export type FollowupConsumerDeps = {
     errorCode: string,
   ): void;
   logLeadSinkLedgerMarkFailed(leadId: string, sinkId: string, errorCode: string): void;
+  logLeadSinkAppendDeferred(leadId: string, sinkId: string, attempt: number): void;
   sinkHandlers: Map<
     string,
     import("@/followup-email-consumer/lead-sink/types").LeadSinkHandler
@@ -194,6 +195,9 @@ export function createFollowupConsumerDepsFromEnv(
     logLedgerUpdateFailed,
     logLeadSinkLedgerRecordFailed,
     logLeadSinkLedgerMarkFailed,
+    logLeadSinkAppendDeferred(leadId, sinkId, attempt) {
+      console.error("lead_sink_append_deferred", { leadId, sinkId, attempt });
+    },
     ledger,
     ownerFromEmail: env.WE_MET_OWNER_FROM_EMAIL,
     fromDisplayName: env.WE_MET_FROM_DISPLAY_NAME,
@@ -205,13 +209,9 @@ export function createFollowupConsumerDepsFromEnv(
         ownerFromEmail: env.WE_MET_OWNER_FROM_EMAIL,
         fromDisplayName: env.WE_MET_FROM_DISPLAY_NAME,
         emailSender,
-        ledger,
         logMalformedLeadSink(leadId) {
           console.error("lead_sink_malformed", { leadId });
         },
-        logLedgerRowMissing,
-        logLedgerUpdateFailed,
-        now,
       }),
     }),
   };
