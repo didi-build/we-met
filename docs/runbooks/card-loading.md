@@ -14,12 +14,12 @@ Prints `OK: <n> cards, <m> hostnames` and exits 0 when the JSON matches the sche
 ## Load file
 
 - **Path:** `data/cards.local.json` (copy from `data/cards.example.json` and edit).
-- **Shape:** matches `design/card/card.html` `card-data` (see `data/cards.example.json`): `slug`, optional `variant` (`mono` only; omit for default), optional `plan` in the file for preview only (not stored in D1), `name`, optional `role`, `photoKey`, optional `about` (`title`, `paragraphs[]`), optional `services` (`title`, `items[]` with `title` / `description`), optional `links` object (`website`, `linkedin`, `github`, `instagram`), optional `alternate` (`url`, `label` — persisted as `bookingLinks.bookingUrl` for legacy rows only; visitor follow-up email copy is fixed in the app), plus `email`, `contact`, `pageCopy`, and `copy` (exchange sheet strings only). Legacy `copy.followUpEmail` in JSON is accepted and ignored with a warning. All public URLs must use `https://`. See [0010](../decisions/0010-card-data-d1-and-load-script.md).
-- **Optional `leadSinks` per card:** array of `{ "id", "kind", "enabled"?, "config" }`. Stable **`id`** (`^[a-z0-9][a-z0-9-]{0,62}$`, unique in the file, must start with **`{slug}-`** so ids cannot collide across cards). **`kind: "email"`** → `config: { "to": "<address>" }` only. Caps: **10** sinks and **5** email sinks per card ([0022](../decisions/0022-lead-delivery-ledger.md)). If **`leadSinks` is omitted** for a card, existing sink rows for that card are left unchanged. If **`leadSinks` is present** (even `[]`), the load reconciles: upsert listed ids and **delete** other sinks for that card.
-- **Non-prod remote load:** when the file includes at least one **email** sink (enabled or disabled), every email sink `config.to` must equal **`WE_MET_TEST_MAIL_TO`** (same value as the non-prod consumer secret). Export that variable before `npm run cards:load -- --remote`. Loads with **no** email sinks do not require `WE_MET_TEST_MAIL_TO`.
-- **Production:** do **not** load email sinks until the follow-up consumer delivers them (DIDI-586 PR4).
+- **Shape:** matches `design/card/card.html` `card-data` (see `data/cards.example.json`): `slug`, optional `variant` (`mono` only; omit for default), optional `plan` in the file for preview only (not stored in D1), `name`, optional `role`, `photoKey`, optional `about` (`title`, `paragraphs[]`), optional `services` (`title`, `items[]` with `title` / `description`), optional `links` object (`website`, `linkedin`, `github`, `instagram`), optional `alternate` (`url`, `label` — persisted as `bookingLinks.bookingUrl` for legacy rows only; visitor follow-up email copy is fixed in the app), plus top-level **`email`** (owner inbox; stored on `accounts.email`), `contact` (no `email` field — vCard uses the account email), `pageCopy`, and `copy` (exchange sheet strings only). Legacy `copy.followUpEmail` in JSON is accepted and ignored with a warning. All public URLs must use `https://`. See [0010](../decisions/0010-card-data-d1-and-load-script.md) and [0025](../decisions/0025-we-met-mvp-accounts-sign-in-and-app-backend.md).
+- **Optional `leadSinks` per card:** array of `{ "id", "kind", "enabled"?, "config" }`. Stable **`id`** (`^[a-z0-9][a-z0-9-]{0,62}$`, unique in the file, must start with **`{slug}-`** so ids cannot collide across cards). **`kind: "email"`** → `config: { "to": "account_email" }` only (resolved from the fixture account at enqueue). At most **one** email sink per card. If **`leadSinks` is omitted** for a card, existing sink rows for that card are left unchanged. If **`leadSinks` is present** (even `[]`), the load reconciles: upsert listed ids and **delete** other sinks for that card.
+- **Accounts:** by default the loader creates a fixture account per card (`google_sub` `fixture:<slug>`). To attach every card in the file to an **existing** account, pass **`--account-id <uuid>`** (the account row must already exist; the loader does not insert or update it). Production loads are not supported — publish through the app ([0025](../decisions/0025-we-met-mvp-accounts-sign-in-and-app-backend.md)).
+- **Non-prod remote load:** `account_email` sinks do not require `WE_MET_TEST_MAIL_TO`.
 
-Example `leadSinks` on a card (use your test inbox for non-prod):
+Example `leadSinks` on a card:
 
 ```json
 "leadSinks": [
@@ -27,7 +27,7 @@ Example `leadSinks` on a card (use your test inbox for non-prod):
     "id": "demo-owner-inbox",
     "kind": "email",
     "enabled": true,
-    "config": { "to": "your-test-inbox@example.com" }
+    "config": { "to": "account_email" }
   }
 ]
 ```
@@ -88,14 +88,7 @@ After a successful remote load, the script prints a read-back query result (`SEL
 
 ## Remote production D1
 
-**Destructive / high blast radius.** Requires `--remote --production`, `WE_MET_D1_DATABASE_ID_PRODUCTION`, and typing `production` at the prompt.
-
-```bash
-export WE_MET_D1_DATABASE_ID_PRODUCTION='<production-db-uuid>'
-npm run cards:load -- --remote --production --file data/cards.local.json
-```
-
-Production loads are operator-only; there is no public API to create or update cards in step 1.
+`cards:load --production` is removed. Publish cards through the app editor on production.
 
 ## Related
 

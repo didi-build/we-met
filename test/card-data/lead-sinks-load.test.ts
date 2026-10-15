@@ -1,11 +1,17 @@
 import { describe, expect, it } from "vitest";
+import { ACCOUNT_EMAIL_SENTINEL } from "@/card-data/account-email";
 import {
   parseCardsLoadFile,
   validateNonProdEmailSinkDestinations,
 } from "@/card-data/load-file";
-import { buildCardsLoadSql, newCardIdsForLoad } from "@/card-data/load-sql";
+import {
+  buildCardsLoadSql,
+  newAccountIdsForLoad,
+  newCardIdsForLoad,
+} from "@/card-data/load-sql";
 import { splitSqlStatements } from "@/card-data/sql-statements";
 import { D1CardRepository } from "@/card-data/d1-repository";
+import type { CardsLoadFile } from "@/card-data/types";
 import { exampleLoadRaw } from "../helpers/example-card";
 import { withIsolatedLocalD1 } from "../helpers/d1";
 import {
@@ -19,24 +25,31 @@ function cardWithSinks(leadSinks: unknown) {
   return raw;
 }
 
+const accountEmailSink = {
+  id: "didi-inbox-a",
+  kind: "email",
+  config: { to: ACCOUNT_EMAIL_SENTINEL },
+};
+
 describe("leadSinks load file (unit)", () => {
   it("accepts a valid email sink", () => {
-    const file = parseCardsLoadFile(
-      cardWithSinks([
-        { id: "didi-inbox-a", kind: "email", config: { to: "owner@example.com" } },
-      ]),
-    );
+    const file = parseCardsLoadFile(cardWithSinks([accountEmailSink]));
     expect(file.cards[0].leadSinks).toHaveLength(1);
   });
 
-  it("loads several email sinks including duplicate to addresses", () => {
-    const file = parseCardsLoadFile(
-      cardWithSinks([
-        { id: "didi-inbox-a", kind: "email", config: { to: "same@example.com" } },
-        { id: "didi-inbox-b", kind: "email", config: { to: "same@example.com" } },
-      ]),
-    );
-    expect(file.cards[0].leadSinks).toHaveLength(2);
+  it("rejects a second email sink on the same card", () => {
+    expect(() =>
+      parseCardsLoadFile(
+        cardWithSinks([
+          accountEmailSink,
+          {
+            id: "didi-inbox-b",
+            kind: "email",
+            config: { to: ACCOUNT_EMAIL_SENTINEL },
+          },
+        ]),
+      ),
+    ).toThrow(new RegExp(`${MAX_EMAIL_SINKS_PER_CARD}`));
   });
 
   it("rejects unknown kinds", () => {
@@ -45,21 +58,21 @@ describe("leadSinks load file (unit)", () => {
     ).toThrow(/Unknown lead sink kind/);
   });
 
-  it("rejects invalid to addresses and extra config keys", () => {
+  it("rejects literal email addresses and extra config keys", () => {
     expect(() =>
       parseCardsLoadFile(
         cardWithSinks([
           { id: "didi-bad", kind: "email", config: { to: "not an email" } },
         ]),
       ),
-    ).toThrow(/single email/);
+    ).toThrow(/account_email/);
     expect(() =>
       parseCardsLoadFile(
         cardWithSinks([
           {
             id: "didi-bad2",
             kind: "email",
-            config: { to: "a@b.com", extra: true },
+            config: { to: ACCOUNT_EMAIL_SENTINEL, extra: true },
           },
         ]),
       ),
@@ -70,15 +83,15 @@ describe("leadSinks load file (unit)", () => {
     expect(() =>
       parseCardsLoadFile(
         cardWithSinks([
-          { id: "didi-dup", kind: "email", config: { to: "a@example.com" } },
-          { id: "didi-dup", kind: "email", config: { to: "b@example.com" } },
+          accountEmailSink,
+          { id: "didi-inbox-a", kind: "email", config: { to: ACCOUNT_EMAIL_SENTINEL } },
         ]),
       ),
     ).toThrow(/Duplicate lead sink id/);
     expect(() =>
       parseCardsLoadFile(
         cardWithSinks([
-          { id: "didi-Bad-ID", kind: "email", config: { to: "a@example.com" } },
+          { id: "didi-Bad-ID", kind: "email", config: { to: ACCOUNT_EMAIL_SENTINEL } },
         ]),
       ),
     ).toThrow(/must match/);
@@ -88,19 +101,10 @@ describe("leadSinks load file (unit)", () => {
     const many = Array.from({ length: MAX_LEAD_SINKS_PER_CARD + 1 }, (_, i) => ({
       id: `didi-sink-${i}`,
       kind: "email",
-      config: { to: `u${i}@example.com` },
+      config: { to: ACCOUNT_EMAIL_SENTINEL },
     }));
     expect(() => parseCardsLoadFile(cardWithSinks(many))).toThrow(
       new RegExp(`${MAX_LEAD_SINKS_PER_CARD}`),
-    );
-
-    const manyEmail = Array.from({ length: MAX_EMAIL_SINKS_PER_CARD + 1 }, (_, i) => ({
-      id: `didi-email-${i}`,
-      kind: "email",
-      config: { to: `u${i}@example.com` },
-    }));
-    expect(() => parseCardsLoadFile(cardWithSinks(manyEmail))).toThrow(
-      new RegExp(`${MAX_EMAIL_SINKS_PER_CARD}`),
     );
   });
 
@@ -108,15 +112,11 @@ describe("leadSinks load file (unit)", () => {
     expect(() =>
       parseCardsLoadFile(
         cardWithSinks([
-          { id: "inbox-a", kind: "email", config: { to: "a@example.com" } },
+          { id: "inbox-a", kind: "email", config: { to: ACCOUNT_EMAIL_SENTINEL } },
         ]),
       ),
     ).toThrow(/must start with "didi-"/);
-    const file = parseCardsLoadFile(
-      cardWithSinks([
-        { id: "didi-inbox-a", kind: "email", config: { to: "a@example.com" } },
-      ]),
-    );
+    const file = parseCardsLoadFile(cardWithSinks([accountEmailSink]));
     expect(file.cards[0].leadSinks?.[0].id).toBe("didi-inbox-a");
   });
 
@@ -127,24 +127,26 @@ describe("leadSinks load file (unit)", () => {
   });
 });
 
+function loadSqlOptions(loadFile: CardsLoadFile) {
+  const updatedAt = "2026-10-15T12:00:00.000Z";
+  return {
+    updatedAt,
+    newCardIds: newCardIdsForLoad(loadFile),
+    accountIds: newAccountIdsForLoad(loadFile),
+  };
+}
+
 describe("leadSinks load SQL reconcile (integration)", () => {
   it("leaves sinks untouched when leadSinks key is absent", async () => {
-    const card = parseCardsLoadFile(exampleLoadRaw()).cards[0];
-    const withSinks = parseCardsLoadFile(
-      cardWithSinks([
-        { id: "didi-keep", kind: "email", config: { to: "a@example.com" } },
-      ]),
-    ).cards[0];
+    const parsed = parseCardsLoadFile(exampleLoadRaw()).cards[0];
+    const { leadSinks: _omit, ...card } = parsed;
+    const withSinks = parseCardsLoadFile(cardWithSinks([accountEmailSink])).cards[0];
 
-    const updatedAt = "2026-10-15T12:00:00.000Z";
     await withIsolatedLocalD1(async (db) => {
       const repo = new D1CardRepository(db);
       const sql1 = buildCardsLoadSql(
         { cards: [withSinks], hostnames: [] },
-        {
-          updatedAt,
-          newCardIds: newCardIdsForLoad({ cards: [withSinks], hostnames: [] }),
-        },
+        loadSqlOptions({ cards: [withSinks], hostnames: [] }),
       );
       for (const statement of splitSqlStatements(sql1)) {
         await db.prepare(statement).run();
@@ -154,7 +156,7 @@ describe("leadSinks load SQL reconcile (integration)", () => {
 
       const sql2 = buildCardsLoadSql(
         { cards: [card], hostnames: [] },
-        { updatedAt, newCardIds: newCardIdsForLoad({ cards: [card], hostnames: [] }) },
+        loadSqlOptions({ cards: [card], hostnames: [] }),
       );
       for (const statement of splitSqlStatements(sql2)) {
         await db.prepare(statement).run();
@@ -165,21 +167,13 @@ describe("leadSinks load SQL reconcile (integration)", () => {
   });
 
   it("deletes sinks when leadSinks is an empty array", async () => {
-    const withSinks = parseCardsLoadFile(
-      cardWithSinks([
-        { id: "didi-gone", kind: "email", config: { to: "a@example.com" } },
-      ]),
-    ).cards[0];
+    const withSinks = parseCardsLoadFile(cardWithSinks([accountEmailSink])).cards[0];
     const empty = parseCardsLoadFile(cardWithSinks([])).cards[0];
-    const updatedAt = "2026-10-15T12:00:00.000Z";
 
     await withIsolatedLocalD1(async (db) => {
       const repo = new D1CardRepository(db);
       const loadFile = { cards: [withSinks], hostnames: [] };
-      const sql1 = buildCardsLoadSql(loadFile, {
-        updatedAt,
-        newCardIds: newCardIdsForLoad(loadFile),
-      });
+      const sql1 = buildCardsLoadSql(loadFile, loadSqlOptions(loadFile));
       for (const statement of splitSqlStatements(sql1)) {
         await db.prepare(statement).run();
       }
@@ -188,7 +182,7 @@ describe("leadSinks load SQL reconcile (integration)", () => {
 
       const sql2 = buildCardsLoadSql(
         { cards: [empty], hostnames: [] },
-        { updatedAt, newCardIds: newCardIdsForLoad({ cards: [empty], hostnames: [] }) },
+        loadSqlOptions({ cards: [empty], hostnames: [] }),
       );
       for (const statement of splitSqlStatements(sql2)) {
         await db.prepare(statement).run();
@@ -199,45 +193,13 @@ describe("leadSinks load SQL reconcile (integration)", () => {
 });
 
 describe("non-prod email sink destination guard (unit)", () => {
-  it("passes when all email sinks use the test inbox", () => {
-    const file = parseCardsLoadFile(
-      cardWithSinks([
-        { id: "didi-a", kind: "email", config: { to: "test@example.com" } },
-      ]),
-    );
-    expect(() =>
-      validateNonProdEmailSinkDestinations(file, "test@example.com"),
-    ).not.toThrow();
-  });
-
-  it("fails when to mismatches or env is unset while email sinks exist", () => {
-    const file = parseCardsLoadFile(
-      cardWithSinks([
-        { id: "didi-a", kind: "email", config: { to: "other@example.com" } },
-      ]),
-    );
-    expect(() =>
-      validateNonProdEmailSinkDestinations(file, "test@example.com"),
-    ).toThrow(/WE_MET_TEST_MAIL_TO/);
-    expect(() => validateNonProdEmailSinkDestinations(file, "")).toThrow(/must be set/);
+  it("passes when email sinks use account_email", () => {
+    const file = parseCardsLoadFile(cardWithSinks([accountEmailSink]));
+    expect(() => validateNonProdEmailSinkDestinations(file, "")).not.toThrow();
   });
 
   it("passes with env unset when the file has no email sinks", () => {
     const file = parseCardsLoadFile(exampleLoadRaw());
     expect(() => validateNonProdEmailSinkDestinations(file, "")).not.toThrow();
-  });
-
-  it("requires WE_MET_TEST_MAIL_TO for disabled email sinks", () => {
-    const file = parseCardsLoadFile(
-      cardWithSinks([
-        {
-          id: "didi-off",
-          kind: "email",
-          enabled: false,
-          config: { to: "test@example.com" },
-        },
-      ]),
-    );
-    expect(() => validateNonProdEmailSinkDestinations(file, "")).toThrow(/must be set/);
   });
 });

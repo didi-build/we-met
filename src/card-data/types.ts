@@ -56,7 +56,6 @@ export type CardContact = {
   name: ContactName;
   org: string;
   title: string;
-  email: string;
   phone: string;
   vcardNote: string;
   urls: ContactUrl[];
@@ -110,11 +109,16 @@ export type CardCopy = {
   exchangeSheet: CardCopyExchangeSheet;
 };
 
+export type CardStatus = "live" | "suspended" | "retired";
+
 export type CardRecord = {
   id: string;
+  accountId: string;
+  status: CardStatus;
   slug: string;
   variant: BrandVariant;
   displayName: string;
+  /** Owner inbox from accounts.email (not stored on cards or in contact_json). */
   email: string;
   photoKey: string | null;
   name: string;
@@ -147,7 +151,13 @@ export type LeadSinkLoadInput = {
   config: unknown;
 };
 
-export type CardLoadInput = Omit<CardRecord, "id" | "updatedAt"> & {
+export type CardLoadInput = Omit<
+  CardRecord,
+  "id" | "updatedAt" | "status" | "accountId"
+> & {
+  status?: CardStatus;
+  /** When omitted, cards:load creates a fixture account from the card email. */
+  accountId?: string;
   /** When omitted, load script leaves existing sink rows unchanged for this card. */
   leadSinks?: LeadSinkLoadInput[];
 };

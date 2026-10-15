@@ -5,16 +5,21 @@
  * Usage:
  *   npx tsx scripts/load-cards.ts [--file data/cards.local.json]
  *   npx tsx scripts/load-cards.ts --remote [--file path]
- *   npx tsx scripts/load-cards.ts --remote --production [--file path]
+ *   npx tsx scripts/load-cards.ts --remote [--account-id <uuid>] [--file path]
  *   npx tsx scripts/load-cards.ts --validate-only [--file path]
  */
-import { createInterface } from "node:readline/promises";
 import { spawnSync } from "node:child_process";
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { execPath, stdin as input, stdout as output } from "node:process";
+import { execPath } from "node:process";
 import { buildWranglerArgs } from "./lib/build-wrangler-args.ts";
-import { buildCardsLoadSql, newCardIdsForLoad } from "../src/card-data/load-sql.ts";
+import {
+  assertAccountsExistForLoad,
+  buildCardsLoadSql,
+  escapeSqlStringLiteral,
+  newAccountIdsForLoad,
+  newCardIdsForLoad,
+} from "../src/card-data/load-sql.ts";
 import {
   parseCardsLoadFile,
   validateNonProdEmailSinkDestinations,
@@ -22,14 +27,13 @@ import {
 import { registerBuiltInLeadSinkKinds } from "../src/card-data/register-lead-sink-kinds.ts";
 
 const D1_CI_CONFIG_REL = "wrangler.d1-nonprod.ci.jsonc";
-const PRODUCTION_CI_CONFIG_REL = "wrangler.load-production.ci.jsonc";
 const DEFAULT_FILE = "data/cards.local.json";
 
 const args = process.argv.slice(2);
 let mode: "local" | "remote" = "local";
 let filePath = DEFAULT_FILE;
-let production = false;
 let validateOnly = false;
+let accountIdOverride: string | undefined;
 
 for (let i = 0; i < args.length; i++) {
   const arg = args[i];
@@ -40,7 +44,16 @@ for (let i = 0; i < args.length; i++) {
   } else if (arg === "--validate-only") {
     validateOnly = true;
   } else if (arg === "--production") {
-    production = true;
+    console.error(
+      "cards:load no longer supports --production. Publish cards through the app.",
+    );
+    process.exit(1);
+  } else if (arg === "--account-id") {
+    accountIdOverride = args[++i]?.trim();
+    if (!accountIdOverride) {
+      console.error("--account-id requires a value");
+      process.exit(1);
+    }
   } else if (arg === "--file") {
     filePath = args[++i] ?? "";
     if (!filePath) {
@@ -54,11 +67,6 @@ for (let i = 0; i < args.length; i++) {
     console.error(`Unexpected argument: ${arg}`);
     process.exit(1);
   }
-}
-
-if (production && mode !== "remote") {
-  console.error("--production requires --remote");
-  process.exit(1);
 }
 
 async function main(): Promise<void> {
@@ -90,7 +98,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  if (mode === "remote" && !production) {
+  if (mode === "remote") {
     if (!process.env.WE_MET_D1_DATABASE_ID_NONPROD?.trim()) {
       console.error(
         "WE_MET_D1_DATABASE_ID_NONPROD is required for non-prod remote load.",
@@ -110,25 +118,15 @@ async function main(): Promise<void> {
     }
   }
 
-  if (mode === "remote" && production) {
-    if (!process.env.WE_MET_D1_DATABASE_ID_PRODUCTION?.trim()) {
-      console.error(
-        "WE_MET_D1_DATABASE_ID_PRODUCTION is required for --remote --production.",
-      );
-      process.exitCode = 1;
-      return;
-    }
-    const rl = createInterface({ input, output });
-    const answer = await rl.question(
-      'Type "production" to load cards into the production D1 database: ',
-    );
-    rl.close();
-    if (answer.trim() !== "production") {
-      console.error("Aborted: production confirmation did not match.");
-      process.exitCode = 1;
-      return;
+  if (accountIdOverride) {
+    for (const card of loadFile.cards) {
+      card.accountId = accountIdOverride;
     }
   }
+
+  const explicitAccountIds = loadFile.cards
+    .map((card) => card.accountId)
+    .filter((id): id is string => Boolean(id));
 
   const sqlRel = `load-${process.pid}.sql`;
   const generatedConfigs: string[] = [];
@@ -137,18 +135,17 @@ async function main(): Promise<void> {
   try {
     const updatedAt = new Date().toISOString();
     const newCardIds = newCardIdsForLoad(loadFile);
-    const sql = buildCardsLoadSql(loadFile, { updatedAt, newCardIds });
-    writeFileSync(sqlRel, sql, "utf8");
+    const accountIds = newAccountIdsForLoad(loadFile);
 
     if (mode === "remote") {
-      configRel = production ? PRODUCTION_CI_CONFIG_REL : D1_CI_CONFIG_REL;
+      configRel = D1_CI_CONFIG_REL;
       generatedConfigs.push(configRel);
       const prep = spawnSync(
         "node",
         [
           "scripts/prepare-wrangler-config.mjs",
           "--target",
-          production ? "production" : "d1-migrate-nonprod",
+          "d1-migrate-nonprod",
           "--output",
           configRel,
         ],
@@ -160,6 +157,30 @@ async function main(): Promise<void> {
         return;
       }
     }
+
+    if (explicitAccountIds.length > 0) {
+      if (mode === "local") {
+        const { getPlatformProxy } = await import("wrangler");
+        const proxy = await getPlatformProxy({
+          configPath: resolve("wrangler.jsonc"),
+          persist: true,
+        });
+        try {
+          const db = proxy.env.WE_MET_DB as D1Database;
+          if (!db) {
+            throw new Error("WE_MET_DB is not configured");
+          }
+          await assertAccountsExistForLoad(db, explicitAccountIds);
+        } finally {
+          await proxy.dispose?.();
+        }
+      } else if (configRel) {
+        assertAccountsExistForRemoteLoad(configRel, explicitAccountIds);
+      }
+    }
+
+    const sql = buildCardsLoadSql(loadFile, { updatedAt, newCardIds, accountIds });
+    writeFileSync(sqlRel, sql, "utf8");
 
     if (
       process.env.NODE_ENV === "test" &&
@@ -218,6 +239,48 @@ async function main(): Promise<void> {
     } catch {
       // ignore cleanup errors
     }
+  }
+}
+
+function assertAccountsExistForRemoteLoad(
+  configRel: string,
+  accountIds: string[],
+): void {
+  const unique = [...new Set(accountIds)];
+  if (unique.length === 0) {
+    return;
+  }
+  const idList = unique.map((id) => escapeSqlStringLiteral(id)).join(", ");
+  const command = `SELECT COUNT(*) AS n FROM accounts WHERE id IN (${idList})`;
+  const result = spawnSync(
+    execPath,
+    buildWranglerArgs({
+      kind: "execute-command",
+      configRel,
+      remote: true,
+      command,
+      json: true,
+    }),
+    { encoding: "utf8" },
+  );
+  if (result.status !== 0) {
+    if (result.stderr) process.stderr.write(result.stderr);
+    throw new Error("Failed to verify account ids on remote D1");
+  }
+  let parsed: Array<{ results?: Array<{ n: number }>; success?: boolean }>;
+  try {
+    parsed = JSON.parse(result.stdout) as Array<{
+      results?: Array<{ n: number }>;
+      success?: boolean;
+    }>;
+  } catch {
+    throw new Error("Failed to parse remote account verification response");
+  }
+  const batch = parsed[0];
+  const found = batch?.results?.[0]?.n;
+  if (!batch?.success || found !== unique.length) {
+    const missing = unique.join(", ");
+    throw new Error(`Unknown account id for card load: ${missing}`);
   }
 }
 

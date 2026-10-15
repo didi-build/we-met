@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import { lookupCard } from "@/card-data/lookup";
 import { getCardRepository } from "@/card-data/server";
 import { isCardServingHost, readWeMetHostConfig } from "@/config/we-met";
 import { clientIpFromHeaders } from "@/exchange/client-ip";
@@ -33,7 +34,11 @@ export async function POST(request: Request) {
 
   const repo = await getCardRepository();
   const exchangeInput = parsed.value;
-  const card = await repo.getBySlug(exchangeInput.slug);
+  const card = await lookupCard(
+    { hostname, pathname: `/hi/${exchangeInput.slug}` },
+    repo,
+    hostConfig,
+  );
   const sinks = card ? await repo.listLeadSinks(card.id) : [];
 
   const clientIp = clientIpFromHeaders(headerList);

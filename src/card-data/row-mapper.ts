@@ -6,7 +6,9 @@ export type CardsRow = {
   slug: string;
   variant: string;
   display_name: string;
-  email: string;
+  account_id: string;
+  status: string;
+  owner_email: string;
   photo_key: string | null;
   links_json: string;
   page_copy_json: string;

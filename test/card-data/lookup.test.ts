@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { lookupCard } from "@/card-data/lookup";
 import { MemoryCardRepository } from "@/card-data/memory-repository";
+import { upsertCardWithEmailSink } from "../helpers/card-email-sink";
 import { exampleCardInput } from "../helpers/example-card";
 
 const hostConfig = {
@@ -13,7 +14,7 @@ describe("lookup (unit)", () => {
   it("resolves by slug on the card host", async () => {
     const repo = new MemoryCardRepository();
     const sample = { ...exampleCardInput(), slug: "didi" };
-    await repo.upsertCard(sample);
+    await upsertCardWithEmailSink(repo, sample);
     const card = await lookupCard(
       { hostname: "we-met.link", pathname: "/hi/didi" },
       repo,
@@ -25,7 +26,7 @@ describe("lookup (unit)", () => {
   it("resolves by slug on preview hosts matching the suffix", async () => {
     const repo = new MemoryCardRepository();
     const sample = { ...exampleCardInput(), slug: "didi" };
-    await repo.upsertCard(sample);
+    await upsertCardWithEmailSink(repo, sample);
     const card = await lookupCard(
       {
         hostname: "pr-1-we-met.diademshoukralla.workers.dev",
@@ -60,7 +61,7 @@ describe("lookup (unit)", () => {
   it("does not resolve reserved hostnames via hostname table", async () => {
     const repo = new MemoryCardRepository();
     const sample = { ...exampleCardInput(), slug: "didi" };
-    await repo.upsertCard(sample);
+    await upsertCardWithEmailSink(repo, sample);
     await repo.upsertHostname({ hostname: "app.we-met.link", slug: "didi" });
     const card = await lookupCard(
       { hostname: "app.we-met.link", pathname: "/" },
@@ -73,7 +74,7 @@ describe("lookup (unit)", () => {
   it("resolves custom hostname mappings", async () => {
     const repo = new MemoryCardRepository();
     const sample = { ...exampleCardInput(), slug: "didi" };
-    await repo.upsertCard(sample);
+    await upsertCardWithEmailSink(repo, sample);
     await repo.upsertHostname({ hostname: "card.example.com", slug: "didi" });
     const card = await lookupCard(
       { hostname: "card.example.com", pathname: "/" },

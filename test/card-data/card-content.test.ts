@@ -8,17 +8,11 @@ import {
   cardInitials,
   WE_MET_CARD_HOME_URL,
 } from "@/lib/hi-card/card-content";
-import { exampleCardInput } from "../helpers/example-card";
+import { exampleCardRecord } from "../helpers/example-card";
 import type { CardRecord } from "@/card-data/types";
 
 function minimalCard(overrides: Partial<CardRecord> = {}): CardRecord {
-  const input = exampleCardInput();
-  return {
-    id: "id",
-    updatedAt: "2026-01-01T00:00:00.000Z",
-    ...input,
-    ...overrides,
-  };
+  return exampleCardRecord({ id: "id", ...overrides });
 }
 
 describe("card content helpers (unit)", () => {

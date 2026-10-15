@@ -1,6 +1,6 @@
 # 0025. We Met MVP: accounts, Google sign-in, sessions and the app backend
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-10-15
 - **Ticket:** DIDI-612 (design), implemented by the tickets listed under Consequences
 - **Updates:** [0003](./0003-urls-and-lookup.md) (slug rules), [0010](./0010-card-data-d1-and-load-script.md) (users table, write endpoints, `cards.email`), [0018](./0018-lead-sink.md) (zero sinks, email sink config), [0022](./0022-lead-delivery-ledger.md) and [0023](./0023-owner-email-lead-sink-consumer.md) (consumer reads `app_settings`), [0014](./0014-reserved-hostnames-and-paths.md) (slug reservations), [0013](./0013-future-app-host.md) (cookie details)

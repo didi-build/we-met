@@ -41,16 +41,15 @@ describe("load-cards remote guards (unit)", () => {
     expect(result.stderr).toContain("WE_MET_D1_DATABASE_ID_NONPROD");
   });
 
-  it("refuses --remote --production without production D1 id", () => {
+  it("refuses --remote --production", () => {
     const result = runScript(
       ["--remote", "--production", "--file", "data/cards.example.json"],
       {
-        WE_MET_D1_DATABASE_ID_PRODUCTION: "",
         WE_MET_D1_DATABASE_ID_NONPROD: "test-nonprod-id",
       },
     );
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain("WE_MET_D1_DATABASE_ID_PRODUCTION");
+    expect(result.stderr).toContain("no longer supports --production");
   });
 
   it("removes generated config and sql when failing after config prepare", () => {
@@ -65,33 +64,7 @@ describe("load-cards remote guards (unit)", () => {
   it("refuses --production without --remote", () => {
     const result = runScript(["--production", "--file", "data/cards.example.json"]);
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain("--production requires --remote");
-  });
-
-  it("exits 1 on wrong production confirmation and leaves no generated files", () => {
-    const result = spawnSync(
-      execPath,
-      [
-        "--import",
-        "tsx",
-        SCRIPT,
-        "--remote",
-        "--production",
-        "--file",
-        "data/cards.example.json",
-      ],
-      {
-        encoding: "utf8",
-        env: {
-          ...process.env,
-          WE_MET_D1_DATABASE_ID_PRODUCTION: "11111111-1111-1111-1111-111111111111",
-          WE_MET_D1_DATABASE_ID_NONPROD: "22222222-2222-2222-2222-222222222222",
-        },
-        input: "not-production\n",
-      },
-    );
-    expect(result.status).toBe(1);
-    expect(leftoverGeneratedArtifacts()).toEqual([]);
+    expect(result.stderr).toContain("no longer supports --production");
   });
 
   it("exits 1 when --file is missing", () => {

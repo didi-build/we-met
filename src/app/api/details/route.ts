@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { lookupCard } from "@/card-data/lookup";
 import { getCardRepository } from "@/card-data/server";
 import { isCardServingHost, readWeMetHostConfig } from "@/config/we-met";
 import { processDetails } from "@/exchange/process-details";
@@ -35,7 +36,11 @@ export async function POST(request: Request) {
   }
 
   const repo = await getCardRepository();
-  const card = await repo.getBySlug(verified.payload.cardSlug);
+  const card = await lookupCard(
+    { hostname, pathname: `/hi/${verified.payload.cardSlug}` },
+    repo,
+    hostConfig,
+  );
   const sinks = card ? await repo.listLeadSinks(card.id) : [];
 
   const result = await processDetails(parsed.value, card, sinks, deps);

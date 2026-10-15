@@ -6,6 +6,7 @@ import type { LeadSinkUpsertInput, CardRepository } from "@/card-data/repository
 import type {
   CardLoadInput,
   CardRecord,
+  CardStatus,
   HostnameMapping,
   LeadSinkRecord,
 } from "@/card-data/types";
@@ -18,13 +19,66 @@ function newId(): string {
   return crypto.randomUUID();
 }
 
+type MemoryAccount = {
+  id: string;
+  email: string;
+  status: "active" | "waitlisted" | "suspended" | "deleted";
+};
+
 export class MemoryCardRepository implements CardRepository {
   private readonly cardsBySlug = new Map<string, CardRecord>();
   private readonly hostnames = new Map<string, string>();
   private readonly leadSinks = new Map<string, LeadSinkRecord>();
+  private readonly accounts = new Map<string, MemoryAccount>();
+
+  private ensureAccount(input: CardLoadInput, existingAccountId?: string): string {
+    if (input.accountId) {
+      const account = this.accounts.get(input.accountId);
+      if (!account) {
+        throw new Error(`Unknown account id for card load: ${input.accountId}`);
+      }
+      account.email = input.email.toLowerCase();
+      return input.accountId;
+    }
+    if (existingAccountId) {
+      const account = this.accounts.get(existingAccountId);
+      if (account) {
+        account.email = input.email.toLowerCase();
+      }
+      return existingAccountId;
+    }
+    const id = newId();
+    this.accounts.set(id, {
+      id,
+      email: input.email.toLowerCase(),
+      status: "active",
+    });
+    return id;
+  }
+
+  private isPublicCard(card: CardRecord): boolean {
+    const account = this.accounts.get(card.accountId);
+    return card.status === "live" && account?.status === "active";
+  }
+
+  /** Test helper: set account status without going through sign-in. */
+  setAccountStatus(
+    accountId: string,
+    status: MemoryAccount["status"],
+  ): void {
+    const account = this.accounts.get(accountId);
+    if (!account) {
+      throw new Error(`Unknown account id: ${accountId}`);
+    }
+    account.status = status;
+  }
 
   async getBySlug(slug: string): Promise<CardRecord | null> {
-    return this.cardsBySlug.get(slug) ?? null;
+    const card = this.cardsBySlug.get(slug) ?? null;
+    if (!card || !this.isPublicCard(card)) {
+      return null;
+    }
+    return card;
   }
 
   async getByHostname(hostname: string): Promise<CardRecord | null> {
@@ -34,7 +88,7 @@ export class MemoryCardRepository implements CardRepository {
     }
     for (const card of this.cardsBySlug.values()) {
       if (card.id === cardId) {
-        return card;
+        return this.isPublicCard(card) ? card : null;
       }
     }
     return null;
@@ -43,9 +97,14 @@ export class MemoryCardRepository implements CardRepository {
   async upsertCard(input: CardLoadInput): Promise<CardRecord> {
     const existing = this.cardsBySlug.get(input.slug);
     const updatedAt = nowIso();
+    const status: CardStatus = input.status ?? "live";
+    const accountId = this.ensureAccount(input, existing?.accountId);
     const record: CardRecord = {
-      id: existing?.id ?? newId(),
       ...input,
+      id: existing?.id ?? newId(),
+      accountId,
+      status,
+      email: input.email.toLowerCase(),
       updatedAt,
     };
     this.cardsBySlug.set(input.slug, record);
@@ -53,7 +112,7 @@ export class MemoryCardRepository implements CardRepository {
   }
 
   async upsertHostname(mapping: HostnameMapping): Promise<void> {
-    const card = await this.getBySlug(mapping.slug);
+    const card = this.cardsBySlug.get(mapping.slug);
     if (!card) {
       throw new Error(`Unknown card slug for hostname mapping: ${mapping.slug}`);
     }

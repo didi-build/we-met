@@ -1,16 +1,10 @@
 import { registerEmailLeadSinkKind } from "@/card-data/lead-sink-kinds/email";
 
-let registered = false;
-
 export function registerBuiltInLeadSinkKinds(): void {
-  if (registered) {
-    return;
-  }
   registerEmailLeadSinkKind();
-  registered = true;
 }
 
-/** Test-only: reset registration guard between cases. */
+/** Test-only: kept for callers that reset sink kinds between cases. */
 export function resetBuiltInLeadSinkKindsForTests(): void {
-  registered = false;
+  // registerBuiltInLeadSinkKinds is idempotent via registry.set.
 }

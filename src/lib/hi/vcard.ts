@@ -38,7 +38,7 @@ export type VCardPhoto = {
 
 export function buildVCard(
   contact: CardContact,
-  options: { photo?: VCardPhoto | null } = {},
+  options: { ownerEmail: string; photo?: VCardPhoto | null },
 ): string {
   const lines = [
     "BEGIN:VCARD",
@@ -48,7 +48,7 @@ export function buildVCard(
     `NICKNAME:${escapeVCardValue(contact.name.nickname)}`,
     `ORG:${escapeVCardValue(contact.org)}`,
     `TITLE:${escapeVCardValue(contact.title)}`,
-    `EMAIL;TYPE=INTERNET,WORK:${contact.email}`,
+    `EMAIL;TYPE=INTERNET,WORK:${escapeVCardValue(options.ownerEmail)}`,
     `TEL;TYPE=CELL:${contact.phone}`,
   ];
 

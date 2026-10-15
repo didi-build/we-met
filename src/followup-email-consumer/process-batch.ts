@@ -246,6 +246,7 @@ async function sendVisitorFollowup(
 
   const { vcardBody, filename } = await buildOwnerVCardAttachment(
     message.card.contact,
+    message.card.email,
     message.card.photoKey,
     deps.assets,
     deps,

@@ -8,11 +8,11 @@ const contact: CardContact = {
   name: { full: "Demo User", family: "User", given: "Demo", nickname: "Demo" },
   org: "Co",
   title: "Role",
-  email: "owner@example.com",
   phone: "+1",
   vcardNote: "note",
   urls: [],
 };
+const ownerEmail = "owner@example.com";
 
 describe("createReadOnlyConsumerAssets (unit)", () => {
   it("reads JPEG content type from R2ObjectBody httpMetadata", async () => {
@@ -28,10 +28,16 @@ describe("createReadOnlyConsumerAssets (unit)", () => {
       })),
     };
     const assets = createReadOnlyConsumerAssets(bucket as never);
-    const result = await buildOwnerVCardAttachment(contact, "photos/demo.jpg", assets, {
-      logMissingPhoto: vi.fn(),
-      logNonJpegPhoto: vi.fn(),
-    });
+    const result = await buildOwnerVCardAttachment(
+      contact,
+      ownerEmail,
+      "photos/demo.jpg",
+      assets,
+      {
+        logMissingPhoto: vi.fn(),
+        logNonJpegPhoto: vi.fn(),
+      },
+    );
     expect(result.vcardBody).toContain("PHOTO;ENCODING=b;TYPE=JPEG:");
     expect(bucket.get).toHaveBeenCalledWith("photos/demo.jpg");
   });
@@ -45,10 +51,16 @@ describe("createReadOnlyConsumerAssets (unit)", () => {
       })),
     };
     const assets = createReadOnlyConsumerAssets(bucket as never);
-    const result = await buildOwnerVCardAttachment(contact, "photos/demo.png", assets, {
-      logMissingPhoto: vi.fn(),
-      logNonJpegPhoto,
-    });
+    const result = await buildOwnerVCardAttachment(
+      contact,
+      ownerEmail,
+      "photos/demo.png",
+      assets,
+      {
+        logMissingPhoto: vi.fn(),
+        logNonJpegPhoto,
+      },
+    );
     expect(result.vcardBody).not.toContain("PHOTO;");
     expect(logNonJpegPhoto).toHaveBeenCalledWith("photos/demo.png");
   });
@@ -59,6 +71,7 @@ describe("createReadOnlyConsumerAssets (unit)", () => {
     const assets = createReadOnlyConsumerAssets(bucket as never);
     const result = await buildOwnerVCardAttachment(
       contact,
+      ownerEmail,
       "photos/missing.jpg",
       assets,
       { logMissingPhoto, logNonJpegPhoto: vi.fn() },

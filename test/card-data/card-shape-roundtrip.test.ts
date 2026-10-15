@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { D1CardRepository } from "@/card-data/d1-repository";
-import { buildCardsLoadSql, newCardIdsForLoad } from "@/card-data/load-sql";
+import {
+  buildCardsLoadSql,
+  newAccountIdsForLoad,
+  newCardIdsForLoad,
+} from "@/card-data/load-sql";
 import { MemoryCardRepository } from "@/card-data/memory-repository";
 import { splitSqlStatements } from "@/card-data/sql-statements";
 import { exampleCardInput, exampleLoadFile } from "../helpers/example-card";
@@ -27,6 +31,7 @@ describe("card shape round-trip (integration)", () => {
     const sql = buildCardsLoadSql(loadFile, {
       updatedAt: "2026-10-11T12:00:00.000Z",
       newCardIds: newCardIdsForLoad(loadFile),
+      accountIds: newAccountIdsForLoad(loadFile),
     });
 
     await withIsolatedLocalD1(async (db) => {
@@ -68,6 +73,7 @@ describe("card shape round-trip (integration)", () => {
     const sql = buildCardsLoadSql(loadFile, {
       updatedAt: "2026-10-11T12:00:00.000Z",
       newCardIds: newCardIdsForLoad(loadFile),
+      accountIds: newAccountIdsForLoad(loadFile),
     });
 
     await withIsolatedLocalD1(async (db) => {

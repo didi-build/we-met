@@ -35,6 +35,7 @@ function cardJson(value: unknown): string {
 export type BuildLoadSqlOptions = {
   updatedAt: string;
   newCardIds: Map<string, string>;
+  accountIds: Map<string, string>;
 };
 
 export function buildCardsLoadSql(
@@ -44,11 +45,23 @@ export function buildCardsLoadSql(
   const statements: string[] = [];
 
   for (const card of loadFile.cards) {
+    if (card.accountId) {
+      continue;
+    }
+    const accountId = options.accountIds.get(card.slug);
+    if (!accountId) {
+      throw new Error(`Missing generated account id for slug: ${card.slug}`);
+    }
+    statements.push(buildFixtureAccountStatement(card, accountId, options.updatedAt));
+  }
+
+  for (const card of loadFile.cards) {
     const id = options.newCardIds.get(card.slug);
-    if (!id) {
+    const accountId = options.accountIds.get(card.slug);
+    if (!id || !accountId) {
       throw new Error(`Missing generated id for slug: ${card.slug}`);
     }
-    statements.push(buildCardUpsertStatement(card, id, options.updatedAt));
+    statements.push(buildCardUpsertStatement(card, id, accountId, options.updatedAt));
   }
 
   for (const mapping of loadFile.hostnames) {
@@ -62,6 +75,32 @@ export function buildCardsLoadSql(
   }
 
   return `${statements.join(";\n")};\n`;
+}
+
+function buildFixtureAccountStatement(
+  card: CardLoadInput,
+  accountId: string,
+  updatedAt: string,
+): string {
+  const googleSub = card.accountId
+    ? `fixture:account:${accountId}`
+    : `fixture:${card.slug}`;
+  return `INSERT INTO accounts (
+  id, google_sub, email, name, status, created_at, updated_at, last_login_at
+) VALUES (
+  ${escapeSqlStringLiteral(accountId)},
+  ${escapeSqlStringLiteral(googleSub)},
+  ${escapeSqlStringLiteral(card.email.toLowerCase())},
+  ${escapeSqlStringLiteral(card.displayName)},
+  'active',
+  ${escapeSqlStringLiteral(updatedAt)},
+  ${escapeSqlStringLiteral(updatedAt)},
+  NULL
+)
+ON CONFLICT(google_sub) DO UPDATE SET
+  email = excluded.email,
+  name = excluded.name,
+  updated_at = excluded.updated_at`;
 }
 
 function buildLeadSinkStatements(card: CardLoadInput, updatedAt: string): string[] {
@@ -118,6 +157,7 @@ ON CONFLICT(id) DO UPDATE SET
 function buildCardUpsertStatement(
   card: CardLoadInput,
   newId: string,
+  accountId: string,
   updatedAt: string,
 ): string {
   const persisted = cardLoadInputToPersisted(card);
@@ -125,16 +165,18 @@ function buildCardUpsertStatement(
   const pageCopyJson = cardJson(persisted.pageCopy);
   const contactJson = cardJson(persisted.contact);
   const copyJson = cardJson(persisted.copy);
+  const status = card.status ?? "live";
 
   return `INSERT INTO cards (
-  id, slug, variant, display_name, email, photo_key,
+  id, slug, variant, display_name, account_id, status, photo_key,
   links_json, page_copy_json, contact_json, copy_json, updated_at
 ) VALUES (
   ${escapeSqlStringLiteral(newId)},
   ${escapeSqlStringLiteral(card.slug)},
   ${escapeSqlStringLiteral(card.variant)},
   ${escapeSqlStringLiteral(card.displayName)},
-  ${escapeSqlStringLiteral(card.email)},
+  ${escapeSqlStringLiteral(accountId)},
+  ${escapeSqlStringLiteral(status)},
   ${sqlNullableString(card.photoKey)},
   ${linksJson},
   ${pageCopyJson},
@@ -145,7 +187,8 @@ function buildCardUpsertStatement(
 ON CONFLICT(slug) DO UPDATE SET
   variant = excluded.variant,
   display_name = excluded.display_name,
-  email = excluded.email,
+  account_id = excluded.account_id,
+  status = excluded.status,
   photo_key = excluded.photo_key,
   links_json = excluded.links_json,
   page_copy_json = excluded.page_copy_json,
@@ -165,10 +208,42 @@ SELECT ${hostname}, id FROM cards WHERE slug = ${slug}
 ON CONFLICT(hostname) DO UPDATE SET card_id = excluded.card_id`;
 }
 
+function fixtureCardId(slug: string): string {
+  return `fixture-card-${slug}`;
+}
+
 export function newCardIdsForLoad(loadFile: CardsLoadFile): Map<string, string> {
   const ids = new Map<string, string>();
   for (const card of loadFile.cards) {
-    ids.set(card.slug, crypto.randomUUID());
+    ids.set(card.slug, fixtureCardId(card.slug));
   }
   return ids;
+}
+
+function fixtureAccountId(slug: string): string {
+  return `fixture-account-${slug}`;
+}
+
+export function newAccountIdsForLoad(loadFile: CardsLoadFile): Map<string, string> {
+  const ids = new Map<string, string>();
+  for (const card of loadFile.cards) {
+    ids.set(card.slug, card.accountId ?? fixtureAccountId(card.slug));
+  }
+  return ids;
+}
+
+export async function assertAccountsExistForLoad(
+  db: D1Database,
+  accountIds: Iterable<string>,
+): Promise<void> {
+  const unique = [...new Set(accountIds)];
+  for (const accountId of unique) {
+    const row = await db
+      .prepare(`SELECT id FROM accounts WHERE id = ?`)
+      .bind(accountId)
+      .first<{ id: string }>();
+    if (!row) {
+      throw new Error(`Unknown account id for card load: ${accountId}`);
+    }
+  }
 }
