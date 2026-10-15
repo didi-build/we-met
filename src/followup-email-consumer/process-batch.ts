@@ -88,6 +88,12 @@ export type FollowupConsumerDeps = {
   logMalformedLeadSink(leadId: string | null): void;
   logLedgerRowMissing(leadId: string, sinkId: string): void;
   logLedgerUpdateFailed(leadId: string, sinkId: string, errorCode: string): void;
+  logLeadSinkLedgerRecordFailed(
+    leadId: string,
+    sinkId: string,
+    errorCode: string,
+  ): void;
+  logLeadSinkLedgerMarkFailed(leadId: string, sinkId: string, errorCode: string): void;
   sinkHandlers: Map<
     string,
     import("@/followup-email-consumer/lead-sink/types").LeadSinkHandler
@@ -110,6 +116,20 @@ export function createFollowupConsumerDepsFromEnv(
   };
   const logLedgerUpdateFailed = (leadId: string, sinkId: string, errorCode: string) => {
     console.error("ledger_update_failed", { leadId, sinkId, errorCode });
+  };
+  const logLeadSinkLedgerRecordFailed = (
+    leadId: string,
+    sinkId: string,
+    errorCode: string,
+  ) => {
+    console.error("lead_sink_ledger_record_failed", { leadId, sinkId, errorCode });
+  };
+  const logLeadSinkLedgerMarkFailed = (
+    leadId: string,
+    sinkId: string,
+    errorCode: string,
+  ) => {
+    console.error("lead_sink_ledger_mark_failed", { leadId, sinkId, errorCode });
   };
   const now = () => new Date();
 
@@ -169,6 +189,8 @@ export function createFollowupConsumerDepsFromEnv(
     },
     logLedgerRowMissing,
     logLedgerUpdateFailed,
+    logLeadSinkLedgerRecordFailed,
+    logLeadSinkLedgerMarkFailed,
     ledger,
     ownerFromEmail: env.WE_MET_OWNER_FROM_EMAIL,
     now,

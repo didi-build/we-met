@@ -117,6 +117,8 @@ function createDeps(
     sinkHandlers,
     logLedgerRowMissing,
     logLedgerUpdateFailed,
+    logLeadSinkLedgerRecordFailed: vi.fn(),
+    logLeadSinkLedgerMarkFailed: vi.fn(),
     logLeadSinkAttemptFailure: vi.fn(),
     logLeadSinkPermanentFailure: vi.fn(),
     logMalformedLeadSink: vi.fn(),
@@ -669,29 +671,125 @@ describe("processFollowupQueueBatch (unit)", () => {
     );
   });
 
-  it("does not block visitor follow-up when email sink fails", async () => {
+  it("does not block visitor follow-up when email sink fails first in batch", async () => {
     const ledger = new MemoryConsumerLeadDeliveryLedger();
     ledger.seedQueued("lead-1", "sink-1", "record");
-    const visitor = createMessage(visitorBody(), { id: "visitor" });
     const sink = createMessage(sinkRecordBody(), { id: "sink" });
+    const visitor = createMessage(visitorBody(), { id: "visitor" });
+    const send = vi.fn(async (email: { messageId?: string }) => {
+      if (email.messageId?.includes("sink-1")) {
+        throw new FollowupEmailError("gmail_network_error");
+      }
+      return { messageId: "v1", threadId: "vt1" };
+    });
+    const deps = createDeps({ emailSender: { send } }, ledger);
+
+    await processFollowupQueueBatch({ messages: [sink, visitor] }, deps);
+
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(sink.retry).toHaveBeenCalledOnce();
+    expect(visitor.ack).toHaveBeenCalledOnce();
+    expect(visitor.retry).not.toHaveBeenCalled();
+  });
+
+  it("delivers second email sink when the first sink fails in the same batch", async () => {
+    const ledger = new MemoryConsumerLeadDeliveryLedger();
+    ledger.seedQueued("lead-1", "sink-a", "record");
+    ledger.seedQueued("lead-1", "sink-b", "record");
+    const sinkA = createMessage(sinkRecordBody({ sinkId: "sink-a" }), { id: "sink-a" });
+    const sinkB = createMessage(sinkRecordBody({ sinkId: "sink-b" }), { id: "sink-b" });
+    const send = vi.fn(async (email: { messageId?: string }) => {
+      if (email.messageId?.includes("sink-a")) {
+        throw new FollowupEmailError("gmail_network_error");
+      }
+      return { messageId: "g-b", threadId: "t-b" };
+    });
+    const deps = createDeps({ emailSender: { send } }, ledger);
+
+    await processFollowupQueueBatch({ messages: [sinkA, sinkB] }, deps);
+
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(sinkA.retry).toHaveBeenCalledOnce();
+    expect(sinkB.ack).toHaveBeenCalledOnce();
+    expect(ledger.getRowState("lead-1", "sink-b", "record")?.status).toBe("sent");
+  });
+
+  it("retries sink message when recordFailedAttempt throws", async () => {
+    const ledger = new MemoryConsumerLeadDeliveryLedger();
+    ledger.seedQueued("lead-1", "sink-1", "record");
+    const recordFailedAttempt = vi.fn(async () => {
+      throw new Error("db down");
+    });
+    const ledgerBroken = {
+      ...ledger,
+      recordFailedAttempt,
+      findRow: ledger.findRow.bind(ledger),
+      markSent: ledger.markSent.bind(ledger),
+      markFailed: ledger.markFailed.bind(ledger),
+    };
+    const message = createMessage(sinkRecordBody(), { attempts: 2 });
     const deps = createDeps(
       {
+        ledger: ledgerBroken,
         emailSender: {
-          send: vi.fn(async (email) => {
-            if (email.messageId?.includes("sink-1")) {
-              throw new FollowupEmailError("gmail_network_error");
-            }
-            return { messageId: "v1", threadId: "vt1" };
+          send: vi.fn(async () => {
+            throw new FollowupEmailError("gmail_network_error");
           }),
         },
       },
       ledger,
     );
 
-    await processFollowupQueueBatch({ messages: [visitor, sink] }, deps);
+    await processFollowupQueueBatch({ messages: [message] }, deps);
 
-    expect(visitor.ack).toHaveBeenCalledOnce();
-    expect(sink.retry).toHaveBeenCalledOnce();
+    expect(message.retry).toHaveBeenCalledWith({
+      delaySeconds: followupEmailRetryDelaySeconds(2),
+    });
+    expect(message.ack).not.toHaveBeenCalled();
+    expect(deps.logLeadSinkLedgerRecordFailed).toHaveBeenCalledWith(
+      "lead-1",
+      "sink-1",
+      "gmail_network_error",
+    );
+  });
+
+  it("acks sink message on final attempt when markFailed throws", async () => {
+    const ledger = new MemoryConsumerLeadDeliveryLedger();
+    ledger.seedQueued("lead-1", "sink-1", "record");
+    const markFailed = vi.fn(async () => {
+      throw new Error("db down");
+    });
+    const ledgerBroken = {
+      ...ledger,
+      markFailed,
+      findRow: ledger.findRow.bind(ledger),
+      recordFailedAttempt: ledger.recordFailedAttempt.bind(ledger),
+      markSent: ledger.markSent.bind(ledger),
+    };
+    const message = createMessage(sinkRecordBody(), {
+      attempts: MAX_VISITOR_FOLLOWUP_ATTEMPTS,
+    });
+    const deps = createDeps(
+      {
+        ledger: ledgerBroken,
+        emailSender: {
+          send: vi.fn(async () => {
+            throw new FollowupEmailError("gmail_network_error");
+          }),
+        },
+      },
+      ledger,
+    );
+
+    await processFollowupQueueBatch({ messages: [message] }, deps);
+
+    expect(message.ack).toHaveBeenCalledOnce();
+    expect(message.retry).not.toHaveBeenCalled();
+    expect(deps.logLeadSinkLedgerMarkFailed).toHaveBeenCalledWith(
+      "lead-1",
+      "sink-1",
+      "gmail_network_error",
+    );
   });
 
   it("acks invalid email sink config without retry", async () => {

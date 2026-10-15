@@ -31,6 +31,12 @@ export type LeadSinkConsumerDeps = {
     sinkId: string,
     error: FollowupEmailErrorLogFields,
   ): void;
+  logLeadSinkLedgerRecordFailed(
+    leadId: string,
+    sinkId: string,
+    errorCode: string,
+  ): void;
+  logLeadSinkLedgerMarkFailed(leadId: string, sinkId: string, errorCode: string): void;
   now: () => Date;
 };
 
@@ -82,11 +88,11 @@ async function recordRetryableFailure(
       updatedAt,
     });
   } catch {
-    console.error("lead_sink_ledger_record_failed", {
-      leadId: parsed.lead.leadId,
-      sinkId: parsed.sinkId,
-      errorCode: errorFields.code,
-    });
+    deps.logLeadSinkLedgerRecordFailed(
+      parsed.lead.leadId,
+      parsed.sinkId,
+      errorFields.code,
+    );
   }
 
   if (!willRetry) {
@@ -100,11 +106,11 @@ async function recordRetryableFailure(
         updatedAt,
       });
     } catch {
-      console.error("lead_sink_ledger_mark_failed", {
-        leadId: parsed.lead.leadId,
-        sinkId: parsed.sinkId,
-        errorCode: errorFields.code,
-      });
+      deps.logLeadSinkLedgerMarkFailed(
+        parsed.lead.leadId,
+        parsed.sinkId,
+        errorFields.code,
+      );
     }
     message.ack();
     return;

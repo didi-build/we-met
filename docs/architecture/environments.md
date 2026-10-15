@@ -109,10 +109,12 @@ The consumer registers on the queue in **its own** Wrangler config; it is not an
 | `lead_sink_malformed`                | `leadId` (may be null)                                                                                                               |
 | `ledger_row_missing`                 | `leadId`, `sinkId`                                                                                                                   |
 | `ledger_update_failed`               | `leadId`, `sinkId`, `errorCode`                                                                                                      |
+| `lead_sink_ledger_record_failed`     | `leadId`, `sinkId`, `errorCode`                                                                                                      |
+| `lead_sink_ledger_mark_failed`       | `leadId`, `sinkId`, `errorCode`                                                                                                      |
 
 **Consumer secrets (follow-up Workers):** `GMAIL_SERVICE_ACCOUNT_JSON`, `GMAIL_SENDER`, `WE_MET_OWNER_FROM_EMAIL` on **both** consumers; **`WE_MET_TEST_MAIL_TO`** on **non-prod only** (four secret names on non-prod, three on production).
 
-**Consumer `errorCode` values (no raw exception text):** `gmail_secret_missing`, `gmail_invalid_service_account_json`, `gmail_token_http_<status>`, `gmail_token_missing_access_token`, `gmail_send_http_<status>`, `gmail_network_error`, `nonprod_mail_redirect_unset`, `owner_from_email_missing`, `malformed_sink_email_config`, `unknown`. For `gmail_secret_missing` and `owner_from_email_missing`, logs include `secretName` — never a secret value.
+**Consumer `errorCode` values (no raw exception text):** `gmail_secret_missing`, `gmail_invalid_service_account_json`, `gmail_token_http_<status>`, `gmail_token_missing_access_token`, `gmail_send_http_<status>`, `gmail_network_error`, `nonprod_mail_redirect_unset`, `owner_from_email_missing`, `malformed_sink_email_config`, `invalid_rfc5322_message_id`, `unknown`. For `gmail_secret_missing` and `owner_from_email_missing`, logs include `secretName` — never a secret value.
 
 **Consumer Wrangler `vars` allowlist:** `WE_MET_ENV` only. `WE_MET_TEST_MAIL_TO` must be a **secret**, not a var.
 

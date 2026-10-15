@@ -161,12 +161,35 @@ describe("buildRawEmailMessage (unit)", () => {
     expect(headerValue(mime, "References")).toBe("<lead.sink.record@we-met.link>");
   });
 
+  it("omits Message-ID headers when not provided (multipart/alternative only)", () => {
+    const raw = buildRawEmailMessage({
+      from: "hello@we-met.link",
+      to: "owner@example.com",
+      subject: "New lead added: Sam",
+      textPlain: "Body",
+      textHtml: "<p>Body</p>",
+    });
+    const mime = decodeRawEmailMessage(raw);
+    expect(headerValue(mime, "Message-ID")).toBeUndefined();
+    expect(headerValue(mime, "In-Reply-To")).toBeUndefined();
+    expect(headerValue(mime, "References")).toBeUndefined();
+  });
+
   it("omits Message-ID headers when not provided (multipart with attachment)", () => {
     const raw = buildRawEmailMessage(baseEmail);
     const mime = decodeRawEmailMessage(raw);
     expect(headerValue(mime, "Message-ID")).toBeUndefined();
     expect(headerValue(mime, "In-Reply-To")).toBeUndefined();
     expect(headerValue(mime, "References")).toBeUndefined();
+  });
+
+  it("emits Message-ID on multipart/mixed when provided", () => {
+    const raw = buildRawEmailMessage({
+      ...baseEmail,
+      messageId: "<lead.sink.record@we-met.link>",
+    });
+    const mime = decodeRawEmailMessage(raw);
+    expect(headerValue(mime, "Message-ID")).toBe("<lead.sink.record@we-met.link>");
   });
 
   it("rejects invalid Message-ID values", () => {
