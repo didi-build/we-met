@@ -97,7 +97,11 @@ describe("lookup visibility (unit)", () => {
     await repo.upsertHostname({ hostname: "card.example.com", slug: "host-hide" });
     repo.setAccountStatus(card.accountId, "suspended");
     expect(
-      await lookupCard({ hostname: "card.example.com", pathname: "/" }, repo, hostConfig),
+      await lookupCard(
+        { hostname: "card.example.com", pathname: "/" },
+        repo,
+        hostConfig,
+      ),
     ).toBeNull();
   });
 

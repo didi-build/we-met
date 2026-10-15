@@ -62,10 +62,7 @@ export class MemoryCardRepository implements CardRepository {
   }
 
   /** Test helper: set account status without going through sign-in. */
-  setAccountStatus(
-    accountId: string,
-    status: MemoryAccount["status"],
-  ): void {
+  setAccountStatus(accountId: string, status: MemoryAccount["status"]): void {
     const account = this.accounts.get(accountId);
     if (!account) {
       throw new Error(`Unknown account id: ${accountId}`);
