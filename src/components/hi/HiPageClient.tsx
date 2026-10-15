@@ -22,7 +22,7 @@ import { substituteFirstName } from "@/lib/copy/substitute-first-name";
 import { captureSheetOpener, restoreSheetFocus } from "@/lib/hi-card/sheet-focus";
 import Image from "next/image";
 import type { MouseEvent } from "react";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type HiPageClientProps = {
   card: CardRecord;
@@ -95,12 +95,17 @@ export function HiPageClient({ card, photoUrl, plan = "free" }: HiPageClientProp
     setSheetOpen(false);
   }, [updateStickyFromScroll]);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (sheetOpen || !pendingSheetFocusRestoreRef.current) {
       return;
     }
     pendingSheetFocusRestoreRef.current = false;
-    restoreSheetFocus(sheetOpenerRef.current, exchangeButtonRef.current);
+    const opener = sheetOpenerRef.current;
+    const fallback = exchangeButtonRef.current;
+    const id = window.requestAnimationFrame(() => {
+      restoreSheetFocus(opener, fallback);
+    });
+    return () => window.cancelAnimationFrame(id);
   }, [sheetOpen]);
 
   useEffect(() => {

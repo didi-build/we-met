@@ -7,7 +7,7 @@ import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { WE_MET_CARD_HOME_URL } from "@/lib/hi-card/card-content";
 import { exampleCardInput } from "../helpers/example-card";
 import type { CardRecord } from "@/card-data/types";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@marsidev/react-turnstile", () => ({
@@ -130,7 +130,7 @@ describe("HiPageClient (component)", () => {
     );
   });
 
-  it("restores focus to the sticky exchange opener without scrolling when the sheet closes", () => {
+  it("restores focus to the sticky exchange opener without scrolling when the sheet closes", async () => {
     const rectSpy = vi
       .spyOn(Element.prototype, "getBoundingClientRect")
       .mockImplementation(function (this: Element) {
@@ -175,7 +175,9 @@ describe("HiPageClient (component)", () => {
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByRole("dialog")).toBeNull();
 
-    expect(focusSpy).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(focusSpy).toHaveBeenCalled();
+    });
     expect(focusSpy.mock.calls.at(-1)?.[0]).toEqual({ preventScroll: true });
     expect(document.activeElement).toBe(stickyExchange);
 
