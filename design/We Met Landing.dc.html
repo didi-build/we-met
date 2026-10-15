@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<title>We Met landing: design hand-off</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap">
+<style>html,body{margin:0;padding:0;background:#e9e9e9}a{color:#161616}a:hover{color:#555555}</style>
+</helmet>
+<div style="padding:64px;font-family:Figtree,system-ui,sans-serif;color:#161616;display:flex;flex-direction:column;gap:72px">
+  <div style="display:flex;flex-direction:column;gap:10px;max-width:920px">
+    <h1 style="margin:0;font-size:32px;font-weight:600;letter-spacing:-0.02em">We Met landing page</h1>
+    <p style="margin:0;font-size:16px;line-height:1.55;color:#555555">Live renders of the plain files in design/landing/: index.html, app-coming-soon.html, landing.css (all values), landing.js (theme, icons, How it works), icons/ and og-image.svg / .png. Only Figtree is loaded from outside. The phone slot shows design/card/card.html as a design-only reference; the real build renders the card component there in preview mode. ?theme=, ?at= and ?fallback=1 are preview-only params. Scroll inside each frame.</p>
+  </div>
+
+  <sc-for list="{{ groups }}" as="g" hint-placeholder-count="4">
+    <section id="{{ g.id }}" data-screen-label="{{ g.title }}" style="display:flex;flex-direction:column;gap:20px">
+      <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap">
+        <h2 style="margin:0;font-size:24px;font-weight:600;letter-spacing:-0.02em">{{ g.title }}</h2>
+        <span style="font-size:14px;color:#555555">{{ g.note }}</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;align-items:flex-start;gap:32px">
+        <sc-for list="{{ g.frames }}" as="f" hint-placeholder-count="4">
+          <div id="{{ f.id }}" style="display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600">
+              <span style="padding:2px 9px;border-radius:999px;background:#161616;color:#fafafa">{{ f.id }}</span>
+              <span>{{ f.label }}</span>
+            </div>
+            <iframe src="{{ f.src }}" title="{{ f.label }}" loading="lazy" style="display:block;width:{{ f.w }};height:{{ f.h }};border:0;border-radius:16px;background:#fafafa"></iframe>
+            <code style="font-size:12px;color:#555555">{{ f.query }}</code>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+  </sc-for>
+
+  <section id="og" data-screen-label="Share image" style="display:flex;flex-direction:column;gap:20px">
+    <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap">
+      <h2 style="margin:0;font-size:24px;font-weight:600;letter-spacing:-0.02em">Share image</h2>
+      <span style="font-size:14px;color:#555555">design/landing/og-image.svg (source) and og-image.png (export), 1200 × 630.</span>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:32px">
+      <div id="O1" style="display:flex;flex-direction:column;gap:10px"><span style="font-size:14px;font-weight:600">Full size</span><img src="design/landing/og-image.png" alt="We Met share image" width="1200" height="630" style="display:block;width:1200px;height:630px;border-radius:16px;border:1px solid #dedede"></div>
+      <div id="O2" style="display:flex;flex-direction:column;gap:10px"><span style="font-size:14px;font-weight:600">As a small link preview (300 wide)</span><img src="design/landing/og-image.png" alt="" width="300" height="158" style="display:block;width:300px;height:158px;border-radius:10px;border:1px solid #dedede"></div>
+    </div>
+  </section>
+
+  <section id="spec" data-screen-label="Spec" style="display:flex;flex-direction:column;gap:24px">
+    <h2 style="margin:0;font-size:28px;font-weight:600;letter-spacing:-0.02em">Spec</h2>
+    <div style="display:flex;flex-wrap:wrap;align-items:flex-start;gap:24px">
+      <div style="flex:1 1 560px;max-width:720px;display:flex;flex-direction:column;gap:10px;padding:28px;border-radius:24px;background:#ffffff;border:1px solid #dedede">
+        <h3 style="margin:0 0 6px;font-size:20px;font-weight:600">Colors (mono, same as the card)</h3>
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) 120px 120px;gap:8px 12px;font-size:13px;color:#555555;font-weight:600"><span>Role · CSS property</span><span>Light</span><span>Dark</span></div>
+        <sc-for list="{{ colors }}" as="c" hint-placeholder-count="10">
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) 120px 120px;gap:12px;align-items:center;font-size:14px;line-height:1.4;padding-top:8px;border-top:1px solid #ededed">
+            <span><span style="font-weight:600">{{ c.role }}</span><br><code style="font-size:12px;color:#555555">{{ c.v }}</code></span>
+            <span style="display:flex;align-items:center;gap:8px"><span style="flex:none;width:18px;height:18px;border-radius:6px;border:1px solid #cfcfcf;background:{{ c.l }}"></span><code style="font-size:12px">{{ c.l }}</code></span>
+            <span style="display:flex;align-items:center;gap:8px"><span style="flex:none;width:18px;height:18px;border-radius:6px;border:1px solid #cfcfcf;background:{{ c.d }}"></span><code style="font-size:12px">{{ c.d }}</code></span>
+          </div>
+        </sc-for>
+        <p style="margin:8px 0 0;font-size:13px;line-height:1.5;color:#555555">Theme: follows prefers-color-scheme unless the root has data-theme. The footer switch writes data-theme and localStorage "card-theme" (shared with the public card).</p>
+      </div>
+
+      <div style="flex:1 1 560px;max-width:720px;display:flex;flex-direction:column;gap:10px;padding:28px;border-radius:24px;background:#ffffff;border:1px solid #dedede">
+        <h3 style="margin:0 0 6px;font-size:20px;font-weight:600">Type</h3>
+        <p style="margin:0 0 6px;font-size:14px;line-height:1.5">Figtree 400, 500, 600, 700. Fallback: system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif. cqi = 1% of the page width (root has container-type: inline-size). Values at 390 / 1280 are computed.</p>
+        <div style="display:grid;grid-template-columns:120px minmax(0,1.4fr) 92px 44px 40px 64px;gap:8px 10px;font-size:13px;color:#555555;font-weight:600"><span>Role</span><span>Size</span><span>390 / 1280</span><span>LH</span><span>Wt</span><span>Track</span></div>
+        <sc-for list="{{ type }}" as="t" hint-placeholder-count="14">
+          <div style="display:grid;grid-template-columns:120px minmax(0,1.4fr) 92px 44px 40px 64px;gap:10px;font-size:13px;line-height:1.4;padding-top:8px;border-top:1px solid #ededed">
+            <span style="font-weight:600">{{ t.r }}</span><code style="font-size:12px">{{ t.s }}</code><code style="font-size:12px">{{ t.c }}</code><code style="font-size:12px">{{ t.lh }}</code><code style="font-size:12px">{{ t.w }}</code><code style="font-size:12px">{{ t.ls }}</code>
+          </div>
+        </sc-for>
+        <p style="margin:8px 0 0;font-size:13px;line-height:1.5;color:#555555">Headings: one h1 (hero), h2 per section, h3 per step. Eyebrows are paragraphs.</p>
+      </div>
+
+      <div style="flex:1 1 100%;max-width:1464px;display:flex;flex-direction:column;gap:10px;padding:28px;border-radius:24px;background:#ffffff;border:1px solid #dedede">
+        <h3 style="margin:0 0 6px;font-size:20px;font-weight:600">Layout and spacing</h3>
+        <p style="margin:0 0 6px;font-size:14px;line-height:1.5">Container: max-width 1168, centred, side padding clamp(20px, 4cqi, 48px) = 20 at 390, 48 at 1280. Breakpoint 860px: How it works becomes two columns with a sticky panel. Everything else flows with flex-wrap.</p>
+        <div style="display:grid;grid-template-columns:160px minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);gap:8px 14px;font-size:13px;color:#555555;font-weight:600"><span>Block</span><span>CSS</span><span>390</span><span>1280</span></div>
+        <sc-for list="{{ spacing }}" as="s" hint-placeholder-count="12">
+          <div style="display:grid;grid-template-columns:160px minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);gap:14px;font-size:13px;line-height:1.5;padding-top:8px;border-top:1px solid #ededed">
+            <span style="font-weight:600;font-size:14px">{{ s.b }}</span><code style="font-size:12px;white-space:pre-wrap">{{ s.css }}</code><code style="font-size:12px;white-space:pre-wrap">{{ s.m }}</code><code style="font-size:12px;white-space:pre-wrap">{{ s.d }}</code>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="flex:1 1 560px;max-width:720px;display:flex;flex-direction:column;gap:10px;padding:28px;border-radius:24px;background:#ffffff;border:1px solid #dedede">
+        <h3 style="margin:0 0 6px;font-size:20px;font-weight:600">Sizes, radii and shadows</h3>
+        <sc-for list="{{ sizes }}" as="s" hint-placeholder-count="12">
+          <div style="display:grid;grid-template-columns:160px minmax(0,1fr);gap:12px;font-size:14px;line-height:1.45;padding-top:8px;border-top:1px solid #ededed">
+            <span style="font-weight:600">{{ s.b }}</span><code style="font-size:12px;line-height:1.6;white-space:pre-wrap">{{ s.v }}</code>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="flex:1 1 560px;max-width:720px;display:flex;flex-direction:column;gap:10px;padding:28px;border-radius:24px;background:#ffffff;border:1px solid #dedede">
+        <h3 style="margin:0 0 6px;font-size:20px;font-weight:600">Phone preview slot</h3>
+        <sc-for list="{{ phone }}" as="s" hint-placeholder-count="8">
+          <div style="display:grid;grid-template-columns:120px minmax(0,1fr);gap:12px;font-size:14px;line-height:1.45;padding-top:8px;border-top:1px solid #ededed">
+            <span style="font-weight:600">{{ s.b }}</span><span>{{ s.v }}</span>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="flex:1 1 560px;max-width:720px;display:flex;flex-direction:column;gap:10px;padding:28px;border-radius:24px;background:#ffffff;border:1px solid #dedede">
+        <h3 style="margin:0 0 6px;font-size:20px;font-weight:600">Motion</h3>
+        <div style="display:grid;grid-template-columns:130px 70px minmax(0,1fr) 70px minmax(0,1fr);gap:8px 10px;font-size:13px;color:#555555;font-weight:600"><span>Name</span><span>Duration</span><span>Easing</span><span>Delay</span><span>Trigger</span></div>
+        <sc-for list="{{ motion }}" as="m" hint-placeholder-count="9">
+          <div style="display:grid;grid-template-columns:130px 70px minmax(0,1fr) 70px minmax(0,1fr);gap:10px;font-size:13px;line-height:1.45;padding-top:8px;border-top:1px solid #ededed">
+            <span style="font-weight:600">{{ m.n }}</span><code style="font-size:12px">{{ m.d }}</code><code style="font-size:12px">{{ m.e }}</code><code style="font-size:12px">{{ m.dl }}</code><span>{{ m.t }}</span>
+          </div>
+        </sc-for>
+        <p style="margin:8px 0 0;font-size:14px;line-height:1.5">Reduced motion: under prefers-reduced-motion: reduce every animation and transition inside .lp is none. The hero appears at once and the How it works panel swaps instantly; the active step still updates.</p>
+      </div>
+
+      <div style="flex:1 1 100%;max-width:1464px;display:flex;flex-direction:column;gap:10px;padding:28px;border-radius:24px;background:#ffffff;border:1px solid #dedede">
+        <h3 style="margin:0 0 6px;font-size:20px;font-weight:600">States</h3>
+        <div style="display:grid;grid-template-columns:160px repeat(4,minmax(0,1fr)) minmax(0,1fr);gap:8px 14px;font-size:13px;color:#555555;font-weight:600"><span>Element</span><span>Default</span><span>Hover</span><span>Pressed</span><span>Focus-visible</span><span>Disabled</span></div>
+        <sc-for list="{{ states }}" as="s" hint-placeholder-count="8">
+          <div style="display:grid;grid-template-columns:160px repeat(4,minmax(0,1fr)) minmax(0,1fr);gap:14px;font-size:13px;line-height:1.45;padding-top:8px;border-top:1px solid #ededed">
+            <span style="font-weight:600;font-size:14px">{{ s.el }}</span><span>{{ s.d }}</span><span>{{ s.h }}</span><span>{{ s.a }}</span><span>{{ s.f }}</span><span>{{ s.x }}</span>
+          </div>
+        </sc-for>
+        <p style="margin:8px 0 0;font-size:13px;line-height:1.5;color:#555555">Every link and button is at least 44 px tall. Vignettes, the phone slot and the sticky panel are aria-hidden and contain no real controls.</p>
+      </div>
+    </div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const fr = (id, label, file, q, wide, h) => ({ id, label, query: file + (q ? '?' + q : ''), src: 'design/landing/' + file + (q ? '?' + q : ''), w: wide ? '1280px' : '390px', h: (h || (wide ? 860 : 844)) + 'px' });
+    const groups = [
+      { id: 'landing', title: 'Landing page', note: 'we-met.link', frames: [
+        fr('L1', '390 · light', 'index.html', 'theme=light'), fr('L2', '390 · dark', 'index.html', 'theme=dark'),
+        fr('L3', '1280 · light', 'index.html', 'theme=light', true), fr('L4', '1280 · dark', 'index.html', 'theme=dark', true)
+      ] },
+      { id: 'how', title: 'How it works', note: 'At 860px and up the panel sticks and swaps with the step at the viewport centre.', frames: [
+        fr('H1', '1280 · step 1', 'index.html', 'theme=light&at=how', true), fr('H2', '1280 · step 2', 'index.html', 'theme=light&at=step2', true),
+        fr('H3', '1280 · step 3 · dark', 'index.html', 'theme=dark&at=step3', true), fr('H4', '390 · inline vignettes', 'index.html', 'theme=light&at=how')
+      ] },
+      { id: 'slot', title: 'Phone slot fallback', note: 'Static markup shown when nothing is mounted in the slot.', frames: [
+        fr('P1', '390 · fallback · light', 'index.html', 'theme=light&fallback=1'), fr('P2', '390 · fallback · dark', 'index.html', 'theme=dark&fallback=1')
+      ] },
+      { id: 'soon', title: 'App coming soon', note: 'app.we-met.link until the app ships.', frames: [
+        fr('C1', '390 · light', 'app-coming-soon.html', 'theme=light'), fr('C2', '390 · dark', 'app-coming-soon.html', 'theme=dark'), fr('C3', '1280 · light', 'app-coming-soon.html', 'theme=light', true, 720)
+      ] }
+    ];
+    const C = (role, v, l, d) => ({ role, v, l, d });
+    const colors = [
+      C('Page background, vignette box, sticky panel', '--c-bg', '#fafafa', '#0f0f0f'), C('Vignette cards, QR tile', '--c-surface', '#ffffff', '#181818'),
+      C('How it works band, phone frame, switch track', '--c-surface-2', '#f0f0f0', '#222222'), C('Text, active step, primary button, focus ring', '--c-ink / --c-accent', '#161616', '#f2f2f2'),
+      C('Body text, inactive step titles, footer credit', '--c-ink-muted', '#555555', '#ababab'), C('Borders, rules, footer top line', '--c-line', '#dedede', '#333333'),
+      C('Inactive step numerals, switch ring, vignette grabber', '--c-line-strong', '#868686', '#717171'), C('Primary hover / pressed', '--c-accent-hover', '#383838', '#cecece'),
+      C('Text on primary', '--c-accent-ink', '#fafafa', '#0f0f0f'), C('Chips, final CTA panel, hero glow', '--c-accent-soft', '#ebebeb', '#292929')
+    ];
+    const T = (r, s, c, lh, w, ls) => ({ r, s, c, lh, w, ls });
+    const type = [
+      T('Hero h1', 'clamp(2.5rem, 6.2cqi, 4.5rem)', '40 / 72', '1.04', '600', '-0.035em'), T('Hero lead', 'clamp(17px, 1.6cqi, 19px)', '17 / 19', '1.6', '400', '0'),
+      T('Section h2', 'clamp(1.75rem, 1.2rem + 2cqi, 2.75rem)', '28 / 44', '1.15', '600', '-0.022em'), T('Step h3', 'clamp(1.9rem, 1.2rem + 2.6cqi, 3.25rem)', '30.4 / 52', '1.1', '600', '-0.025em'),
+      T('Step numeral', 'clamp(2.5rem, 2rem + 2cqi, 3.5rem)', '40 / 56', '1', '600', '-0.03em'), T('Body', '17px', '17', '1.6', '400', '0'),
+      T('Eyebrow', '15px', '15', '1.6', '600', '0'), T('Chip', '15px', '15', '1.6', '500', '0'),
+      T('Button lg / sm', '17px / 15px', '17 / 15', '1', '600', '0'), T('Link button', '16px', '16', '1', '600', '0 · underline 1.5px, offset 3'),
+      T('Header wordmark', '20px', '20', '1', '700', '-0.02em'), T('Footer wordmark', '17px', '17', '1', '700', '-0.02em'),
+      T('Footer credit', '15px', '15', '1.5', '400 (link 600)', '0'), T('Vignette text', '11–17px', 'fixed', '1.2–1.35', '400–700', '0 (title -0.02em)')
+    ];
+    const S = (b, css, m, d) => ({ b, css, m, d });
+    const spacing = [
+      S('Header', 'min-height 72 · padding 12 gutter · gap 16 · mark 26 + gap 10', 'gutter 20', 'gutter 48'),
+      S('Hero', 'padding-top clamp(24px,5cqi,72px) · bottom clamp(64px,9cqi,112px) · flex-wrap, gap 56 64 · text col flex 1 1 380, gap 24 · actions margin-top 8, gap 12 24', 'top 24 · bottom 64 · phone stacks below text, centred', 'top 64 · bottom 112 · text left, phone right'),
+      S('How it works band', 'surface-2 band · padding clamp(56px,9cqi,112px) gutter · gap clamp(32px,5cqi,56px) · head gap 16', 'padding 56 20 · gap 32', 'padding 112 48 · gap 56'),
+      S('Steps', 'li padding 32 0 · gap 14 · chips gap 8', 'one column · 2px ink rule above each step · inline vignette box below', 'grid 2 cols, gap 0 64 · li min-height 520 · first rule 2px ink, then 1px line'),
+      S('Vignette box', 'min-height 240 · padding 24 · gap 12', 'shown in each step', 'hidden; sticky panel instead'),
+      S('Sticky panel', 'top 48 · min-height 440 · padding 32 · layer gap 12', 'hidden', 'left column, sticky'),
+      S('Privacy', 'padding-top clamp(56px,9cqi,112px) · flex-wrap gap 16 64 · head flex 1 1 320, gap 16 · text flex 1.3 1 min(440px,100%), padding-top 4, max 46ch', 'top 56 · stacked', 'top 112 · side by side'),
+      S('Final CTA', 'section padding clamp(56px,9cqi,112px) · panel padding clamp(40px,7cqi,80px) clamp(24px,5cqi,64px), gap 20 · button margin-top 8', 'section 56 · panel 40 24', 'section 112 · panel 80 64'),
+      S('Footer', 'top rule 1px · padding 24 0 (28 + safe-area) · flex-wrap gap 12 24 · left gap 4 14 · mark 20 + gap 8 · leaf 12 + gap 6', 'switch wraps under the credit', 'one row'),
+      S('Coming soon', 'centred column · gap 20 · padding 48 0 64 · min-height 100svh − header − footer · mark 56', 'same', 'same')
+    ];
+    const Z = (b, v) => ({ b, v });
+    const sizes = [
+      Z('Buttons', 'primary lg 56 tall, padding 0 28, gap 12 · sm 44, padding 0 18, gap 10 · radius 999 · link 44 tall, no padding'),
+      Z('Chip', 'padding 6 14 · radius 999 · not interactive'),
+      Z('Footer switch', 'hit 52 × 44 · track 44 × 26, radius 999, inset 1px line-strong ring · knob 20 circle, inset 3, travels 18 · sun 13 / moon 12'),
+      Z('Phone frame', 'outer 318 × 668 (300 × 650 screen + 8 padding + 1px border each side) · radius 46 · screen radius 38 · no shadow'),
+      Z('Sticky panel / vignette box', 'radius 24 · 1px line · bg fill · no shadow'),
+      Z('Final CTA panel', 'radius 24 · accent-soft fill · no border'),
+      Z('Vignettes', 'max-width 300 · cards radius 20 · fields radius 10 · mail rows radius 16 · QR tile radius 12, 104 QR · avatars 32 · fake button 40 tall'),
+      Z('Hero glow', 'ellipse min(1100px, 140%) × 620, top −220, centred, radial-gradient(closest-side, accent-soft, transparent), z −1'),
+      Z('Shadows', 'none anywhere on the landing (borders and fills only)'),
+      Z('Icons', 'mark 26 / 20 / 56 · leaf 12 · copy, contact-card 14 · QR 104')
+    ];
+    const P = (b, v) => ({ b, v });
+    const phone = [
+      P('Position', 'Right of the hero text at 1280 (flex item, vertically centred); below it and centred at 390.'),
+      P('Frame', '318 wide: 8px padding, 1px --c-line border, radius 46, --c-surface-2 fill, no shadow.'),
+      P('Screen', '300 × 650, radius 38, overflow hidden, --c-bg fill.'),
+      P('Content', 'A 390 × 845 box scaled 0.7693 from the top-left, so the card renders at its real mobile width.'),
+      P('Behaviour', 'pointer-events: none and user-select: none on the screen. A one-finger swipe scrolls the page; there is no inner scrolling and nothing inside can be tapped or submitted. The whole slot is aria-hidden.'),
+      P('Production', 'Render the real card component in its preview mode: plan pro (no strip or band), no sticky bar, Exchange does nothing, current theme.'),
+      P('Design-only', 'landing.js mounts design/card/card.html as an iframe (data-design-only) over the fallback. Delete that block in production.'),
+      P('Fallback', 'Static markup of the top of the card (initials, greeting, role, Exchange pill, About). Shown with ?fallback=1 or when nothing is mounted.')
+    ];
+    const M = (n, d, e, dl, t) => ({ n, d, e, dl, t });
+    const motion = [
+      M('Hero eyebrow', '0.5s', 'cubic-bezier(.2,.7,.2,1) · fade + 12px up', '0', 'Page load'), M('Hero h1', '0.5s', 'same', '60ms', 'Page load'),
+      M('Hero lead', '0.5s', 'same', '120ms', 'Page load'), M('Hero actions', '0.5s', 'same', '180ms', 'Page load'),
+      M('Phone', '0.6s', 'same', '240ms', 'Page load'), M('Panel layer in / out', '0.3s', 'opacity ease · transform cubic-bezier(.2,.7,.2,1) · 10px', '0 (visibility hides after 0.3s)', 'Active step changes (860px+)'),
+      M('Step numeral / title colour', '0.3s', 'ease', '0', 'Active step changes'), M('Button colours', '0.15s', 'ease', '0', 'Hover / press'),
+      M('Switch knob', '0.2s', 'ease', '0', 'Theme switch')
+    ];
+    const st = (el, d, h, a, f, x) => ({ el, d, h, a, f, x });
+    const ring = '3px ink outline, 3px offset';
+    const states = [
+      st('Primary button', 'ink fill, bg text', 'accent-hover fill', 'accent-hover fill, no scale', ring, '70% opacity, no pointer events (aria-disabled); not used today'),
+      st('Link button', 'ink, underlined', 'muted', 'muted', ring, '–'),
+      st('Wordmark link', 'ink', 'ink (no change)', 'ink', ring, '–'),
+      st('Didi Build link', 'ink 600, underlined', 'muted', 'muted', ring, '–'),
+      st('Footer switch', 'track surface-2, knob left, sun', 'track line fill', 'track line fill', ring, '–'),
+      st('Footer switch on', 'knob right, moon, aria-checked true', 'same', 'same', ring, '–'),
+      st('Step (860px+)', 'numeral line-strong, title muted', '–', '–', '–', 'Active: numeral and title ink, its vignettes show in the panel'),
+      st('Chip', 'accent-soft fill', '–', '–', '–', 'Not interactive')
+    ];
+    return { groups, colors, type, spacing, sizes, phone, motion, states };
+  }
+}
+</script>
+</body>
+</html>
