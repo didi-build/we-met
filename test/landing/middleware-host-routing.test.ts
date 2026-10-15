@@ -46,6 +46,18 @@ describe("landing middleware host routing (unit)", () => {
     expect(response?.status).not.toBe(404);
   });
 
+  it("does not rewrite /privacy or /terms on the card host or preview host", () => {
+    for (const path of ["/privacy", "/terms"]) {
+      const cardHost = middleware(request(path, "we-met.link"));
+      expect(cardHost?.headers.get("x-middleware-rewrite")).toBeNull();
+      expect(cardHost?.status).not.toBe(404);
+
+      const previewHost = middleware(request(path, "pr-42-we-met.example.workers.dev"));
+      expect(previewHost?.headers.get("x-middleware-rewrite")).toBeNull();
+      expect(previewHost?.status).not.toBe(404);
+    }
+  });
+
   it("returns 404 for /app-coming-soon on the card host", () => {
     const response = middleware(request("/app-coming-soon", "we-met.link"));
     expect(response?.status).toBe(404);

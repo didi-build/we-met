@@ -41,7 +41,11 @@ export function LandingHome({ urls, getStartedLabel }: LandingHomeProps) {
 
         <HowItWorksSection />
 
-        <section className="lp-wrap lp-privacy" aria-labelledby="privacy-title">
+        <section
+          className="lp-wrap lp-privacy"
+          aria-labelledby="privacy-title"
+          role="region"
+        >
           <div className="lp-privacy-head">
             <p className="lp-eyebrow">Privacy</p>
             <h2 className="lp-h2" id="privacy-title">
@@ -51,7 +55,11 @@ export function LandingHome({ urls, getStartedLabel }: LandingHomeProps) {
           <p className="lp-body">
             Emails from We Met are sent through our operator&apos;s mailbox, so the
             operator can technically see them. We only store delivery information (like
-            whether an email was sent), not the contents of your leads.
+            whether an email was sent), not the contents of your leads. Anyone you
+            exchange details with also gets your Google account email address, so
+            replies go to it and it is in your contact card. Read our{" "}
+            <a href={urls.privacy}>Privacy</a> and <a href={urls.terms}>Terms</a> pages
+            for more.
           </p>
         </section>
 

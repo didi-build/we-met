@@ -10,6 +10,8 @@ const urls = {
   siteHome: "https://we-met.link",
   appHome: "https://app.we-met.link",
   exampleCard: "https://we-met.link/hi/didi",
+  privacy: "https://we-met.link/privacy",
+  terms: "https://we-met.link/terms",
   didiBuild: "https://didi.build",
 };
 

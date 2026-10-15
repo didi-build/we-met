@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   resolveAppComingSoonMetadata,
   resolveLandingMetadata,
+  resolvePrivacyMetadata,
+  resolveTermsMetadata,
 } from "@/lib/landing/metadata";
 
 const previewConfig = {
@@ -47,5 +49,15 @@ describe("resolveLandingMetadata (unit)", () => {
   it("marks the app coming-soon page as noindex", () => {
     const meta = resolveAppComingSoonMetadata();
     expect(meta.robots).toEqual({ index: false, follow: false });
+  });
+});
+
+describe("resolvePrivacyMetadata and resolveTermsMetadata (unit)", () => {
+  it("set canonical URLs from the configured base URL", () => {
+    const privacy = resolvePrivacyMetadata(previewConfig);
+    expect(privacy.alternates?.canonical).toBe(`${previewConfig.baseUrl}/privacy`);
+
+    const terms = resolveTermsMetadata(previewConfig);
+    expect(terms.alternates?.canonical).toBe(`${previewConfig.baseUrl}/terms`);
   });
 });

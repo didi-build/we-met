@@ -45,3 +45,45 @@ export function resolveAppComingSoonMetadata(): Metadata {
     robots: { index: false, follow: false },
   };
 }
+
+export function resolvePrivacyMetadata(config: WeMetHostConfig): Metadata {
+  const canonical = absoluteUrl(config.baseUrl, "/privacy");
+  const description =
+    "How We Met handles your data during the pre-alpha, including sign-in, your card, and contact exchanges.";
+
+  return {
+    metadataBase: new URL(config.baseUrl),
+    title: "Privacy | We Met",
+    description,
+    alternates: {
+      canonical,
+    },
+    openGraph: {
+      title: "Privacy | We Met",
+      description,
+      type: "website",
+      url: canonical,
+    },
+  };
+}
+
+export function resolveTermsMetadata(config: WeMetHostConfig): Metadata {
+  const canonical = absoluteUrl(config.baseUrl, "/terms");
+  const description =
+    "Terms for using We Met during the pre-alpha, including your card, link, and email delivery.";
+
+  return {
+    metadataBase: new URL(config.baseUrl),
+    title: "Terms | We Met",
+    description,
+    alternates: {
+      canonical,
+    },
+    openGraph: {
+      title: "Terms | We Met",
+      description,
+      type: "website",
+      url: canonical,
+    },
+  };
+}

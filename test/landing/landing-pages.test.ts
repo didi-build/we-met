@@ -12,14 +12,17 @@ vi.mock("@opennextjs/cloudflare", () => ({
 }));
 
 describe("landing pages (regression)", () => {
-  it("marks / and /app-coming-soon as force-dynamic", () => {
-    const home = readFileSync(join(process.cwd(), "src/app/page.tsx"), "utf8");
-    const soon = readFileSync(
-      join(process.cwd(), "src/app/app-coming-soon/page.tsx"),
-      "utf8",
-    );
-    expect(home).toMatch(/export const dynamic = "force-dynamic"/);
-    expect(soon).toMatch(/export const dynamic = "force-dynamic"/);
+  it("marks marketing routes as force-dynamic", () => {
+    const paths = [
+      "src/app/page.tsx",
+      "src/app/app-coming-soon/page.tsx",
+      "src/app/privacy/page.tsx",
+      "src/app/terms/page.tsx",
+    ];
+    for (const relativePath of paths) {
+      const source = readFileSync(join(process.cwd(), relativePath), "utf8");
+      expect(source).toMatch(/export const dynamic = "force-dynamic"/);
+    }
   });
 
   it("reads host config from Worker env at request time", async () => {
