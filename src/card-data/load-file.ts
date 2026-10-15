@@ -149,14 +149,6 @@ function requireHttpsUrl(raw: string, field: string): string {
   return raw;
 }
 
-function optionalHttpsUrl(value: unknown, field: string): string | undefined {
-  if (value === undefined || value === null) {
-    return undefined;
-  }
-  const raw = requireNonWhitespaceString(value, field, LIMITS.url);
-  return requireHttpsUrl(raw, field);
-}
-
 function requireEmail(value: string, field: string): string {
   assertNoControlCharacters(value, field);
   if (value.length > LIMITS.email) {
@@ -680,7 +672,10 @@ function parseCard(raw: unknown, seenSinkIds: Set<string>): CardLoadInput {
     LIMITS.sectionTitle,
   );
   const publicLinks = parsePublicLinks(raw.links);
-  const fallbackUrl = optionalHttpsUrl(raw.fallbackUrl, "fallbackUrl");
+  const fallbackUrl = requireHttpsUrl(
+    requireNonWhitespaceString(raw.fallbackUrl, "fallbackUrl", LIMITS.url),
+    "fallbackUrl",
+  );
   const fallbackLabel = optionalNonWhitespaceString(
     raw.fallbackLabel,
     "fallbackLabel",
@@ -710,7 +705,7 @@ function parseCard(raw: unknown, seenSinkIds: Set<string>): CardLoadInput {
     fallbackUrl,
     fallbackLabel,
     links: {
-      bookingUrl: fallbackUrl ?? "",
+      bookingUrl: fallbackUrl,
       items: publicLinks ?? [],
     },
     pageCopy: parsePageCopy(raw.pageCopy),

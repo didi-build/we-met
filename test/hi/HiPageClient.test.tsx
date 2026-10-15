@@ -89,7 +89,6 @@ describe("HiPageClient (component)", () => {
       services: undefined,
       servicesTitle: undefined,
       publicLinks: [],
-      fallbackUrl: undefined,
       fallbackLabel: undefined,
     });
     expect(screen.queryByText("About me")).toBeNull();
@@ -107,6 +106,21 @@ describe("HiPageClient (component)", () => {
     for (const link of banners) {
       expect(link.getAttribute("href")).toBe(WE_MET_CARD_HOME_URL);
     }
+  });
+
+  it("does not override document dark theme with a nested data-theme", () => {
+    document.documentElement.setAttribute("data-theme", "dark");
+    document.documentElement.setAttribute("data-palette", "green");
+    renderCard();
+    expect(document.querySelector('[data-theme="light"]')).toBeNull();
+    const rootSurface = getComputedStyle(document.documentElement)
+      .getPropertyValue("--surface")
+      .trim();
+    const cardSurface = document.querySelector(".bg-surface");
+    expect(cardSurface).toBeTruthy();
+    expect(getComputedStyle(cardSurface!).getPropertyValue("--surface").trim()).toBe(
+      rootSurface,
+    );
   });
 
   it.each([

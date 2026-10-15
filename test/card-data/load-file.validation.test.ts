@@ -29,6 +29,13 @@ describe("parseCardsLoadFile validation (unit)", () => {
     );
   });
 
+  it("rejects missing fallbackUrl", () => {
+    expectReject((raw) => {
+      const card = (raw.cards as Record<string, unknown>[])[0];
+      delete card.fallbackUrl;
+    }, /fallbackUrl/);
+  });
+
   it("rejects blue variant", () => {
     expectReject((raw) => {
       const card = (raw.cards as Record<string, unknown>[])[0];

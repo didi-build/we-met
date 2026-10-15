@@ -59,7 +59,6 @@ describe("card content helpers (unit)", () => {
         aboutTitle: undefined,
         services: [],
         publicLinks: [],
-        fallbackUrl: undefined,
         fallbackLabel: undefined,
         photoKey: null,
       }),
