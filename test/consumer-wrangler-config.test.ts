@@ -76,6 +76,13 @@ describe("follow-up email consumer wrangler configs (unit)", () => {
     expect(prodConsumer.max_retries).toBe(MAX_VISITOR_FOLLOWUP_ATTEMPTS);
   });
 
+  it("disables workers.dev and Version URLs on both consumer configs", () => {
+    expect(nonprod.workers_dev).toBe(false);
+    expect(nonprod.preview_urls).toBe(false);
+    expect(production.workers_dev).toBe(false);
+    expect(production.preview_urls).toBe(false);
+  });
+
   it("binds WE_MET_DB to the environment database name", () => {
     const nonprodD1 = (
       nonprod.d1_databases as { binding: string; database_name: string }[]
