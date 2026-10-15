@@ -19,18 +19,7 @@ const card: CardEmailSnapshot = {
     vcardNote: "note",
     urls: [],
   },
-  links: { bookingUrl: "https://example.com/book" },
   pageCopy: { emailFromName: "Demo at Example" },
-  copy: {
-    followUpEmail: {
-      subjectTemplate: "Hi",
-      greetingTemplate: "Hi",
-      bodyParagraphs: ["One"],
-      attachmentLine: "Attached",
-      bookCtaLabel: "Book",
-      closingLine: "Bye",
-    },
-  },
 };
 
 const baseLead = {
@@ -75,7 +64,30 @@ describe("isPlainSingleEmailAddress (unit)", () => {
   }
 });
 
-describe("parseVisitorFollowupMessage lead email (unit)", () => {
+describe("parseVisitorFollowupMessage (unit)", () => {
+  it("accepts queued card snapshots that still include legacy bookingUrl and followUpEmail", () => {
+    const parsed = parseVisitorFollowupMessage({
+      type: "visitor_followup",
+      lead: { ...baseLead, email: "visitor@example.com" },
+      card: {
+        ...card,
+        links: { bookingUrl: "https://example.com/book", footer: [] },
+        copy: {
+          followUpEmail: {
+            subjectTemplate: "legacy",
+            greetingTemplate: "legacy",
+            bodyParagraphs: ["legacy"],
+            attachmentLine: "legacy",
+            bookCtaLabel: "legacy",
+            closingLine: "legacy",
+          },
+        },
+      },
+    });
+    expect(parsed?.card.slug).toBe("demo");
+    expect(parsed?.card).not.toHaveProperty("links");
+  });
+
   it("rejects visitor_followup when lead email is not a plain single address", () => {
     const parsed = parseVisitorFollowupMessage({
       type: "visitor_followup",

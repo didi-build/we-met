@@ -1,9 +1,4 @@
-import type {
-  CardBookingLinks,
-  CardContact,
-  CardCopyFollowUpEmail,
-  CardPageCopy,
-} from "@/card-data/types";
+import type { CardContact, CardPageCopy } from "@/card-data/types";
 
 export type VisitorLead = {
   leadId: string;
@@ -34,11 +29,7 @@ export type CardEmailSnapshot = {
   email: string;
   photoKey: string | null;
   contact: CardContact;
-  links: CardBookingLinks;
   pageCopy: Pick<CardPageCopy, "emailFromName">;
-  copy: {
-    followUpEmail: CardCopyFollowUpEmail;
-  };
 };
 
 export type ExchangeSuccessResponse = {

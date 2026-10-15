@@ -207,7 +207,7 @@ function checkPreviewBlock(previews) {
   );
 }
 
-const ALLOWED_CONSUMER_VAR_KEYS = new Set(["WE_MET_ENV"]);
+const ALLOWED_CONSUMER_VAR_KEYS = new Set(["WE_MET_ENV", "WE_MET_BASE_URL"]);
 const CONSUMER_D1_BINDING = "WE_MET_DB";
 
 function checkConsumerQueueConsumerSettings(consumerRow) {

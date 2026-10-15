@@ -32,18 +32,7 @@ const card: CardEmailSnapshot = {
     vcardNote: "note",
     urls: [],
   },
-  links: { bookingUrl: "https://example.com/book" },
   pageCopy: { emailFromName: "Demo at Example" },
-  copy: {
-    followUpEmail: {
-      subjectTemplate: "Hello {firstName}",
-      greetingTemplate: "Hi {firstName}",
-      bodyParagraphs: ["One"],
-      attachmentLine: "Attached",
-      bookCtaLabel: "Book",
-      closingLine: "Bye",
-    },
-  },
 };
 
 function base64UrlDecodeToString(raw: string): string {
@@ -136,6 +125,7 @@ describe("follow-up email consumer worker queue (integration)", () => {
 
     const env: FollowupConsumerEnv = {
       WE_MET_ENV: "preview",
+      WE_MET_BASE_URL: "https://we-met.link",
       GMAIL_SENDER: "sender@example.com",
       GMAIL_SERVICE_ACCOUNT_JSON: json,
       WE_MET_OWNER_FROM_EMAIL: "hello@we-met.link",
@@ -198,6 +188,7 @@ describe("follow-up email consumer worker queue (integration)", () => {
 
     const env: FollowupConsumerEnv = {
       WE_MET_ENV: "preview",
+      WE_MET_BASE_URL: "https://we-met.link",
       GMAIL_SENDER: "",
       GMAIL_SERVICE_ACCOUNT_JSON: json,
       WE_MET_OWNER_FROM_EMAIL: "hello@we-met.link",

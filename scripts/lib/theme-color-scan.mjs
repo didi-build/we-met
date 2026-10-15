@@ -1,6 +1,7 @@
 const ALLOWLIST = new Set([
   "src/components/hi/icons/HiCardIcons.tsx",
   "design/Hi.dc.html",
+  "src/email/templates/generated.ts",
 ]);
 
 const SKIP_DIRS = new Set([

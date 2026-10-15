@@ -14,7 +14,7 @@ export function HiWeMetBannerTop({ show }: HiWeMetBannerTopProps) {
       href={WE_MET_CARD_HOME_URL}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex min-h-11 items-center justify-center gap-2 bg-ink px-4 text-[14px] font-medium leading-[1.3] text-bg no-underline hover:text-bg"
+      className="bg-ink flex min-h-11 items-center justify-center gap-2 px-4 text-[14px] font-medium leading-[1.3] no-underline"
     >
       <span className="flex items-center gap-1.5 font-bold">
         <WeMetMarkIcon size={16} />
@@ -44,7 +44,7 @@ export function HiWeMetBannerBand({ show }: HiWeMetBannerBandProps) {
       href={WE_MET_CARD_HOME_URL}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex justify-center bg-ink text-bg no-underline hover:text-bg"
+      className="bg-ink flex justify-center no-underline"
     >
       <span className="flex w-full max-w-[420px] box-border items-center justify-between gap-4 px-6 pb-[calc(24px+env(safe-area-inset-bottom))] pt-6">
         <span className="flex flex-col gap-0.5 text-left">

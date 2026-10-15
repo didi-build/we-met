@@ -101,14 +101,6 @@ function legacyDidiRow(variant: string) {
           emailInvalid: "Invalid",
         },
       },
-      followUpEmail: {
-        subjectTemplate: "Hi",
-        greetingTemplate: "Hi",
-        bodyParagraphs: ["One"],
-        attachmentLine: "Attached",
-        bookCtaLabel: "Book",
-        closingLine: "Bye",
-      },
     }),
     updated_at: "2026-10-15T00:00:00.000Z",
   };

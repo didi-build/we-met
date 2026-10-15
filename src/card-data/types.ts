@@ -35,7 +35,7 @@ export type CardServices = {
   items: CardServiceItem[];
 };
 
-/** Email / snapshot pipeline booking URL (derived from alternate when present). */
+/** Persisted booking URL for legacy rows; not used in v1 visitor email snapshot. */
 export type CardBookingLinks = {
   bookingUrl: string;
 };
@@ -103,21 +103,11 @@ export type CardCopyExchangeSheet = {
   errors: CardCopyExchangeSheetErrors;
 };
 
-export type CardCopyFollowUpEmail = {
-  subjectTemplate: string;
-  greetingTemplate: string;
-  bodyParagraphs: string[];
-  attachmentLine: string;
-  bookCtaLabel: string;
-  closingLine: string;
-};
-
 export type CardCopy = {
   thanksMessage: string;
   exchangeAriaLabel: string;
   footerNavLabel: string;
   exchangeSheet: CardCopyExchangeSheet;
-  followUpEmail: CardCopyFollowUpEmail;
 };
 
 export type CardRecord = {

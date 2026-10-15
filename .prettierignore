@@ -9,3 +9,4 @@ design/
 design/Hi.dc.html
 # Hand-written mono palette tokens (design/card/card.css)
 src/theme/tokens/
+src/email/templates/

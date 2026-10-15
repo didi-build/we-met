@@ -551,76 +551,30 @@ function parseExchangeSheet(raw: unknown): CardCopy["exchangeSheet"] {
   };
 }
 
-function parseFollowUpEmail(raw: unknown): CardCopy["followUpEmail"] {
-  if (!isRecord(raw)) {
-    throw new Error("copy.followUpEmail must be an object");
-  }
-  assertAllowedKeys(
-    raw,
-    [
-      "subjectTemplate",
-      "greetingTemplate",
-      "bodyParagraphs",
-      "attachmentLine",
-      "bookCtaLabel",
-      "closingLine",
-    ],
-    "copy.followUpEmail",
-  );
-  return {
-    subjectTemplate: requireCopyString(
-      raw.subjectTemplate,
-      "copy.followUpEmail.subjectTemplate",
-    ),
-    greetingTemplate: requireCopyString(
-      raw.greetingTemplate,
-      "copy.followUpEmail.greetingTemplate",
-    ),
-    bodyParagraphs:
-      parseStringArray(
-        raw.bodyParagraphs,
-        "copy.followUpEmail.bodyParagraphs",
-        1,
-        LIMITS.bodyParagraphs,
-        LIMITS.copyLeaf,
-        true,
-      ) ?? [],
-    attachmentLine: requireCopyString(
-      raw.attachmentLine,
-      "copy.followUpEmail.attachmentLine",
-    ),
-    bookCtaLabel: requireCopyString(
-      raw.bookCtaLabel,
-      "copy.followUpEmail.bookCtaLabel",
-    ),
-    closingLine: requireCopyString(raw.closingLine, "copy.followUpEmail.closingLine"),
-  };
-}
-
 function parseCopy(raw: unknown): CardCopy {
   if (!isRecord(raw)) {
     throw new Error("copy must be an object");
   }
+  if (raw.followUpEmail !== undefined) {
+    console.warn(
+      "copy.followUpEmail is ignored (follow-up email copy is fixed in v1); remove it from the card file",
+    );
+  }
+  const copyInput = { ...raw };
+  delete copyInput.followUpEmail;
   assertAllowedKeys(
-    raw,
-    [
-      "thanksMessage",
-      "exchangeAriaLabel",
-      "footerNavLabel",
-      "exchangeSheet",
-      "followUpEmail",
-    ],
+    copyInput,
+    ["thanksMessage", "exchangeAriaLabel", "footerNavLabel", "exchangeSheet"],
     "copy",
   );
   return {
-    thanksMessage: requireCopyString(raw.thanksMessage, "copy.thanksMessage"),
+    thanksMessage: requireCopyString(copyInput.thanksMessage, "copy.thanksMessage"),
     exchangeAriaLabel: requireCopyString(
-      raw.exchangeAriaLabel,
+      copyInput.exchangeAriaLabel,
       "copy.exchangeAriaLabel",
     ),
-    footerNavLabel: requireCopyString(raw.footerNavLabel, "copy.footerNavLabel"),
-    exchangeSheet: parseExchangeSheet(raw.exchangeSheet),
-    followUpEmail: parseFollowUpEmail(raw.followUpEmail),
+    footerNavLabel: requireCopyString(copyInput.footerNavLabel, "copy.footerNavLabel"),
+    exchangeSheet: parseExchangeSheet(copyInput.exchangeSheet),
   };
 }
 

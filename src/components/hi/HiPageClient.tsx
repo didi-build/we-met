@@ -45,6 +45,13 @@ export function HiPageClient({ card, photoUrl, plan = "free" }: HiPageClientProp
   const flags = cardContentFlags(card);
   const initials = cardInitials(card.name);
   const greeting = cardGreeting(card.name);
+  const [photoBroken, setPhotoBroken] = useState(false);
+  const showPhoto = flags.hasPhoto && Boolean(photoUrl) && !photoBroken;
+
+  useEffect(() => {
+    setPhotoBroken(false);
+  }, [photoUrl]);
+
   const chips = servicesForChips(card.services?.items).map((s) => ({
     label: s.title,
     explanation: s.description,
@@ -127,7 +134,7 @@ export function HiPageClient({ card, photoUrl, plan = "free" }: HiPageClientProp
                 aria-label={card.name}
                 className="flex flex-col items-center gap-3.5 text-center"
               >
-                {flags.hasPhoto && photoUrl ? (
+                {showPhoto && photoUrl ? (
                   <Image
                     src={photoUrl}
                     alt={pageCopy.headshotAlt}
@@ -136,6 +143,7 @@ export function HiPageClient({ card, photoUrl, plan = "free" }: HiPageClientProp
                     className="block h-[136px] w-[136px] shrink-0 rounded-full object-cover bg-surface-2 shadow-[0_0_0_6px_var(--bg)]"
                     priority
                     unoptimized
+                    onError={() => setPhotoBroken(true)}
                   />
                 ) : (
                   <div

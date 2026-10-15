@@ -69,6 +69,12 @@ a.bg-accent:hover {
   text-decoration: none;
 }
 
+a.bg-ink,
+a.bg-ink:hover {
+  color: var(--bg);
+  text-decoration: none;
+}
+
 :focus-visible {
   outline: 3px solid var(--accent);
   outline-offset: 3px;

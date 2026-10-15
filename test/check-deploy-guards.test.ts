@@ -377,7 +377,7 @@ describe("check-deploy-guards (unit)", () => {
     const base = readFileSync(CONSUMER_NONPROD, "utf8");
     const config = parseJsonc(base) as Record<string, unknown>;
     const vars = config.vars as Record<string, string>;
-    vars.WE_MET_BASE_URL = "https://we-met.link";
+    vars.WE_MET_DISALLOWED_EXAMPLE = "nope";
     const path = join(dir, "wrangler.jsonc");
     writeFileSync(path, JSON.stringify(config, null, 2), "utf8");
     const result = runGuards("consumer-nonprod", path);

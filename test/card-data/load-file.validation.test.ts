@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { parseCardsLoadFile } from "@/card-data/load-file";
 import { exampleLoadRaw } from "../helpers/example-card";
 
@@ -36,6 +36,20 @@ describe("parseCardsLoadFile validation (unit)", () => {
     const parsed = parseCardsLoadFile(raw);
     expect(parsed.cards[0].alternate).toBeUndefined();
     expect(parsed.cards[0].bookingLinks.bookingUrl).toBe("");
+  });
+
+  it("accepts legacy copy.followUpEmail with a warning", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const raw = cloneLoadFile();
+    const card = (raw.cards as Record<string, unknown>[])[0];
+    const copy = card.copy as Record<string, unknown>;
+    copy.followUpEmail = { subjectTemplate: "x" };
+    const parsed = parseCardsLoadFile(raw);
+    expect(parsed.cards[0].copy).not.toHaveProperty("followUpEmail");
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("copy.followUpEmail is ignored"),
+    );
+    warn.mockRestore();
   });
 
   it("rejects green variant", () => {
@@ -160,16 +174,6 @@ describe("parseCardsLoadFile validation (unit)", () => {
         }
       },
       pattern: /about.paragraphs exceeds max length/,
-    },
-    {
-      label: "empty bodyParagraphs",
-      mutate: (raw) => {
-        const card = (raw.cards as Record<string, unknown>[])[0];
-        const followUp = (card.copy as { followUpEmail: Record<string, unknown> })
-          .followUpEmail;
-        followUp.bodyParagraphs = [];
-      },
-      pattern: /bodyParagraphs/,
     },
   ];
 

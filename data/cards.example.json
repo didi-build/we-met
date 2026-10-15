@@ -110,17 +110,6 @@
             "emailRequired": "Add your email so I can reach you.",
             "emailInvalid": "That email doesn't look quite right. Check for a typo?"
           }
-        },
-        "followUpEmail": {
-          "subjectTemplate": "Great meeting you, {firstName}",
-          "greetingTemplate": "Hi {firstName},",
-          "bodyParagraphs": [
-            "It was great meeting you. As promised, my contact details are attached.",
-            "If you'd like to talk about your product, book a time using the link below."
-          ],
-          "attachmentLine": "My vCard is attached.",
-          "bookCtaLabel": "Book a time",
-          "closingLine": "Talk soon,"
         }
       }
     }

@@ -24,32 +24,31 @@ function parseCardSnapshot(value: unknown): CardEmailSnapshot | null {
   if (!isRecord(value)) {
     return null;
   }
-  const copy = value.copy;
-  const followUpEmail =
-    isRecord(copy) && isRecord(copy.followUpEmail) ? copy.followUpEmail : null;
   const pageCopy = isRecord(value.pageCopy) ? value.pageCopy : null;
-  const links = isRecord(value.links) ? value.links : null;
   const contact = isRecord(value.contact) ? value.contact : null;
   if (
     !isNonEmptyString(value.slug) ||
     !isNonEmptyString(value.displayName) ||
     !isNonEmptyString(value.email) ||
     !contact ||
-    !links ||
-    !isNonEmptyString(links.bookingUrl) ||
     !pageCopy ||
-    !isNonEmptyString(pageCopy.emailFromName) ||
-    !followUpEmail ||
-    !isNonEmptyString(followUpEmail.subjectTemplate) ||
-    !isNonEmptyString(followUpEmail.greetingTemplate) ||
-    !Array.isArray(followUpEmail.bodyParagraphs) ||
-    !isNonEmptyString(followUpEmail.attachmentLine) ||
-    !isNonEmptyString(followUpEmail.bookCtaLabel) ||
-    !isNonEmptyString(followUpEmail.closingLine)
+    !isNonEmptyString(pageCopy.emailFromName)
   ) {
     return null;
   }
-  return value as CardEmailSnapshot;
+  return {
+    slug: value.slug,
+    displayName: value.displayName,
+    email: value.email,
+    photoKey:
+      value.photoKey === null
+        ? null
+        : typeof value.photoKey === "string"
+          ? value.photoKey
+          : null,
+    contact: contact as CardEmailSnapshot["contact"],
+    pageCopy: { emailFromName: pageCopy.emailFromName },
+  };
 }
 
 function parseLead(value: unknown): VisitorLead | null {

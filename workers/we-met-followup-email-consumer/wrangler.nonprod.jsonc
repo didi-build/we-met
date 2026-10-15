@@ -8,6 +8,7 @@
   "compatibility_flags": ["global_fetch_strictly_public"],
   "vars": {
     "WE_MET_ENV": "preview",
+    "WE_MET_BASE_URL": "https://we-met.link",
   },
   "d1_databases": [
     {
