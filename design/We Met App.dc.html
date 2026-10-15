@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<title>We Met app: design hand-off</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap">
+<style>html,body{margin:0;padding:0;background:#e9e9e9}a{color:#161616}a:hover{color:#555555}</style>
+</helmet>
+<div style="padding:64px;font-family:Figtree,system-ui,sans-serif;color:#161616;display:flex;flex-direction:column;gap:72px">
+  <div style="display:flex;flex-direction:column;gap:10px;max-width:920px">
+    <h1 style="margin:0;font-size:32px;font-weight:600;letter-spacing:-0.02em">We Met app: sign-in and card editor</h1>
+    <p style="margin:0;font-size:16px;line-height:1.55;color:#555555">Live renders of the plain files in design/app/: index.html (markup, templates and the sample-data block), app.css (all values), app.js (behaviour, plus the one WeMetApp hook object documented at the top) and icons/. The preview inside the editor is the real design/card/card.html, fed the form values. States are forced with ?state= and ?theme=, handled by the preview-only code at the bottom of app.js. Scroll inside each frame.</p>
+  </div>
+
+  <sc-for list="{{ groups }}" as="g" hint-placeholder-count="7">
+    <section id="{{ g.id }}" data-screen-label="{{ g.title }}" style="display:flex;flex-direction:column;gap:20px">
+      <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap">
+        <h2 style="margin:0;font-size:24px;font-weight:600;letter-spacing:-0.02em">{{ g.title }}</h2>
+        <span style="font-size:14px;color:#555555">{{ g.note }}</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;align-items:flex-start;gap:32px">
+        <sc-for list="{{ g.frames }}" as="f" hint-placeholder-count="4">
+          <div id="{{ f.id }}" style="display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600">
+              <span style="padding:2px 9px;border-radius:999px;background:#161616;color:#fafafa">{{ f.id }}</span>
+              <span>{{ f.label }}</span>
+            </div>
+            <iframe src="{{ f.src }}" title="{{ f.label }}" loading="lazy" style="display:block;width:{{ f.w }};height:{{ f.h }};border:0;border-radius:16px;background:#fafafa"></iframe>
+            <code style="font-size:12px;color:#555555">{{ f.query }}</code>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+  </sc-for>
+
+  <section id="spec" data-screen-label="Spec" style="display:flex;flex-direction:column;gap:24px">
+    <h2 style="margin:0;font-size:28px;font-weight:600;letter-spacing:-0.02em">Spec</h2>
+    <div style="display:flex;flex-wrap:wrap;align-items:flex-start;gap:24px">
+      <div style="flex:1 1 560px;max-width:720px;display:flex;flex-direction:column;gap:10px;padding:28px;border-radius:24px;background:#ffffff;border:1px solid #dedede">
+        <h3 style="margin:0 0 6px;font-size:20px;font-weight:600">Colors (mono, same as the card)</h3>
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) 150px 150px;gap:8px 12px;font-size:13px;color:#555555;font-weight:600"><span>Role · CSS property</span><span>Light</span><span>Dark</span></div>
+        <sc-for list="{{ colors }}" as="c" hint-placeholder-count="12">
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) 150px 150px;gap:12px;align-items:center;font-size:14px;line-height:1.4;padding-top:8px;border-top:1px solid #ededed">
+            <span><span style="font-weight:600">{{ c.role }}</span><br><code style="font-size:12px;color:#555555">{{ c.v }}</code></span>
+            <span style="display:flex;align-items:center;gap:8px"><span style="flex:none;width:18px;height:18px;border-radius:6px;border:1px solid #cfcfcf;background:{{ c.l }}"></span><code style="font-size:12px">{{ c.l }}</code></span>
+            <span style="display:flex;align-items:center;gap:8px"><span style="flex:none;width:18px;height:18px;border-radius:6px;border:1px solid #cfcfcf;background:{{ c.d }}"></span><code style="font-size:12px">{{ c.d }}</code></span>
+          </div>
+        </sc-for>
+        <p style="margin:8px 0 0;font-size:13px;line-height:1.5;color:#555555">Theme: follows prefers-color-scheme unless the root has data-theme. The header button writes data-theme and localStorage "wemet-app-theme". The preview card gets the same theme.</p>
+      </div>
+
+      <div style="flex:1 1 560px;max-width:720px;display:flex;flex-direction:column;gap:10px;padding:28px;border-radius:24px;background:#ffffff;border:1px solid #dedede">
+        <h3 style="margin:0 0 6px;font-size:20px;font-weight:600">Type</h3>
+        <p style="margin:0 0 6px;font-size:14px;line-height:1.5">Figtree 400, 500, 600, 700 (Google Fonts). Fallback: system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif. Sizes are the same at 390 and 1280.</p>
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) 64px 52px 52px 72px;gap:8px 12px;font-size:13px;color:#555555;font-weight:600"><span>Role</span><span>Size</span><span>LH</span><span>Wt</span><span>Tracking</span></div>
+        <sc-for list="{{ type }}" as="t" hint-placeholder-count="18">
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) 64px 52px 52px 72px;gap:12px;font-size:14px;line-height:1.4;padding-top:8px;border-top:1px solid #ededed">
+            <span>{{ t.r }}</span><code style="font-size:12px">{{ t.s }}</code><code style="font-size:12px">{{ t.lh }}</code><code style="font-size:12px">{{ t.w }}</code><code style="font-size:12px">{{ t.ls }}</code>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="flex:1 1 560px;max-width:720px;display:flex;flex-direction:column;gap:10px;padding:28px;border-radius:24px;background:#ffffff;border:1px solid #dedede">
+        <h3 style="margin:0 0 6px;font-size:20px;font-weight:600">Layout and spacing</h3>
+        <div style="display:grid;grid-template-columns:170px minmax(0,1fr) minmax(0,1fr);gap:8px 12px;font-size:13px;color:#555555;font-weight:600"><span>Block</span><span>390 (below 900)</span><span>1280 (900 and up)</span></div>
+        <sc-for list="{{ spacing }}" as="s" hint-placeholder-count="16">
+          <div style="display:grid;grid-template-columns:170px minmax(0,1fr) minmax(0,1fr);gap:12px;font-size:13px;line-height:1.5;padding-top:8px;border-top:1px solid #ededed">
+            <span style="font-weight:600;font-size:14px">{{ s.b }}</span><code style="font-size:12px;white-space:pre-wrap">{{ s.m }}</code><code style="font-size:12px;white-space:pre-wrap">{{ s.d }}</code>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="flex:1 1 560px;max-width:720px;display:flex;flex-direction:column;gap:10px;padding:28px;border-radius:24px;background:#ffffff;border:1px solid #dedede">
+        <h3 style="margin:0 0 6px;font-size:20px;font-weight:600">Sizes, radii and shadows</h3>
+        <sc-for list="{{ sizes }}" as="s" hint-placeholder-count="16">
+          <div style="display:grid;grid-template-columns:170px minmax(0,1fr);gap:12px;font-size:14px;line-height:1.45;padding-top:8px;border-top:1px solid #ededed">
+            <span style="font-weight:600">{{ s.b }}</span><code style="font-size:12px;line-height:1.6;white-space:pre-wrap">{{ s.v }}</code>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="flex:1 1 560px;max-width:720px;display:flex;flex-direction:column;gap:10px;padding:28px;border-radius:24px;background:#ffffff;border:1px solid #dedede">
+        <h3 style="margin:0 0 6px;font-size:20px;font-weight:600">Field rules and copy</h3>
+        <sc-for list="{{ rules }}" as="s" hint-placeholder-count="12">
+          <div style="display:grid;grid-template-columns:150px minmax(0,1fr);gap:12px;font-size:14px;line-height:1.45;padding-top:8px;border-top:1px solid #ededed">
+            <span style="font-weight:600">{{ s.b }}</span><span>{{ s.v }}</span>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="flex:1 1 560px;max-width:720px;display:flex;flex-direction:column;gap:10px;padding:28px;border-radius:24px;background:#ffffff;border:1px solid #dedede">
+        <h3 style="margin:0 0 6px;font-size:20px;font-weight:600">Motion</h3>
+        <div style="display:grid;grid-template-columns:150px 90px minmax(0,1fr) minmax(0,1fr);gap:8px 12px;font-size:13px;color:#555555;font-weight:600"><span>Name</span><span>Duration</span><span>Easing</span><span>Trigger</span></div>
+        <sc-for list="{{ motion }}" as="m" hint-placeholder-count="10">
+          <div style="display:grid;grid-template-columns:150px 90px minmax(0,1fr) minmax(0,1fr);gap:12px;font-size:13px;line-height:1.45;padding-top:8px;border-top:1px solid #ededed">
+            <span style="font-weight:600;font-size:14px">{{ m.n }}</span><code style="font-size:12px">{{ m.d }}</code><code style="font-size:12px">{{ m.e }}</code><span>{{ m.t }}</span>
+          </div>
+        </sc-for>
+        <p style="margin:8px 0 0;font-size:14px;line-height:1.5">Reduced motion: under prefers-reduced-motion: reduce every animation and transition inside .ap is none, and spinners become a static half-opacity ring next to their text label (Saving…, Checking…, Uploading…).</p>
+      </div>
+
+      <div style="flex:1 1 100%;max-width:1464px;display:flex;flex-direction:column;gap:10px;padding:28px;border-radius:24px;background:#ffffff;border:1px solid #dedede">
+        <h3 style="margin:0 0 6px;font-size:20px;font-weight:600">States</h3>
+        <div style="display:grid;grid-template-columns:160px repeat(4,minmax(0,1fr)) minmax(0,1.4fr);gap:8px 14px;font-size:13px;color:#555555;font-weight:600"><span>Element</span><span>Default</span><span>Hover</span><span>Pressed</span><span>Focus-visible</span><span>Disabled · loading · error</span></div>
+        <sc-for list="{{ states }}" as="s" hint-placeholder-count="12">
+          <div style="display:grid;grid-template-columns:160px repeat(4,minmax(0,1fr)) minmax(0,1.4fr);gap:14px;font-size:13px;line-height:1.45;padding-top:8px;border-top:1px solid #ededed">
+            <span style="font-weight:600;font-size:14px">{{ s.el }}</span><span>{{ s.d }}</span><span>{{ s.h }}</span><span>{{ s.a }}</span><span>{{ s.f }}</span><span>{{ s.o }}</span>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="flex:1 1 100%;max-width:1464px;display:flex;flex-direction:column;gap:8px;padding:28px;border-radius:24px;background:#ffffff;border:1px solid #dedede;font-size:14px;line-height:1.55">
+        <h3 style="margin:0 0 6px;font-size:20px;font-weight:600">Accessibility</h3>
+        <sc-for list="{{ a11y }}" as="x" hint-placeholder-count="8"><p style="margin:0">{{ x }}</p></sc-for>
+      </div>
+    </div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const base = 'design/app/index.html';
+    const fr = (id, label, q, wide) => ({ id, label, query: '?' + q, src: base + '?' + q, w: wide ? '1280px' : '390px', h: wide ? '860px' : '844px' });
+    const groups = [
+      { id: 'login', title: 'Sign in', note: 'Google only.', frames: [
+        fr('L1', '390 · light', 'state=login&theme=light'), fr('L2', '390 · dark', 'state=login&theme=dark'), fr('L3', 'Waiting for Google', 'state=login-signing&theme=light'),
+        fr('L4', 'Sign-in failed or canceled', 'state=login-error&theme=light'), fr('L5', "Sign-up isn't open yet", 'state=closed&theme=light'), fr('L6', '1280 · light', 'state=login&theme=light', true)
+      ] },
+      { id: 'editor', title: 'Editor', note: 'Below 900px: Edit / Preview tabs. 900px and up: side by side.', frames: [
+        fr('E1', 'First time, empty', 'state=empty&theme=light'), fr('E2', 'Filled, published (Published pill)', 'state=filled&theme=light'), fr('E3', 'Filled · dark', 'state=filled&theme=dark'), fr('E4', 'Preview tab', 'state=preview&theme=light'), fr('E8', 'Collapsed sections', 'state=collapsed&theme=light'), fr('E9', 'Collapsed · dark', 'state=collapsed&theme=dark'),
+        fr('E5', '1280 · filled · light', 'state=filled&theme=light', true), fr('E6', '1280 · filled · dark', 'state=filled&theme=dark', true), fr('E7', '1280 · first time, empty', 'state=empty&theme=light', true)
+      ] },
+      { id: 'errors', title: 'Field errors', note: 'Over-limit name, role, paragraph and service title; missing service title; http and bare links; label without a link. Scroll to see each.', frames: [
+        fr('V1', '390 · light', 'state=errors&theme=light'), fr('V2', '390 · dark', 'state=errors&theme=dark'), fr('V3', '1280 · light', 'state=errors&theme=light', true)
+      ] },
+      { id: 'photo', title: 'Photo', note: 'Choose a file, crop square (shown as a circle), upload.', frames: [
+        fr('P1', 'Crop and zoom', 'state=crop&theme=light'), fr('P2', 'Crop · dark', 'state=crop&theme=dark'), fr('P3', 'Uploading', 'state=uploading&theme=light'),
+        fr('P4', 'Upload failed', 'state=upload-error&theme=light'), fr('P5', '1280 · crop', 'state=crop&theme=light', true)
+      ] },
+      { id: 'slug', title: 'Your link', note: 'Checked 400ms after typing stops. Format and reserved names are checked on the device first.', frames: [
+        fr('S1', 'Empty', 'state=empty&theme=light'), fr('S2', 'Checking', 'state=slug-checking&theme=light'), fr('S3', 'Available', 'state=slug-available&theme=light'), fr('S4', 'Taken', 'state=slug-taken&theme=light'),
+        fr('S5', 'Invalid format', 'state=slug-invalid&theme=light'), fr('S6', 'Reserved', 'state=slug-reserved&theme=light'), fr('S7', 'Published: locked', 'state=filled&theme=light'), fr('S8', 'Unlocked, typing a new link', 'state=slug-unlocked&theme=light'), fr('S9', 'New link confirmed, not yet published', 'state=slug-change&theme=light')
+      ] },
+      { id: 'save', title: 'Saving and publishing', note: 'Status sits in the bottom bar.', frames: [
+        fr('B1', 'Saving', 'state=saving&theme=light'), fr('B2', "Couldn't save, retry", 'state=save-error&theme=light'), fr('B3', 'Not published: Publish', 'state=draft&theme=light'), fr('B4', 'Publish blocked', 'state=publish-blocked&theme=light'),
+        fr('B5', 'Published: share sheet', 'state=published&theme=light'), fr('B6', 'Changes: Publish changes', 'state=unpublished&theme=light'), fr('B8', 'Share card (from the bottom bar)', 'state=share&theme=light'), fr('B7', '1280 · published dialog', 'state=published&theme=dark', true)
+      ] },
+      { id: 'account', title: 'Session and account', note: '', frames: [
+        fr('A1', 'Session expired', 'state=session-expired&theme=light'), fr('A2', 'Account menu', 'state=menu&theme=light'), fr('A3', 'Account menu · dark', 'state=menu&theme=dark'), fr('A4', '1280 · session expired', 'state=session-expired&theme=light', true)
+      ] }
+    ];
+    const C = (role, v, l, d) => ({ role, v, l, d });
+    const colors = [
+      C('Page, dialog panels, header, bottom bar', '--c-bg', '#fafafa', '#0f0f0f'), C('Section cards, focused field, menu', '--c-surface', '#ffffff', '#181818'),
+      C('Fields, tab track, hover fills, URL box', '--c-surface-2', '#f0f0f0', '#222222'), C('Text, icons, avatar button', '--c-ink', '#161616', '#f2f2f2'),
+      C('Labels, helper text, counters', '--c-ink-muted', '#555555', '#ababab'), C('Borders, rules, service item outline', '--c-line', '#dedede', '#333333'),
+      C('Strong line', '--c-line-strong', '#868686', '#717171'), C('Primary button, focus ring, field focus', '--c-accent', '#161616', '#f2f2f2'),
+      C('Primary hover / pressed', '--c-accent-hover', '#383838', '#cecece'), C('Text on primary', '--c-accent-ink', '#fafafa', '#0f0f0f'),
+      C('Badge fill, info alert fill', '--c-accent-soft', '#ebebeb', '#292929'), C('Error text, border, alert mark', '--c-error', '#b3241f', '#f98f82'),
+      C('Error alert fill', '--c-error-soft', '#ffe9e5', '#3e1f1b'), C('Scrim', '--c-scrim', 'rgba(3,3,3,.6)', 'rgba(3,3,3,.6)'),
+      C('Google button fill', '--c-g-bg', '#ffffff', '#131314'), C('Google button border', '--c-g-line', '#747775', '#8e918f'),
+      C('Google button text', '--c-g-ink', '#1f1f1f', '#e3e3e3'), C('Google button hover', '--c-g-hover', '#f3f3f3', '#1f1f20'),
+      C('Crop surround / ring (both themes)', 'literal', 'rgba(3,3,3,.5) · #222222 · rgba(250,250,250,.9)', 'same')
+    ];
+    const T = (r, s, lh, w, ls) => ({ r, s, lh, w, ls });
+    const type = [
+      T('Wordmark "We Met"', '19', '1', '700', '-0.02em'), T('Login title', '30', '1.15', '600', '-0.03em'), T('Login subtitle', '17', '1.6', '400', '0'), T('Login note', '14', '1.5', '400', '0'),
+      T('Editor title "Your card"', '24', '1.2', '600', '-0.02em'), T('Editor subtitle', '15', '1.5', '400', '0'), T('Section title', '18', '1.3', '600', '-0.01em'), T('Section helper', '14', '1.5', '400', '0'),
+      T('Field label (inside box)', '13', '1.3', '500', '0'), T('Field input / prefix', '17', '1.4', '400', '0'), T('Field error', '14', '1.45', '500', '0'), T('Counter', '13', '1.45', '500 tabular', '0'),
+      T('Slug status', '14', '1.45', '500', '0'), T('Item label "Service 1"', '14', '1.3', '600', '0'), T('Save status', '13', '1.4', '500', '0'),
+      T('Button md / lg / sm', '16 / 17 / 15', '1', '600', '0'), T('Text button', '15', '1', '600', '0'), T('Tabs', '15', '1', '600', '0'), T('Dialog title', '22', '1.2', '600', '-0.02em'),
+      T('Dialog text', '16', '1.55', '400', '0'), T('Alert', '15', '1.5', '400 (strong 600)', '0'), T('Menu label / email / item', '13 / 15 / 15', '1.3 / 1.4 / 1', '500 / 600 / 500', '0'), T('Photo initials', '30', '1', '600', '-0.02em')
+    ];
+    const S = (b, m, d) => ({ b, m, d });
+    const spacing = [
+      S('Header', 'sticky · height 64 · padding 0 12 0 20 · gap 12 · brand mark 28 + gap 10 · right group gap 4', 'padding 0 20 0 32 · rest same'),
+      S('Login column', 'max-width 420 · padding 56 24 48 · centred · gap 24 · actions gap 14, margin-top 8', 'same, centred in the page'),
+      S('Tabs', 'sticky top 64 · padding 12 20 · track padding 4', 'hidden'),
+      S('Editor', 'padding 0 20 128 · form max-width 560, centred', 'grid: 560 form + 420 preview, gap 48, centred · padding 32 32 128'),
+      S('Form', 'gap 16 between sections · head padding 8 4 4, gap 6', 'same'),
+      S('Section card', 'padding 24 20 · gap 16 · head gap 4', 'padding 28 · gap 16'),
+      S('Field', 'box padding 10 16 11 · label → input 2 · field → meta row 6 · meta padding 0 4, gap 12', 'same'),
+      S('Prefixed input', 'prefix text or 18 icon + gap 8', 'same'),
+      S('Photo row', 'avatar 88 + gap 16 · actions gap 4 12', 'same'),
+      S('Lists', 'items gap 12 · service item padding 14, gap 10 · item bar min-height 44, margin -6 -6 -2 0', 'same'),
+      S('Preview', 'Preview tab: full width, edge to edge, height 100svh − 64 − 68 − 73', 'sticky top 96 · head gap 12 · frame height 100svh − 240, max 844, min 480'),
+      S('Bottom bar', 'fixed · padding 12 20 (12 + safe-area) · two rows, gap 10: save status row, then buttons full width (each flex 1, 48 tall, gap 8) · blocked alert padding 12 20 0', 'content max-width 1028 · padding 12 32 · rest same'),
+      S('Account menu', 'width 260 · top 52 · right 0 · padding 8 · label 8 12 0 · email 2 12 10 · rule margin 0 4 6', 'same'),
+      S('Dialog', 'bottom sheet · padding-top 24 outside · panel padding 8 24 (28 + safe-area) · gap 16 · actions stacked gap 10', 'centred modal · max-width 460 · padding 24 28 28 · actions in a row, primary right'),
+      S('Crop', 'stage max 320 square, centred · zoom row max 320, gap 12', 'same'),
+      S('Published URL box', 'min-height 52 · padding 0 6 0 16 · gap 8', 'same')
+    ];
+    const Z = (b, v) => ({ b, v });
+    const sizes = [
+      Z('Buttons', 'primary md 48 · lg 56 · sm 44 · radius 999 · padding 0 22 / 0 28 / 0 18 · gap 10 / 12 / 8 · outline: inset 1.5px ink'),
+      Z('Google button', '52 tall · full width · 1px border · radius 999 · G logo 20 · gap 12'),
+      Z('Icon buttons', '44 × 44 circle · icon 18 to 20'),
+      Z('Avatar button', '44 hit · 32 circle, ink fill with a 2px ink rim, overflow hidden · person silhouette 26 in bg colour, body clipped inside the rim so it follows the curve · dark theme: figure scaled 1.12 from the bottom so it reads the same size as the light-on-dark figure · hover / open: accent-hover fill and rim'),
+      Z('Tabs', 'track radius 999 · each tab 44 tall · selected: surface fill + 1px line ring (box-shadow 0 0 0 1px)'),
+      Z('Field box', 'radius 12 · 1px border (transparent → accent or error) · focus ring box-shadow 0 0 0 1px accent · textarea min-height 72, grows with content'),
+      Z('Section card', 'radius 24 · 1px line · surface fill · no shadow'),
+      Z('Service item', 'radius 16 · 1px line'),
+      Z('Photo', '88 circle · 1px line · busy overlay rgba(3,3,3,.5) with 16 spinner'),
+      Z('Alerts', 'radius 14 · padding 12 14 · mark 20 circle'),
+      Z('Menu', 'radius 14 · 1px line · shadow light 0 14 30 −12 rgba(22,22,22,.25), 0 2 6 rgba(22,22,22,.08); dark 0 18 36 −14 rgba(0,0,0,.7), 0 2 8 rgba(0,0,0,.3) · items 44 tall, radius 10'),
+      Z('Dialog panel', 'sheet radius 24 24 0 0, max-width 520 · modal radius 24, max-width 460'),
+      Z('Preview frame', 'radius 24 · 1px line (tab view: no radius, top border only)'),
+      Z('Crop stage', 'square · radius 16 · circle mask: box-shadow 0 0 0 999px rgba(3,3,3,.5) + 2px outline rgba(250,250,250,.9) · 2px frame border'),
+      Z('Spinner', '16 (12 in save status, 14 in slug status) · 2px ring, right side transparent'),
+      Z('Stacking', 'tabs 20 · bottom bar 25 · header 30 · menu 40 · dialogs 50'),
+      Z('Tap targets', 'every control ≥ 44 tall, including tabs, text buttons, reorder and delete, Retry and the zoom slider')
+    ];
+    const R = (b, v) => ({ b, v });
+    const rules = [
+      R('Name', 'Required to publish. Max 60. "Add your name to publish." / "Keep your name to 60 characters or fewer."'),
+      R('Role', 'Optional. Max 100. "Keep this to 100 characters or fewer."'),
+      R('Photo', 'JPG, PNG or WebP, up to 5 MB (assumed limit, confirm in the backend). Cropped to 512 × 512 JPEG. Errors: "Use a JPG, PNG or WebP image." "That photo is over 5 MB. Choose a smaller one." "The upload didn\'t finish. Check your connection and try again."'),
+      R('About me', 'Up to 4 paragraphs, each max 500. Title fixed. Empty paragraphs are ignored.'),
+      R('What I do', 'Up to 10, title max 40, description max 220. Reorder with up/down, delete. Description without a title: "Add a title for this service." Items without a title are left off the card.'),
+      R('Links', 'Website, LinkedIn, GitHub, Instagram. Optional. Must be https with a domain: "Use a full link that starts with https://"'),
+      R('Extra link', 'Optional URL + label (max 60). Shows on the card only when both are filled; helper: "If you leave this empty, this extra link won\'t show." Label without URL: "Add the link this text should open." Never in emails.'),
+      R('Slug', '3 to 40 lowercase letters, numbers and single hyphens, not at the ends. Spaces turn into hyphens and capitals into lowercase as you type. Reserved: app, www, api, admin, hi, help, support, login, signin, signup, settings, account, we-met, wemet, mail, static.'),
+      R('Address lock', 'After the first publish the address is locked (read-only, lock button in the field). Unlock → type → tap the check (enabled only when the new address is available) → Publish. Cancel restores the old address. While unlocked, the change is not saved and Publish is blocked: "tap the check to confirm your new link, or cancel". After confirming, an info alert says the old link will stop working.'),
+      R('Collapsing', 'Below 900px every section title is a toggle (chevron rotates −90° when closed). Not stored. Publish blocked opens any collapsed section that holds an error. At 900 and up everything is always open and the chevrons are hidden.'),
+      R('Counters', 'Appear at 80% of the limit as "452 / 500"; turn red over the limit. Typing past the limit is allowed so nothing is cut off; publishing is blocked.'),
+      R('Publish', 'Needs a name, an available slug and no field errors. Blocked message names what is missing: "To publish, add your name and choose your link."'),
+      R('Autosave', '800ms after the last change. Saved / Saving… / Couldn\'t save. Retry. The draft is also kept in localStorage so a lost session loses nothing.'),
+      R('Preview', 'The real card, plan free. Empty name shows the greeting "Your name here" (card-data "greeting" override) and an empty initials circle. Exchange and the sticky bar are off; chips and Show more work.')
+    ];
+    const M = (n, d, e, t) => ({ n, d, e, t });
+    const motion = [
+      M('Sheet in (below 900)', '0.5s', 'cubic-bezier(.32,.72,0,1)', 'Crop, published, session dialogs open'), M('Modal in (900+)', '0.25s', 'cubic-bezier(.2,.7,.2,1), fade + 12px', 'Same dialogs, wide screens'),
+      M('Scrim in', '0.3s', 'ease-out', 'Any dialog opens'), M('Menu in', '0.12s', 'cubic-bezier(0,0,.2,1), fade + 4px', 'Account button'),
+      M('Spinner', '0.8s loop', 'linear', 'Saving, checking, uploading, publishing, signing in'), M('Colour changes', '0.15s', 'ease', 'Hover on buttons, tabs, fields'),
+      M('Chevron rotate', '0.2s', 'cubic-bezier(.4,0,.2,1)', 'Section collapse'),
+      M('Field focus', '0.15s', 'ease', 'Border, ring and fill'), M('Preview update', '250ms debounce', 'no animation; double-buffered iframe swap keeps scroll', 'Typing'),
+      M('Slug check', '400ms debounce', 'n/a', 'Typing in the link field'), M('Autosave', '800ms debounce', 'n/a', 'Any change')
+    ];
+    const st = (el, d, h, a, f, o) => ({ el, d, h, a, f, o });
+    const ring = '3px accent outline, 3px offset';
+    const states = [
+      st('Primary button', 'accent fill, accent-ink text', 'accent-hover', 'accent-hover, no scale', ring, 'Not published: "Publish" · Changes since the last publish: "Publish changes" · Nothing new: turns into a passive pill (accent-soft fill, ink text, 8px dot, "Published", disabled at full opacity) · Loading: spinner + "Publishing…"'),
+      st('Outline button', 'transparent, 1.5px ink ring', 'ink fill, bg text', 'ink fill', ring, 'Disabled: 70% opacity'),
+      st('Google button', 'g-bg fill, g-line border', 'g-hover fill', 'g-hover fill', ring, 'Loading: spinner + "Waiting for Google…", 70% · Error: alert above'),
+      st('Text button', 'ink, underlined', 'muted', 'muted', ring, 'Disabled: muted, 60%, no underline'),
+      st('Icon button', 'transparent', 'surface-2 fill', 'line fill', ring, 'Disabled (first Move up, last Move down): 40%'),
+      st('Tabs', 'muted text', 'ink text', 'ink text', ring, 'Selected: surface fill, 1px line ring, ink text'),
+      st('Field', 'surface-2, transparent border, muted label', '–', '–', 'surface fill, 1px accent border + 1px ring, ink label', 'Error: 1px error border, error label, "!" message below, aria-invalid'),
+      st('Slug field', 'helper "Lowercase letters…"', '–', '–', 'as field', 'Checking spinner · Available ✓ · Taken / Invalid / Reserved as field error · Info alert when changing a published link'),
+      st('Photo', 'initials or photo', '–', '–', 'on its buttons', 'Uploading: overlay spinner, buttons disabled, "Uploading…" · Error: message replaces helper'),
+      st('Save status', 'check + "Saved"', '–', '–', 'Retry: ' + ring, 'Saving: spinner · Error: red "Couldn\'t save." + Retry'),
+      st('Share card', 'outline sm, share icon', 'ink fill, bg text', 'ink fill', ring, 'Hidden until the first publish. Opens the share sheet titled "Share your card"'),
+      st('Address lock button', '44 icon button, lock icon', 'surface-2', 'line', ring, 'Unlocked: check icon on accent fill; disabled at 40% until the address is available'),
+      st('Collapse toggles', 'title + chevron', 'chevron ink', '–', ring, 'Collapsed: chevron −90°, section body hidden (below 900 only)'),
+      st('Menu item', 'transparent', 'surface-2', 'surface-2', 'surface-2 fill + ' + ring, '–')
+    ];
+    const a11y = [
+      'Every control is at least 44 px tall; focus is always visible (3px outline, or the field ring).',
+      'Every input has a visible label inside its box. Errors and counters are linked with aria-describedby and the field gets aria-invalid.',
+      'Save status, slug status, copy and general announcements use polite live regions; publish blocked and upload errors use role="alert".',
+      'Dialogs have role="dialog" (session: alertdialog), aria-modal, a title, trapped Tab focus, Escape to close (not for session), and focus returns to the opener.',
+      'Tabs use role="tablist" / "tab" / "tabpanel" with arrow keys. The account menu uses aria-haspopup, aria-expanded and Escape.',
+      'Reorder buttons are labelled with the service name ("Move System audit up"); moves are announced.',
+      'The crop stage is focusable and moves with arrow keys; the zoom slider is a labelled range.',
+      'Reduced motion turns off every animation and transition.'
+    ];
+    return { groups, colors, type, spacing, sizes, rules, motion, states, a11y };
+  }
+}
+</script>
+</body>
+</html>
