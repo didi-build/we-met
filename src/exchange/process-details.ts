@@ -1,3 +1,4 @@
+import { resolveLeadSinksForDispatch } from "@/card-data/account-email";
 import type { CardRecord, LeadSinkRecord } from "@/card-data/types";
 import {
   dispatchDetailsAppend,
@@ -82,7 +83,7 @@ export async function processDetails(
   };
 
   await dispatchDetailsAppend(
-    sinks,
+    resolveLeadSinksForDispatch(sinks, card.email),
     lead,
     details,
     card.id,

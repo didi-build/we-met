@@ -4,7 +4,11 @@ import {
   clearLeadSinkKindsForTests,
   registerLeadSinkKind,
 } from "@/card-data/lead-sink-registry";
-import { buildCardsLoadSql, newCardIdsForLoad } from "@/card-data/load-sql";
+import {
+  buildCardsLoadSql,
+  newAccountIdsForLoad,
+  newCardIdsForLoad,
+} from "@/card-data/load-sql";
 import { MemoryCardRepository } from "@/card-data/memory-repository";
 import type { CardRepository } from "@/card-data/repository";
 import { splitSqlStatements } from "@/card-data/sql-statements";
@@ -30,6 +34,10 @@ async function resetD1Tables(db: D1Database) {
   await db.prepare("DELETE FROM lead_sinks").run();
   await db.prepare("DELETE FROM hostnames").run();
   await db.prepare("DELETE FROM cards").run();
+  await db.prepare("DELETE FROM card_drafts").run();
+  await db.prepare("DELETE FROM sessions").run();
+  await db.prepare("DELETE FROM oauth_attempts").run();
+  await db.prepare("DELETE FROM accounts").run();
 }
 
 function defineContract(
@@ -123,6 +131,7 @@ describe("load SQL hostname mapping (d1 integration)", () => {
       const sql = buildCardsLoadSql(loadFile, {
         updatedAt: "2026-10-11T12:00:00.000Z",
         newCardIds: newCardIdsForLoad(loadFile),
+        accountIds: newAccountIdsForLoad(loadFile),
       });
       for (const statement of splitSqlStatements(sql)) {
         await db.prepare(statement).run();

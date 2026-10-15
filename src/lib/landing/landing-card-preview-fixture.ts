@@ -5,6 +5,8 @@ export const LANDING_CARD_PREVIEW_PHOTO_URL = "/landing-preview/didi.png";
 
 export const LANDING_CARD_PREVIEW_FIXTURE: CardRecord = {
   id: "landing-preview",
+  accountId: "landing-preview-account",
+  status: "live",
   slug: "landing-preview",
   variant: "mono",
   displayName: "Didi Shoukralla",
@@ -75,7 +77,6 @@ export const LANDING_CARD_PREVIEW_FIXTURE: CardRecord = {
     },
     org: "Didi Build",
     title: "Software Engineer and Technical Advisor",
-    email: "didi@didi.build",
     phone: "+1-416-555-0100",
     vcardNote: "Met via We Met",
     urls: [{ url: "https://didi.build", type: "Portfolio" }],

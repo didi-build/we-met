@@ -10,21 +10,23 @@ describe("escapeVCardValue", () => {
 
 describe("buildVCard", () => {
   const contact = exampleCardInput().contact;
+  const ownerEmail = exampleCardInput().email;
 
   it("uses CRLF line endings and required fields", () => {
-    const vcard = buildVCard(contact);
+    const vcard = buildVCard(contact, { ownerEmail });
 
     expect(vcard).toContain("\r\n");
     expect(vcard.startsWith("BEGIN:VCARD\r\n")).toBe(true);
     expect(vcard.endsWith("END:VCARD\r\n")).toBe(true);
     expect(vcard).toContain(`FN:${contact.name.full}`);
-    expect(vcard).toContain(`EMAIL;TYPE=INTERNET,WORK:${contact.email}`);
+    expect(vcard).toContain(`EMAIL;TYPE=INTERNET,WORK:${ownerEmail}`);
     expect(vcard).toContain(`NOTE:${contact.vcardNote.replace(/;/g, "\\;")}`);
     expect(vcard).not.toContain("PHOTO;");
   });
 
   it("includes photo when provided", () => {
     const vcard = buildVCard(contact, {
+      ownerEmail,
       photo: { base64: "aGVsbG8=" },
     });
     expect(vcard).toContain("PHOTO;ENCODING=b;TYPE=JPEG:aGVsbG8=");

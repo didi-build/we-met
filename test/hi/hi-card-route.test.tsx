@@ -25,7 +25,9 @@ function legacyDidiRow(variant: string) {
     slug: "didi",
     variant,
     display_name: "Didi Shoukralla",
-    email: "didi@didi.build",
+    account_id: "legacy-account",
+    status: "live",
+    owner_email: "didi@didi.build",
     photo_key: "didi",
     links_json: JSON.stringify({
       bookingUrl: "",

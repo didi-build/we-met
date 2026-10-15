@@ -1,3 +1,4 @@
+import { ACCOUNT_EMAIL_SENTINEL } from "@/card-data/account-email";
 import { registerLeadSinkKind } from "@/card-data/lead-sink-registry";
 
 const PLAIN_EMAIL_FORBIDDEN = /[\s,;<>"\\()\u0000-\u001f\u007f]/;
@@ -44,13 +45,10 @@ function parseEmailLeadSinkConfig(raw: unknown): EmailLeadSinkConfig {
   if (!to) {
     throw new Error('email sink config "to" must not be empty');
   }
-  if (to.length > 254) {
-    throw new Error('email sink config "to" exceeds max length 254');
+  if (to === ACCOUNT_EMAIL_SENTINEL) {
+    return { to: ACCOUNT_EMAIL_SENTINEL };
   }
-  if (!isPlainSingleEmailAddress(to)) {
-    throw new Error('email sink config "to" must be a single email address');
-  }
-  return { to };
+  throw new Error('email sink config "to" must be account_email in v1');
 }
 
 export function registerEmailLeadSinkKind(): void {

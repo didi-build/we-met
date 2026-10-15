@@ -35,6 +35,7 @@ export async function GET(_request: Request, context: RouteContext) {
   }
 
   const body = buildVCard(card.contact, {
+    ownerEmail: card.email,
     photo: photoBase64 ? { base64: photoBase64 } : null,
   });
 

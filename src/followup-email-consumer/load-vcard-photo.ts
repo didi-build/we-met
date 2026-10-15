@@ -21,6 +21,7 @@ export function vcardAttachmentFilename(contact: CardContact): string {
 
 export async function buildOwnerVCardAttachment(
   contact: CardContact,
+  ownerEmail: string,
   photoKey: string | null,
   assets: ReadOnlyR2Assets,
   log: { logMissingPhoto(key: string): void; logNonJpegPhoto(key: string): void },
@@ -37,7 +38,7 @@ export async function buildOwnerVCardAttachment(
     }
   }
 
-  const vcardBody = buildVCard(contact, { photo });
+  const vcardBody = buildVCard(contact, { ownerEmail: ownerEmail, photo });
   return {
     vcardBody,
     filename: vcardAttachmentFilename(contact),

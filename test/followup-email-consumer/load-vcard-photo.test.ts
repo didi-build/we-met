@@ -6,7 +6,6 @@ const contact: CardContact = {
   name: { full: "Demo User", family: "User", given: "Demo", nickname: "Demo" },
   org: "Co",
   title: "Role",
-  email: "owner@example.com",
   phone: "+1",
   vcardNote: "note",
   urls: [],
@@ -25,11 +24,13 @@ describe("buildOwnerVCardAttachment (unit)", () => {
     }));
     const result = await buildOwnerVCardAttachment(
       contact,
+      "owner@example.com",
       "photos/demo.jpg",
       { get },
       { logMissingPhoto: vi.fn(), logNonJpegPhoto: vi.fn() },
     );
     expect(result.vcardBody).toContain("PHOTO;ENCODING=b;TYPE=JPEG:");
+    expect(result.vcardBody).toContain("owner@example.com");
     expect(get).toHaveBeenCalledWith("photos/demo.jpg");
   });
 
@@ -37,6 +38,7 @@ describe("buildOwnerVCardAttachment (unit)", () => {
     const get = vi.fn();
     const result = await buildOwnerVCardAttachment(
       contact,
+      "owner@example.com",
       null,
       { get },
       { logMissingPhoto: vi.fn(), logNonJpegPhoto: vi.fn() },
@@ -53,6 +55,7 @@ describe("buildOwnerVCardAttachment (unit)", () => {
     }));
     const result = await buildOwnerVCardAttachment(
       contact,
+      "owner@example.com",
       "photos/demo.png",
       { get },
       { logMissingPhoto: vi.fn(), logNonJpegPhoto },

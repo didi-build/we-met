@@ -1,6 +1,7 @@
 import type { WeMetHostConfig } from "@/config/we-met";
 import { isCardServingHost } from "@/config/we-met";
 import { isReservedHostname } from "@/card-data/reserved";
+import { isVisitorVisibleCard } from "@/card-data/live-card";
 import type { CardRepository } from "@/card-data/repository";
 import { isValidSlug } from "@/card-data/slug";
 import type { CardRecord } from "@/card-data/types";
@@ -33,7 +34,7 @@ export async function lookupCard(
 
   if (!isReservedHostname(hostname)) {
     const byHost = await repo.getByHostname(hostname);
-    if (byHost) {
+    if (byHost && (await isVisitorVisibleCard(repo, byHost))) {
       return byHost;
     }
   }
@@ -47,5 +48,9 @@ export async function lookupCard(
     return null;
   }
 
-  return repo.getBySlug(slug);
+  const card = await repo.getBySlug(slug);
+  if (!card || !(await isVisitorVisibleCard(repo, card))) {
+    return null;
+  }
+  return card;
 }

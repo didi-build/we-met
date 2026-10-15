@@ -105,6 +105,12 @@ function normalizeAlternateFromLegacy(
   return undefined;
 }
 
+function contactFromStored(raw: CardContact & { email?: string }): CardContact {
+  const { email: _ignoredLegacyEmail, ...contact } = raw;
+  void _ignoredLegacyEmail;
+  return contact;
+}
+
 export function cardLoadInputToPersisted(input: CardLoadInput): {
   pageCopy: CardPageCopyStored;
   links: CardLinksStored;
@@ -123,7 +129,7 @@ export function cardLoadInputToPersisted(input: CardLoadInput): {
       alternate: content.alternate,
     },
     links: { bookingUrl: bookingLinks.bookingUrl },
-    contact,
+    contact: contactFromStored(contact as CardContact & { email?: string }),
     copy,
   };
 }
@@ -134,7 +140,9 @@ export function cardRowToRecord(
     slug: string;
     variant: string;
     display_name: string;
-    email: string;
+    account_id: string;
+    status: string;
+    owner_email: string;
     photo_key: string | null;
     links_json: string;
     page_copy_json: string;
@@ -148,7 +156,9 @@ export function cardRowToRecord(
   const linksStored = parseJson<
     CardLinksStored & { items?: { type: string; url: string }[]; fallbackUrl?: string }
   >("links", row.links_json);
-  const contact = parseJson<CardContact>("contact", row.contact_json);
+  const contact = contactFromStored(
+    parseJson<CardContact & { email?: string }>("contact", row.contact_json),
+  );
   const copy = parseJson<CardCopy>("copy", row.copy_json);
 
   const about = normalizeAboutFromLegacy(pageStored);
@@ -156,12 +166,19 @@ export function cardRowToRecord(
   const links = normalizeLinksFromLegacy(pageStored, linksStored);
   const alternate = normalizeAlternateFromLegacy(pageStored, linksStored);
 
+  const status = row.status;
+  if (status !== "live" && status !== "suspended" && status !== "retired") {
+    throw new Error(`Invalid card status in database: ${status}`);
+  }
+
   return {
     id: row.id,
+    accountId: row.account_id,
+    status,
     slug: row.slug,
     variant: normalizeBrandVariant(row.variant),
     displayName: row.display_name,
-    email: row.email,
+    email: row.owner_email,
     photoKey: row.photo_key,
     name: pageStored.name ?? row.display_name,
     role: pageStored.role,
@@ -187,7 +204,7 @@ export function cardLoadInputFromPersisted(
   slug: string,
   variant: BrandVariant,
   displayName: string,
-  email: string,
+  ownerEmail: string,
   photoKey: string | null,
   pageStored: CardPageCopyStored,
   linksStored: CardLinksStored,
@@ -203,7 +220,7 @@ export function cardLoadInputFromPersisted(
     slug,
     variant,
     displayName,
-    email,
+    email: ownerEmail,
     photoKey,
     name: pageStored.name,
     role: pageStored.role,

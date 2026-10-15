@@ -20,6 +20,13 @@ export type BuildWranglerArgsInput =
   | {
       kind: "read-back";
       configRel: string | null;
+    }
+  | {
+      kind: "execute-command";
+      configRel: string;
+      remote: boolean;
+      command: string;
+      json?: boolean;
     };
 
 /**
@@ -40,6 +47,22 @@ export function buildWranglerArgs(input: BuildWranglerArgsInput): string[] {
       wranglerTarget,
       "--file",
       input.sqlRel,
+    ];
+  }
+
+  if (input.kind === "execute-command") {
+    const wranglerTarget = input.remote ? "--remote" : "--local";
+    const jsonFlag = input.json ? ["--json"] : [];
+    return [
+      wranglerEntry,
+      ...configFlag,
+      "d1",
+      "execute",
+      "WE_MET_DB",
+      wranglerTarget,
+      "--command",
+      input.command,
+      ...jsonFlag,
     ];
   }
 

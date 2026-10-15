@@ -1,17 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { buildCardEmailSnapshot } from "@/exchange/card-snapshot";
 import { parseVisitorFollowupMessage } from "@/followup-email-consumer/validate";
-import { exampleCardInput } from "../helpers/example-card";
+import { exampleCardRecord } from "../helpers/example-card";
 import type { CardRecord } from "@/card-data/types";
 
 function cardRecord(overrides: Partial<CardRecord> = {}): CardRecord {
-  const input = exampleCardInput();
-  return {
-    id: "test-id",
-    updatedAt: "2026-01-01T00:00:00.000Z",
-    ...input,
-    ...overrides,
-  };
+  return exampleCardRecord(overrides);
 }
 
 describe("card email snapshot (unit)", () => {

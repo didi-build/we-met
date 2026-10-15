@@ -1,3 +1,4 @@
+import { resolveLeadSinksForDispatch } from "@/card-data/account-email";
 import type { CardRecord, LeadSinkRecord } from "@/card-data/types";
 import { buildCardEmailSnapshot } from "@/exchange/card-snapshot";
 import {
@@ -95,7 +96,7 @@ export async function processExchange(
 
   const sourceUrl = absoluteUrl(deps.baseUrl, `/hi/${card.slug}`);
   await dispatchLeadOnExchange(
-    sinks,
+    resolveLeadSinksForDispatch(sinks, card.email),
     lead,
     card.id,
     card.slug,

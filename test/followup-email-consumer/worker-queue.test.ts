@@ -27,7 +27,6 @@ const card: CardEmailSnapshot = {
     name: { full: "Demo User", family: "User", given: "Demo", nickname: "Demo" },
     org: "Co",
     title: "Role",
-    email: "owner@example.com",
     phone: "+1",
     vcardNote: "note",
     urls: [],

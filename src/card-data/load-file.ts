@@ -343,12 +343,8 @@ function parseContact(raw: unknown): CardLoadInput["contact"] {
   }
   assertAllowedKeys(
     raw,
-    ["name", "org", "title", "email", "phone", "vcardNote", "urls"],
+    ["name", "org", "title", "phone", "vcardNote", "urls"],
     "contact",
-  );
-  const email = requireEmail(
-    requireNonWhitespaceString(raw.email, "contact.email", LIMITS.contactEmail),
-    "contact.email",
   );
   if (!Array.isArray(raw.urls)) {
     throw new Error("contact.urls must be an array");
@@ -360,7 +356,6 @@ function parseContact(raw: unknown): CardLoadInput["contact"] {
     name: parseContactName(raw.name),
     org: requireNonWhitespaceString(raw.org, "contact.org", LIMITS.contactField),
     title: requireNonWhitespaceString(raw.title, "contact.title", LIMITS.contactField),
-    email,
     phone: requireNonWhitespaceString(raw.phone, "contact.phone", LIMITS.contactPhone),
     vcardNote: requireNonWhitespaceString(
       raw.vcardNote,
@@ -762,9 +757,6 @@ export function validateNonProdEmailSinkDestinations(
     return;
   }
   const expected = testMailTo.trim();
-  if (!expected) {
-    throw new Error("WE_MET_TEST_MAIL_TO must be set for non-prod remote load");
-  }
   for (const card of loadFile.cards) {
     if (!card.leadSinks) {
       continue;
@@ -774,9 +766,16 @@ export function validateNonProdEmailSinkDestinations(
         continue;
       }
       const config = sink.config as { to?: string };
-      if (config.to?.trim() !== expected) {
+      const to = config.to?.trim();
+      if (to === "account_email") {
+        continue;
+      }
+      if (!expected) {
+        throw new Error("WE_MET_TEST_MAIL_TO must be set for non-prod remote load");
+      }
+      if (to !== expected) {
         throw new Error(
-          `Non-prod load: email sink "${sink.id}" on card "${card.slug}" must use WE_MET_TEST_MAIL_TO as config.to`,
+          `Non-prod load: email sink "${sink.id}" on card "${card.slug}" must use account_email or WE_MET_TEST_MAIL_TO as config.to`,
         );
       }
     }

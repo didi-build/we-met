@@ -27,8 +27,9 @@ async function runStatements(db: D1Database, statements: string[]): Promise<void
  * **UNVERIFIED:** Wrangler `getPlatformProxy({ persist: { path } })` is the documented Miniflare
  * persist option; confirm against current Wrangler release notes if local test behavior changes.
  */
-export async function withIsolatedLocalD1<T>(
+async function withIsolatedD1Proxy<T>(
   fn: (db: D1Database) => Promise<T>,
+  prepare?: (db: D1Database) => Promise<void>,
 ): Promise<T> {
   const persistDir = mkdtempSync(resolve(tmpdir(), "we-met-d1-test-"));
   const { getPlatformProxy } = await import("wrangler");
@@ -41,12 +42,28 @@ export async function withIsolatedLocalD1<T>(
     if (!db) {
       throw new Error("WE_MET_DB is not configured for local tests");
     }
-    await runStatements(db, migrationStatements());
+    if (prepare) {
+      await prepare(db);
+    }
     return await fn(db);
   } finally {
     await proxy.dispose?.();
     rmSync(persistDir, { recursive: true, force: true });
   }
+}
+
+export async function withIsolatedLocalD1<T>(
+  fn: (db: D1Database) => Promise<T>,
+): Promise<T> {
+  return withIsolatedD1Proxy(fn, async (db) => {
+    await runStatements(db, migrationStatements());
+  });
+}
+
+export async function withEmptyIsolatedLocalD1<T>(
+  fn: (db: D1Database) => Promise<T>,
+): Promise<T> {
+  return withIsolatedD1Proxy(fn);
 }
 
 /** @deprecated Use withIsolatedLocalD1 — avoids sharing the maintainer's default local D1. */

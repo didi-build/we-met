@@ -65,7 +65,6 @@
         },
         "org": "Didi Build",
         "title": "Software Engineer and Technical Advisor",
-        "email": "didi@didi.build",
         "phone": "+1-416-555-0100",
         "vcardNote": "Met via We Met",
         "urls": [
@@ -111,7 +110,15 @@
             "emailInvalid": "That email doesn't look quite right. Check for a typo?"
           }
         }
-      }
+      },
+      "leadSinks": [
+        {
+          "id": "didi-owner-inbox",
+          "kind": "email",
+          "enabled": true,
+          "config": { "to": "account_email" }
+        }
+      ]
     }
   ],
   "hostnames": []
