@@ -224,9 +224,9 @@ describe("parseCardsLoadFile validation (unit)", () => {
     });
   }
 
-  it("rejects leadSinks in step 1", () => {
+  it("rejects leadSinks at the file root", () => {
     const raw = cloneLoadFile();
     raw.leadSinks = [];
-    expect(() => parseCardsLoadFile(raw)).toThrow(/step 1/);
+    expect(() => parseCardsLoadFile(raw)).toThrow(/each card object/);
   });
 });

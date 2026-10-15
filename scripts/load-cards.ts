@@ -15,7 +15,11 @@ import { resolve } from "node:path";
 import { execPath, stdin as input, stdout as output } from "node:process";
 import { buildWranglerArgs } from "./lib/build-wrangler-args.ts";
 import { buildCardsLoadSql, newCardIdsForLoad } from "../src/card-data/load-sql.ts";
-import { parseCardsLoadFile } from "../src/card-data/load-file.ts";
+import {
+  parseCardsLoadFile,
+  validateNonProdEmailSinkDestinations,
+} from "../src/card-data/load-file.ts";
+import { registerBuiltInLeadSinkKinds } from "../src/card-data/register-lead-sink-kinds.ts";
 
 const D1_CI_CONFIG_REL = "wrangler.d1-nonprod.ci.jsonc";
 const PRODUCTION_CI_CONFIG_REL = "wrangler.load-production.ci.jsonc";
@@ -58,6 +62,7 @@ if (production && mode !== "remote") {
 }
 
 async function main(): Promise<void> {
+  registerBuiltInLeadSinkKinds();
   let raw: string;
   try {
     raw = readFileSync(resolve(filePath), "utf8");
@@ -90,6 +95,16 @@ async function main(): Promise<void> {
       console.error(
         "WE_MET_D1_DATABASE_ID_NONPROD is required for non-prod remote load.",
       );
+      process.exitCode = 1;
+      return;
+    }
+    try {
+      validateNonProdEmailSinkDestinations(
+        loadFile,
+        process.env.WE_MET_TEST_MAIL_TO ?? "",
+      );
+    } catch (error) {
+      console.error(String(error));
       process.exitCode = 1;
       return;
     }

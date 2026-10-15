@@ -34,8 +34,9 @@ export class MemoryLeadDeliveryLedger implements LeadDeliveryLedger {
     sinkId: string,
     phase: LeadDeliveryPhase,
     errorCode: string,
-    _updatedAt: string,
+    updatedAt: string,
   ): Promise<void> {
+    void updatedAt;
     const row = this.rows.find(
       (r) => r.leadId === leadId && r.sinkId === sinkId && r.phase === phase,
     );

@@ -234,7 +234,9 @@ function checkConsumerPublicUrlSettings(config) {
     fail("consumer workers_dev must be false (no public workers.dev route)");
   }
   if (config.preview_urls !== false) {
-    fail("consumer preview_urls must be false (no Version URLs on follow-up consumers)");
+    fail(
+      "consumer preview_urls must be false (no Version URLs on follow-up consumers)",
+    );
   }
 }
 

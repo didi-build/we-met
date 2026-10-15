@@ -12,10 +12,11 @@ describe("lead delivery ledger D1 (integration)", () => {
         cardId: "card-1",
         sinkId: "sink-1",
         sinkKind: "email",
+        phase: "append" as const,
         retryUntil: "2026-10-13T12:00:00.000Z",
         createdAt: "2026-10-12T12:00:00.000Z",
       };
-      await ledger.insertQueuedRow({ ...base, phase: "append" });
+      await ledger.insertQueuedRow(base);
       const second = await ledger.insertAppendIfAbsent({
         ...base,
         id: "row-2",

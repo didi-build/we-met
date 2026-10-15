@@ -9,6 +9,7 @@ import {
   type CardsRow,
   type LeadSinksRow,
 } from "@/card-data/row-mapper";
+import { registerBuiltInLeadSinkKinds } from "@/card-data/register-lead-sink-kinds";
 import type {
   CardLoadInput,
   CardRecord,
@@ -25,7 +26,9 @@ function newId(): string {
 }
 
 export class D1CardRepository implements CardRepository {
-  constructor(private readonly db: D1Database) {}
+  constructor(private readonly db: D1Database) {
+    registerBuiltInLeadSinkKinds();
+  }
 
   async getBySlug(slug: string): Promise<CardRecord | null> {
     const row = await this.db

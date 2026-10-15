@@ -1,4 +1,9 @@
-import type { CardsLoadFile, CardLoadInput } from "@/card-data/types";
+import { serializeLeadSinkConfig } from "@/card-data/lead-sink-registry";
+import type {
+  CardsLoadFile,
+  CardLoadInput,
+  LeadSinkLoadInput,
+} from "@/card-data/types";
 
 const CONTROL_OR_NUL = /[\u0000-\u001F\u007F]/;
 
@@ -49,7 +54,64 @@ export function buildCardsLoadSql(
     statements.push(buildHostnameUpsertStatement(mapping));
   }
 
+  for (const card of loadFile.cards) {
+    if (card.leadSinks !== undefined) {
+      statements.push(...buildLeadSinkStatements(card, options.updatedAt));
+    }
+  }
+
   return `${statements.join(";\n")};\n`;
+}
+
+function buildLeadSinkStatements(card: CardLoadInput, updatedAt: string): string[] {
+  const sinks = card.leadSinks ?? [];
+  const slugLiteral = escapeSqlStringLiteral(card.slug);
+  const statements: string[] = [];
+
+  for (const sink of sinks) {
+    statements.push(buildLeadSinkUpsertStatement(card.slug, sink, updatedAt));
+  }
+
+  if (sinks.length === 0) {
+    statements.push(
+      `DELETE FROM lead_sinks WHERE card_id = (SELECT id FROM cards WHERE slug = ${slugLiteral})`,
+    );
+  } else {
+    const idLiterals = sinks.map((s) => escapeSqlStringLiteral(s.id)).join(", ");
+    statements.push(
+      `DELETE FROM lead_sinks WHERE card_id = (SELECT id FROM cards WHERE slug = ${slugLiteral}) AND id NOT IN (${idLiterals})`,
+    );
+  }
+
+  return statements;
+}
+
+function buildLeadSinkUpsertStatement(
+  slug: string,
+  sink: LeadSinkLoadInput,
+  updatedAt: string,
+): string {
+  const configJson = escapeSqlStringLiteral(
+    serializeLeadSinkConfig(sink.kind, sink.config),
+  );
+  const enabled = sink.enabled ? 1 : 0;
+  const slugLiteral = escapeSqlStringLiteral(slug);
+  return `INSERT INTO lead_sinks (id, card_id, kind, config_json, enabled, created_at, updated_at)
+SELECT
+  ${escapeSqlStringLiteral(sink.id)},
+  c.id,
+  ${escapeSqlStringLiteral(sink.kind)},
+  ${configJson},
+  ${enabled},
+  ${escapeSqlStringLiteral(updatedAt)},
+  ${escapeSqlStringLiteral(updatedAt)}
+FROM cards c WHERE c.slug = ${slugLiteral}
+ON CONFLICT(id) DO UPDATE SET
+  card_id = excluded.card_id,
+  kind = excluded.kind,
+  config_json = excluded.config_json,
+  enabled = excluded.enabled,
+  updated_at = excluded.updated_at`;
 }
 
 function buildCardUpsertStatement(

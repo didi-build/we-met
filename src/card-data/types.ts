@@ -137,6 +137,13 @@ export type LeadSinkRecord = {
   updatedAt: string;
 };
 
+export type LeadSinkLoadInput = {
+  id: string;
+  kind: string;
+  enabled: boolean;
+  config: unknown;
+};
+
 export type CardLoadInput = {
   slug: string;
   variant: BrandVariant;
@@ -147,6 +154,8 @@ export type CardLoadInput = {
   pageCopy: CardPageCopy;
   contact: CardContact;
   copy: CardCopy;
+  /** When omitted, load script leaves existing sink rows unchanged for this card. */
+  leadSinks?: LeadSinkLoadInput[];
 };
 
 export type HostnameMapping = {

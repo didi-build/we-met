@@ -110,10 +110,18 @@ describe("lead delivery dispatch (unit)", () => {
 
   it("skips enqueue when ledger insert fails and logs ledger_write_failed", async () => {
     const ledger = new MemoryLeadDeliveryLedger();
-    const insert = vi.spyOn(ledger, "insertQueuedRow").mockRejectedValue(new Error("db"));
+    const insert = vi
+      .spyOn(ledger, "insertQueuedRow")
+      .mockRejectedValue(new Error("db"));
     const deps = createDispatchDeps({ ledger });
 
-    await dispatchLeadOnExchange([sink("sink-a", "a@example.com")], lead, "card-1", "demo", deps);
+    await dispatchLeadOnExchange(
+      [sink("sink-a", "a@example.com")],
+      lead,
+      "card-1",
+      "demo",
+      deps,
+    );
 
     expect(deps.sinkMessages).toHaveLength(0);
     expect(deps.deliveryLogger.logLedgerWriteFailed).toHaveBeenCalledWith(
@@ -127,7 +135,13 @@ describe("lead delivery dispatch (unit)", () => {
   it("marks ledger failed when enqueue fails after insert", async () => {
     const deps = createDispatchDeps({ failingSinkIds: new Set(["sink-a"]) });
 
-    await dispatchLeadOnExchange([sink("sink-a", "a@example.com")], lead, "card-1", "demo", deps);
+    await dispatchLeadOnExchange(
+      [sink("sink-a", "a@example.com")],
+      lead,
+      "card-1",
+      "demo",
+      deps,
+    );
 
     expect(deps.sinkMessages).toHaveLength(0);
     expect(deps.deliveryLogger.logLedgerEnqueueFailed).toHaveBeenCalledWith(
