@@ -3,6 +3,10 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { LandingPhonePreview } from "@/components/landing/LandingPhonePreview";
+import {
+  LANDING_PHONE_AVATAR_TOP_INSET_PX,
+  LANDING_PHONE_AVATAR_TOP_INSET_SCALED_PX,
+} from "@/lib/landing/landing-phone-layout";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -47,6 +51,20 @@ afterEach(() => {
 });
 
 describe("LandingPhonePreview (unit)", () => {
+  it("uses design pro top margin so the avatar clears the phone screen (L3/L4)", () => {
+    const { container } = render(
+      <ThemeProvider>
+        <LandingPhonePreview />
+      </ThemeProvider>,
+    );
+    const cardSection = container.querySelector(
+      "section.relative.w-full.rounded-\\[24px\\]",
+    );
+    expect(cardSection?.className).toMatch(/mt-\[84px\]/);
+    expect(LANDING_PHONE_AVATAR_TOP_INSET_PX).toBeGreaterThan(0);
+    expect(LANDING_PHONE_AVATAR_TOP_INSET_SCALED_PX).toBeCloseTo(24.6176, 3);
+  });
+
   it("renders live card presentation without iframe and is aria-hidden", () => {
     const { container } = render(
       <ThemeProvider>

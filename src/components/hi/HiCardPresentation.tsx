@@ -24,9 +24,11 @@ export type HiCardPresentationProps = {
   card: CardRecord;
   photoUrl: string | null;
   plan?: CardPlan;
-  /** Marketing embed: no exchange, links, or theme toggle; follows page theme. */
+  /** No exchange flow (button inert; sheet/sticky live outside this component). */
   preview?: boolean;
-  /** Fixed-height slot (landing phone). */
+  /** Chips and About “Show more”; when false, links render as non-navigating spans. */
+  interactive?: boolean;
+  /** Fixed-height slot (landing phone); uses design 390px top card margin. */
   embedded?: boolean;
   exchangeButtonRef?: Ref<HTMLButtonElement>;
   ctaRef?: Ref<HTMLDivElement>;
@@ -51,6 +53,7 @@ export function HiCardPresentation({
   photoUrl,
   plan = "free",
   preview = false,
+  interactive = true,
   embedded = false,
   exchangeButtonRef,
   ctaRef,
@@ -62,7 +65,7 @@ export function HiCardPresentation({
   const initials = cardInitials(card.name);
   const greeting = cardGreeting(card.name);
   const [photoBroken, setPhotoBroken] = useState(false);
-  const showPhoto = Boolean(photoUrl) && !photoBroken && (preview || flags.hasPhoto);
+  const showPhoto = flags.hasPhoto && Boolean(photoUrl) && !photoBroken;
 
   useEffect(() => {
     setPhotoBroken(false);
@@ -73,9 +76,10 @@ export function HiCardPresentation({
     explanation: s.description,
   }));
   const linkEntries = cardLinkEntries(card.links);
-  const showBanner = !preview && plan === "free";
+  const showBanner = plan === "free";
 
-  const cardTopMargin = showBanner ? "mt-[84px]" : "mt-[clamp(16px,5svh,48px)]";
+  const cardTopMargin =
+    embedded || showBanner ? "mt-[84px]" : "mt-[clamp(16px,5svh,48px)]";
   const rootClass = embedded
     ? "hi-card-page relative isolate h-[845px] overflow-hidden bg-bg text-ink [container-type:inline-size]"
     : "hi-card-page relative isolate min-h-svh overflow-hidden bg-bg text-ink [container-type:inline-size]";
@@ -163,7 +167,7 @@ export function HiCardPresentation({
                 </div>
                 {flags.hasAlternate &&
                   card.alternate &&
-                  (preview ? (
+                  (!interactive ? (
                     <span className="hi-link-alternate inline-flex min-h-11 items-center self-center px-2 text-[15px] font-medium">
                       {card.alternate.label}
                     </span>
@@ -195,7 +199,7 @@ export function HiCardPresentation({
                 <HiCardAbout
                   title={card.about.title}
                   paragraphs={card.about.paragraphs}
-                  interactive={!preview}
+                  interactive={interactive}
                 />
               </div>
             )}
@@ -207,7 +211,7 @@ export function HiCardPresentation({
                 <h3 className="m-0 text-[22px] font-semibold leading-[1.15] tracking-[-0.02em]">
                   {card.services.title}
                 </h3>
-                <HiWhatIDoChips chips={chips} interactive={!preview} />
+                <HiWhatIDoChips chips={chips} interactive={interactive} />
               </div>
             )}
 
@@ -218,7 +222,7 @@ export function HiCardPresentation({
                 <ul className="m-0 flex list-none flex-wrap justify-end gap-2 p-0">
                   {linkEntries.map((link) => (
                     <li key={`${link.type}-${link.url}`}>
-                      {preview ? (
+                      {!interactive ? (
                         <span
                           aria-label={link.label}
                           title={link.label}
@@ -250,7 +254,7 @@ export function HiCardPresentation({
           <ul className="m-0 flex list-none flex-wrap items-center justify-center gap-0.5 p-0">
             <li className="pl-2 text-[15px] font-medium text-ink-muted">Powered by</li>
             <li>
-              {preview ? (
+              {!interactive ? (
                 <span className="hi-link-attribution inline-flex min-h-11 items-center gap-2 rounded-pill px-2 text-[15px] font-medium">
                   <WeMetMarkIcon size={14} />
                   We Met
@@ -269,7 +273,7 @@ export function HiCardPresentation({
             </li>
             <li aria-hidden className="h-[3px] w-[3px] rounded-full bg-line-strong" />
             <li>
-              {preview ? (
+              {!interactive ? (
                 <span className="hi-link-attribution inline-flex min-h-11 items-center gap-2 rounded-pill px-2 text-[15px] font-medium">
                   <DidiBuildLeafIcon size={12} className="text-accent" />
                   Didi Build

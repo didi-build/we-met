@@ -14,6 +14,7 @@ export function LandingPhonePreview() {
             photoUrl={LANDING_CARD_PREVIEW_PHOTO_URL}
             plan="pro"
             preview
+            interactive={false}
             embedded
           />
         </div>
