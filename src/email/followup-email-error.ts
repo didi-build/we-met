@@ -8,6 +8,7 @@ export type FollowupEmailErrorCode =
   | "nonprod_mail_redirect_unset"
   | "owner_from_email_missing"
   | "malformed_sink_email_config"
+  | "invalid_rfc5322_message_id"
   | "unknown";
 
 export class FollowupEmailError extends Error {

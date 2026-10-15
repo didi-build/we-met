@@ -179,6 +179,9 @@ export function createFollowupConsumerDepsFromEnv(
         ownerFromEmail: env.WE_MET_OWNER_FROM_EMAIL,
         emailSender,
         ledger,
+        logMalformedLeadSink(leadId) {
+          console.error("lead_sink_malformed", { leadId });
+        },
         logLedgerRowMissing,
         logLedgerUpdateFailed,
         now,

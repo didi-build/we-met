@@ -161,6 +161,27 @@ describe("buildRawEmailMessage (unit)", () => {
     expect(headerValue(mime, "References")).toBe("<lead.sink.record@we-met.link>");
   });
 
+  it("omits Message-ID headers when not provided (multipart with attachment)", () => {
+    const raw = buildRawEmailMessage(baseEmail);
+    const mime = decodeRawEmailMessage(raw);
+    expect(headerValue(mime, "Message-ID")).toBeUndefined();
+    expect(headerValue(mime, "In-Reply-To")).toBeUndefined();
+    expect(headerValue(mime, "References")).toBeUndefined();
+  });
+
+  it("rejects invalid Message-ID values", () => {
+    expect(() =>
+      buildRawEmailMessage({
+        from: "hello@we-met.link",
+        to: "owner@example.com",
+        subject: "Hi",
+        textPlain: "Body",
+        textHtml: "<p>Body</p>",
+        messageId: "not-wrapped",
+      }),
+    ).toThrowError(expect.objectContaining({ code: "invalid_rfc5322_message_id" }));
+  });
+
   it("does not allow header injection via subject, display name, or filename", () => {
     const raw = buildRawEmailMessage({
       ...baseEmail,

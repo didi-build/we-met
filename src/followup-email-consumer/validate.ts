@@ -87,16 +87,6 @@ export function parseVisitorFollowupMessage(
   return { type: "visitor_followup", lead, card };
 }
 
-function parseEmailSinkConfig(value: unknown): { to: string } | null {
-  if (!isRecord(value) || !isNonEmptyString(value.to)) {
-    return null;
-  }
-  if (!isPlainSingleEmailAddress(value.to)) {
-    return null;
-  }
-  return { to: value.to };
-}
-
 function parseAppendLead(value: unknown): LeadSinkAppendLead | null {
   if (!isRecord(value)) {
     return null;
@@ -137,16 +127,15 @@ function parseDetails(value: unknown): LeadSinkAppendDetailsMessage["details"] |
 function parseLeadSinkCommon(body: Record<string, unknown>): {
   sinkId: string;
   sinkKind: string;
-  sinkConfig: { to: string };
+  sinkConfig: unknown;
   cardId: string;
   cardSlug: string;
   sourceUrl: string;
 } | null {
-  const sinkConfig = parseEmailSinkConfig(body.sinkConfig);
   if (
     !isNonEmptyString(body.sinkId) ||
     !isNonEmptyString(body.sinkKind) ||
-    !sinkConfig ||
+    !isRecord(body.sinkConfig) ||
     !isNonEmptyString(body.cardId) ||
     !isNonEmptyString(body.cardSlug) ||
     !isNonEmptyString(body.sourceUrl)
@@ -156,17 +145,16 @@ function parseLeadSinkCommon(body: Record<string, unknown>): {
   return {
     sinkId: body.sinkId,
     sinkKind: body.sinkKind,
-    sinkConfig,
+    sinkConfig: body.sinkConfig,
     cardId: body.cardId,
     cardSlug: body.cardSlug,
     sourceUrl: body.sourceUrl,
   };
 }
 
-export type ParsedLeadSinkMessage =
-  LeadSinkRecordLeadMessage | LeadSinkAppendDetailsMessage;
-
-export function parseLeadSinkMessage(body: unknown): ParsedLeadSinkMessage | null {
+export function parseLeadSinkMessage(
+  body: unknown,
+): LeadSinkRecordLeadMessage | LeadSinkAppendDetailsMessage | null {
   if (!isRecord(body)) {
     return null;
   }

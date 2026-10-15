@@ -9,16 +9,15 @@ import {
   followupEmailRetryDelaySeconds,
   MAX_VISITOR_FOLLOWUP_ATTEMPTS,
 } from "@/followup-email-consumer/retry";
-import {
-  parseLeadSinkMessage,
-  type ParsedLeadSinkMessage,
-} from "@/followup-email-consumer/validate";
+import type { ParsedLeadSinkMessage } from "@/followup-email-consumer/lead-sink/types";
+import { parseLeadSinkMessage } from "@/followup-email-consumer/validate";
 import type { FollowupQueueMessage } from "@/followup-email-consumer/process-batch";
 import { UnsupportedQueueMessageError } from "@/followup-email-consumer/unsupported-queue-message";
 
 export type LeadSinkConsumerDeps = {
   sinkHandlers: Map<string, LeadSinkHandler>;
   ledger: ConsumerLeadDeliveryLedger;
+  logUnsupportedType(typeLabel: string): void;
   logMalformedLeadSink(leadId: string | null): void;
   logLeadSinkAttemptFailure(
     leadId: string,
@@ -73,24 +72,40 @@ async function recordRetryableFailure(
     deps.now().getTime() + delaySeconds * 1000,
   ).toISOString();
 
-  await deps.ledger.recordFailedAttempt({
-    leadId: parsed.lead.leadId,
-    sinkId: parsed.sinkId,
-    phase,
-    attemptCount: message.attempts,
-    nextAttemptAt,
-    updatedAt,
-  });
-
-  if (!willRetry) {
-    deps.logLeadSinkPermanentFailure(parsed.lead.leadId, parsed.sinkId, errorFields);
-    await deps.ledger.markFailed({
+  try {
+    await deps.ledger.recordFailedAttempt({
       leadId: parsed.lead.leadId,
       sinkId: parsed.sinkId,
       phase,
-      errorCode: errorFields.code,
+      attemptCount: message.attempts,
+      nextAttemptAt,
       updatedAt,
     });
+  } catch {
+    console.error("lead_sink_ledger_record_failed", {
+      leadId: parsed.lead.leadId,
+      sinkId: parsed.sinkId,
+      errorCode: errorFields.code,
+    });
+  }
+
+  if (!willRetry) {
+    deps.logLeadSinkPermanentFailure(parsed.lead.leadId, parsed.sinkId, errorFields);
+    try {
+      await deps.ledger.markFailed({
+        leadId: parsed.lead.leadId,
+        sinkId: parsed.sinkId,
+        phase,
+        errorCode: errorFields.code,
+        updatedAt,
+      });
+    } catch {
+      console.error("lead_sink_ledger_mark_failed", {
+        leadId: parsed.lead.leadId,
+        sinkId: parsed.sinkId,
+        errorCode: errorFields.code,
+      });
+    }
     message.ack();
     return;
   }
@@ -138,6 +153,7 @@ export async function processLeadSinkQueueMessage(
 
   const handler = getLeadSinkHandler(deps.sinkHandlers, parsed.sinkKind);
   if (!handler) {
+    deps.logUnsupportedType(parsed.sinkKind);
     throw new UnsupportedQueueMessageError(parsed.sinkKind);
   }
 

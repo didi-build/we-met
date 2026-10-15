@@ -122,7 +122,8 @@ export function createConsumerLeadDeliveryLedger(
           `UPDATE lead_delivery_ledger
            SET status = 'failed',
                error_code = ?,
-               updated_at = ?
+               updated_at = ?,
+               next_attempt_at = NULL
            WHERE lead_id = ? AND sink_id = ? AND phase = ? AND status = 'queued'`,
         )
         .bind(input.errorCode, input.updatedAt, input.leadId, input.sinkId, input.phase)

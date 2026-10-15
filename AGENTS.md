@@ -17,7 +17,7 @@ Do not break these; each links to the canonical doc.
 - **No hardcoded hostnames:** use `WE_MET_BASE_URL` ([0003](docs/decisions/0003-urls-and-lookup.md)).
 - **No runtime dependency on `didi-build/web`:** [0002](docs/decisions/0002-hosting-workers-opennext.md).
 - **Non-prod builds never bind production** queue, consumer, D1, or R2: [0006](docs/decisions/0006-non-prod-safety.md), [environments](docs/architecture/environments.md).
-- **Lead delivery** uses **`lead_sinks`** rows and per-sink queue dispatch; step 1 has **no sink implementations**: [0018](docs/decisions/0018-lead-sink.md).
+- **Lead delivery** uses **`lead_sinks`** rows and per-sink queue dispatch; the follow-up consumer delivers the **`email`** sink kind (owner notification): [0018](docs/decisions/0018-lead-sink.md), [0023](docs/decisions/0023-owner-email-lead-sink-consumer.md).
 - **Production deploys** require GitHub **`production`** environment approval (merge to `main` starts the job): [0007](docs/decisions/0007-production-deploy-manual.md), [deploy](docs/runbooks/deploy.md).
 - **Email templates are fixed**; user-supplied fields are escaped plain text: [0004](docs/decisions/0004-card-data-and-branding.md).
 - **Card images** enter only through the single image ingestion function; nothing else writes to R2: [0012](docs/decisions/0012-r2-images-single-ingestion.md).

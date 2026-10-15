@@ -7,7 +7,7 @@ export type ParsedLeadSinkRecordMessage = LeadSinkRecordLeadMessage;
 export type ParsedLeadSinkAppendMessage = LeadSinkAppendDetailsMessage;
 
 export type ParsedLeadSinkMessage =
-  ParsedLeadSinkRecordMessage | ParsedLeadSinkAppendMessage;
+  LeadSinkRecordLeadMessage | LeadSinkAppendDetailsMessage;
 
 export type LeadSinkHandlerContext = {
   messageAttempts: number;

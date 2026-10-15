@@ -6,6 +6,7 @@ import {
   WE_MET_OWNER_EMAIL_DISPLAY_NAME,
 } from "@/email/format-owner-lead-email";
 import { resolveOwnerFromEmail } from "@/email/owner-from";
+import { parseEmailSinkConfig } from "@/email/parse-email-sink-config";
 import { resolveSinkEmailRecipient } from "@/email/recipient";
 import { sanitizeEmailHeaderValue } from "@/email/mime-headers";
 import type { EmailSender } from "@/email/types";
@@ -22,6 +23,7 @@ export type EmailLeadSinkHandlerDeps = {
   ownerFromEmail?: string;
   emailSender: EmailSender;
   ledger: ConsumerLeadDeliveryLedger;
+  logMalformedLeadSink(leadId: string): void;
   logLedgerRowMissing(leadId: string, sinkId: string): void;
   logLedgerUpdateFailed(leadId: string, sinkId: string, errorCode: string): void;
   now: () => Date;
@@ -46,6 +48,25 @@ export function createEmailLeadSinkHandler(
     return "proceed";
   }
 
+  async function failMalformedEmailConfig(
+    leadId: string,
+    sinkId: string,
+    phase: "record" | "append",
+  ): Promise<void> {
+    deps.logMalformedLeadSink(leadId);
+    try {
+      await deps.ledger.markFailed({
+        leadId,
+        sinkId,
+        phase,
+        errorCode: "malformed_sink_email_config",
+        updatedAt: deps.now().toISOString(),
+      });
+    } catch {
+      // Best-effort.
+    }
+  }
+
   async function afterSendMarkSent(
     leadId: string,
     sinkId: string,
@@ -54,21 +75,31 @@ export function createEmailLeadSinkHandler(
     gmailThreadId: string | null,
   ): Promise<void> {
     const sentAt = deps.now().toISOString();
-    const updated = await deps.ledger.markSent({
-      leadId,
-      sinkId,
-      phase,
-      sentAt,
-      gmailMessageId,
-      gmailThreadId,
-    });
-    if (!updated) {
+    try {
+      const updated = await deps.ledger.markSent({
+        leadId,
+        sinkId,
+        phase,
+        sentAt,
+        gmailMessageId,
+        gmailThreadId,
+      });
+      if (!updated) {
+        deps.logLedgerUpdateFailed(leadId, sinkId, "ledger_update_failed");
+      }
+    } catch {
       deps.logLedgerUpdateFailed(leadId, sinkId, "ledger_update_failed");
     }
   }
 
   return {
     async handleRecord(message: ParsedLeadSinkRecordMessage) {
+      const sinkConfig = parseEmailSinkConfig(message.sinkConfig);
+      if (!sinkConfig) {
+        await failMalformedEmailConfig(message.lead.leadId, message.sinkId, "record");
+        return;
+      }
+
       const gate = await ensureQueuedRow(message.lead.leadId, message.sinkId, "record");
       if (gate !== "proceed") {
         return;
@@ -77,7 +108,7 @@ export function createEmailLeadSinkHandler(
       const ownerFrom = resolveOwnerFromEmail(deps.ownerFromEmail);
       const recipient = resolveSinkEmailRecipient({
         weMetEnv: deps.weMetEnv,
-        sinkDestinationEmail: message.sinkConfig.to,
+        sinkDestinationEmail: sinkConfig.to,
         testMailTo: deps.testMailTo,
       });
       const nonProdLabel =
@@ -119,6 +150,12 @@ export function createEmailLeadSinkHandler(
     },
 
     async handleAppend(message: ParsedLeadSinkAppendMessage) {
+      const sinkConfig = parseEmailSinkConfig(message.sinkConfig);
+      if (!sinkConfig) {
+        await failMalformedEmailConfig(message.lead.leadId, message.sinkId, "append");
+        return;
+      }
+
       const gate = await ensureQueuedRow(message.lead.leadId, message.sinkId, "append");
       if (gate !== "proceed") {
         return;
@@ -127,7 +164,7 @@ export function createEmailLeadSinkHandler(
       const ownerFrom = resolveOwnerFromEmail(deps.ownerFromEmail);
       const recipient = resolveSinkEmailRecipient({
         weMetEnv: deps.weMetEnv,
-        sinkDestinationEmail: message.sinkConfig.to,
+        sinkDestinationEmail: sinkConfig.to,
         testMailTo: deps.testMailTo,
       });
       const nonProdLabel =

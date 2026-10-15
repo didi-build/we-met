@@ -1,7 +1,6 @@
 import type { LeadSinkRecord } from "@/card-data/types";
 import { computeLeadDeliveryRetryUntilIso } from "@/lead-delivery-ledger/retry-until";
 import type { LeadDeliveryLedger } from "@/lead-delivery-ledger/types";
-import type { EmailSinkConfigSnapshot } from "@/exchange/queue/types";
 import type { LeadSinkQueueProducer } from "@/exchange/queue/producer";
 import type {
   LeadSinkAppendLead,
@@ -70,7 +69,7 @@ export async function dispatchLeadOnExchange(
         type: "lead_sink_record",
         sinkId: sink.id,
         sinkKind: sink.kind,
-        sinkConfig: sink.config as EmailSinkConfigSnapshot,
+        sinkConfig: sink.config,
         lead,
         cardId,
         cardSlug,
@@ -148,7 +147,7 @@ export async function dispatchDetailsAppend(
         type: "lead_sink_append_details",
         sinkId: sink.id,
         sinkKind: sink.kind,
-        sinkConfig: sink.config as EmailSinkConfigSnapshot,
+        sinkConfig: sink.config,
         lead,
         details,
         cardId,
