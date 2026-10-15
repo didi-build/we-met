@@ -1,4 +1,4 @@
-export const CHIPS_OPENED_STORAGE_KEY = "didi-chips-opened";
+export const CHIPS_OPENED_STORAGE_KEY = "card-chips-opened";
 
 export type ChipPopoverPosition = {
   left: number;

@@ -1,16 +1,43 @@
+/** Values storable in D1 `cards.variant` (see migrations/0001). */
 export type BrandVariant = "green" | "mono";
 
+export type CardPlan = "free" | "pro";
+
+/** @deprecated Legacy footer kinds; not used on the v1 public card. */
 export type FooterLinkKind = "site" | "linkedin" | "github" | "portfolio" | "google";
 
-export type CardFooterLink = {
-  kind: FooterLinkKind;
-  label: string;
-  url: string;
+export type CardPublicLinkType = "website" | "linkedin" | "github" | "instagram";
+
+export type CardPublicLinksMap = {
+  website?: string;
+  linkedin?: string;
+  github?: string;
+  instagram?: string;
 };
 
-export type CardLinks = {
-  bookingUrl?: string;
-  footer: CardFooterLink[];
+export type CardAlternate = {
+  url: string;
+  label: string;
+};
+
+export type CardAbout = {
+  title: string;
+  paragraphs: string[];
+};
+
+export type CardServiceItem = {
+  title: string;
+  description: string;
+};
+
+export type CardServices = {
+  title: string;
+  items: CardServiceItem[];
+};
+
+/** Persisted booking URL for legacy rows; not used in v1 visitor email snapshot. */
+export type CardBookingLinks = {
+  bookingUrl: string;
 };
 
 export type ContactName = {
@@ -39,25 +66,6 @@ export type CardPageCopy = {
   pageTitle: string;
   emailFromName: string;
   headshotAlt: string;
-  greetingName: string;
-  exchangeButton: string;
-  bookLink?: string;
-};
-
-export type CardCopyAboutChip = {
-  label: string;
-  explanation: string;
-};
-
-export type CardCopyAbout = {
-  title: string;
-  intro: string;
-  expandedParagraphs: string[];
-  consultationHighlight: string;
-  showMore: string;
-  showLess: string;
-  whatIDoTitle: string;
-  chips: CardCopyAboutChip[];
 };
 
 export type CardCopyExchangeSheetErrors = {
@@ -99,7 +107,6 @@ export type CardCopy = {
   thanksMessage: string;
   exchangeAriaLabel: string;
   footerNavLabel: string;
-  about: CardCopyAbout;
   exchangeSheet: CardCopyExchangeSheet;
 };
 
@@ -110,7 +117,13 @@ export type CardRecord = {
   displayName: string;
   email: string;
   photoKey: string | null;
-  links: CardLinks;
+  name: string;
+  role?: string;
+  about?: CardAbout;
+  services?: CardServices;
+  links?: CardPublicLinksMap;
+  alternate?: CardAlternate;
+  bookingLinks: CardBookingLinks;
   pageCopy: CardPageCopy;
   contact: CardContact;
   copy: CardCopy;
@@ -134,16 +147,7 @@ export type LeadSinkLoadInput = {
   config: unknown;
 };
 
-export type CardLoadInput = {
-  slug: string;
-  variant: BrandVariant;
-  displayName: string;
-  email: string;
-  photoKey: string | null;
-  links: CardLinks;
-  pageCopy: CardPageCopy;
-  contact: CardContact;
-  copy: CardCopy;
+export type CardLoadInput = Omit<CardRecord, "id" | "updatedAt"> & {
   /** When omitted, load script leaves existing sink rows unchanged for this card. */
   leadSinks?: LeadSinkLoadInput[];
 };

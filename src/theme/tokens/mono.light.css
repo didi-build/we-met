@@ -1,0 +1,26 @@
+[data-palette="mono"][data-theme="light"] {
+  --bg: #fafafa;
+  --surface: #ffffff;
+  --surface-2: #f0f0f0;
+  --ink: #161616;
+  --ink-muted: #555555;
+  --line: #dedede;
+  --line-strong: #868686;
+  --accent: #161616;
+  --accent-hover: #383838;
+  --accent-ink: #fafafa;
+  --accent-soft: #ebebeb;
+  --accent-text: #161616;
+  --chip-hover: #dcdcdc;
+  --chip-press: #cecece;
+  --error: #b3241f;
+  --error-soft: #ffe9e5;
+  --band-label: #b3b3b3;
+  --ring: rgba(22, 22, 22, 0.4);
+  --ring-0: rgba(22, 22, 22, 0);
+  --sheet-scrim: rgba(3, 3, 3, 0.6);
+  --pop-bg: #ffffff;
+  --chip-popover-shadow:
+    0 14px 30px -12px rgba(22, 22, 22, 0.25), 0 2px 6px rgba(22, 22, 22, 0.08);
+  color-scheme: light;
+}

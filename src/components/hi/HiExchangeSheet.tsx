@@ -181,6 +181,7 @@ export function HiExchangeSheet({
   const [turnstileError, setTurnstileError] = useState<string | undefined>();
   const [turnstileToken, setTurnstileToken] = useState("");
   const [detailsSaved, setDetailsSaved] = useState(false);
+  const [exchangeLeaving, setExchangeLeaving] = useState(false);
   const closeAnimationCleanupRef = useRef<(() => void) | null>(null);
 
   const dragRef = useRef<{
@@ -332,6 +333,11 @@ export function HiExchangeSheet({
     const nextFirstName = firstNameFromName(name);
     setToken(result.token);
     onExchangeSuccess(nextFirstName, result.token);
+    if (!prefersReducedMotion()) {
+      setExchangeLeaving(true);
+      await new Promise((resolve) => window.setTimeout(resolve, 200));
+      setExchangeLeaving(false);
+    }
     setStep("details");
   };
 
@@ -561,7 +567,7 @@ export function HiExchangeSheet({
               onSubmit={onSubmitExchange}
               noValidate
               aria-label={copy.exchangeFormAriaLabel}
-              className="flex flex-col gap-5"
+              className={`flex flex-col gap-5 ${exchangeLeaving ? "animate-hi-fade-out" : ""}`}
             >
               <input
                 type="text"

@@ -14,8 +14,10 @@ describe("card shape round-trip (integration)", () => {
     await repo.upsertCard({ ...card, slug: "memory-roundtrip" });
     const loaded = await repo.getBySlug("memory-roundtrip");
     expect(loaded?.links).toEqual(card.links);
+    expect(loaded?.bookingLinks).toEqual(card.bookingLinks);
     expect(loaded?.contact.urls).toEqual(card.contact.urls);
     expect(loaded?.copy).toEqual(card.copy);
+    expect(loaded?.name).toBe(card.name);
   });
 
   it("round-trips through D1 repository and load SQL", async () => {
@@ -33,6 +35,7 @@ describe("card shape round-trip (integration)", () => {
         await db.prepare(statement).run();
       }
       const loaded = await repo.getBySlug(slug);
+      expect(loaded?.bookingLinks.bookingUrl).toBe(input.bookingLinks.bookingUrl);
       expect(loaded?.links).toEqual(input.links);
       expect(loaded?.contact.urls).toEqual(input.contact.urls);
       expect(loaded?.copy).toEqual(input.copy);
@@ -41,7 +44,26 @@ describe("card shape round-trip (integration)", () => {
 
   it("preserves special characters in nested strings after D1 round-trip", async () => {
     const slug = "special-chars";
-    const input = { ...card, slug };
+    const input = {
+      ...card,
+      slug,
+      contact: {
+        ...card.contact,
+        vcardNote: "Met at an event; Didi's note — demo 🎉",
+      },
+      copy: {
+        ...card.copy,
+        exchangeSheet: {
+          ...card.copy.exchangeSheet,
+          exchangeNotSavedPrefix: "Could not save ",
+          exchangeNotSavedSuffix: " please try again",
+        },
+      },
+      about: {
+        title: "About",
+        paragraphs: ["Paragraph one… with ellipsis.", "Paragraph two."],
+      },
+    };
     const loadFile = { cards: [input], hostnames: [] };
     const sql = buildCardsLoadSql(loadFile, {
       updatedAt: "2026-10-11T12:00:00.000Z",
@@ -57,7 +79,7 @@ describe("card shape round-trip (integration)", () => {
       expect(loaded?.contact.vcardNote).toContain(";");
       expect(loaded?.contact.vcardNote).toContain("'");
       expect(loaded?.contact.vcardNote).toContain("🎉");
-      expect(loaded?.copy.about.expandedParagraphs[0]).toContain("…");
+      expect(loaded?.about?.paragraphs[0]).toContain("…");
       expect(loaded?.copy.exchangeSheet.exchangeNotSavedPrefix).toBe("Could not save ");
       expect(loaded?.copy.exchangeSheet.exchangeNotSavedSuffix).toBe(
         " please try again",
@@ -65,15 +87,15 @@ describe("card shape round-trip (integration)", () => {
     });
   });
 
-  it("keeps https://example.com exactly in booking and urls", () => {
-    expect(card.links.bookingUrl).toBe("https://example.com");
-    expect(card.links.footer[0].url).toBe("https://example.com");
-    expect(card.contact.urls[0].url).toBe("https://example.com");
+  it("keeps https booking and link urls", () => {
+    expect(card.bookingLinks.bookingUrl).toBe("https://didi.build/book");
+    expect(card.links?.website).toBe("https://didi.build");
+    expect(card.contact.urls[0].url).toBe("https://didi.build");
   });
 
   it("parses the committed example file", () => {
     const file = exampleLoadFile();
     expect(file.cards).toHaveLength(1);
-    expect(file.cards[0].slug).toBe("demo");
+    expect(file.cards[0].slug).toBe("didi");
   });
 });

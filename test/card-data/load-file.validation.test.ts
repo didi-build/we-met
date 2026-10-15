@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { CARD_FIELD_LIMITS } from "@/card-data/limits";
 import { parseCardsLoadFile } from "@/card-data/load-file";
 import { exampleLoadRaw } from "../helpers/example-card";
 
@@ -29,41 +30,96 @@ describe("parseCardsLoadFile validation (unit)", () => {
     );
   });
 
+  it("accepts cards without alternate", () => {
+    const raw = cloneLoadFile();
+    const card = (raw.cards as Record<string, unknown>[])[0];
+    delete card.alternate;
+    const parsed = parseCardsLoadFile(raw);
+    expect(parsed.cards[0].alternate).toBeUndefined();
+    expect(parsed.cards[0].bookingLinks.bookingUrl).toBe("");
+  });
+
+  it("accepts up to CARD_FIELD_LIMITS.services service items", () => {
+    const raw = cloneLoadFile();
+    const card = (raw.cards as Record<string, unknown>[])[0];
+    const services = card.services as {
+      title: string;
+      items: { title: string; description: string }[];
+    };
+    while (services.items.length < CARD_FIELD_LIMITS.services) {
+      services.items.push({
+        title: `Service ${services.items.length + 1}`,
+        description: "Description.",
+      });
+    }
+    const parsed = parseCardsLoadFile(raw);
+    expect(parsed.cards[0].services?.items).toHaveLength(CARD_FIELD_LIMITS.services);
+  });
+
+  it("rejects more than CARD_FIELD_LIMITS.services service items", () => {
+    expectReject((raw) => {
+      const card = (raw.cards as Record<string, unknown>[])[0];
+      const services = card.services as {
+        title: string;
+        items: { title: string; description: string }[];
+      };
+      while (services.items.length <= CARD_FIELD_LIMITS.services) {
+        services.items.push({
+          title: `Extra ${services.items.length + 1}`,
+          description: "Description.",
+        });
+      }
+    }, /services\.items exceeds max length/);
+  });
+
+  it("accepts legacy copy.followUpEmail with a warning", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const raw = cloneLoadFile();
+    const card = (raw.cards as Record<string, unknown>[])[0];
+    const copy = card.copy as Record<string, unknown>;
+    copy.followUpEmail = { subjectTemplate: "x" };
+    const parsed = parseCardsLoadFile(raw);
+    expect(parsed.cards[0].copy).not.toHaveProperty("followUpEmail");
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("copy.followUpEmail is ignored"),
+    );
+    warn.mockRestore();
+  });
+
+  it("rejects green variant", () => {
+    expectReject((raw) => {
+      const card = (raw.cards as Record<string, unknown>[])[0];
+      card.variant = "green";
+    }, /mono only/i);
+  });
+
+  it("rejects unknown variant", () => {
+    expectReject((raw) => {
+      const card = (raw.cards as Record<string, unknown>[])[0];
+      card.variant = "purple";
+    }, /Invalid variant: purple/);
+  });
+
   const cases: {
     label: string;
     mutate: (raw: Record<string, unknown>) => void;
     pattern: RegExp;
   }[] = [
     {
-      label: "http bookingUrl",
+      label: "http alternate url",
       mutate: (raw) => {
         const card = (raw.cards as Record<string, unknown>[])[0];
-        (card.links as Record<string, unknown>).bookingUrl = "http://example.com";
+        const alt = card.alternate as { url: string };
+        alt.url = "http://example.com";
       },
       pattern: /https/,
     },
     {
-      label: "https: without slashes bookingUrl",
+      label: "http public link url",
       mutate: (raw) => {
         const card = (raw.cards as Record<string, unknown>[])[0];
-        (card.links as Record<string, unknown>).bookingUrl = "https:example.com";
-      },
-      pattern: /must start with https:\/\//,
-    },
-    {
-      label: "whitespace in bookingUrl",
-      mutate: (raw) => {
-        const card = (raw.cards as Record<string, unknown>[])[0];
-        (card.links as Record<string, unknown>).bookingUrl = "https://exa mple.com";
-      },
-      pattern: /whitespace/,
-    },
-    {
-      label: "javascript footer url",
-      mutate: (raw) => {
-        const card = (raw.cards as Record<string, unknown>[])[0];
-        const footer = (card.links as { footer: Record<string, unknown>[] }).footer;
-        footer[0].url = "javascript:alert(1)";
+        const links = card.links as { website: string };
+        links.website = "http://x.com";
       },
       pattern: /https/,
     },
@@ -76,48 +132,11 @@ describe("parseCardsLoadFile validation (unit)", () => {
       pattern: /https/,
     },
     {
-      label: "unknown footer kind",
+      label: "unknown key in links object",
       mutate: (raw) => {
         const card = (raw.cards as Record<string, unknown>[])[0];
-        const footer = (card.links as { footer: Record<string, unknown>[] }).footer;
-        footer[0].kind = "twitter";
-      },
-      pattern: /footer kind/,
-    },
-    {
-      label: "too many footer items",
-      mutate: (raw) => {
-        const card = (raw.cards as Record<string, unknown>[])[0];
-        const links = card.links as { footer: unknown[] };
-        while (links.footer.length <= 6) {
-          links.footer.push({ kind: "site", label: "X", url: "https://example.com/x" });
-        }
-      },
-      pattern: /footer must have/,
-    },
-    {
-      label: "unknown key in links",
-      mutate: (raw) => {
-        const card = (raw.cards as Record<string, unknown>[])[0];
-        (card.links as Record<string, unknown>).extra = true;
-      },
-      pattern: /Unknown key in links/,
-    },
-    {
-      label: "unknown key in footer item",
-      mutate: (raw) => {
-        const card = (raw.cards as Record<string, unknown>[])[0];
-        const footer = (card.links as { footer: Record<string, unknown>[] }).footer;
-        footer[0].extra = true;
-      },
-      pattern: /Unknown key/,
-    },
-    {
-      label: "unknown key in contact.urls item",
-      mutate: (raw) => {
-        const card = (raw.cards as Record<string, unknown>[])[0];
-        const urls = (card.contact as { urls: Record<string, unknown>[] }).urls;
-        urls[0].extra = true;
+        const links = card.links as Record<string, unknown>;
+        links.twitter = "https://example.com";
       },
       pattern: /Unknown key/,
     },
@@ -128,15 +147,6 @@ describe("parseCardsLoadFile validation (unit)", () => {
         (card.copy as Record<string, unknown>).extra = true;
       },
       pattern: /Unknown key in copy/,
-    },
-    {
-      label: "missing copy.about.title",
-      mutate: (raw) => {
-        const card = (raw.cards as Record<string, unknown>[])[0];
-        const about = (card.copy as { about: Record<string, unknown> }).about;
-        delete about.title;
-      },
-      pattern: /copy.about.title/,
     },
     {
       label: "non-string copy leaf",
@@ -150,15 +160,15 @@ describe("parseCardsLoadFile validation (unit)", () => {
       label: "control character in string",
       mutate: (raw) => {
         const card = (raw.cards as Record<string, unknown>[])[0];
-        card.displayName = "bad\nname";
+        card.name = "bad\nname";
       },
       pattern: /Control characters/,
     },
     {
-      label: "over-length copy leaf",
+      label: "over-length name",
       mutate: (raw) => {
         const card = (raw.cards as Record<string, unknown>[])[0];
-        (card.copy as Record<string, unknown>).thanksMessage = "x".repeat(1001);
+        card.name = "x".repeat(61);
       },
       pattern: /exceeds max length/,
     },
@@ -189,31 +199,15 @@ describe("parseCardsLoadFile validation (unit)", () => {
       pattern: /non-whitespace/,
     },
     {
-      label: "empty expandedParagraphs",
+      label: "too many about paragraphs",
       mutate: (raw) => {
         const card = (raw.cards as Record<string, unknown>[])[0];
-        const about = (card.copy as { about: Record<string, unknown> }).about;
-        about.expandedParagraphs = [];
+        const about = card.about as { paragraphs: string[] };
+        while (about.paragraphs.length <= 4) {
+          about.paragraphs.push("Another paragraph.");
+        }
       },
-      pattern: /expandedParagraphs must have at least/,
-    },
-    {
-      label: "empty chips",
-      mutate: (raw) => {
-        const card = (raw.cards as Record<string, unknown>[])[0];
-        const about = (card.copy as { about: Record<string, unknown> }).about;
-        about.chips = [];
-      },
-      pattern: /chips must have at least/,
-    },
-    {
-      label: "bookLink without bookingUrl",
-      mutate: (raw) => {
-        const card = (raw.cards as Record<string, unknown>[])[0];
-        const links = card.links as Record<string, unknown>;
-        delete links.bookingUrl;
-      },
-      pattern: /links\.bookingUrl is required when pageCopy\.bookLink/,
+      pattern: /about.paragraphs exceeds max length/,
     },
   ];
 

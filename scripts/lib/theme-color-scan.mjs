@@ -1,6 +1,5 @@
 const ALLOWLIST = new Set([
-  "src/theme/tokens/green.light.css",
-  "src/theme/tokens/green.dark.css",
+  "src/components/hi/icons/HiCardIcons.tsx",
   "design/Hi.dc.html",
   "src/email/templates/generated.ts",
 ]);
@@ -214,7 +213,13 @@ const INLINE_STYLE_PROPERTY =
   "(?:color|background(?:Color|Image)?|border(?:Top|Right|Bottom|Left|Block|Inline|Start|End)?(?:Color|Width|Style)?|outline(?:Color|Width|Style|Offset)?|fill|stroke|caretColor|accentColor|textDecoration(?:Color)?|textShadow|boxShadow|filter|columnRule|scrollbarColor)";
 
 function isAllowlisted(rel) {
-  return ALLOWLIST.has(rel);
+  if (ALLOWLIST.has(rel)) {
+    return true;
+  }
+  if (rel.startsWith("src/theme/tokens/") && rel.endsWith(".css")) {
+    return true;
+  }
+  return false;
 }
 
 const TAILWIND_VARIANT_PREFIX = "(?:(?:[\\w-]+|\\[[^\\]]+\\]|data-\\[[^\\]]+\\]):)*";

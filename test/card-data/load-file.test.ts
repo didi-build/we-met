@@ -6,6 +6,6 @@ describe("parseCardsLoadFile (unit)", () => {
   it("parses the committed example file", () => {
     const file = parseCardsLoadFile(exampleLoadRaw());
     expect(file.cards).toHaveLength(1);
-    expect(file.cards[0].slug).toBe("demo");
+    expect(file.cards[0].slug).toBe("didi");
   });
 });

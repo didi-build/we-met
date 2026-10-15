@@ -12,9 +12,6 @@ const loadHiCard = cache(async (slug: string): Promise<CardRecord | null> => {
   if (!card || card.slug !== slug) {
     return null;
   }
-  if (card.variant !== "green") {
-    return null;
-  }
   return card;
 });
 

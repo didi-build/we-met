@@ -1,102 +1,114 @@
 {
   "cards": [
     {
-      "slug": "demo",
-      "variant": "green",
-      "displayName": "Demo User",
-      "email": "demo@example.com",
-      "photoKey": null,
-      "links": {
-        "bookingUrl": "https://example.com",
-        "footer": [
+      "slug": "didi",
+      "variant": "mono",
+      "plan": "free",
+      "name": "Didi Shoukralla",
+      "role": "Software Engineer and Technical Advisor",
+      "photoKey": "didi",
+      "about": {
+        "title": "About me",
+        "paragraphs": [
+          "I'm a software engineer in Toronto. I help founders who built their app with AI get it ready for real users, paying customers, or investors.",
+          "I've shipped software at startups and on production teams, so I know what breaks once people actually show up.",
+          "If you're building something, I'm happy to give you an honest, straight read during your free consultation."
+        ]
+      },
+      "services": {
+        "title": "What I do",
+        "items": [
           {
-            "kind": "site",
-            "label": "Site",
-            "url": "https://example.com"
+            "title": "System audit",
+            "description": "I review your app and give you a written summary: what's solid, what's risky, and what to do next."
           },
           {
-            "kind": "github",
-            "label": "GitHub",
-            "url": "https://github.com/example"
+            "title": "Custom development",
+            "description": "I build what your product needs, whether that's a new feature or a custom tool made just for you."
+          },
+          {
+            "title": "Technical advisory",
+            "description": "I answer your technical questions in plain English and help you decide what to build, what to skip, and what to ask your developers."
+          },
+          {
+            "title": "Fractional CTO",
+            "description": "I act as your part-time technical lead: I guide the technical decisions and the team, without a full-time hire."
+          },
+          {
+            "title": "AI Integrations",
+            "description": "I add AI to your product where it helps, like a chat assistant, smarter search, or an agent that handles tasks for you."
           }
         ]
       },
+      "links": {
+        "website": "https://didi.build",
+        "linkedin": "https://www.linkedin.com/in/diadem-shoukralla/",
+        "github": "https://github.com/DiademShoukralla/",
+        "instagram": "https://instagram.com/didi.build"
+      },
+      "alternate": {
+        "url": "https://didi.build/book",
+        "label": "or book a time directly"
+      },
+      "email": "didi@didi.build",
       "pageCopy": {
-        "pageTitle": "Hi, I'm Demo",
-        "emailFromName": "Demo at Example",
-        "headshotAlt": "Demo User",
-        "greetingName": "I'm Demo",
-        "exchangeButton": "Exchange contact",
-        "bookLink": "or book a time directly"
+        "pageTitle": "Didi Shoukralla · We Met",
+        "emailFromName": "Didi Shoukralla",
+        "headshotAlt": "Didi Shoukralla"
       },
       "contact": {
         "name": {
-          "full": "Demo User",
-          "family": "User",
-          "given": "Demo",
-          "nickname": "Demo"
+          "full": "Didi Shoukralla",
+          "family": "Shoukralla",
+          "given": "Didi",
+          "nickname": "Didi"
         },
-        "org": "Example Co",
-        "title": "Example role",
-        "email": "demo@example.com",
-        "phone": "+1-555-555-0100",
-        "vcardNote": "Met at an event; Didi's note — demo 🎉",
+        "org": "Didi Build",
+        "title": "Software Engineer and Technical Advisor",
+        "email": "didi@didi.build",
+        "phone": "+1-416-555-0100",
+        "vcardNote": "Met via We Met",
         "urls": [
           {
-            "url": "https://example.com",
+            "url": "https://didi.build",
             "type": "Portfolio"
           }
         ]
       },
       "copy": {
         "thanksMessage": "Thanks, {firstName}. Talk soon.",
-        "exchangeAriaLabel": "Open exchange form",
-        "footerNavLabel": "Footer links",
-        "about": {
-          "title": "About Demo",
-          "intro": "Demo intro with emoji 🎉 and semicolon; still one field.",
-          "expandedParagraphs": ["Paragraph one… with ellipsis.", "Paragraph two."],
-          "consultationHighlight": "Book a consult",
-          "showMore": "Show more",
-          "showLess": "Show less",
-          "whatIDoTitle": "What I do",
-          "chips": [
-            {
-              "label": "Chip",
-              "explanation": "Chip detail"
-            }
-          ]
-        },
+        "exchangeAriaLabel": "Exchange contacts",
+        "footerNavLabel": "Elsewhere",
         "exchangeSheet": {
-          "exchangeTitle": "Exchange",
-          "detailsTitle": "Details",
-          "detailsIntro": "Your details",
-          "nameLabel": "Name",
+          "exchangeTitle": "Let's stay in touch",
+          "detailsTitle": "Nice to meet you, {firstName} 👋",
+          "detailsIntro": "Add a few details to help me remember you.",
+          "nameLabel": "Full name",
           "emailLabel": "Email",
           "phoneLabel": "Phone",
-          "phoneOptional": "Optional",
+          "phoneOptional": "(optional)",
           "countryCodeAriaLabel": "Country code",
-          "submitExchange": "Submit",
-          "submitDetails": "Send",
-          "consent": "I agree",
+          "submitExchange": "Exchange contact",
+          "submitDetails": "Save details",
+          "consent": "I agree to share my contact details.",
           "closeLabel": "Close",
-          "exchangeFormAriaLabel": "Exchange form",
-          "detailsFormAriaLabel": "Details form",
-          "notePlaceholder": "Note",
+          "exchangeFormAriaLabel": "Exchange contact form",
+          "detailsFormAriaLabel": "Optional details form",
+          "notePlaceholder": "Where we met, what you're working on",
           "jobTitleLabel": "Job title",
           "companyLabel": "Company",
           "noteLabel": "Note",
-          "pendingExchange": "Pending",
-          "pendingDetails": "Pending details",
-          "detailsSaved": "Saved",
-          "networkErrorMessage": "Network error",
-          "exchangeNotSavedPrefix": "Could not save ",
-          "exchangeNotSavedEmail": "help@example.com",
-          "exchangeNotSavedSuffix": " please try again",
+          "pendingExchange": "Sending…",
+          "pendingDetails": "Saving…",
+          "detailsSaved": "Details saved",
+          "networkErrorMessage": "Network error. Please try again.",
+          "exchangeNotSavedPrefix": "We could not save your details. Email ",
+          "exchangeNotSavedEmail": "help@didi.build",
+          "exchangeNotSavedSuffix": " and we'll connect you manually.",
           "errors": {
-            "nameRequired": "Name required",
-            "emailRequired": "Email required",
-            "emailInvalid": "Invalid email"
+            "nameRequired": "Add your name so I know who you are.",
+            "emailRequired": "Add your email so I can reach you.",
+            "emailInvalid": "That email doesn't look quite right. Check for a typo?"
           }
         }
       }

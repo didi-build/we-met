@@ -23,7 +23,7 @@ describe("leadSinks load file (unit)", () => {
   it("accepts a valid email sink", () => {
     const file = parseCardsLoadFile(
       cardWithSinks([
-        { id: "demo-inbox-a", kind: "email", config: { to: "owner@example.com" } },
+        { id: "didi-inbox-a", kind: "email", config: { to: "owner@example.com" } },
       ]),
     );
     expect(file.cards[0].leadSinks).toHaveLength(1);
@@ -32,8 +32,8 @@ describe("leadSinks load file (unit)", () => {
   it("loads several email sinks including duplicate to addresses", () => {
     const file = parseCardsLoadFile(
       cardWithSinks([
-        { id: "demo-inbox-a", kind: "email", config: { to: "same@example.com" } },
-        { id: "demo-inbox-b", kind: "email", config: { to: "same@example.com" } },
+        { id: "didi-inbox-a", kind: "email", config: { to: "same@example.com" } },
+        { id: "didi-inbox-b", kind: "email", config: { to: "same@example.com" } },
       ]),
     );
     expect(file.cards[0].leadSinks).toHaveLength(2);
@@ -41,7 +41,7 @@ describe("leadSinks load file (unit)", () => {
 
   it("rejects unknown kinds", () => {
     expect(() =>
-      parseCardsLoadFile(cardWithSinks([{ id: "demo-x", kind: "linear", config: {} }])),
+      parseCardsLoadFile(cardWithSinks([{ id: "didi-x", kind: "linear", config: {} }])),
     ).toThrow(/Unknown lead sink kind/);
   });
 
@@ -49,7 +49,7 @@ describe("leadSinks load file (unit)", () => {
     expect(() =>
       parseCardsLoadFile(
         cardWithSinks([
-          { id: "demo-bad", kind: "email", config: { to: "not an email" } },
+          { id: "didi-bad", kind: "email", config: { to: "not an email" } },
         ]),
       ),
     ).toThrow(/single email/);
@@ -57,7 +57,7 @@ describe("leadSinks load file (unit)", () => {
       parseCardsLoadFile(
         cardWithSinks([
           {
-            id: "demo-bad2",
+            id: "didi-bad2",
             kind: "email",
             config: { to: "a@b.com", extra: true },
           },
@@ -70,15 +70,15 @@ describe("leadSinks load file (unit)", () => {
     expect(() =>
       parseCardsLoadFile(
         cardWithSinks([
-          { id: "demo-dup", kind: "email", config: { to: "a@example.com" } },
-          { id: "demo-dup", kind: "email", config: { to: "b@example.com" } },
+          { id: "didi-dup", kind: "email", config: { to: "a@example.com" } },
+          { id: "didi-dup", kind: "email", config: { to: "b@example.com" } },
         ]),
       ),
     ).toThrow(/Duplicate lead sink id/);
     expect(() =>
       parseCardsLoadFile(
         cardWithSinks([
-          { id: "demo-Bad-ID", kind: "email", config: { to: "a@example.com" } },
+          { id: "didi-Bad-ID", kind: "email", config: { to: "a@example.com" } },
         ]),
       ),
     ).toThrow(/must match/);
@@ -86,7 +86,7 @@ describe("leadSinks load file (unit)", () => {
 
   it("enforces per-card caps", () => {
     const many = Array.from({ length: MAX_LEAD_SINKS_PER_CARD + 1 }, (_, i) => ({
-      id: `demo-sink-${i}`,
+      id: `didi-sink-${i}`,
       kind: "email",
       config: { to: `u${i}@example.com` },
     }));
@@ -95,7 +95,7 @@ describe("leadSinks load file (unit)", () => {
     );
 
     const manyEmail = Array.from({ length: MAX_EMAIL_SINKS_PER_CARD + 1 }, (_, i) => ({
-      id: `demo-email-${i}`,
+      id: `didi-email-${i}`,
       kind: "email",
       config: { to: `u${i}@example.com` },
     }));
@@ -111,13 +111,13 @@ describe("leadSinks load file (unit)", () => {
           { id: "inbox-a", kind: "email", config: { to: "a@example.com" } },
         ]),
       ),
-    ).toThrow(/must start with "demo-"/);
+    ).toThrow(/must start with "didi-"/);
     const file = parseCardsLoadFile(
       cardWithSinks([
-        { id: "demo-inbox-a", kind: "email", config: { to: "a@example.com" } },
+        { id: "didi-inbox-a", kind: "email", config: { to: "a@example.com" } },
       ]),
     );
-    expect(file.cards[0].leadSinks?.[0].id).toBe("demo-inbox-a");
+    expect(file.cards[0].leadSinks?.[0].id).toBe("didi-inbox-a");
   });
 
   it("rejects root-level leadSinks", () => {
@@ -132,7 +132,7 @@ describe("leadSinks load SQL reconcile (integration)", () => {
     const card = parseCardsLoadFile(exampleLoadRaw()).cards[0];
     const withSinks = parseCardsLoadFile(
       cardWithSinks([
-        { id: "demo-keep", kind: "email", config: { to: "a@example.com" } },
+        { id: "didi-keep", kind: "email", config: { to: "a@example.com" } },
       ]),
     ).cards[0];
 
@@ -167,7 +167,7 @@ describe("leadSinks load SQL reconcile (integration)", () => {
   it("deletes sinks when leadSinks is an empty array", async () => {
     const withSinks = parseCardsLoadFile(
       cardWithSinks([
-        { id: "demo-gone", kind: "email", config: { to: "a@example.com" } },
+        { id: "didi-gone", kind: "email", config: { to: "a@example.com" } },
       ]),
     ).cards[0];
     const empty = parseCardsLoadFile(cardWithSinks([])).cards[0];
@@ -202,7 +202,7 @@ describe("non-prod email sink destination guard (unit)", () => {
   it("passes when all email sinks use the test inbox", () => {
     const file = parseCardsLoadFile(
       cardWithSinks([
-        { id: "demo-a", kind: "email", config: { to: "test@example.com" } },
+        { id: "didi-a", kind: "email", config: { to: "test@example.com" } },
       ]),
     );
     expect(() =>
@@ -213,7 +213,7 @@ describe("non-prod email sink destination guard (unit)", () => {
   it("fails when to mismatches or env is unset while email sinks exist", () => {
     const file = parseCardsLoadFile(
       cardWithSinks([
-        { id: "demo-a", kind: "email", config: { to: "other@example.com" } },
+        { id: "didi-a", kind: "email", config: { to: "other@example.com" } },
       ]),
     );
     expect(() =>
@@ -231,7 +231,7 @@ describe("non-prod email sink destination guard (unit)", () => {
     const file = parseCardsLoadFile(
       cardWithSinks([
         {
-          id: "demo-off",
+          id: "didi-off",
           kind: "email",
           enabled: false,
           config: { to: "test@example.com" },
