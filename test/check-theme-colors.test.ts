@@ -1,6 +1,8 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
+import { collectThemeColorOffenders, walk } from "../scripts/check-theme-colors.mjs";
 import { scanFileContent } from "../scripts/lib/theme-color-scan.mjs";
 
 const fixtureDir = join(process.cwd(), "test/fixtures/theme-colors");
@@ -263,6 +265,28 @@ describe("theme-color scan (unit)", () => {
     for (let i = 0; i < 3; i += 1) {
       const reasons = scanTsx("x.tsx", source);
       expect(reasons).toContain("tailwind-palette");
+    }
+  });
+
+  it("skips the repo-root design/ directory when walking for theme colors", () => {
+    const root = mkdtempSync(join(tmpdir(), "theme-colors-walk-"));
+    try {
+      mkdirSync(join(root, "design"));
+      const designHex = "#" + "ff0000";
+      const srcHex = "#" + "00ff00";
+      writeFileSync(join(root, "design", "ref.css"), `.x { color: ${designHex}; }`);
+      mkdirSync(join(root, "src"));
+      writeFileSync(join(root, "src", "app.css"), `.y { color: ${srcHex}; }`);
+
+      const files = walk(root).map((path) => relative(root, path).replace(/\\/g, "/"));
+      expect(files).not.toContain("design/ref.css");
+      expect(files).toContain("src/app.css");
+
+      const offenders = collectThemeColorOffenders(root);
+      expect(offenders.some(({ file }) => file === "design/ref.css")).toBe(false);
+      expect(offenders.some(({ file }) => file === "src/app.css")).toBe(true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
     }
   });
 
