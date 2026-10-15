@@ -36,16 +36,16 @@ Facts this design rests on (read from the repo on 2026-10-15):
 
 Tables added or changed (names are normative; exact columns are the implementer's call within these rules):
 
-| Table | Purpose | Key points |
-|---|---|---|
-| `accounts` | One row per Google account | `id` (own id), `google_sub` UNIQUE, `email` (lowercase), `name`, `status` in (`waitlisted`, `active`, `suspended`, `deleted`), `created_at`, `updated_at`, `last_login_at`. Email is not unique. |
-| `sessions` | Server-side sessions | SHA-256 hash of the opaque token as key, `account_id`, `created_at`, `expires_at` (30 days sliding), `absolute_expires_at` (90 days), `last_seen_at`. |
-| `oauth_attempts` | Single-use OAuth state | State hash, nonce, PKCE verifier, `mode` (`redirect` or `popup`), `created_at`, `expires_at` (10 minutes). |
-| `card_drafts` | The editor draft | One row per account, the draft JSON, `photo_key`, `updated_at`. |
-| `app_settings` | Flags and caps | Key and value. Keys: `signups_open`, `lead_email_enabled`, `daily_cap_global`, `daily_cap_per_card`. |
-| `daily_send_counts` | Pricing data and caps | Primary key (`day`, `card_id`, `kind` in `owner` or `visitor`), `count`. `card_id` is not a foreign key, so it outlives cards. |
-| `cards` (rebuilt) | Published cards only | The current columns minus `email`, plus `account_id NOT NULL` and `status` in (`live`, `suspended`, `retired`). Slug uniqueness and one card per account are **named unique indexes** (`CREATE UNIQUE INDEX`), not inline constraints, so a later migration can change them without another table rebuild. |
-| `lead_sinks` | Unchanged, plus an index | A partial unique index `lead_sinks(card_id) WHERE kind = 'email'`. |
+| Table               | Purpose                    | Key points                                                                                                                                                                                                                                                                                                 |
+| ------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `accounts`          | One row per Google account | `id` (own id), `google_sub` UNIQUE, `email` (lowercase), `name`, `status` in (`waitlisted`, `active`, `suspended`, `deleted`), `created_at`, `updated_at`, `last_login_at`. Email is not unique.                                                                                                           |
+| `sessions`          | Server-side sessions       | SHA-256 hash of the opaque token as key, `account_id`, `created_at`, `expires_at` (30 days sliding), `absolute_expires_at` (90 days), `last_seen_at`.                                                                                                                                                      |
+| `oauth_attempts`    | Single-use OAuth state     | State hash, nonce, PKCE verifier, `mode` (`redirect` or `popup`), `created_at`, `expires_at` (10 minutes).                                                                                                                                                                                                 |
+| `card_drafts`       | The editor draft           | One row per account, the draft JSON, `photo_key`, `updated_at`.                                                                                                                                                                                                                                            |
+| `app_settings`      | Flags and caps             | Key and value. Keys: `signups_open`, `lead_email_enabled`, `daily_cap_global`, `daily_cap_per_card`.                                                                                                                                                                                                       |
+| `daily_send_counts` | Pricing data and caps      | Primary key (`day`, `card_id`, `kind` in `owner` or `visitor`), `count`. `card_id` is not a foreign key, so it outlives cards.                                                                                                                                                                             |
+| `cards` (rebuilt)   | Published cards only       | The current columns minus `email`, plus `account_id NOT NULL` and `status` in (`live`, `suspended`, `retired`). Slug uniqueness and one card per account are **named unique indexes** (`CREATE UNIQUE INDEX`), not inline constraints, so a later migration can change them without another table rebuild. |
+| `lead_sinks`        | Unchanged, plus an index   | A partial unique index `lead_sinks(card_id) WHERE kind = 'email'`.                                                                                                                                                                                                                                         |
 
 Rules:
 
@@ -88,18 +88,18 @@ Rules:
 
 Routes (all JSON; served only on the app host, preview hosts and localhost, and 404 on the production card host):
 
-| Route | `AppApi` method |
-|---|---|
-| `GET /api/auth/google/start?mode=redirect\|popup` | `signIn` |
-| `GET /api/auth/google/callback` | `signIn` |
-| `POST /api/auth/preview-login` | previews only |
-| `POST /api/auth/logout` | `signOut` |
-| `GET /api/app/session` (always 200, session or `null`) | `getSession` |
-| `GET /api/app/card` | `getCard` |
-| `PUT /api/app/card/draft` | `saveDraft` |
-| `GET /api/app/slug-check?slug=` | `checkSlug` |
-| `POST /api/app/photo`, `GET /api/app/photo?v=<key>` | `uploadPhoto` |
-| `POST /api/app/card/publish` | `publish` |
+| Route                                                  | `AppApi` method |
+| ------------------------------------------------------ | --------------- |
+| `GET /api/auth/google/start?mode=redirect\|popup`      | `signIn`        |
+| `GET /api/auth/google/callback`                        | `signIn`        |
+| `POST /api/auth/preview-login`                         | previews only   |
+| `POST /api/auth/logout`                                | `signOut`       |
+| `GET /api/app/session` (always 200, session or `null`) | `getSession`    |
+| `GET /api/app/card`                                    | `getCard`       |
+| `PUT /api/app/card/draft`                              | `saveDraft`     |
+| `GET /api/app/slug-check?slug=`                        | `checkSlug`     |
+| `POST /api/app/photo`, `GET /api/app/photo?v=<key>`    | `uploadPhoto`   |
+| `POST /api/app/card/publish`                           | `publish`       |
 
 - **SPA mount:** production serves it at `app.we-met.link/`. Local and previews serve the same SPA under `/app`, backed by the real API. The `/app-preview` stub route is removed.
 - **Errors:** `{ "error": { "code": "...", "fields"?: ... } }`. 401 `unauthorized`, 403 `forbidden`, 409 `slug-taken` or `slug-locked`, 422 `name-missing` or `slug-invalid` or `slug-reserved` or `invalid-fields`, 413 and 415 for photos, 429 `rate-limited`. A 5xx or network failure becomes the client's `network`. New client codes: `slug-locked`, `forbidden`, `rate-limited`, `invalid-fields`.
