@@ -12,7 +12,7 @@ The OpenNext app Worker `we-met` enqueues follow-up jobs but must not send mail 
 
 - **Two consumer Workers** (one queue consumer each): `we-met-followup-email-consumer-nonprod` and `we-met-followup-email-consumer`, with Wrangler configs in `workers/we-met-followup-email-consumer/`.
 - **Shared code** lives under `src/email/` (sender interface + Gmail implementation) and `src/followup-email-consumer/` (queue batch logic). The OpenNext bundle does not import the consumer entrypoint.
-- **D1:** each consumer binds **`WE_MET_DB`** to the matching environment database (`we-met-db-nonprod` / `we-met-db`). **No migrations and no runtime D1 use** until the metadata-only delivery ledger ([DIDI-586](https://linear.app/didi-build/issue/DIDI-586)). **R2:** bind `WE_MET_ASSETS`; enforce read-only in code (`get` only).
+- **D1:** each consumer binds **`WE_MET_DB`** to the matching environment database (`we-met-db-nonprod` / `we-met-db`). Runtime D1 use is **ledger only** ([0022](./0022-lead-delivery-ledger.md), [0023](./0023-owner-email-lead-sink-consumer.md)). **R2:** bind `WE_MET_ASSETS`; enforce read-only in code (`get` only).
 - **Non-prod deploy** is manual after merge; **production** consumer deploy runs in the approved **Deploy production** workflow ([DIDI-599](https://linear.app/didi-build/issue/DIDI-599)).
 
 ## Reasons

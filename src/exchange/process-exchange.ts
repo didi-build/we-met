@@ -14,6 +14,7 @@ import type {
 import type { ExchangeRateLimiter } from "@/exchange/rate-limit";
 import { createDetailsToken } from "@/exchange/token";
 import type { TurnstileVerifier } from "@/exchange/turnstile";
+import { absoluteUrl } from "@/config/we-met";
 import type { ExchangeSuccessResponse, VisitorLead } from "@/exchange/types";
 import type { ValidatedExchangeInput } from "@/exchange/validation";
 
@@ -31,6 +32,7 @@ export type ProcessExchangeDeps = {
   createLeadId: () => string;
   createLedgerId: () => string;
   now: () => Date;
+  baseUrl: string;
 };
 
 export type ProcessExchangeResult =
@@ -91,7 +93,15 @@ export async function processExchange(
     createLedgerId: deps.createLedgerId,
   };
 
-  await dispatchLeadOnExchange(sinks, lead, card.id, card.slug, sinkDispatchDeps);
+  const sourceUrl = absoluteUrl(deps.baseUrl, `/hi/${card.slug}`);
+  await dispatchLeadOnExchange(
+    sinks,
+    lead,
+    card.id,
+    card.slug,
+    sourceUrl,
+    sinkDispatchDeps,
+  );
 
   try {
     await deps.followupQueue.enqueueVisitorFollowup({
@@ -110,6 +120,7 @@ export async function processExchange(
       cardId: card.id,
       cardSlug: card.slug,
       visitorEmail: lead.email,
+      visitorName: lead.name,
     },
     Math.floor(deps.now().getTime() / 1000),
   );

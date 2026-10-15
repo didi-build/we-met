@@ -12,6 +12,7 @@ describe("details token (unit)", () => {
         cardId: "card-1",
         cardSlug: "demo",
         visitorEmail: "visitor@example.com",
+        visitorName: "Alex",
       },
       1_700_000_000,
     );
@@ -30,6 +31,7 @@ describe("details token (unit)", () => {
         cardId: "card-1",
         cardSlug: "demo",
         visitorEmail: "visitor@example.com",
+        visitorName: "Alex",
       },
       1_700_000_000,
     );
@@ -45,6 +47,7 @@ describe("details token (unit)", () => {
         cardId: "card-1",
         cardSlug: "demo",
         visitorEmail: "visitor@example.com",
+        visitorName: "Alex",
       },
       1_700_000_000,
     );

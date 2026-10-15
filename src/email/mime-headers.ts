@@ -43,6 +43,17 @@ export function formatEmailFromHeader(email: string, displayName?: string): stri
 }
 
 /** Encode Subject per RFC 2047 when non-ASCII characters are present. */
+const RFC5322_MESSAGE_ID = /^<[^<>\s\u0000-\u001f\u007f]+>$/;
+
+/** Validate a Message-ID / In-Reply-To / References token. */
+export function sanitizeRfc5322MessageId(value: string): string {
+  const trimmed = value.trim();
+  if (!RFC5322_MESSAGE_ID.test(trimmed)) {
+    throw new Error("invalid_rfc5322_message_id");
+  }
+  return trimmed;
+}
+
 export function encodeEmailSubject(subject: string): string {
   const sanitized = sanitizeEmailHeaderValue(subject);
   if (isAsciiOnly(sanitized)) {

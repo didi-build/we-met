@@ -17,7 +17,7 @@ Card owners will send leads to **multiple destinations** (Linear, email, later J
 - Every **`kind`** implements the same **`LeadSink`** interface: **record lead**, **append details**, **note delivery failure**.
 - **Dispatcher:** on exchange (and details where applicable), enqueue **one queue message per enabled sink** so each delivery has its own retries; **one failing sink never blocks or duplicates another**. The **visitor follow-up email** remains its **own** message, independent of lead sinks (owner notification becomes an **email** sink in step 2 — [DIDI-586](https://linear.app/didi-build/issue/DIDI-586)).
 - **Step 1:** ship the table, interface, and dispatcher. **No sink implementations** and **no `"none"` kind**. A card with **zero enabled sinks** sends leads nowhere; **exchange still succeeds**.
-- **Step 2:** **email** sink implementation ([DIDI-586](https://linear.app/didi-build/issue/DIDI-586)). **Linear** sink timing follows the option chosen in that ticket.
+- **Step 2:** **email** sink implementation ([DIDI-586](https://linear.app/didi-build/issue/DIDI-586), consumer delivery [0023](./0023-owner-email-lead-sink-consumer.md)). **Linear** sink timing follows the option chosen in that ticket.
 - **Delivery ledger and config at send time:** the app writes **`lead_delivery_ledger`** rows ([0022](./0022-lead-delivery-ledger.md)). Queue messages include a **`sinkConfig` snapshot**; the follow-up consumer reads destination addresses from the message, not from `lead_sinks` D1.
 
 ## Reasons

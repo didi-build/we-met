@@ -8,7 +8,8 @@ import {
 import type { LeadDeliveryLedger } from "@/lead-delivery-ledger/types";
 import type { LeadSinkQueueProducer } from "@/exchange/queue/producer";
 import { verifyDetailsToken } from "@/exchange/token";
-import type { VisitorLead, VisitorLeadDetails } from "@/exchange/types";
+import { absoluteUrl } from "@/config/we-met";
+import type { LeadSinkAppendLead, VisitorLeadDetails } from "@/exchange/types";
 import type { ValidatedDetailsInput } from "@/exchange/validation";
 
 export type ProcessDetailsDeps = {
@@ -20,24 +21,21 @@ export type ProcessDetailsDeps = {
   leadSinkLogger: LeadSinkDispatchLogger;
   createLedgerId: () => string;
   now: () => Date;
+  baseUrl: string;
 };
 
 export type ProcessDetailsResult =
   { status: "success" } | { status: "invalid_token" } | { status: "card_not_found" };
 
-function leadFromToken(
-  payload: { leadId: string; visitorEmail: string },
-  environment: string,
-  now: Date,
-): VisitorLead {
+function leadFromToken(payload: {
+  leadId: string;
+  visitorEmail: string;
+  visitorName: string;
+}): LeadSinkAppendLead {
   return {
     leadId: payload.leadId,
-    submittedAt: now.toISOString(),
-    environment,
-    isTestLead: environment !== "production",
-    name: "",
+    name: payload.visitorName,
     email: payload.visitorEmail,
-    phone: null,
   };
 }
 
@@ -70,7 +68,9 @@ export async function processDetails(
     note: input.note,
   };
 
-  const lead = leadFromToken(verified.payload, deps.environment, deps.now());
+  const lead = leadFromToken(verified.payload);
+  const sourceUrl = absoluteUrl(deps.baseUrl, `/hi/${card.slug}`);
+  const detailsSubmittedAt = deps.now().toISOString();
 
   const sinkDispatchDeps: LeadSinkDispatchDeps = {
     producer: deps.leadSinkQueue,
@@ -87,6 +87,8 @@ export async function processDetails(
     details,
     card.id,
     card.slug,
+    sourceUrl,
+    detailsSubmittedAt,
     sinkDispatchDeps,
   );
 

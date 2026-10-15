@@ -21,6 +21,13 @@ export type VisitorLeadDetails = {
   note: string | null;
 };
 
+/** Lead fields on append-details sink messages (no fabricated exchange metadata). */
+export type LeadSinkAppendLead = {
+  leadId: string;
+  name: string;
+  email: string;
+};
+
 export type CardEmailSnapshot = {
   slug: string;
   displayName: string;

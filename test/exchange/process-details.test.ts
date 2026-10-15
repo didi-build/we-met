@@ -20,6 +20,7 @@ describe("processDetails (unit)", () => {
         cardId: card.id,
         cardSlug: card.slug,
         visitorEmail: "visitor@example.com",
+        visitorName: "Visitor",
       },
       nowSeconds,
     );
@@ -54,6 +55,7 @@ describe("processDetails (unit)", () => {
         },
         createLedgerId: () => "ledger-1",
         now: () => new Date("2026-10-12T12:00:00.000Z"),
+        baseUrl: "https://we-met.link",
       },
     );
 
@@ -81,6 +83,7 @@ describe("processDetails (unit)", () => {
         },
         createLedgerId: () => "ledger-1",
         now: () => new Date(),
+        baseUrl: "https://we-met.link",
       },
     );
     expect(result.status).toBe("invalid_token");

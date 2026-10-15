@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-const TOKEN_VERSION = 1;
+const TOKEN_VERSION = 2;
 const TOKEN_TTL_SECONDS = 2 * 60 * 60;
 
 export type DetailsTokenPayload = {
@@ -9,6 +9,7 @@ export type DetailsTokenPayload = {
   cardId: string;
   cardSlug: string;
   visitorEmail: string;
+  visitorName: string;
   exp: number;
   iat: number;
 };
@@ -80,9 +81,13 @@ export function verifyDetailsToken(
   }
   if (
     typeof parsed.visitorEmail !== "string" ||
+    typeof parsed.visitorName !== "string" ||
     typeof parsed.cardSlug !== "string" ||
     typeof parsed.exp !== "number"
   ) {
+    return { ok: false };
+  }
+  if (!parsed.visitorName.trim()) {
     return { ok: false };
   }
   if (parsed.exp <= nowSeconds) {

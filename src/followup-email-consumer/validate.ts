@@ -1,5 +1,16 @@
-import type { CardEmailSnapshot, VisitorLead } from "@/exchange/types";
+import { isPlainSingleEmailAddress } from "@/email/plain-email";
+import type {
+  LeadSinkAppendDetailsMessage,
+  LeadSinkRecordLeadMessage,
+} from "@/exchange/queue/types";
+import type {
+  CardEmailSnapshot,
+  LeadSinkAppendLead,
+  VisitorLead,
+} from "@/exchange/types";
 import type { VisitorFollowupQueueMessage } from "@/exchange/queue/types";
+
+export { isPlainSingleEmailAddress };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -7,22 +18,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
-}
-
-const PLAIN_EMAIL_FORBIDDEN = /[\s,;<>"\\()\u0000-\u001f\u007f]/;
-
-/** Single RFC5322 addr-spec style address (no display names or multiple recipients). */
-export function isPlainSingleEmailAddress(email: string): boolean {
-  if (!email || PLAIN_EMAIL_FORBIDDEN.test(email)) {
-    return false;
-  }
-  const at = email.indexOf("@");
-  if (at <= 0 || email.indexOf("@", at + 1) !== -1) {
-    return false;
-  }
-  const local = email.slice(0, at);
-  const domain = email.slice(at + 1);
-  return local.length > 0 && domain.length > 0;
 }
 
 function parseCardSnapshot(value: unknown): CardEmailSnapshot | null {
@@ -92,11 +87,140 @@ export function parseVisitorFollowupMessage(
   return { type: "visitor_followup", lead, card };
 }
 
+function parseEmailSinkConfig(value: unknown): { to: string } | null {
+  if (!isRecord(value) || !isNonEmptyString(value.to)) {
+    return null;
+  }
+  if (!isPlainSingleEmailAddress(value.to)) {
+    return null;
+  }
+  return { to: value.to };
+}
+
+function parseAppendLead(value: unknown): LeadSinkAppendLead | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  if (
+    !isNonEmptyString(value.leadId) ||
+    !isNonEmptyString(value.name) ||
+    !isNonEmptyString(value.email) ||
+    !isPlainSingleEmailAddress(value.email)
+  ) {
+    return null;
+  }
+  return {
+    leadId: value.leadId,
+    name: value.name,
+    email: value.email,
+  };
+}
+
+function parseDetails(value: unknown): LeadSinkAppendDetailsMessage["details"] | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  if (
+    !(value.jobTitle === null || typeof value.jobTitle === "string") ||
+    !(value.company === null || typeof value.company === "string") ||
+    !(value.note === null || typeof value.note === "string")
+  ) {
+    return null;
+  }
+  return {
+    jobTitle: value.jobTitle,
+    company: value.company,
+    note: value.note,
+  };
+}
+
+function parseLeadSinkCommon(body: Record<string, unknown>): {
+  sinkId: string;
+  sinkKind: string;
+  sinkConfig: { to: string };
+  cardId: string;
+  cardSlug: string;
+  sourceUrl: string;
+} | null {
+  const sinkConfig = parseEmailSinkConfig(body.sinkConfig);
+  if (
+    !isNonEmptyString(body.sinkId) ||
+    !isNonEmptyString(body.sinkKind) ||
+    !sinkConfig ||
+    !isNonEmptyString(body.cardId) ||
+    !isNonEmptyString(body.cardSlug) ||
+    !isNonEmptyString(body.sourceUrl)
+  ) {
+    return null;
+  }
+  return {
+    sinkId: body.sinkId,
+    sinkKind: body.sinkKind,
+    sinkConfig,
+    cardId: body.cardId,
+    cardSlug: body.cardSlug,
+    sourceUrl: body.sourceUrl,
+  };
+}
+
+export type ParsedLeadSinkMessage =
+  LeadSinkRecordLeadMessage | LeadSinkAppendDetailsMessage;
+
+export function parseLeadSinkMessage(body: unknown): ParsedLeadSinkMessage | null {
+  if (!isRecord(body)) {
+    return null;
+  }
+  const common = parseLeadSinkCommon(body);
+  if (!common) {
+    return null;
+  }
+
+  if (body.type === "lead_sink_record") {
+    const lead = parseLead(body.lead);
+    if (!lead) {
+      return null;
+    }
+    return {
+      type: "lead_sink_record",
+      ...common,
+      lead,
+    };
+  }
+
+  if (body.type === "lead_sink_append_details") {
+    const lead = parseAppendLead(body.lead);
+    const details = parseDetails(body.details);
+    if (!lead || !details || !isNonEmptyString(body.detailsSubmittedAt)) {
+      return null;
+    }
+    return {
+      type: "lead_sink_append_details",
+      ...common,
+      lead,
+      details,
+      detailsSubmittedAt: body.detailsSubmittedAt,
+    };
+  }
+
+  return null;
+}
+
+export function isLeadSinkQueueMessageType(body: unknown): boolean {
+  if (!isRecord(body) || typeof body.type !== "string") {
+    return false;
+  }
+  return body.type === "lead_sink_record" || body.type === "lead_sink_append_details";
+}
+
 export function isUnsupportedQueueMessageType(body: unknown): boolean {
   if (!isRecord(body) || typeof body.type !== "string") {
     return true;
   }
-  if (body.type === "visitor_followup") {
+  if (
+    body.type === "visitor_followup" ||
+    body.type === "lead_sink_record" ||
+    body.type === "lead_sink_append_details"
+  ) {
     return false;
   }
   return true;

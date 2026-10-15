@@ -6,11 +6,14 @@ import {
   MAX_VISITOR_FOLLOWUP_ATTEMPTS,
 } from "@/followup-email-consumer/retry";
 import { followupRetryWindowSecondsThroughAttempt } from "../../scripts/lib/queue-retry-policy.mjs";
+import { createEmailLeadSinkHandler } from "@/followup-email-consumer/lead-sink/email-handler";
+import { createLeadSinkHandlerRegistry } from "@/followup-email-consumer/lead-sink/registry";
 import {
   processFollowupQueueBatch,
   type FollowupConsumerDeps,
   type FollowupQueueMessage,
 } from "@/followup-email-consumer/process-batch";
+import { MemoryConsumerLeadDeliveryLedger } from "../followup-email-consumer/memory-consumer-ledger";
 
 const card: CardEmailSnapshot = {
   slug: "demo",
@@ -73,12 +76,43 @@ function createMessage(
 
 function createDeps(
   overrides: Partial<FollowupConsumerDeps> = {},
+  ledger = new MemoryConsumerLeadDeliveryLedger(),
 ): FollowupConsumerDeps {
+  const emailSender = overrides.emailSender ?? {
+    send: vi.fn(async () => ({ messageId: "g1", threadId: "t1" })),
+  };
+  const now = overrides.now ?? (() => new Date("2026-10-12T12:00:00.000Z"));
+  const logLedgerRowMissing = vi.fn();
+  const logLedgerUpdateFailed = vi.fn();
+  const sinkHandlers =
+    overrides.sinkHandlers ??
+    createLeadSinkHandlerRegistry({
+      email: createEmailLeadSinkHandler({
+        weMetEnv: overrides.weMetEnv ?? "preview",
+        testMailTo: overrides.testMailTo ?? "test-inbox@example.com",
+        ownerFromEmail: overrides.ownerFromEmail ?? "hello@we-met.link",
+        emailSender,
+        ledger,
+        logLedgerRowMissing,
+        logLedgerUpdateFailed,
+        now,
+      }),
+    });
+
   return {
     weMetEnv: "preview",
     gmailSender: "sender@example.com",
     testMailTo: "test-inbox@example.com",
-    emailSender: { send: vi.fn(async () => {}) },
+    ownerFromEmail: "hello@we-met.link",
+    emailSender,
+    ledger,
+    sinkHandlers,
+    logLedgerRowMissing,
+    logLedgerUpdateFailed,
+    logLeadSinkAttemptFailure: vi.fn(),
+    logLeadSinkPermanentFailure: vi.fn(),
+    logMalformedLeadSink: vi.fn(),
+    now,
     assets: {
       get: vi.fn(async () => ({
         body: new ReadableStream({
@@ -96,6 +130,20 @@ function createDeps(
     logUnsupportedType: vi.fn(),
     logMissingPhoto: vi.fn(),
     logNonJpegPhoto: vi.fn(),
+    ...overrides,
+  };
+}
+
+function sinkRecordBody(overrides: Record<string, unknown> = {}) {
+  return {
+    type: "lead_sink_record",
+    sinkId: "sink-1",
+    sinkKind: "email",
+    sinkConfig: { to: "owner@example.com" },
+    lead: visitorBody().lead,
+    cardId: "card-1",
+    cardSlug: "demo",
+    sourceUrl: "https://we-met.link/hi/demo",
     ...overrides,
   };
 }
@@ -193,7 +241,7 @@ describe("processFollowupQueueBatch (unit)", () => {
   });
 
   it("never calls send when non-prod redirect is unset; retries then permanent failure", async () => {
-    const send = vi.fn(async () => {});
+    const send = vi.fn(async () => ({ messageId: null, threadId: null }));
     const depsUnset = createDeps({ testMailTo: undefined, emailSender: { send } });
     const msgRetry = createMessage(visitorBody(), { attempts: 3 });
     await processFollowupQueueBatch({ messages: [msgRetry] }, depsUnset);
@@ -220,7 +268,7 @@ describe("processFollowupQueueBatch (unit)", () => {
   });
 
   it("production mode acks malformed comma-separated visitor email without sending", async () => {
-    const send = vi.fn(async () => {});
+    const send = vi.fn(async () => ({ messageId: null, threadId: null }));
     const message = createMessage(
       visitorBody({
         lead: {
@@ -283,21 +331,32 @@ describe("processFollowupQueueBatch (unit)", () => {
     expect(message.ack).toHaveBeenCalledOnce();
   });
 
-  it("retries lead_sink_record without acking", async () => {
+  it("acks lead_sink_record after successful owner email send", async () => {
+    const ledger = new MemoryConsumerLeadDeliveryLedger();
+    ledger.seedQueued("lead-1", "sink-1", "record");
+    const message = createMessage(sinkRecordBody());
+    const deps = createDeps({}, ledger);
+
+    await processFollowupQueueBatch({ messages: [message] }, deps);
+
+    expect(deps.emailSender.send).toHaveBeenCalledOnce();
+    const sent = vi.mocked(deps.emailSender.send).mock.calls[0][0];
+    expect(sent.to).toBe("test-inbox@example.com");
+    expect(sent.from).toBe("hello@we-met.link");
+    expect(sent.fromDisplayName).toBe("We Met");
+    expect(message.ack).toHaveBeenCalledOnce();
+    expect(message.retry).not.toHaveBeenCalled();
+  });
+
+  it("retries unsupported sink kinds without acking", async () => {
     const message = createMessage({
-      type: "lead_sink_record",
-      sinkId: "s1",
-      sinkKind: "email",
-      sinkConfig: {},
-      lead: visitorBody().lead,
-      cardId: "c1",
-      cardSlug: "demo",
+      ...sinkRecordBody(),
+      sinkKind: "linear",
     });
     const deps = createDeps();
 
     await processFollowupQueueBatch({ messages: [message] }, deps);
 
-    expect(deps.logUnsupportedType).toHaveBeenCalledWith("lead_sink_record");
     expect(message.retry).toHaveBeenCalledOnce();
     expect(message.ack).not.toHaveBeenCalled();
   });
@@ -315,7 +374,7 @@ describe("processFollowupQueueBatch (unit)", () => {
 
   it("does not block sibling messages in a batch", async () => {
     const good = createMessage(visitorBody(), { id: "good" });
-    const bad = createMessage({ type: "lead_sink_append_details", sinkId: "s" });
+    const bad = createMessage({ ...sinkRecordBody(), sinkKind: "linear" });
     const deps = createDeps();
 
     await processFollowupQueueBatch({ messages: [good, bad] }, deps);

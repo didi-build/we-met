@@ -1,8 +1,13 @@
 import type { LeadSinkRecord } from "@/card-data/types";
 import { computeLeadDeliveryRetryUntilIso } from "@/lead-delivery-ledger/retry-until";
 import type { LeadDeliveryLedger } from "@/lead-delivery-ledger/types";
+import type { EmailSinkConfigSnapshot } from "@/exchange/queue/types";
 import type { LeadSinkQueueProducer } from "@/exchange/queue/producer";
-import type { VisitorLead, VisitorLeadDetails } from "@/exchange/types";
+import type {
+  LeadSinkAppendLead,
+  VisitorLead,
+  VisitorLeadDetails,
+} from "@/exchange/types";
 
 export type LeadSinkDispatchLogger = {
   logSinkEnqueueFailure(sinkId: string, error: unknown): void;
@@ -27,6 +32,7 @@ export async function dispatchLeadOnExchange(
   lead: VisitorLead,
   cardId: string,
   cardSlug: string,
+  sourceUrl: string,
   deps: LeadSinkDispatchDeps,
 ): Promise<void> {
   const enabled = sinks.filter((s) => s.enabled);
@@ -64,10 +70,11 @@ export async function dispatchLeadOnExchange(
         type: "lead_sink_record",
         sinkId: sink.id,
         sinkKind: sink.kind,
-        sinkConfig: sink.config,
+        sinkConfig: sink.config as EmailSinkConfigSnapshot,
         lead,
         cardId,
         cardSlug,
+        sourceUrl,
       });
     } catch (error) {
       deps.sinkLogger.logSinkEnqueueFailure(sink.id, error);
@@ -93,10 +100,12 @@ export async function dispatchLeadOnExchange(
 
 export async function dispatchDetailsAppend(
   sinks: LeadSinkRecord[],
-  lead: VisitorLead,
+  lead: LeadSinkAppendLead,
   details: VisitorLeadDetails,
   cardId: string,
   cardSlug: string,
+  sourceUrl: string,
+  detailsSubmittedAt: string,
   deps: LeadSinkDispatchDeps,
 ): Promise<void> {
   const enabled = sinks.filter((s) => s.enabled);
@@ -139,11 +148,13 @@ export async function dispatchDetailsAppend(
         type: "lead_sink_append_details",
         sinkId: sink.id,
         sinkKind: sink.kind,
-        sinkConfig: sink.config,
+        sinkConfig: sink.config as EmailSinkConfigSnapshot,
         lead,
         details,
         cardId,
         cardSlug,
+        sourceUrl,
+        detailsSubmittedAt,
       });
     } catch (error) {
       deps.sinkLogger.logSinkEnqueueFailure(sink.id, error);

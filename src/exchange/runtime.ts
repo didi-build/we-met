@@ -111,6 +111,7 @@ export async function createProcessExchangeDeps(
     createLeadId: () => crypto.randomUUID(),
     createLedgerId: () => crypto.randomUUID(),
     now: () => new Date(),
+    baseUrl: hostConfig.baseUrl,
   };
 }
 
@@ -144,5 +145,6 @@ export async function createProcessDetailsDeps(): Promise<ProcessDetailsDeps> {
     leadSinkLogger: consoleSinkLogger(),
     createLedgerId: () => crypto.randomUUID(),
     now: () => new Date(),
+    baseUrl: hostConfig.baseUrl,
   };
 }

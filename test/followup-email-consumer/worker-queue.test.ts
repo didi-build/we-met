@@ -4,6 +4,19 @@ import { resetGmailTokenCacheForTests } from "@/email/gmail-sender";
 import { generateTestServiceAccount } from "../helpers/gmail-test-service-account";
 import followupEmailConsumer from "../../workers/we-met-followup-email-consumer/index";
 import type { FollowupConsumerEnv } from "@/followup-email-consumer/process-batch";
+import type { D1Database } from "@cloudflare/workers-types";
+
+function createNoopConsumerD1(): D1Database {
+  const stmt = {
+    bind: () => ({
+      run: async () => ({ meta: { changes: 0 } }),
+      first: async () => null,
+    }),
+  };
+  return {
+    prepare: () => stmt,
+  } as unknown as D1Database;
+}
 
 const card: CardEmailSnapshot = {
   slug: "demo",
@@ -127,6 +140,7 @@ describe("follow-up email consumer worker queue (integration)", () => {
       GMAIL_SERVICE_ACCOUNT_JSON: json,
       WE_MET_TEST_MAIL_TO: "test-inbox@example.com",
       WE_MET_ASSETS: bucket as never,
+      WE_MET_DB: createNoopConsumerD1(),
     };
 
     await followupEmailConsumer.queue(
@@ -184,6 +198,7 @@ describe("follow-up email consumer worker queue (integration)", () => {
       GMAIL_SERVICE_ACCOUNT_JSON: json,
       WE_MET_TEST_MAIL_TO: "test-inbox@example.com",
       WE_MET_ASSETS: { get: vi.fn() } as never,
+      WE_MET_DB: createNoopConsumerD1(),
     };
 
     await followupEmailConsumer.queue(

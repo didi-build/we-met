@@ -6,6 +6,8 @@ export type FollowupEmailErrorCode =
   | `gmail_send_http_${number}`
   | "gmail_network_error"
   | "nonprod_mail_redirect_unset"
+  | "owner_from_email_missing"
+  | "malformed_sink_email_config"
   | "unknown";
 
 export class FollowupEmailError extends Error {
@@ -36,7 +38,11 @@ export function followupEmailErrorLogFields(
 ): FollowupEmailErrorLogFields {
   if (error instanceof FollowupEmailError) {
     const fields: FollowupEmailErrorLogFields = { code: error.code };
-    if (error.code === "gmail_secret_missing" && error.secretName) {
+    if (
+      (error.code === "gmail_secret_missing" ||
+        error.code === "owner_from_email_missing") &&
+      error.secretName
+    ) {
       fields.secretName = error.secretName;
     }
     return fields;

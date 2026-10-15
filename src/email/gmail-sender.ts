@@ -1,6 +1,6 @@
 import { buildRawEmailMessage } from "@/email/mime-message";
 import { FollowupEmailError } from "@/email/followup-email-error";
-import type { EmailSender, OutboundEmail } from "@/email/types";
+import type { EmailSender, EmailSendResult, OutboundEmail } from "@/email/types";
 
 const GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send";
 const TOKEN_AUDIENCE = "https://oauth2.googleapis.com/token";
@@ -190,22 +190,39 @@ export async function getGmailAccessToken(
 
 export function createGmailEmailSender(config: GmailServiceAccountConfig): EmailSender {
   return {
-    async send(message: OutboundEmail): Promise<void> {
+    async send(message: OutboundEmail): Promise<EmailSendResult> {
       requireGmailSecrets(config);
       const fetchFn = config.fetchFn ?? fetch;
       const accessToken = await getGmailAccessToken(config);
       const raw = buildRawEmailMessage(message);
+      const body: { raw: string; threadId?: string } = { raw };
+      if (message.threadId?.trim()) {
+        body.threadId = message.threadId.trim();
+      }
       const response = await fetchWithNetworkError(fetchFn, GMAIL_SEND_URL, {
         method: "POST",
         headers: {
           authorization: `Bearer ${accessToken}`,
           "content-type": "application/json",
         },
-        body: JSON.stringify({ raw }),
+        body: JSON.stringify(body),
       });
 
       if (!response.ok) {
         throw new FollowupEmailError(`gmail_send_http_${response.status}`);
+      }
+
+      try {
+        const payload = (await response.json()) as {
+          id?: string;
+          threadId?: string;
+        };
+        return {
+          messageId: payload.id ?? null,
+          threadId: payload.threadId ?? null,
+        };
+      } catch {
+        return { messageId: null, threadId: null };
       }
     },
   };

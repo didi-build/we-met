@@ -1,8 +1,13 @@
 import type {
   CardEmailSnapshot,
+  LeadSinkAppendLead,
   VisitorLead,
   VisitorLeadDetails,
 } from "@/exchange/types";
+
+export type EmailSinkConfigSnapshot = {
+  to: string;
+};
 
 export type VisitorFollowupQueueMessage = {
   type: "visitor_followup";
@@ -14,21 +19,24 @@ export type LeadSinkRecordLeadMessage = {
   type: "lead_sink_record";
   sinkId: string;
   sinkKind: string;
-  sinkConfig: unknown;
+  sinkConfig: EmailSinkConfigSnapshot;
   lead: VisitorLead;
   cardId: string;
   cardSlug: string;
+  sourceUrl: string;
 };
 
 export type LeadSinkAppendDetailsMessage = {
   type: "lead_sink_append_details";
   sinkId: string;
   sinkKind: string;
-  sinkConfig: unknown;
-  lead: VisitorLead;
+  sinkConfig: EmailSinkConfigSnapshot;
+  lead: LeadSinkAppendLead;
   details: VisitorLeadDetails;
   cardId: string;
   cardSlug: string;
+  sourceUrl: string;
+  detailsSubmittedAt: string;
 };
 
 export type WeMetQueueMessage =
