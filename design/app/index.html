@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>We Met</title>
+<link rel="icon" type="image/svg+xml" href="icons/we-met-mark.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<!--
+  SAMPLE DATA (preview only, safe to delete). The real app gets these from the hooks in app.js.
+  "card" has the same shape as the card-data block in design/card/card.html, plus "slug".
+  The About and What I do titles are fixed ("About me", "What I do") and are not stored per card.
+-->
+<script type="application/json" id="sample-data">
+{
+  "session": { "email": "didi.shoukralla@gmail.com", "name": "Didi Shoukralla" },
+  "card": {
+    "slug": "didi",
+    "name": "Didi Shoukralla",
+    "role": "Software Engineer and Technical Advisor",
+    "photo": "../card/assets/didi.png",
+    "about": [
+      "I'm a software engineer in Toronto. I help founders who built their app with AI get it ready for real users, paying customers, or investors.",
+      "I've shipped software at startups and on production teams, so I know what breaks once people actually show up.",
+      "If you're building something, I'm happy to give you an honest, straight read during your free consultation."
+    ],
+    "services": [
+      { "title": "System audit", "description": "I review your app and give you a written summary: what's solid, what's risky, and what to do next." },
+      { "title": "Custom development", "description": "I build what your product needs, whether that's a new feature or a custom tool made just for you." },
+      { "title": "Technical advisory", "description": "I answer your technical questions in plain English and help you decide what to build, what to skip, and what to ask your developers." },
+      { "title": "Fractional CTO", "description": "I act as your part-time technical lead: I guide the technical decisions and the team, without a full-time hire." },
+      { "title": "AI Integrations", "description": "I add AI to your product where it helps, like a chat assistant, smarter search, or an agent that handles tasks for you." }
+    ],
+    "links": {
+      "website": "https://didi.build",
+      "linkedin": "https://www.linkedin.com/in/diadem-shoukralla/",
+      "github": "https://github.com/DiademShoukralla/",
+      "instagram": "https://instagram.com/didi.build"
+    },
+    "alternate": { "url": "https://didi.build/book", "label": "or book a time directly" }
+  }
+}
+</script>
+
+<div class="ap" id="ap-root">
+  <header class="ap-header">
+    <a class="ap-brand" href="https://we-met.link"><span class="ap-icon" data-icon="we-met-mark" data-size="28" aria-hidden="true"></span>We Met</a>
+    <div class="ap-header-right">
+      <button type="button" class="ap-iconbtn" data-theme-toggle aria-label="Use dark mode">
+        <span class="ap-icon ap-sun" data-icon="sun" data-size="20" aria-hidden="true"></span>
+        <span class="ap-icon ap-moon" data-icon="moon" data-size="20" aria-hidden="true"></span>
+      </button>
+      <div class="ap-account" data-account hidden>
+        <button type="button" class="ap-avatar-btn" data-menu-btn aria-label="Account" aria-haspopup="menu" aria-expanded="false" aria-controls="ap-menu"><span><span class="ap-icon" data-icon="person" data-size="26" aria-hidden="true"></span></span></button>
+        <div class="ap-menu" id="ap-menu" role="menu" aria-label="Account" data-menu hidden>
+          <p class="ap-menu-label">Signed in as</p>
+          <p class="ap-menu-email" data-email>didi.shoukralla@gmail.com</p>
+          <div class="ap-menu-rule" aria-hidden="true"></div>
+          <button type="button" class="ap-menu-item" role="menuitem" data-signout>Sign out</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- View: sign in -->
+  <main class="ap-login" data-view="login" hidden>
+    <span class="ap-icon ap-login-mark" data-icon="we-met-mark" data-size="56" aria-hidden="true"></span>
+    <h1 class="ap-login-title">Make your We Met card</h1>
+    <p class="ap-login-sub">One link to share when you meet people. Free, and it takes a few minutes.</p>
+    <div class="ap-login-actions">
+      <div class="ap-alert" role="alert" data-login-error hidden><span class="ap-alert-mark" aria-hidden="true">!</span><span>Sign-in didn't finish. Try again, or choose a different Google account.</span></div>
+      <button type="button" class="ap-google" data-signin><span class="ap-icon" data-icon="google-g" data-size="20" aria-hidden="true"></span><span data-signin-label>Sign in with Google</span></button>
+      <p class="ap-login-note">Leads from your card are emailed to your Google address.</p>
+    </div>
+  </main>
+
+  <!-- View: sign-up closed -->
+  <main class="ap-login" data-view="closed" hidden>
+    <span class="ap-icon ap-login-mark" data-icon="we-met-mark" data-size="56" aria-hidden="true"></span>
+    <h1 class="ap-login-title">Sign-up isn't open yet</h1>
+    <p class="ap-login-sub">We Met is open to a small group for now. You're signed in as <strong data-email>you@gmail.com</strong>.</p>
+    <div class="ap-login-actions">
+      <button type="button" class="ap-btn ap-btn-outline ap-btn-block" data-signout>Use a different account</button>
+    </div>
+  </main>
+
+  <!-- View: editor -->
+  <div data-view="editor" hidden>
+    <div class="ap-tabs">
+      <div class="ap-seg" role="tablist" aria-label="Editor view">
+        <button type="button" role="tab" id="tab-edit" aria-selected="true" aria-controls="ap-form" data-tab="edit">Edit</button>
+        <button type="button" role="tab" id="tab-preview" aria-selected="false" aria-controls="ap-preview" data-tab="preview">Preview</button>
+      </div>
+    </div>
+
+    <div class="ap-editor" data-editor data-tab="edit">
+      <form class="ap-form" id="ap-form" role="tabpanel" aria-labelledby="tab-edit" novalidate data-form>
+        <div class="ap-form-head">
+          <h1 class="ap-form-title">Your card</h1>
+          <p class="ap-form-sub">Changes save as you type. Your public card only changes when you publish.</p>
+        </div>
+
+        <section class="ap-sec" aria-labelledby="sec-link" data-sec>
+          <div class="ap-sec-head"><h2 class="ap-sec-title" id="sec-link"><button type="button" class="ap-sec-toggle" aria-expanded="true" aria-controls="body-link" data-sec-toggle><span class="ap-sec-name">Your link</span><span class="ap-icon ap-chev" data-icon="chevron-down" data-size="20" aria-hidden="true"></span></button></h2></div>
+          <div class="ap-sec-body" id="body-link">
+          <div class="ap-field" data-field="slug">
+            <div class="ap-box ap-box-action" data-slug-box><label class="ap-label" for="f-slug">Card address</label>
+              <span class="ap-prefixed"><span class="ap-prefix" aria-hidden="true">we-met.link/hi/</span><input class="ap-input" id="f-slug" data-bind="slug" data-max="40" autocomplete="off" autocapitalize="none" spellcheck="false" inputmode="url" placeholder="your-name" aria-describedby="f-slug-status f-slug-err"></span>
+              <button type="button" class="ap-iconbtn ap-box-btn" data-slug-action aria-label="Unlock to change your link" hidden><span class="ap-icon" data-icon="lock" data-size="18" aria-hidden="true" data-slug-ic-lock></span><span class="ap-icon" data-icon="check" data-size="18" aria-hidden="true" data-slug-ic-ok hidden></span></button></div>
+            <div class="ap-slug-edit" data-slug-edit hidden><span class="ap-help">Type the new address, then tap the check to use it.</span><button type="button" class="ap-textbtn" data-slug-cancel>Cancel</button></div>
+            <p class="ap-slug-status" id="f-slug-status" role="status" aria-live="polite" data-slug-status>Lowercase letters, numbers and hyphens.</p>
+            <div class="ap-meta"><p class="ap-err" id="f-slug-err" data-err="slug" hidden></p></div>
+            <div class="ap-alert ap-alert-info" data-slug-warning hidden><span class="ap-alert-mark" aria-hidden="true">!</span><span class="ap-alert-body"><span>When you publish, <strong data-old-url>we-met.link/hi/didi</strong> will stop working. Anyone with the old link or QR code won't reach your card.</span></span></div>
+          </div>
+        </div>
+        </section>
+
+        <section class="ap-sec" aria-labelledby="sec-profile" data-sec>
+          <div class="ap-sec-head"><h2 class="ap-sec-title" id="sec-profile"><button type="button" class="ap-sec-toggle" aria-expanded="true" aria-controls="body-profile" data-sec-toggle><span class="ap-sec-name">Profile</span><span class="ap-icon ap-chev" data-icon="chevron-down" data-size="20" aria-hidden="true"></span></button></h2></div>
+          <div class="ap-sec-body" id="body-profile">
+          <div class="ap-field" data-field="photo">
+            <div class="ap-photo">
+              <div class="ap-photo-img">
+                <img data-photo-img alt="" hidden>
+                <span class="ap-photo-initials" data-photo-initials aria-hidden="true"></span>
+                <span class="ap-photo-busy" data-photo-busy hidden><span class="ap-spin" aria-hidden="true"></span><span class="ap-sr">Uploading photo</span></span>
+              </div>
+              <div class="ap-photo-actions">
+                <button type="button" class="ap-btn ap-btn-outline ap-btn-sm" data-photo-pick><span class="ap-icon" data-icon="camera" data-size="18" aria-hidden="true"></span><span data-photo-pick-label>Add photo</span></button>
+                <button type="button" class="ap-textbtn" data-photo-remove hidden>Remove</button>
+              </div>
+            </div>
+            <input type="file" accept="image/jpeg,image/png,image/webp" data-photo-file hidden>
+            <div class="ap-meta"><p class="ap-err" id="f-photo-err" role="alert" data-err="photo" hidden></p><p class="ap-help" data-photo-help>JPG, PNG or WebP, up to 5 MB. Without a photo, your card shows your initials.</p></div>
+          </div>
+          <div class="ap-field" data-field="name">
+            <label class="ap-box" for="f-name"><span class="ap-label">Name</span><input class="ap-input" id="f-name" data-bind="name" data-max="60" autocomplete="name" aria-describedby="f-name-err f-name-count"></label>
+            <div class="ap-meta"><p class="ap-err" id="f-name-err" data-err="name" hidden></p><span class="ap-count" id="f-name-count" data-count="name" hidden></span></div>
+          </div>
+          <div class="ap-field" data-field="role">
+            <label class="ap-box" for="f-role"><span class="ap-label">Role <span class="ap-label-opt">(optional)</span></span><input class="ap-input" id="f-role" data-bind="role" data-max="100" autocomplete="organization-title" placeholder="What you do, in a few words" aria-describedby="f-role-err f-role-count"></label>
+            <div class="ap-meta"><p class="ap-err" id="f-role-err" data-err="role" hidden></p><span class="ap-count" id="f-role-count" data-count="role" hidden></span></div>
+          </div>
+        </div>
+        </section>
+
+        <section class="ap-sec" aria-labelledby="sec-about" data-sec>
+          <div class="ap-sec-head"><h2 class="ap-sec-title" id="sec-about"><button type="button" class="ap-sec-toggle" aria-expanded="true" aria-controls="body-about" data-sec-toggle><span class="ap-sec-name">About me</span><span class="ap-icon ap-chev" data-icon="chevron-down" data-size="20" aria-hidden="true"></span></button></h2><p class="ap-sec-sub">Up to 4 short paragraphs. The first one shows; the rest open with Show more.</p></div>
+          <div class="ap-sec-body" id="body-about">
+          <ol class="ap-items" data-list="about"></ol>
+          <button type="button" class="ap-textbtn ap-add" data-add="about"><span class="ap-icon" data-icon="plus" data-size="16" aria-hidden="true"></span>Add paragraph</button>
+          <p class="ap-limit" data-limit="about" hidden>That's the maximum of 4 paragraphs.</p>
+        </div>
+        </section>
+
+        <section class="ap-sec" aria-labelledby="sec-services" data-sec>
+          <div class="ap-sec-head"><h2 class="ap-sec-title" id="sec-services"><button type="button" class="ap-sec-toggle" aria-expanded="true" aria-controls="body-services" data-sec-toggle><span class="ap-sec-name">What I do</span><span class="ap-icon ap-chev" data-icon="chevron-down" data-size="20" aria-hidden="true"></span></button></h2><p class="ap-sec-sub">Up to 10. Each shows as a chip; tapping it shows the description.</p></div>
+          <div class="ap-sec-body" id="body-services">
+          <ol class="ap-items" data-list="services"></ol>
+          <button type="button" class="ap-textbtn ap-add" data-add="services"><span class="ap-icon" data-icon="plus" data-size="16" aria-hidden="true"></span>Add service</button>
+          <p class="ap-limit" data-limit="services" hidden>That's the maximum of 10 services.</p>
+        </div>
+        </section>
+
+        <section class="ap-sec" aria-labelledby="sec-links" data-sec>
+          <div class="ap-sec-head"><h2 class="ap-sec-title" id="sec-links"><button type="button" class="ap-sec-toggle" aria-expanded="true" aria-controls="body-links" data-sec-toggle><span class="ap-sec-name">Links</span><span class="ap-icon ap-chev" data-icon="chevron-down" data-size="20" aria-hidden="true"></span></button></h2><p class="ap-sec-sub">All optional. Each one shows as an icon on your card.</p></div>
+          <div class="ap-sec-body" id="body-links">
+          <div class="ap-field" data-field="links.website">
+            <label class="ap-box" for="f-website"><span class="ap-label">Website</span><span class="ap-prefixed"><span class="ap-icon ap-prefix-icon" data-icon="website" data-size="18" aria-hidden="true"></span><input class="ap-input" id="f-website" type="url" inputmode="url" data-bind="links.website" autocomplete="url" placeholder="https://" aria-describedby="f-website-err"></span></label>
+            <div class="ap-meta"><p class="ap-err" id="f-website-err" data-err="links.website" hidden></p></div>
+          </div>
+          <div class="ap-field" data-field="links.linkedin">
+            <label class="ap-box" for="f-linkedin"><span class="ap-label">LinkedIn</span><span class="ap-prefixed"><span class="ap-icon ap-prefix-icon" data-icon="linkedin" data-size="18" aria-hidden="true"></span><input class="ap-input" id="f-linkedin" type="url" inputmode="url" data-bind="links.linkedin" placeholder="https://www.linkedin.com/in/" aria-describedby="f-linkedin-err"></span></label>
+            <div class="ap-meta"><p class="ap-err" id="f-linkedin-err" data-err="links.linkedin" hidden></p></div>
+          </div>
+          <div class="ap-field" data-field="links.github">
+            <label class="ap-box" for="f-github"><span class="ap-label">GitHub</span><span class="ap-prefixed"><span class="ap-icon ap-prefix-icon" data-icon="github" data-size="18" aria-hidden="true"></span><input class="ap-input" id="f-github" type="url" inputmode="url" data-bind="links.github" placeholder="https://github.com/" aria-describedby="f-github-err"></span></label>
+            <div class="ap-meta"><p class="ap-err" id="f-github-err" data-err="links.github" hidden></p></div>
+          </div>
+          <div class="ap-field" data-field="links.instagram">
+            <label class="ap-box" for="f-instagram"><span class="ap-label">Instagram</span><span class="ap-prefixed"><span class="ap-icon ap-prefix-icon" data-icon="instagram" data-size="18" aria-hidden="true"></span><input class="ap-input" id="f-instagram" type="url" inputmode="url" data-bind="links.instagram" placeholder="https://instagram.com/" aria-describedby="f-instagram-err"></span></label>
+            <div class="ap-meta"><p class="ap-err" id="f-instagram-err" data-err="links.instagram" hidden></p></div>
+          </div>
+        </div>
+        </section>
+
+        <section class="ap-sec" aria-labelledby="sec-alt" data-sec>
+          <div class="ap-sec-head"><h2 class="ap-sec-title" id="sec-alt"><button type="button" class="ap-sec-toggle" aria-expanded="true" aria-controls="body-alt" data-sec-toggle><span class="ap-sec-name">Extra link <span class="ap-label-opt" style="font-size:14px;font-weight:500;color:var(--c-ink-muted)">(optional)</span></span><span class="ap-icon ap-chev" data-icon="chevron-down" data-size="20" aria-hidden="true"></span></button></h2><p class="ap-sec-sub" id="f-alt-help">Shows as a small link under the Exchange button on your card, like a booking page. It's never included in emails.</p></div>
+          <div class="ap-sec-body" id="body-alt">
+          <div class="ap-field" data-field="alternate.url">
+            <label class="ap-box" for="f-alt-url"><span class="ap-label">Link</span><span class="ap-prefixed"><span class="ap-icon ap-prefix-icon" data-icon="link" data-size="18" aria-hidden="true"></span><input class="ap-input" id="f-alt-url" type="url" inputmode="url" data-bind="alternate.url" placeholder="https://" aria-describedby="f-alt-help f-alt-url-err"></span></label>
+            <div class="ap-meta"><p class="ap-err" id="f-alt-url-err" data-err="alternate.url" hidden></p></div>
+          </div>
+          <div class="ap-field" data-field="alternate.label">
+            <label class="ap-box" for="f-alt-label"><span class="ap-label">Link text</span><input class="ap-input" id="f-alt-label" data-bind="alternate.label" data-max="60" placeholder="Book a time" aria-describedby="f-alt-label-help f-alt-label-err f-alt-label-count"></label>
+            <div class="ap-meta"><p class="ap-help" id="f-alt-label-help" data-help="alternate.label">If you leave this empty, this extra link won't show.</p><p class="ap-err" id="f-alt-label-err" data-err="alternate.label" hidden></p><span class="ap-count" id="f-alt-label-count" data-count="alternate.label" hidden></span></div>
+          </div>
+        </div>
+        </section>
+
+        <section class="ap-sec" aria-labelledby="sec-leads" data-sec>
+          <div class="ap-sec-head"><h2 class="ap-sec-title" id="sec-leads"><button type="button" class="ap-sec-toggle" aria-expanded="true" aria-controls="body-leads" data-sec-toggle><span class="ap-sec-name">Leads</span><span class="ap-icon ap-chev" data-icon="chevron-down" data-size="20" aria-hidden="true"></span></button></h2></div>
+          <div class="ap-sec-body" id="body-leads">
+          <p class="ap-leads"><span class="ap-icon" data-icon="mail" data-size="18" aria-hidden="true"></span><span>Leads go to <strong data-email>didi.shoukralla@gmail.com</strong></span></p>
+        </div>
+        </section>
+      </form>
+
+      <aside class="ap-preview-col" id="ap-preview" role="tabpanel" aria-labelledby="tab-preview" aria-label="Card preview">
+        <div class="ap-preview-head"><span class="ap-preview-title">Preview</span><span class="ap-preview-note">Exchange is off in the preview.</span></div>
+        <div class="ap-frame" data-frame>
+          <iframe title="Card preview" data-front="true" tabindex="0"></iframe>
+          <iframe title="Card preview" data-front="false" tabindex="-1" aria-hidden="true"></iframe>
+        </div>
+      </aside>
+    </div>
+
+    <div class="ap-bar">
+      <div class="ap-blocked" data-blocked hidden>
+        <div class="ap-alert" role="alert"><span class="ap-alert-mark" aria-hidden="true">!</span><span class="ap-alert-body"><span data-blocked-text>To publish, add your name and choose your link.</span></span></div>
+      </div>
+      <div class="ap-bar-in">
+        <div class="ap-bar-status">
+          <span class="ap-save" role="status" aria-live="polite" data-save>Saved</span>
+        </div>
+        <div class="ap-bar-actions">
+          <button type="button" class="ap-btn ap-btn-outline ap-btn-sm" data-share hidden><span class="ap-icon" data-icon="share" data-size="18" aria-hidden="true"></span>Share card</button>
+          <button type="button" class="ap-btn" data-publish data-label="Publish">Publish</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dialog: crop photo -->
+  <div class="ap-dialog" data-dialog="crop" hidden>
+    <div class="ap-scrim" data-dialog-close></div>
+    <div class="ap-panel" role="dialog" aria-modal="true" aria-labelledby="crop-title">
+      <div class="ap-panel-head"><h2 class="ap-panel-title" id="crop-title">Crop your photo</h2><button type="button" class="ap-iconbtn ap-close" aria-label="Close" data-dialog-close><span class="ap-icon" data-icon="close" data-size="20" aria-hidden="true"></span></button></div>
+      <div class="ap-crop" data-crop-stage aria-label="Drag to move the photo" role="img"><img data-crop-img alt=""><span class="ap-crop-mask" aria-hidden="true"></span><span class="ap-crop-frame" aria-hidden="true"></span></div>
+      <label class="ap-zoom"><span class="ap-icon" data-icon="zoom-out" data-size="20" aria-hidden="true"></span><span class="ap-sr">Zoom</span><input type="range" min="1" max="3" step="0.01" value="1" data-crop-zoom><span class="ap-icon" data-icon="zoom-in" data-size="20" aria-hidden="true"></span></label>
+      <p class="ap-crop-note">Drag to move. Your photo is saved square and shows as a circle on your card.</p>
+      <div class="ap-panel-actions">
+        <button type="button" class="ap-btn ap-btn-lg" data-crop-use>Use photo</button>
+        <button type="button" class="ap-btn ap-btn-outline ap-btn-lg" data-dialog-close>Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dialog: published -->
+  <div class="ap-dialog" data-dialog="published" hidden>
+    <div class="ap-scrim" data-dialog-close></div>
+    <div class="ap-panel" role="dialog" aria-modal="true" aria-labelledby="pub-title">
+      <div class="ap-panel-head"><h2 class="ap-panel-title" id="pub-title">Your card is live</h2><button type="button" class="ap-iconbtn ap-close" aria-label="Close" data-dialog-close><span class="ap-icon" data-icon="close" data-size="20" aria-hidden="true"></span></button></div>
+      <p class="ap-panel-text">Share this link, or open your card to show its QR code.</p>
+      <div class="ap-url"><span data-pub-url>we-met.link/hi/didi</span><button type="button" class="ap-btn ap-btn-sm" data-copy><span class="ap-icon" data-icon="copy" data-size="18" aria-hidden="true"></span><span data-copy-label>Copy link</span></button></div>
+      <p class="ap-sr" role="status" aria-live="polite" data-copy-status></p>
+      <div class="ap-panel-actions">
+        <a class="ap-btn ap-btn-outline ap-btn-lg" data-pub-open href="#" target="_blank" rel="noopener"><span class="ap-icon" data-icon="external" data-size="18" aria-hidden="true"></span>Open card</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dialog: session expired -->
+  <div class="ap-dialog" data-dialog="session" hidden>
+    <div class="ap-scrim"></div>
+    <div class="ap-panel" role="alertdialog" aria-modal="true" aria-labelledby="sess-title" aria-describedby="sess-text">
+      <div class="ap-panel-head"><h2 class="ap-panel-title" id="sess-title">Sign in again to keep editing</h2></div>
+      <p class="ap-panel-text" id="sess-text">You were signed out. Your changes are kept on this device and will save once you're back.</p>
+      <div class="ap-panel-actions">
+        <button type="button" class="ap-google" data-signin><span class="ap-icon" data-icon="google-g" data-size="20" aria-hidden="true"></span><span data-signin-label>Sign in with Google</span></button>
+      </div>
+    </div>
+  </div>
+
+  <p class="ap-sr" role="status" aria-live="polite" data-announce></p>
+</div>
+
+<template id="tpl-para">
+  <li class="ap-item">
+    <div class="ap-field">
+      <label class="ap-box"><span class="ap-label" data-item-label>Paragraph 1</span><textarea class="ap-input" rows="3"></textarea></label>
+      <div class="ap-meta"><p class="ap-err" hidden></p><span class="ap-count" hidden></span></div>
+    </div>
+    <button type="button" class="ap-textbtn" data-remove style="align-self:flex-start"><span class="ap-icon" data-icon="trash" data-size="16" aria-hidden="true"></span>Remove paragraph</button>
+  </li>
+</template>
+
+<template id="tpl-service">
+  <li class="ap-item ap-item-svc">
+    <div class="ap-item-bar">
+      <span class="ap-item-label" data-item-label>Service 1</span>
+      <span class="ap-item-tools">
+        <button type="button" class="ap-iconbtn" data-move="-1" aria-label="Move up"><span class="ap-icon" data-icon="arrow-up" data-size="18" aria-hidden="true"></span></button>
+        <button type="button" class="ap-iconbtn" data-move="1" aria-label="Move down"><span class="ap-icon" data-icon="arrow-down" data-size="18" aria-hidden="true"></span></button>
+        <button type="button" class="ap-iconbtn" data-remove aria-label="Delete"><span class="ap-icon" data-icon="trash" data-size="18" aria-hidden="true"></span></button>
+      </span>
+    </div>
+    <div class="ap-field" data-part="title">
+      <label class="ap-box"><span class="ap-label">Title</span><input class="ap-input" placeholder="System audit"></label>
+      <div class="ap-meta"><p class="ap-err" hidden></p><span class="ap-count" hidden></span></div>
+    </div>
+    <div class="ap-field" data-part="description">
+      <label class="ap-box"><span class="ap-label">Description</span><textarea class="ap-input" rows="2" placeholder="One or two sentences about it"></textarea></label>
+      <div class="ap-meta"><p class="ap-err" hidden></p><span class="ap-count" hidden></span></div>
+    </div>
+  </li>
+</template>
+
+<script src="app.js"></script>
+</body>
+</html>
