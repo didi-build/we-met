@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Didi Shoukralla · We Met</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="card.css">
+</head>
+<body>
+<!--
+  CARD DATA. The only per-card input. card.js reads it and fills the markup below.
+  Empty or missing fields hide their section:
+    photo        -> initials circle instead of the photo
+    role         -> role line hidden
+    about        -> About section hidden (first paragraph shows, the rest sit behind "Show more")
+    services     -> What I do section hidden
+    links.*      -> each social icon hidden on its own; whole row hidden if none
+    alternate    -> the small underlined link under Exchange contact hidden
+    plan "pro"   -> no top strip, no bottom band
+-->
+<script type="application/json" id="card-data">
+{
+  "plan": "free",
+  "name": "Didi Shoukralla",
+  "role": "Software Engineer and Technical Advisor",
+  "photo": "assets/didi.png",
+  "about": {
+    "title": "About me",
+    "paragraphs": [
+      "I'm a software engineer in Toronto. I help founders who built their app with AI get it ready for real users, paying customers, or investors.",
+      "I've shipped software at startups and on production teams, so I know what breaks once people actually show up.",
+      "If you're building something, I'm happy to give you an honest, straight read during your free consultation."
+    ]
+  },
+  "services": {
+    "title": "What I do",
+    "items": [
+      { "title": "System audit", "description": "I review your app and give you a written summary: what's solid, what's risky, and what to do next." },
+      { "title": "Custom development", "description": "I build what your product needs, whether that's a new feature or a custom tool made just for you." },
+      { "title": "Technical advisory", "description": "I answer your technical questions in plain English and help you decide what to build, what to skip, and what to ask your developers." },
+      { "title": "Fractional CTO", "description": "I act as your part-time technical lead: I guide the technical decisions and the team, without a full-time hire." },
+      { "title": "AI Integrations", "description": "I add AI to your product where it helps, like a chat assistant, smarter search, or an agent that handles tasks for you." }
+    ]
+  },
+  "links": {
+    "website": "https://didi.build",
+    "linkedin": "https://www.linkedin.com/in/diadem-shoukralla/",
+    "github": "https://github.com/DiademShoukralla/",
+    "instagram": "https://instagram.com/didi.build"
+  },
+  "alternate": { "url": "https://didi.build/book", "label": "or book a time directly" }
+}
+</script>
+
+<div class="wm-page" id="wm-root">
+  <div class="wm-glow" aria-hidden="true"></div>
+
+  <a class="wm-strip" data-plan-free href="https://we-met.link" target="_blank" rel="noopener">
+    <span class="wm-strip-brand">
+      <span class="wm-icon" data-icon="we-met-mark" data-size="16" aria-hidden="true"></span>
+      We Met
+    </span>
+    <span class="wm-dot" aria-hidden="true"></span>
+    <span class="wm-strip-text">Get your own card for free</span>
+    <span class="wm-icon" data-icon="arrow-right" data-size="16" aria-hidden="true"></span>
+  </a>
+
+  <main class="wm-main">
+    <div class="wm-stack">
+      <section class="wm-card" aria-label="About">
+        <div class="wm-head">
+          <section class="wm-id" data-bind-aria="name">
+            <img class="wm-avatar" data-bind-photo alt="" width="136" height="136">
+            <div class="wm-initials" data-initials aria-hidden="true" hidden></div>
+            <div class="wm-names">
+              <p class="wm-greeting" data-greeting>I'm Didi</p>
+              <p class="wm-role" data-bind="role">Software Engineer and Technical Advisor</p>
+            </div>
+          </section>
+
+          <section class="wm-cta" id="wm-cta" aria-label="Exchange contacts">
+            <div class="wm-ringwrap">
+              <span class="wm-ring" aria-hidden="true"></span>
+              <button type="button" class="wm-btn wm-btn-block" data-open-sheet>Exchange contact</button>
+            </div>
+            <a class="wm-alt" data-alternate href="https://didi.build/book" target="_blank" rel="noopener">or book a time directly</a>
+            <p class="wm-thanks" role="status" data-thanks hidden>Thanks, <span data-visitor-first>there</span>. Talk soon.</p>
+          </section>
+          <div class="wm-rule" aria-hidden="true"></div>
+        </div>
+
+        <div class="wm-about" data-section="about">
+          <h2 class="wm-h" data-bind="about.title">About me</h2>
+          <p class="wm-p" data-about-first></p>
+          <div class="wm-about-rest" id="wm-about-rest" data-about-rest hidden></div>
+          <button type="button" class="wm-more" data-more aria-expanded="false" aria-controls="wm-about-rest">Show more</button>
+        </div>
+
+        <div class="wm-services" data-section="services">
+          <h3 class="wm-h" data-bind="services.title">What I do</h3>
+          <div class="wm-chiproot" data-chiproot>
+            <ul class="wm-chips" data-chips></ul>
+            <div class="wm-pop" id="wm-pop" role="note" data-pop hidden>
+              <span class="wm-pop-arrow" aria-hidden="true"></span>
+              <p class="wm-pop-title" data-pop-title></p>
+              <p class="wm-pop-body" data-pop-body></p>
+            </div>
+          </div>
+        </div>
+
+        <div class="wm-links" data-section="links">
+          <ul class="wm-socials">
+            <li data-link="website"><a class="wm-social" href="#" target="_blank" rel="noopener" aria-label="Website" title="Website">
+              <span class="wm-icon" data-icon="website" data-size="18" aria-hidden="true"></span>
+            </a></li>
+            <li data-link="linkedin"><a class="wm-social" href="#" target="_blank" rel="noopener" aria-label="LinkedIn" title="LinkedIn">
+              <span class="wm-icon" data-icon="linkedin" data-size="18" aria-hidden="true"></span>
+            </a></li>
+            <li data-link="github"><a class="wm-social" href="#" target="_blank" rel="noopener" aria-label="GitHub" title="GitHub">
+              <span class="wm-icon" data-icon="github" data-size="18" aria-hidden="true"></span>
+            </a></li>
+            <li data-link="instagram"><a class="wm-social" href="#" target="_blank" rel="noopener" aria-label="Instagram" title="Instagram">
+              <span class="wm-icon" data-icon="instagram" data-size="18" aria-hidden="true"></span>
+            </a></li>
+          </ul>
+        </div>
+      </section>
+    </div>
+
+    <nav class="wm-powered" aria-label="Elsewhere">
+      <ul>
+        <li class="wm-powered-label">Powered by</li>
+        <li><a class="wm-plink" href="https://we-met.link" target="_blank" rel="noopener">
+          <span class="wm-icon" data-icon="we-met-mark" data-size="14" aria-hidden="true"></span>
+          We Met</a></li>
+        <li class="wm-sep" aria-hidden="true"></li>
+        <li><a class="wm-plink" href="https://didi.build" target="_blank" rel="noopener">
+          <span class="wm-icon wm-leaf" data-icon="didi-build-leaf" data-size="12" aria-hidden="true"></span>
+          Didi Build</a></li>
+        <li><button type="button" class="wm-toggle" role="switch" aria-checked="false" aria-label="Dark mode" data-theme-toggle>
+          <span class="wm-track" aria-hidden="true"><span class="wm-knob">
+            <span class="wm-icon wm-moon" data-icon="moon" data-size="12" aria-hidden="true"></span>
+            <span class="wm-icon wm-sun" data-icon="sun" data-size="13" aria-hidden="true"></span>
+          </span></span>
+        </button></li>
+      </ul>
+    </nav>
+  </main>
+
+  <a class="wm-band" data-plan-free href="https://we-met.link" target="_blank" rel="noopener">
+    <span class="wm-band-in">
+      <span class="wm-band-text">
+        <span class="wm-band-label">
+          <span class="wm-icon" data-icon="we-met-mark" data-size="14" aria-hidden="true"></span>
+          We Met</span>
+        <span class="wm-band-title">Get your own card for free</span>
+      </span>
+      <span class="wm-band-btn">Start<span class="wm-icon" data-icon="arrow-right" data-size="16" aria-hidden="true"></span></span>
+    </span>
+  </a>
+
+  <div class="wm-bar" data-bar aria-hidden="true">
+    <div class="wm-bar-in">
+      <img class="wm-bar-avatar" data-bind-photo alt="" width="36" height="36">
+      <div class="wm-bar-initials" data-initials aria-hidden="true" hidden></div>
+      <div class="wm-bar-text">
+        <span class="wm-bar-name" data-bind="name">Didi Shoukralla</span>
+        <span class="wm-bar-role" data-bind="role">Software Engineer and Technical Advisor</span>
+      </div>
+      <div class="wm-ringwrap" style="flex:none"><span class="wm-ring wm-ring-sm" aria-hidden="true"></span><button type="button" class="wm-btn wm-btn-sm" data-open-sheet tabindex="-1">Exchange</button></div>
+    </div>
+  </div>
+
+  <div class="wm-sheet" data-sheet hidden>
+    <div class="wm-scrim" data-close aria-hidden="true"></div>
+    <div class="wm-panel" role="dialog" aria-modal="true" aria-labelledby="wm-sheet-title">
+      <div class="wm-panel-in">
+        <div class="wm-sheet-head" data-drag>
+          <div class="wm-grabber" aria-hidden="true"><span></span></div>
+          <div class="wm-sheet-row">
+            <h1 class="wm-sheet-title" id="wm-sheet-title" data-title-exchange>Let's stay in touch</h1>
+            <h1 class="wm-sheet-title wm-sheet-title-sm" data-title-details hidden>Nice to meet you, <span data-visitor-first>there</span>&nbsp;👋</h1>
+            <button type="button" class="wm-close" aria-label="Close" data-close>
+              <span class="wm-icon" data-icon="close" data-size="20" aria-hidden="true"></span>
+            </button>
+          </div>
+        </div>
+
+        <form class="wm-form" data-step="exchange" novalidate>
+          <div class="wm-fields wm-rise" style="animation-delay:200ms">
+            <div class="wm-field" data-field="name">
+              <label class="wm-box" for="x-name"><span class="wm-label">Full name</span>
+                <input class="wm-input" id="x-name" name="name" type="text" inputmode="text" autocomplete="name" aria-describedby="x-name-err"></label>
+              <p class="wm-err" id="x-name-err" hidden><span aria-hidden="true">!</span><span data-msg></span></p>
+            </div>
+            <div class="wm-field" data-field="email">
+              <label class="wm-box" for="x-email"><span class="wm-label">Email</span>
+                <input class="wm-input" id="x-email" name="email" type="email" inputmode="email" autocomplete="email" aria-describedby="x-email-err"></label>
+              <p class="wm-err" id="x-email-err" hidden><span aria-hidden="true">!</span><span data-msg></span></p>
+            </div>
+            <div class="wm-field" data-field="phone">
+              <label class="wm-box" for="x-phone"><span class="wm-label">Phone<span class="wm-label-opt">(optional)</span></span>
+                <span class="wm-phone">
+                  <select class="wm-cc" name="country" aria-label="Country code">
+                    <option value="+1" data-code="CA">CA +1</option>
+                    <option value="+1" data-code="US">US +1</option>
+                    <option value="+44" data-code="GB">UK +44</option>
+                    <option value="+61" data-code="AU">AU +61</option>
+                    <option value="+91" data-code="IN">IN +91</option>
+                    <option value="+20" data-code="EG">EG +20</option>
+                    <option value="+33" data-code="FR">FR +33</option>
+                    <option value="+49" data-code="DE">DE +49</option>
+                  </select>
+                  <input class="wm-input" id="x-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel-national" style="flex:1">
+                </span></label>
+            </div>
+          </div>
+          <div class="wm-alert" role="alert" data-error hidden><span class="wm-alert-mark" aria-hidden="true">!</span><span>Something went wrong on my end, and your details are still here. Try again?</span></div>
+          <div class="wm-rise" style="animation-delay:260ms"><button type="submit" class="wm-btn wm-btn-block" data-submit data-label="Exchange contact">Exchange contact</button></div>
+        </form>
+
+        <form class="wm-form" data-step="details" hidden>
+          <p class="wm-intro wm-rise">Add a few details to help me remember you.</p>
+          <div class="wm-fields wm-rise" style="animation-delay:70ms">
+            <div class="wm-field"><label class="wm-box" for="d-job"><span class="wm-label">Job title</span><input class="wm-input" id="d-job" name="jobTitle" type="text" autocomplete="organization-title"></label></div>
+            <div class="wm-field"><label class="wm-box" for="d-company"><span class="wm-label">Company</span><input class="wm-input" id="d-company" name="company" type="text" autocomplete="organization"></label></div>
+            <div class="wm-field"><label class="wm-box" for="d-note"><span class="wm-label">Note</span><textarea class="wm-input" id="d-note" name="note" rows="3" placeholder="Where we met, what you're working on"></textarea></label></div>
+          </div>
+          <div class="wm-alert" role="alert" data-error hidden><span class="wm-alert-mark" aria-hidden="true">!</span><span>Something went wrong on my end, and your details are still here. Try again?</span></div>
+          <div class="wm-rise" style="animation-delay:140ms"><button type="submit" class="wm-btn wm-btn-block" data-submit data-label="Save details">Save details</button></div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<template id="tpl-chip">
+  <li><button type="button" class="wm-chip" aria-expanded="false" aria-controls="wm-pop">
+    <span class="wm-pill"><span data-chip-label></span>
+      <span class="wm-pill-ic" aria-hidden="true"><span class="wm-icon" data-icon="plus" data-size="12" aria-hidden="true"></span></span>
+    </span>
+  </button></li>
+</template>
+
+<!-- Icons: each <span data-icon="name" data-size="px"> is filled by card.js from icons/<name>.svg (inlined so currentColor works). -->
+<script src="card.js"></script>
+</body>
+</html>
