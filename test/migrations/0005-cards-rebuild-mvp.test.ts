@@ -25,6 +25,46 @@ describe("0005_cards_rebuild_mvp migration (unit)", () => {
     expect(lintMigrationSql(sql).ok).toBe(false);
   });
 
+  it("can be retried after CHECK failure when cards is emptied", async () => {
+    await withEmptyIsolatedLocalD1(async (db) => {
+      for (const statement of migrationStatementsBefore0005()) {
+        await db.prepare(statement).run();
+      }
+      const now = "2026-10-15T12:00:00.000Z";
+      await db
+        .prepare(
+          `INSERT INTO cards (
+            id, slug, variant, display_name, email, photo_key,
+            links_json, page_copy_json, contact_json, copy_json, updated_at
+          ) VALUES (?, ?, 'mono', 'Name', 'owner@example.com', NULL, '{}', '{}', '{}', '{}', ?)`,
+        )
+        .bind("card-1", "demo", now)
+        .run();
+
+      const statements = splitSqlStatements(sql);
+      let failed = false;
+      try {
+        for (const statement of statements) {
+          await db.prepare(statement).run();
+        }
+      } catch (error) {
+        failed = true;
+        expect(String(error)).toMatch(/CHECK constraint failed/i);
+      }
+      expect(failed).toBe(true);
+
+      await db.prepare(`DELETE FROM cards`).run();
+
+      for (const statement of statements) {
+        await db.prepare(statement).run();
+      }
+      const count = await db
+        .prepare(`SELECT COUNT(*) AS n FROM cards`)
+        .first<{ n: number }>();
+      expect(count?.n).toBe(0);
+    });
+  });
+
   it("fails when cards already has a row", async () => {
     await withEmptyIsolatedLocalD1(async (db) => {
       for (const statement of migrationStatementsBefore0005()) {

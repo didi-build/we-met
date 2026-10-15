@@ -1,6 +1,8 @@
 -- Rebuild published cards for MVP (ADR 0025). Not expand-only: hand-applied after emptying cards.
 -- Fails loudly when cards holds any row (invalid status trips cards_new CHECK). Seeds app_settings when empty.
 
+DROP TABLE IF EXISTS cards_new;
+
 INSERT INTO app_settings (key, value)
 SELECT 'signups_open', '0'
 WHERE NOT EXISTS (
