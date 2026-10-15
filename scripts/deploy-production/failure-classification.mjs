@@ -1,4 +1,5 @@
 import { parseGhHttpStatus } from "../lib/gh-api-errors.mjs";
+import { formatGhApiExecBufferExceededDetail } from "../lib/privileged-gh-api.mjs";
 
 const DETAIL_MAX_LENGTH = 200;
 
@@ -140,9 +141,33 @@ export function shortenFailureDetail(raw) {
 
 /**
  * @param {unknown} error
+ * @returns {boolean}
+ */
+export function isExecBufferExceededError(error) {
+  if (
+    error &&
+    typeof error === "object" &&
+    "code" in error &&
+    error.code === "ENOBUFS"
+  ) {
+    return true;
+  }
+  const text = errorToDiagnosticText(error);
+  return /maxBuffer|ENOBUFS/i.test(text);
+}
+
+/**
+ * @param {unknown} error
  * @returns {PlanFailureClassification}
  */
 export function classifyPlanFailure(error) {
+  if (isExecBufferExceededError(error)) {
+    return {
+      category: "bug",
+      detail: formatGhApiExecBufferExceededDetail(),
+    };
+  }
+
   const text = errorToDiagnosticText(error);
   const httpStatus = extractHttpStatusFromError(error);
 

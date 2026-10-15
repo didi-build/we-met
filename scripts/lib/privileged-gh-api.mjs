@@ -13,7 +13,22 @@ export function buildGhApiArgs(args, hasInput) {
 }
 
 /**
- * @typedef {(file: string, args: string[], options?: { encoding?: string; input?: string; env?: Record<string, string | undefined>; stdio?: string }) => string} GhExec
+ * Node's default `maxBuffer` for `execFileSync` / `spawnSync` is 1 MiB. Large
+ * `gh api --paginate --slurp` responses (e.g. compare across many merges) exceed
+ * that and raise ENOBUFS without an explicit limit.
+ */
+export const GH_API_EXEC_MAX_BUFFER = 64 * 1024 * 1024;
+
+/**
+ * @returns {string}
+ */
+export function formatGhApiExecBufferExceededDetail() {
+  const mib = GH_API_EXEC_MAX_BUFFER / (1024 * 1024);
+  return `GitHub API response exceeded the child-process output buffer limit (${mib} MiB)`;
+}
+
+/**
+ * @typedef {(file: string, args: string[], options?: { encoding?: string; input?: string; env?: Record<string, string | undefined>; stdio?: string; maxBuffer?: number }) => string} GhExec
  */
 
 /**
@@ -28,6 +43,7 @@ export function ghApiCall(exec, env, args, input) {
   return exec("gh", buildGhApiArgs(args, hasInput), {
     encoding: "utf8",
     input: hasInput ? input : undefined,
+    maxBuffer: GH_API_EXEC_MAX_BUFFER,
     env: {
       ...env,
       GH_TOKEN: env.GH_TOKEN ?? env.GITHUB_TOKEN,

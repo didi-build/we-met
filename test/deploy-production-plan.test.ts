@@ -22,7 +22,9 @@ import { collectAdvisoryLintWarnings } from "../scripts/deploy-production/adviso
 import {
   classifyPlanFailure,
   errorToDiagnosticText,
+  isExecBufferExceededError,
 } from "../scripts/deploy-production/failure-classification.mjs";
+import { formatGhApiExecBufferExceededDetail } from "../scripts/lib/privileged-gh-api.mjs";
 import {
   ADVISORY_LINT_NOTE,
   buildPlanFailureContent,
@@ -398,6 +400,26 @@ describe("deploy-production failure classification (unit)", () => {
       detail: "HTTP 503",
     });
     expect(warningAnnotation).toBe("PLAN UNAVAILABLE: GitHub API problem (HTTP 503).");
+  });
+
+  it("classifies ENOBUFS with a buffer-limit detail message", () => {
+    const enobufs = Object.assign(new Error("spawnSync gh ENOBUFS"), {
+      code: "ENOBUFS",
+    });
+    const classified = classifyPlanFailure(enobufs);
+    expect(classified.category).toBe("bug");
+    expect(classified.detail).toBe(formatGhApiExecBufferExceededDetail());
+    const { summaryMarkdown } = buildPlanFailureContent(classified);
+    expect(summaryMarkdown).toContain(formatGhApiExecBufferExceededDetail());
+    expect(summaryMarkdown).not.toContain("spawnSync gh ENOBUFS");
+  });
+
+  it("keeps non-ENOBUFS bug detail unchanged", () => {
+    const error = new TypeError("Cannot read properties of undefined");
+    const classified = classifyPlanFailure(error);
+    expect(classified.category).toBe("bug");
+    expect(classified.detail).toContain("Cannot read properties of undefined");
+    expect(isExecBufferExceededError(error)).toBe(false);
   });
 
   it("classifies real execFileSync gh stderr failures", () => {
