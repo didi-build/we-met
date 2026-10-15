@@ -23,3 +23,9 @@ Multi-user accounts and an editor are backlog ([DIDI-581](https://linear.app/did
 
 - **Not built in step 1** — record only.
 - Turnstile production keys cover `we-met.link` and `app.we-met.link` ([environments.md](../architecture/environments.md)).
+
+## Implementation (DIDI-610)
+
+- **`app.we-met.link`** is routed on the same Worker (`wrangler.jsonc` custom domain).
+- **Host-aware root:** Next.js middleware rewrites `app.we-met.link/` to an internal `/app-coming-soon` page (coming-soon placeholder). The card host `we-met.link/` serves the product landing page. `/app-coming-soon` returns 404 on the card host.
+- **`/hi/<slug>`** cache headers and behavior are unchanged on both hosts.

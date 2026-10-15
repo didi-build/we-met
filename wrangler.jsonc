@@ -9,6 +9,10 @@
       "pattern": "we-met.link",
       "custom_domain": true,
     },
+    {
+      "pattern": "app.we-met.link",
+      "custom_domain": true,
+    },
   ],
   "compatibility_date": "2026-09-24",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
