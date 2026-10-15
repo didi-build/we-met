@@ -1,6 +1,10 @@
 @import "tailwindcss";
+@import "../theme/tokens/mono.light.css";
+@import "../theme/tokens/mono.dark.css";
 @import "../theme/tokens/green.light.css";
 @import "../theme/tokens/green.dark.css";
+@import "../theme/tokens/blue.light.css";
+@import "../theme/tokens/blue.dark.css";
 
 @custom-variant dark (&:where([data-theme=dark] *));
 
@@ -25,6 +29,7 @@
   --radius-lg: 24px;
   --radius-xl: 28px;
   --radius-pill: 999px;
+  --radius-field: 12px;
 }
 
 html {
@@ -45,10 +50,7 @@ html {
 body {
   margin: 0;
   overflow-x: clip;
-  background:
-    radial-gradient(1200px 720px at 80% -160px, var(--glow-top), transparent 70%)
-      no-repeat,
-    var(--bg);
+  background: var(--bg);
   color: var(--ink);
   font-family: var(--font-figtree), system-ui, sans-serif;
   font-size: 17px;
@@ -56,13 +58,13 @@ body {
 }
 
 a {
-  color: var(--accent-text);
-  text-decoration-thickness: 1.5px;
+  color: var(--ink);
+  text-decoration-thickness: 1px;
   text-underline-offset: 3px;
 }
 
 a:hover {
-  color: var(--ink);
+  color: var(--ink-muted);
 }
 
 a.bg-accent,
@@ -78,7 +80,8 @@ a.bg-accent:hover {
 
 input:focus-visible,
 textarea:focus-visible,
-button:focus-visible {
+button:focus-visible,
+select:focus-visible {
   outline: none;
 }
 
@@ -89,27 +92,6 @@ button:focus-visible {
 
 .rounded-pill {
   border-radius: var(--radius-pill);
-}
-
-@keyframes hi-copied {
-  from {
-    opacity: 0;
-    transform: translateY(2px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-.animate-hi-copied {
-  animation: hi-copied 0.2s ease-out;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .animate-hi-copied {
-    animation: none;
-  }
 }
 
 @keyframes hi-sheet-in {
@@ -148,6 +130,29 @@ button:focus-visible {
   }
 }
 
+@keyframes hi-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes hi-ring-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklch, var(--accent) 40%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 12px color-mix(in oklch, var(--accent) 0%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 12px transparent;
+  }
+}
+
 @keyframes hi-fade {
   from {
     opacity: 0;
@@ -179,12 +184,17 @@ button:focus-visible {
   animation: hi-fade 0.25s ease-out;
 }
 
+.animate-hi-rise {
+  animation: hi-rise 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-hi-sheet-in,
   .animate-hi-sheet-out,
   .animate-hi-scrim-in,
   .animate-hi-scrim-out,
-  .animate-hi-fade {
+  .animate-hi-fade,
+  .animate-hi-rise {
     animation: none;
   }
 }

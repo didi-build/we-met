@@ -1,1 +1,1 @@
-export const THEME_STORAGE_KEY = "we-met-theme";
+export const THEME_STORAGE_KEY = "card-theme";

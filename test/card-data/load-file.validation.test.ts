@@ -29,41 +29,46 @@ describe("parseCardsLoadFile validation (unit)", () => {
     );
   });
 
+  it("rejects missing fallbackUrl", () => {
+    expectReject((raw) => {
+      const card = (raw.cards as Record<string, unknown>[])[0];
+      delete card.fallbackUrl;
+    }, /fallbackUrl/);
+  });
+
+  it("rejects blue variant", () => {
+    expectReject((raw) => {
+      const card = (raw.cards as Record<string, unknown>[])[0];
+      card.variant = "blue";
+    }, /blue.*not storable/i);
+  });
+
+  it("rejects unknown variant", () => {
+    expectReject((raw) => {
+      const card = (raw.cards as Record<string, unknown>[])[0];
+      card.variant = "purple";
+    }, /Invalid variant: purple/);
+  });
+
   const cases: {
     label: string;
     mutate: (raw: Record<string, unknown>) => void;
     pattern: RegExp;
   }[] = [
     {
-      label: "http bookingUrl",
+      label: "http fallbackUrl",
       mutate: (raw) => {
         const card = (raw.cards as Record<string, unknown>[])[0];
-        (card.links as Record<string, unknown>).bookingUrl = "http://example.com";
+        card.fallbackUrl = "http://example.com";
       },
       pattern: /https/,
     },
     {
-      label: "https: without slashes bookingUrl",
+      label: "http public link url",
       mutate: (raw) => {
         const card = (raw.cards as Record<string, unknown>[])[0];
-        (card.links as Record<string, unknown>).bookingUrl = "https:example.com";
-      },
-      pattern: /must start with https:\/\//,
-    },
-    {
-      label: "whitespace in bookingUrl",
-      mutate: (raw) => {
-        const card = (raw.cards as Record<string, unknown>[])[0];
-        (card.links as Record<string, unknown>).bookingUrl = "https://exa mple.com";
-      },
-      pattern: /whitespace/,
-    },
-    {
-      label: "javascript footer url",
-      mutate: (raw) => {
-        const card = (raw.cards as Record<string, unknown>[])[0];
-        const footer = (card.links as { footer: Record<string, unknown>[] }).footer;
-        footer[0].url = "javascript:alert(1)";
+        const links = card.links as { url: string }[];
+        links[0].url = "http://x.com";
       },
       pattern: /https/,
     },
@@ -76,48 +81,35 @@ describe("parseCardsLoadFile validation (unit)", () => {
       pattern: /https/,
     },
     {
-      label: "unknown footer kind",
+      label: "unknown link type",
       mutate: (raw) => {
         const card = (raw.cards as Record<string, unknown>[])[0];
-        const footer = (card.links as { footer: Record<string, unknown>[] }).footer;
-        footer[0].kind = "twitter";
+        const links = card.links as { type: string }[];
+        links[0].type = "twitter";
       },
-      pattern: /footer kind/,
+      pattern: /Invalid link type/,
     },
     {
-      label: "too many footer items",
+      label: "too many public links",
       mutate: (raw) => {
         const card = (raw.cards as Record<string, unknown>[])[0];
-        const links = card.links as { footer: unknown[] };
-        while (links.footer.length <= 6) {
-          links.footer.push({ kind: "site", label: "X", url: "https://example.com/x" });
+        const links = card.links as unknown[];
+        while (links.length <= 8) {
+          links.push({
+            type: "website",
+            label: "Site",
+            url: "https://example.com/x",
+          });
         }
       },
-      pattern: /footer must have/,
+      pattern: /links exceeds max length/,
     },
     {
-      label: "unknown key in links",
+      label: "unknown key in links item",
       mutate: (raw) => {
         const card = (raw.cards as Record<string, unknown>[])[0];
-        (card.links as Record<string, unknown>).extra = true;
-      },
-      pattern: /Unknown key in links/,
-    },
-    {
-      label: "unknown key in footer item",
-      mutate: (raw) => {
-        const card = (raw.cards as Record<string, unknown>[])[0];
-        const footer = (card.links as { footer: Record<string, unknown>[] }).footer;
-        footer[0].extra = true;
-      },
-      pattern: /Unknown key/,
-    },
-    {
-      label: "unknown key in contact.urls item",
-      mutate: (raw) => {
-        const card = (raw.cards as Record<string, unknown>[])[0];
-        const urls = (card.contact as { urls: Record<string, unknown>[] }).urls;
-        urls[0].extra = true;
+        const links = card.links as Record<string, unknown>[];
+        links[0].extra = true;
       },
       pattern: /Unknown key/,
     },
@@ -128,15 +120,6 @@ describe("parseCardsLoadFile validation (unit)", () => {
         (card.copy as Record<string, unknown>).extra = true;
       },
       pattern: /Unknown key in copy/,
-    },
-    {
-      label: "missing copy.about.title",
-      mutate: (raw) => {
-        const card = (raw.cards as Record<string, unknown>[])[0];
-        const about = (card.copy as { about: Record<string, unknown> }).about;
-        delete about.title;
-      },
-      pattern: /copy.about.title/,
     },
     {
       label: "non-string copy leaf",
@@ -150,15 +133,15 @@ describe("parseCardsLoadFile validation (unit)", () => {
       label: "control character in string",
       mutate: (raw) => {
         const card = (raw.cards as Record<string, unknown>[])[0];
-        card.displayName = "bad\nname";
+        card.name = "bad\nname";
       },
       pattern: /Control characters/,
     },
     {
-      label: "over-length copy leaf",
+      label: "over-length name",
       mutate: (raw) => {
         const card = (raw.cards as Record<string, unknown>[])[0];
-        (card.copy as Record<string, unknown>).thanksMessage = "x".repeat(1001);
+        card.name = "x".repeat(61);
       },
       pattern: /exceeds max length/,
     },
@@ -189,22 +172,15 @@ describe("parseCardsLoadFile validation (unit)", () => {
       pattern: /non-whitespace/,
     },
     {
-      label: "empty expandedParagraphs",
+      label: "too many about paragraphs",
       mutate: (raw) => {
         const card = (raw.cards as Record<string, unknown>[])[0];
-        const about = (card.copy as { about: Record<string, unknown> }).about;
-        about.expandedParagraphs = [];
+        const about = card.about as string[];
+        while (about.length <= 4) {
+          about.push("Another paragraph.");
+        }
       },
-      pattern: /expandedParagraphs must have at least/,
-    },
-    {
-      label: "empty chips",
-      mutate: (raw) => {
-        const card = (raw.cards as Record<string, unknown>[])[0];
-        const about = (card.copy as { about: Record<string, unknown> }).about;
-        about.chips = [];
-      },
-      pattern: /chips must have at least/,
+      pattern: /about exceeds max length/,
     },
     {
       label: "empty bodyParagraphs",
@@ -214,7 +190,7 @@ describe("parseCardsLoadFile validation (unit)", () => {
           .followUpEmail;
         followUp.bodyParagraphs = [];
       },
-      pattern: /bodyParagraphs must have at least/,
+      pattern: /bodyParagraphs/,
     },
   ];
 

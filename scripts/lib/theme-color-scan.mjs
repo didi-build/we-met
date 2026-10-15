@@ -213,7 +213,16 @@ const INLINE_STYLE_PROPERTY =
   "(?:color|background(?:Color|Image)?|border(?:Top|Right|Bottom|Left|Block|Inline|Start|End)?(?:Color|Width|Style)?|outline(?:Color|Width|Style|Offset)?|fill|stroke|caretColor|accentColor|textDecoration(?:Color)?|textShadow|boxShadow|filter|columnRule|scrollbarColor)";
 
 function isAllowlisted(rel) {
-  return ALLOWLIST.has(rel);
+  if (ALLOWLIST.has(rel)) {
+    return true;
+  }
+  if (rel.startsWith("src/theme/tokens/") && rel.endsWith(".css")) {
+    return true;
+  }
+  if (rel === "scripts/generate-card-palette-css.mjs") {
+    return true;
+  }
+  return false;
 }
 
 const TAILWIND_VARIANT_PREFIX = "(?:(?:[\\w-]+|\\[[^\\]]+\\]|data-\\[[^\\]]+\\]):)*";
