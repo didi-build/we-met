@@ -29,6 +29,6 @@ describe("app preview card link colors (CSS guards)", () => {
   it("does not apply editor default link color to the whole .ap subtree", () => {
     expect(appEditor).not.toMatch(/^\.ap a \{/m);
     expect(appEditor).toMatch(/\.ap :where\(\.ap-header, \.ap-bar, \.ap-dialog\) a/);
-    expect(appEditor).toContain(".ap-card-preview-inert");
+    expect(appEditor).toContain(".ap-card-preview-shell");
   });
 });

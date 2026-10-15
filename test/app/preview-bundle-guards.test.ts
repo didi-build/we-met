@@ -11,9 +11,10 @@ describe("App card preview inertness (static)", () => {
     expect(src).toContain("HiCardPresentation");
     expect(src).toContain("preview");
     expect(src).toContain("interactive");
-    expect(src).toContain("inert");
+    expect(src).toContain("blockPreviewLinkNavigation");
     expect(src).toContain("MirroredThemeProvider");
     expect(src).not.toContain("HiPageClient");
+    expect(src).not.toMatch(/\binert\b/);
   });
 
   it("HiCardPresentation supports preview-only exchange inertness", () => {

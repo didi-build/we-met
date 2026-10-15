@@ -91,14 +91,11 @@ describe("AppCardEditor behavior", () => {
     expect(screen.getByText("Your name here")).toBeTruthy();
   });
 
-  it("preview subtree is inert and does not call fetch", async () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch");
+  it("preview shell is not inert (chips and About can receive clicks)", () => {
     renderEditor();
-    const preview = screen.getByTestId("app-card-preview-inert");
-    expect(preview.hasAttribute("inert")).toBe(true);
-    fireEvent.click(preview);
-    expect(fetchSpy).not.toHaveBeenCalled();
-    fetchSpy.mockRestore();
+    const preview = screen.getByTestId("app-card-preview");
+    expect(preview.hasAttribute("inert")).toBe(false);
+    expect(preview.className).toContain("ap-card-preview-shell");
   });
 
   it("debounces autosave and shows Saving then Saved", async () => {

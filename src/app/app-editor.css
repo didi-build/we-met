@@ -6,13 +6,11 @@
 html[data-theme="dark"] .ap {
   color-scheme: dark;
 }
-.ap-card-preview-inert {
-  pointer-events: none;
-  user-select: none;
+.ap-card-preview-shell {
   min-height: 100%;
+  position: relative;
 }
-.ap-card-preview-inert a {
-  pointer-events: none;
+.ap-card-preview-shell a[href] {
   cursor: default;
 }
 *,

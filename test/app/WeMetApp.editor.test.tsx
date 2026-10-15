@@ -105,7 +105,7 @@ describe("WeMetApp editor (integration)", () => {
       },
       { timeout: 8000 },
     );
-    expect(screen.getByTestId("app-card-preview-inert")).toBeTruthy();
+    expect(screen.getByTestId("app-card-preview")).toBeTruthy();
     expect(screen.queryByText(/useTheme must be used/i)).toBeNull();
   });
 

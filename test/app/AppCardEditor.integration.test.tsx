@@ -82,7 +82,7 @@ describe("AppCardEditor (integration)", () => {
     await waitFor(() => {
       expect(screen.getByRole("heading", { name: /your card/i })).toBeTruthy();
     });
-    expect(screen.getByTestId("app-card-preview-inert")).toBeTruthy();
+    expect(screen.getByTestId("app-card-preview")).toBeTruthy();
     expect(screen.getByText(/exchange is off in the preview/i)).toBeTruthy();
   });
 });
