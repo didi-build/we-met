@@ -64,7 +64,8 @@ Values live in GitHub Environments, the Cloudflare dashboard, or local `.env`. *
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Build time (browser bundle) | Public; only `NEXT_PUBLIC_*` vars reach the client                                                                                                                                                                                                                                                                       |
 | `TURNSTILE_SECRET_KEY`           | App Worker                  | Server-side Turnstile verify                                                                                                                                                                                                                                                                                             |
 | `GMAIL_SERVICE_ACCOUNT_JSON`     | Consumer                    | Gmail API credentials (follow-up email)                                                                                                                                                                                                                                                                                  |
-| `GMAIL_SENDER`                   | Consumer                    | From address for Gmail API                                                                                                                                                                                                                                                                                               |
+| `GMAIL_SENDER`                   | Consumer                    | Gmail API delegated sender (JWT `sub`); not the visible **From** on outbound mail ([0023](../decisions/0023-owner-email-lead-sink-consumer.md))                                                                                                                                                                          |
+| `WE_MET_OWNER_FROM_EMAIL`        | Consumer                    | Visible **From** address on visitor follow-up and owner sink mail ([0023](../decisions/0023-owner-email-lead-sink-consumer.md))                                                                                                                                                                                          |
 | `WE_MET_TEST_MAIL_TO`            | Consumer                    | **Non-prod only:** all outbound mail redirected here                                                                                                                                                                                                                                                                     |
 | `BOOKING_URL`                    | App Worker                  | Public booking link in the card flow                                                                                                                                                                                                                                                                                     |
 
@@ -95,19 +96,19 @@ The consumer registers on the queue in **its own** Wrangler config; it is not an
 
 **Consumer logs (debugging live mail):**
 
-| Event                                | Fields                                                                                                 |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------ |
-| `visitor_followup_attempt_failure`   | `leadId`, `attempt`, `errorCode`, `willRetry`; `secretName` when `errorCode` is `gmail_secret_missing` |
-| `visitor_followup_permanent_failure` | `leadId`, `errorCode`; `secretName` when `errorCode` is `gmail_secret_missing`                         |
-| `visitor_followup_malformed`         | `leadId` (may be null)                                                                                 |
-| `followup_unsupported_queue_type`    | `typeLabel`                                                                                            |
-| `followup_vcard_photo_missing`       | `photoKey`                                                                                             |
-| `followup_vcard_photo_not_jpeg`      | `photoKey`                                                                                             |
-| `lead_sink_attempt_failure`          | `leadId`, `sinkId`, `attempt`, `errorCode`, `willRetry`; `secretName` when applicable                  |
-| `lead_sink_permanent_failure`        | `leadId`, `sinkId`, `errorCode`; `secretName` when applicable                                          |
-| `lead_sink_malformed`                | `leadId` (may be null)                                                                                 |
-| `ledger_row_missing`                 | `leadId`, `sinkId`                                                                                     |
-| `ledger_update_failed`               | `leadId`, `sinkId`, `errorCode`                                                                        |
+| Event                                | Fields                                                                                                                               |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `visitor_followup_attempt_failure`   | `leadId`, `attempt`, `errorCode`, `willRetry`; `secretName` when `errorCode` is `gmail_secret_missing` or `owner_from_email_missing` |
+| `visitor_followup_permanent_failure` | `leadId`, `errorCode`; `secretName` when `errorCode` is `gmail_secret_missing` or `owner_from_email_missing`                         |
+| `visitor_followup_malformed`         | `leadId` (may be null)                                                                                                               |
+| `followup_unsupported_queue_type`    | `typeLabel`                                                                                                                          |
+| `followup_vcard_photo_missing`       | `photoKey`                                                                                                                           |
+| `followup_vcard_photo_not_jpeg`      | `photoKey`                                                                                                                           |
+| `lead_sink_attempt_failure`          | `leadId`, `sinkId`, `attempt`, `errorCode`, `willRetry`; `secretName` when applicable                                                |
+| `lead_sink_permanent_failure`        | `leadId`, `sinkId`, `errorCode`; `secretName` when applicable                                                                        |
+| `lead_sink_malformed`                | `leadId` (may be null)                                                                                                               |
+| `ledger_row_missing`                 | `leadId`, `sinkId`                                                                                                                   |
+| `ledger_update_failed`               | `leadId`, `sinkId`, `errorCode`                                                                                                      |
 
 **Consumer secrets (follow-up Workers):** `GMAIL_SERVICE_ACCOUNT_JSON`, `GMAIL_SENDER`, `WE_MET_OWNER_FROM_EMAIL` on **both** consumers; **`WE_MET_TEST_MAIL_TO`** on **non-prod only** (four secret names on non-prod, three on production).
 

@@ -11,7 +11,7 @@
 ## Decision
 
 1. **Delivery pipe, not CRM.** No visitor PII in D1; the ledger stays metadata only ([0022](./0022-lead-delivery-ledger.md)).
-2. **From:** owner sink emails use secret `WE_MET_OWNER_FROM_EMAIL` with display name **`We Met`**. Visitor follow-up remains From `GMAIL_SENDER` with card `emailFromName`. JWT `sub` stays `GMAIL_SENDER`; OAuth scope stays `gmail.send` only.
+2. **From:** all consumer outbound mail uses secret **`WE_MET_OWNER_FROM_EMAIL`** as the SMTP From address. Owner sink emails use display name **`We Met`**. Visitor follow-up keeps the card snapshot **`emailFromName`** as the display name and **`Reply-To`** = the card owner email from the snapshot (never hardcoded). JWT `sub` stays **`GMAIL_SENDER`** (delegated Gmail user); OAuth scope stays `gmail.send` only.
 3. **No fallback:** missing or non-plain `WE_MET_OWNER_FROM_EMAIL` fails closed with `owner_from_email_missing` through the normal retry/final-failure path.
 4. **Destination:** `to` from queue `sinkConfig` snapshot only; consumer D1 reads **`lead_delivery_ledger` only**; never log `to`.
 5. **Non-prod safety:** production sends to `sinkConfig.to`; other `WE_MET_ENV` redirects to `WE_MET_TEST_MAIL_TO` (fail closed if unset). One function beside `resolveEmailRecipient`. Non-prod subjects/bodies use the existing `[we-met test → …]` prefix and **Test delivery** line naming the **sink destination** (not the visitor).

@@ -5,6 +5,7 @@ import {
 } from "@/email/followup-email-error";
 import { createGmailEmailSender } from "@/email/gmail-sender";
 import { sanitizeEmailHeaderValue } from "@/email/mime-headers";
+import { resolveOwnerFromEmail } from "@/email/owner-from";
 import { resolveEmailRecipient } from "@/email/recipient";
 import type { EmailSender } from "@/email/types";
 import {
@@ -55,7 +56,6 @@ export type FollowupConsumerEnv = {
 
 export type FollowupConsumerDeps = {
   weMetEnv: string;
-  gmailSender: string;
   testMailTo?: string;
   emailSender: EmailSender;
   assets: ReadOnlyR2Assets;
@@ -115,7 +115,6 @@ export function createFollowupConsumerDepsFromEnv(
 
   return {
     weMetEnv: env.WE_MET_ENV,
-    gmailSender: env.GMAIL_SENDER,
     testMailTo: env.WE_MET_TEST_MAIL_TO,
     emailSender,
     assets: createReadOnlyConsumerAssets(env.WE_MET_ASSETS),
@@ -192,6 +191,7 @@ async function sendVisitorFollowup(
   message: NonNullable<ReturnType<typeof parseVisitorFollowupMessage>>,
   deps: FollowupConsumerDeps,
 ): Promise<void> {
+  const ownerFrom = resolveOwnerFromEmail(deps.ownerFromEmail);
   const recipient = resolveEmailRecipient({
     weMetEnv: deps.weMetEnv,
     visitorEmail: message.lead.email,
@@ -215,7 +215,7 @@ async function sendVisitorFollowup(
   );
 
   await deps.emailSender.send({
-    from: deps.gmailSender,
+    from: ownerFrom,
     fromDisplayName: message.card.pageCopy.emailFromName,
     to: recipient.to,
     replyTo: sanitizeEmailHeaderValue(message.card.email),

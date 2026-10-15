@@ -46,6 +46,9 @@ export class MemoryConsumerLeadDeliveryLedger implements ConsumerLeadDeliveryLed
     leadId: string;
     sinkId: string;
     phase: LeadDeliveryPhase;
+    sentAt: string;
+    gmailMessageId: string | null;
+    gmailThreadId: string | null;
   }): Promise<boolean> {
     const row = this.rows.get(key(input.leadId, input.sinkId, input.phase));
     if (!row || row.status !== "queued") {
@@ -53,8 +56,8 @@ export class MemoryConsumerLeadDeliveryLedger implements ConsumerLeadDeliveryLed
     }
     this.rows.set(key(input.leadId, input.sinkId, input.phase), {
       status: "sent",
-      gmailMessageId: "gmail-sent",
-      gmailThreadId: "thread-sent",
+      gmailMessageId: input.gmailMessageId,
+      gmailThreadId: input.gmailThreadId,
     });
     return true;
   }

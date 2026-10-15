@@ -32,7 +32,6 @@ export type LeadSinkConsumerDeps = {
     sinkId: string,
     error: FollowupEmailErrorLogFields,
   ): void;
-  logMalformedLeadSink(leadId: string | null): void;
   now: () => Date;
 };
 

@@ -144,6 +144,23 @@ describe("buildRawEmailMessage (unit)", () => {
     expect(bccHeaders).toHaveLength(0);
   });
 
+  it("emits Message-ID, In-Reply-To, and References when provided", () => {
+    const raw = buildRawEmailMessage({
+      from: "hello@we-met.link",
+      to: "owner@example.com",
+      subject: "Re: New lead added: Sam",
+      textPlain: "Body",
+      textHtml: "<p>Body</p>",
+      messageId: "<lead.sink.append@we-met.link>",
+      inReplyTo: "<lead.sink.record@we-met.link>",
+      references: "<lead.sink.record@we-met.link>",
+    });
+    const mime = decodeRawEmailMessage(raw);
+    expect(headerValue(mime, "Message-ID")).toBe("<lead.sink.append@we-met.link>");
+    expect(headerValue(mime, "In-Reply-To")).toBe("<lead.sink.record@we-met.link>");
+    expect(headerValue(mime, "References")).toBe("<lead.sink.record@we-met.link>");
+  });
+
   it("does not allow header injection via subject, display name, or filename", () => {
     const raw = buildRawEmailMessage({
       ...baseEmail,

@@ -1,6 +1,15 @@
 import { FollowupEmailError } from "@/email/followup-email-error";
 import { isPlainSingleEmailAddress } from "@/email/plain-email";
 
+/** Non-prod consumer redirect target; never derived from queue fields. */
+export function resolveNonProdTestMailTo(testMailTo: string | undefined): string {
+  const redirect = testMailTo?.trim();
+  if (!redirect) {
+    throw new FollowupEmailError("nonprod_mail_redirect_unset");
+  }
+  return redirect;
+}
+
 export type ResolveEmailRecipientInput = {
   /** Consumer Wrangler var only — never from queue messages. */
   weMetEnv: string;
@@ -24,10 +33,7 @@ export function resolveEmailRecipient(
     return { mode: "production", to: input.visitorEmail };
   }
 
-  const redirect = input.testMailTo?.trim();
-  if (!redirect) {
-    throw new FollowupEmailError("nonprod_mail_redirect_unset");
-  }
+  const redirect = resolveNonProdTestMailTo(input.testMailTo);
 
   return {
     mode: "nonprod",
@@ -59,10 +65,7 @@ export function resolveSinkEmailRecipient(
     return { mode: "production", to: destination };
   }
 
-  const redirect = input.testMailTo?.trim();
-  if (!redirect) {
-    throw new FollowupEmailError("nonprod_mail_redirect_unset");
-  }
+  const redirect = resolveNonProdTestMailTo(input.testMailTo);
 
   return {
     mode: "nonprod",

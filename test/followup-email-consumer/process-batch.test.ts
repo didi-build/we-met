@@ -101,7 +101,6 @@ function createDeps(
 
   return {
     weMetEnv: "preview",
-    gmailSender: "sender@example.com",
     testMailTo: "test-inbox@example.com",
     ownerFromEmail: "hello@we-met.link",
     emailSender,
@@ -158,6 +157,9 @@ describe("processFollowupQueueBatch (unit)", () => {
     expect(deps.emailSender.send).toHaveBeenCalledOnce();
     const sent = vi.mocked(deps.emailSender.send).mock.calls[0][0];
     expect(sent.to).toBe("test-inbox@example.com");
+    expect(sent.from).toBe("hello@we-met.link");
+    expect(sent.fromDisplayName).toBe("Demo at Example");
+    expect(sent.replyTo).toBe("owner@example.com");
     expect(message.ack).toHaveBeenCalledOnce();
     expect(message.retry).not.toHaveBeenCalled();
   });
@@ -238,6 +240,33 @@ describe("processFollowupQueueBatch (unit)", () => {
     });
     expect(message.ack).toHaveBeenCalledOnce();
     expect(message.retry).not.toHaveBeenCalled();
+  });
+
+  it("never calls send when WE_MET_OWNER_FROM_EMAIL is unset; retries then permanent failure", async () => {
+    const send = vi.fn(async () => ({ messageId: null, threadId: null }));
+    const depsUnset = createDeps({ ownerFromEmail: undefined, emailSender: { send } });
+    const msgRetry = createMessage(visitorBody(), { attempts: 3 });
+    await processFollowupQueueBatch({ messages: [msgRetry] }, depsUnset);
+    expect(send).not.toHaveBeenCalled();
+    expect(msgRetry.retry).toHaveBeenCalledOnce();
+    expect(depsUnset.logVisitorFollowupAttemptFailure).toHaveBeenCalledWith(
+      "lead-1",
+      3,
+      { code: "owner_from_email_missing", secretName: "WE_MET_OWNER_FROM_EMAIL" },
+      true,
+    );
+
+    const msgFinal = createMessage(visitorBody(), {
+      attempts: MAX_VISITOR_FOLLOWUP_ATTEMPTS,
+    });
+    const depsFinal = createDeps({ ownerFromEmail: "", emailSender: { send } });
+    await processFollowupQueueBatch({ messages: [msgFinal] }, depsFinal);
+    expect(send).not.toHaveBeenCalled();
+    expect(msgFinal.ack).toHaveBeenCalledOnce();
+    expect(depsFinal.logVisitorFollowupPermanentFailure).toHaveBeenCalledWith(
+      "lead-1",
+      { code: "owner_from_email_missing", secretName: "WE_MET_OWNER_FROM_EMAIL" },
+    );
   });
 
   it("never calls send when non-prod redirect is unset; retries then permanent failure", async () => {
@@ -328,6 +357,54 @@ describe("processFollowupQueueBatch (unit)", () => {
     await processFollowupQueueBatch({ messages: [message] }, deps);
 
     expect(deps.logMalformedVisitorFollowup).toHaveBeenCalledWith("lead-x");
+    expect(message.ack).toHaveBeenCalledOnce();
+  });
+
+  it("acks lead_sink_record without sending when ledger row is already sent", async () => {
+    const ledger = new MemoryConsumerLeadDeliveryLedger();
+    ledger.seedSent("lead-1", "sink-1", "record");
+    const message = createMessage(sinkRecordBody());
+    const send = vi.fn(async () => ({ messageId: "g1", threadId: "t1" }));
+    const deps = createDeps({ emailSender: { send } }, ledger);
+
+    await processFollowupQueueBatch({ messages: [message] }, deps);
+
+    expect(send).not.toHaveBeenCalled();
+    expect(message.ack).toHaveBeenCalledOnce();
+  });
+
+  it("threads lead_sink_append_details when record email was sent", async () => {
+    const ledger = new MemoryConsumerLeadDeliveryLedger();
+    ledger.seedSent("lead-1", "sink-1", "record", "gmail-thread-record");
+    ledger.seedQueued("lead-1", "sink-1", "append");
+    const message = createMessage({
+      type: "lead_sink_append_details",
+      sinkId: "sink-1",
+      sinkKind: "email",
+      sinkConfig: { to: "owner@example.com" },
+      lead: {
+        leadId: "lead-1",
+        name: "Alex Visitor",
+        email: "visitor@example.com",
+      },
+      details: { jobTitle: "CEO", company: null, note: null },
+      detailsSubmittedAt: "2026-10-12T01:00:00.000Z",
+      cardId: "card-1",
+      cardSlug: "demo",
+      sourceUrl: "https://we-met.link/hi/demo",
+    });
+    const deps = createDeps({}, ledger);
+
+    await processFollowupQueueBatch({ messages: [message] }, deps);
+
+    expect(deps.emailSender.send).toHaveBeenCalledOnce();
+    const sent = vi.mocked(deps.emailSender.send).mock.calls[0][0];
+    expect(sent.subject).toBe(
+      "Re: [we-met test → owner@example.com] New lead added: Alex Visitor",
+    );
+    expect(sent.inReplyTo).toBe("<lead-1.sink-1.record@we-met.link>");
+    expect(sent.references).toBe("<lead-1.sink-1.record@we-met.link>");
+    expect(sent.threadId).toBe("gmail-thread-record");
     expect(message.ack).toHaveBeenCalledOnce();
   });
 

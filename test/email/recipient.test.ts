@@ -1,6 +1,21 @@
 import { describe, expect, it } from "vitest";
 import { FollowupEmailError } from "@/email/followup-email-error";
-import { resolveEmailRecipient, resolveSinkEmailRecipient } from "@/email/recipient";
+import {
+  resolveEmailRecipient,
+  resolveNonProdTestMailTo,
+  resolveSinkEmailRecipient,
+} from "@/email/recipient";
+
+describe("resolveNonProdTestMailTo (unit)", () => {
+  it("returns trimmed redirect address", () => {
+    expect(resolveNonProdTestMailTo("  inbox@example.com  ")).toBe("inbox@example.com");
+  });
+
+  it("fails closed when unset", () => {
+    expect(() => resolveNonProdTestMailTo(undefined)).toThrow(FollowupEmailError);
+    expect(() => resolveNonProdTestMailTo("")).toThrow(FollowupEmailError);
+  });
+});
 
 describe("resolveEmailRecipient (unit)", () => {
   const cases = [
