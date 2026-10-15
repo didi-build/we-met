@@ -9,6 +9,7 @@ import { assertNoControlCharacters } from "@/card-data/load-sql";
 import { parseLeadSinkConfig } from "@/card-data/lead-sink-registry";
 import { registerBuiltInLeadSinkKinds } from "@/card-data/register-lead-sink-kinds";
 import { parseCardVariantForLoad } from "@/card-data/normalize-variant";
+import { CARD_FIELD_LIMITS } from "@/card-data/limits";
 import { assertValidSlug, isValidSlug } from "@/card-data/slug";
 import type {
   BrandVariant,
@@ -33,17 +34,10 @@ const PLACEHOLDER_TOKEN = /\{([^}]+)\}/g;
 const URL_TYPE_RE = /^[a-zA-Z0-9]{1,30}$/;
 
 const LIMITS = {
-  name: 60,
-  role: 100,
-  sectionTitle: 40,
-  aboutParagraphs: 4,
-  aboutParagraph: 500,
-  services: 6,
-  serviceLabel: 40,
-  serviceDescription: 220,
+  ...CARD_FIELD_LIMITS,
+  fallbackLabel: CARD_FIELD_LIMITS.alternateLabel,
   links: 8,
   linkLabel: 40,
-  fallbackLabel: 60,
   email: 254,
   photoKey: 256,
   pageCopyField: 500,
@@ -51,7 +45,7 @@ const LIMITS = {
   contactEmail: 254,
   contactPhone: 64,
   copyLeaf: 1000,
-  url: 2048,
+  url: CARD_FIELD_LIMITS.publicUrlMaxLength,
   bodyParagraphs: 6,
   contactUrls: 8,
   urlType: 30,

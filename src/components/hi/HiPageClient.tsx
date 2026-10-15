@@ -105,7 +105,7 @@ export function HiPageClient({ card, photoUrl, plan = "free" }: HiPageClientProp
   const cardTopMargin = showBanner ? "mt-[84px]" : "mt-[clamp(16px,5svh,48px)]";
 
   return (
-    <div className="relative isolate min-h-svh overflow-hidden bg-bg text-ink [container-type:inline-size]">
+    <div className="hi-card-page relative isolate min-h-svh overflow-hidden bg-bg text-ink [container-type:inline-size]">
       <div
         aria-hidden
         className="pointer-events-none absolute -top-[200px] left-1/2 z-[-1] h-[420px] w-[520px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,var(--accent-soft),transparent)]"
@@ -186,7 +186,7 @@ export function HiPageClient({ card, photoUrl, plan = "free" }: HiPageClientProp
                     href={card.alternate.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex min-h-11 items-center self-center px-2 text-[15px] font-medium text-ink-muted underline decoration-1 underline-offset-[3px] hover:text-ink"
+                    className="hi-link-alternate inline-flex min-h-11 items-center self-center px-2 text-[15px] font-medium"
                   >
                     {card.alternate.label}
                   </a>
@@ -237,7 +237,7 @@ export function HiPageClient({ card, photoUrl, plan = "free" }: HiPageClientProp
                         rel="noopener noreferrer"
                         aria-label={link.label}
                         title={link.label}
-                        className="flex h-11 w-11 items-center justify-center rounded-pill border border-line text-ink no-underline transition-[background-color,color] duration-120 hover:bg-ink hover:text-bg"
+                        className="hi-link-social flex h-11 w-11 items-center justify-center rounded-pill border border-line transition-[background-color,color] duration-120"
                       >
                         <HiSocialLinkIcon type={link.type} />
                       </a>
@@ -257,7 +257,7 @@ export function HiPageClient({ card, photoUrl, plan = "free" }: HiPageClientProp
                 href={WE_MET_CARD_HOME_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex min-h-11 items-center gap-2 rounded-pill px-2 text-[15px] font-medium text-ink-muted no-underline hover:bg-surface-2 hover:text-ink"
+                className="hi-link-attribution inline-flex min-h-11 items-center gap-2 rounded-pill px-2 text-[15px] font-medium"
               >
                 <WeMetMarkIcon size={14} />
                 We Met
@@ -269,7 +269,7 @@ export function HiPageClient({ card, photoUrl, plan = "free" }: HiPageClientProp
                 href="https://didi.build"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex min-h-11 items-center gap-2 rounded-pill px-2 text-[15px] font-medium text-ink-muted no-underline hover:bg-surface-2 hover:text-ink"
+                className="hi-link-attribution inline-flex min-h-11 items-center gap-2 rounded-pill px-2 text-[15px] font-medium"
               >
                 <DidiBuildLeafIcon size={12} className="text-accent" />
                 Didi Build

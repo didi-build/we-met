@@ -14,16 +14,14 @@ export function HiWeMetBannerTop({ show }: HiWeMetBannerTopProps) {
       href={WE_MET_CARD_HOME_URL}
       target="_blank"
       rel="noopener noreferrer"
-      className="bg-ink flex min-h-11 items-center justify-center gap-2 px-4 text-[14px] font-medium leading-[1.3] no-underline"
+      className="hi-link-strip bg-ink flex min-h-11 items-center justify-center gap-2 px-4 text-[14px] font-medium leading-[1.3] no-underline"
     >
       <span className="flex items-center gap-1.5 font-bold">
         <WeMetMarkIcon size={16} />
         We Met
       </span>
       <span aria-hidden className="h-[3px] w-[3px] rounded-full bg-current" />
-      <span className="hover:underline hover:underline-offset-[3px]">
-        Get your own card for free
-      </span>
+      <span className="hi-link-strip-text">Get your own card for free</span>
       <span aria-hidden className="inline-flex">
         <ArrowRightIcon size={16} />
       </span>
@@ -44,7 +42,7 @@ export function HiWeMetBannerBand({ show }: HiWeMetBannerBandProps) {
       href={WE_MET_CARD_HOME_URL}
       target="_blank"
       rel="noopener noreferrer"
-      className="bg-ink flex justify-center no-underline"
+      className="hi-link-strip bg-ink flex justify-center no-underline"
     >
       <span className="flex w-full max-w-[420px] box-border items-center justify-between gap-4 px-6 pb-[calc(24px+env(safe-area-inset-bottom))] pt-6">
         <span className="flex flex-col gap-0.5 text-left">

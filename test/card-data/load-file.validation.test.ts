@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { CARD_FIELD_LIMITS } from "@/card-data/limits";
 import { parseCardsLoadFile } from "@/card-data/load-file";
 import { exampleLoadRaw } from "../helpers/example-card";
 
@@ -36,6 +37,39 @@ describe("parseCardsLoadFile validation (unit)", () => {
     const parsed = parseCardsLoadFile(raw);
     expect(parsed.cards[0].alternate).toBeUndefined();
     expect(parsed.cards[0].bookingLinks.bookingUrl).toBe("");
+  });
+
+  it("accepts up to CARD_FIELD_LIMITS.services service items", () => {
+    const raw = cloneLoadFile();
+    const card = (raw.cards as Record<string, unknown>[])[0];
+    const services = card.services as {
+      title: string;
+      items: { title: string; description: string }[];
+    };
+    while (services.items.length < CARD_FIELD_LIMITS.services) {
+      services.items.push({
+        title: `Service ${services.items.length + 1}`,
+        description: "Description.",
+      });
+    }
+    const parsed = parseCardsLoadFile(raw);
+    expect(parsed.cards[0].services?.items).toHaveLength(CARD_FIELD_LIMITS.services);
+  });
+
+  it("rejects more than CARD_FIELD_LIMITS.services service items", () => {
+    expectReject((raw) => {
+      const card = (raw.cards as Record<string, unknown>[])[0];
+      const services = card.services as {
+        title: string;
+        items: { title: string; description: string }[];
+      };
+      while (services.items.length <= CARD_FIELD_LIMITS.services) {
+        services.items.push({
+          title: `Extra ${services.items.length + 1}`,
+          description: "Description.",
+        });
+      }
+    }, /services\.items exceeds max length/);
   });
 
   it("accepts legacy copy.followUpEmail with a warning", () => {

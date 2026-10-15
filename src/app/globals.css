@@ -63,6 +63,64 @@ a:hover {
   color: var(--ink-muted);
 }
 
+button:not(:disabled):not([aria-busy="true"]),
+[role="button"]:not([aria-disabled="true"]),
+summary,
+select:not(:disabled),
+label:has(input[type="checkbox"]:not(:disabled)),
+label:has(input[type="radio"]:not(:disabled)) {
+  cursor: pointer;
+}
+
+button:disabled,
+button[aria-busy="true"],
+select:disabled {
+  cursor: default;
+}
+
+input:not([type="button"]):not([type="submit"]):not([type="reset"]):not(
+    [type="checkbox"]
+  ):not([type="radio"]),
+textarea {
+  cursor: text;
+}
+
+.hi-card-page a.hi-link-social {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.hi-card-page a.hi-link-social:hover {
+  background: var(--ink);
+  color: var(--bg);
+}
+
+.hi-card-page a.hi-link-attribution {
+  color: var(--ink-muted);
+  text-decoration: none;
+}
+
+.hi-card-page a.hi-link-attribution:hover {
+  color: var(--ink);
+  background: var(--surface-2);
+}
+
+.hi-card-page a.hi-link-alternate {
+  color: var(--ink-muted);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.hi-card-page a.hi-link-alternate:hover {
+  color: var(--ink);
+}
+
+.hi-card-page a.hi-link-strip:hover .hi-link-strip-text {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 a.bg-accent,
 a.bg-accent:hover {
   color: var(--accent-ink);
