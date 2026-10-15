@@ -3,7 +3,6 @@
 import { AppCardEditor } from "@/components/app/AppCardEditor";
 import { useAppThemeToggle } from "@/components/app/AppThemeProvider";
 import {
-  AppWeMetMarkIcon,
   GoogleGIcon,
   MoonIcon,
   PersonIcon,
@@ -11,6 +10,7 @@ import {
 } from "@/components/app/icons/AppIcons";
 import { useAppApi } from "@/app-api/AppApiProvider";
 import { AppApiError, type AppSession, type EditorCard } from "@/app-api/types";
+import { WeMetMarkIcon } from "@/components/hi/icons/HiCardIcons";
 import { WE_MET_CARD_HOME_URL } from "@/lib/hi-card/card-content";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -59,18 +59,16 @@ export function WeMetApp() {
 
   useEffect(() => {
     let cancelled = false;
-    api
-      .getSession()
-      .then((s) => {
-        if (!cancelled) {
-          return routeSession(s);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setBooting(false);
-        }
-      });
+    void (async () => {
+      const s = await api.getSession();
+      if (cancelled) {
+        return;
+      }
+      await routeSession(s);
+      if (!cancelled) {
+        setBooting(false);
+      }
+    })();
     return () => {
       cancelled = true;
     };
@@ -143,7 +141,7 @@ export function WeMetApp() {
       <header className="ap-header">
         <a className="ap-brand" href={WE_MET_CARD_HOME_URL}>
           <span className="ap-icon" aria-hidden>
-            <AppWeMetMarkIcon size={28} />
+            <WeMetMarkIcon size={28} />
           </span>
           We Met
         </a>
@@ -207,7 +205,7 @@ export function WeMetApp() {
       {view === "login" ? (
         <main className="ap-login">
           <span className="ap-icon ap-login-mark" aria-hidden>
-            <AppWeMetMarkIcon size={56} />
+            <WeMetMarkIcon size={56} />
           </span>
           <h1 className="ap-login-title">Make your We Met card</h1>
           <p className="ap-login-sub">
@@ -249,7 +247,7 @@ export function WeMetApp() {
       {view === "closed" && session ? (
         <main className="ap-login">
           <span className="ap-icon ap-login-mark" aria-hidden>
-            <AppWeMetMarkIcon size={56} />
+            <WeMetMarkIcon size={56} />
           </span>
           <h1 className="ap-login-title">Sign-up isn&apos;t open yet</h1>
           <p className="ap-login-sub">

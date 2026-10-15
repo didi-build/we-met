@@ -76,3 +76,27 @@ export function useTheme() {
   }
   return ctx;
 }
+
+/**
+ * Read-only theme context for embedded card preview (e.g. app editor).
+ * Does not read or write `card-theme` localStorage; toggle is a no-op.
+ */
+export function MirroredThemeProvider({
+  theme,
+  children,
+}: {
+  theme: ThemeMode;
+  children: React.ReactNode;
+}) {
+  const toggleTheme = useCallback(() => {}, []);
+  const value = useMemo(
+    () => ({
+      theme,
+      toggleTheme,
+      themeAria:
+        theme === "dark" ? hiUiA11y.themeSwitchToLight : hiUiA11y.themeSwitchToDark,
+    }),
+    [theme, toggleTheme],
+  );
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+}

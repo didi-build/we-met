@@ -6,6 +6,15 @@
 html[data-theme="dark"] .ap {
   color-scheme: dark;
 }
+.ap-card-preview-inert {
+  pointer-events: none;
+  user-select: none;
+  min-height: 100%;
+}
+.ap-card-preview-inert a {
+  pointer-events: none;
+  cursor: default;
+}
 *,
 *::before,
 *::after {

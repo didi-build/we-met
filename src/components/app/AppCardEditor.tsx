@@ -1,9 +1,20 @@
 "use client";
 
 import { useAppApi } from "@/app-api/AppApiProvider";
-import { AppApiError, type AppSession, type EditorCard } from "@/app-api/types";
+import type { AppSession, EditorCard } from "@/app-api/types";
 import { CARD_FIELD_LIMITS } from "@/card-data/limits";
-import { HiPageClient } from "@/components/hi/HiPageClient";
+import { AppEditorBottomBar } from "@/components/app/editor/AppEditorBottomBar";
+import { AppCardPreview } from "@/components/app/editor/AppCardPreview";
+import { AppEditorDialogs } from "@/components/app/editor/AppEditorDialogs";
+import { SlugStatusMessage } from "@/components/app/editor/SlugStatusMessage";
+import {
+  getPath,
+  idFor,
+  normalizeSlugInput,
+  setPath,
+  useMediaWide,
+} from "@/components/app/editor/editor-utils";
+import { useAppThemeToggle } from "@/components/app/AppThemeProvider";
 import { CharCount, FieldError } from "@/components/app/FieldControls";
 import {
   ArrowDownIcon,
@@ -11,31 +22,25 @@ import {
   CameraIcon,
   CheckIcon,
   ChevronDownIcon,
-  CloseIcon,
-  CopyIcon,
-  ExternalIcon,
   GithubIcon,
-  GoogleGIcon,
   InstagramIcon,
   LinkIcon,
   LinkedinIcon,
   LockIcon,
   MailIcon,
   PlusIcon,
-  ShareIcon,
   TrashIcon,
   WebsiteIcon,
-  ZoomInIcon,
-  ZoomOutIcon,
 } from "@/components/app/icons/AppIcons";
-import { editorCardToPreviewRecord } from "@/lib/app-editor/draft-to-preview-card";
 import {
   clampCrop,
   cropBaseScale,
   type CropState,
   renderCroppedPhotoJpeg,
 } from "@/lib/app-editor/photo-crop";
-import { slugFormatCheck, type SlugUiStatus } from "@/lib/app-editor/slug";
+import { useAutosave } from "@/lib/app-editor/hooks/useAutosave";
+import { publishBlockers, usePublish } from "@/lib/app-editor/hooks/usePublish";
+import { useSlugCheck } from "@/lib/app-editor/hooks/useSlugCheck";
 import { allFieldKeys, fieldError } from "@/lib/app-editor/validation";
 import { cardInitials } from "@/lib/hi-card/card-content";
 import {
@@ -45,71 +50,10 @@ import {
   useMemo,
   useRef,
   useState,
-  type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
 
-type SaveUiState = "saved" | "saving" | "error";
 type EditorTab = "edit" | "preview";
-
-function idFor(key: string): string {
-  return key.replace(/\./g, "-");
-}
-
-function getPath(card: EditorCard, path: string): string {
-  const parts = path.split(".");
-  let cur: unknown = card;
-  for (const p of parts) {
-    if (cur == null || typeof cur !== "object") {
-      return "";
-    }
-    cur = (cur as Record<string, unknown>)[p];
-  }
-  return String(cur ?? "");
-}
-
-function setPath(card: EditorCard, path: string, value: string): EditorCard {
-  const next = structuredClone(card);
-  const parts = path.split(".");
-  let cur: Record<string, unknown> = next as unknown as Record<string, unknown>;
-  for (let i = 0; i < parts.length - 1; i++) {
-    const key = parts[i]!;
-    const child = cur[key];
-    if (child == null || typeof child !== "object") {
-      cur[key] = {};
-    }
-    cur = cur[key] as Record<string, unknown>;
-  }
-  cur[parts[parts.length - 1]!] = value;
-  return next;
-}
-
-function sentence(blockers: string[]): string {
-  if (!blockers.length) {
-    return "";
-  }
-  const s =
-    blockers.length > 1
-      ? `${blockers.slice(0, -1).join(", ")} and ${blockers[blockers.length - 1]}`
-      : blockers[0];
-  return `To publish, ${s}.`;
-}
-
-function normalizeSlugInput(raw: string): string {
-  return raw.toLowerCase().replace(/\s+/g, "-");
-}
-
-function useMediaWide(): boolean {
-  const [wide, setWide] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia("(min-width: 900px)");
-    const onChange = () => setWide(mq.matches);
-    onChange();
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, []);
-  return wide;
-}
 
 type AppCardEditorProps = {
   session: AppSession;
@@ -129,21 +73,18 @@ export function AppCardEditor({
   signingIn,
 }: AppCardEditorProps) {
   const api = useAppApi();
+  const { theme: appTheme } = useAppThemeToggle();
   const wide = useMediaWide();
   const announceId = useId();
 
   const [card, setCard] = useState<EditorCard>(initialDraft);
   const [published, setPublished] = useState<EditorCard | null>(initialPublished);
-  const [slugStatus, setSlugStatus] = useState<SlugUiStatus>({ status: "empty" });
   const [slugEditing, setSlugEditing] = useState(false);
   const [slugPrev, setSlugPrev] = useState("");
   const [triedPublish, setTriedPublish] = useState(false);
-  const [saveUi, setSaveUi] = useState<SaveUiState>("saved");
-  const [pendingSave, setPendingSave] = useState(false);
   const [tab, setTab] = useState<EditorTab>("edit");
   const [blockedOpen, setBlockedOpen] = useState(false);
   const [blockedText, setBlockedText] = useState("");
-  const [publishing, setPublishing] = useState(false);
   const [photoError, setPhotoError] = useState("");
   const [photoUploading, setPhotoUploading] = useState(false);
   const [announce, setAnnounce] = useState("");
@@ -166,21 +107,13 @@ export function AppCardEditor({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dialogOpenerRef = useRef<HTMLElement | null>(null);
 
-  const saveTickRef = useRef(0);
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const slugTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const slugSeqRef = useRef(0);
+  const onSessionExpired = useCallback(() => {
+    setDialog("session");
+    dialogOpenerRef.current = document.activeElement as HTMLElement;
+  }, []);
 
-  const previewRecord = useMemo(() => editorCardToPreviewRecord(card), [card]);
-
-  const dirty = useMemo(() => {
-    if (!published) {
-      return true;
-    }
-    return JSON.stringify(card) !== JSON.stringify(published);
-  }, [card, published]);
-
-  const publishState = !published ? "draft" : dirty ? "changes" : "live";
+  const { saveUi, scheduleSave, retrySave } = useAutosave(api, card, onSessionExpired);
+  const { slugStatus, onSlugInput, markMine } = useSlugCheck(api, published, card.slug);
 
   const fieldKeys = useMemo(() => allFieldKeys(card), [card]);
 
@@ -199,65 +132,6 @@ export function AppCardEditor({
     });
   }, []);
 
-  useEffect(() => {
-    fitBar();
-  }, [blockedOpen, fitBar, publishState, saveUi]);
-
-  useEffect(() => {
-    const onResize = () => fitBar();
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, [fitBar]);
-
-  useEffect(() => {
-    const onBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (!pendingSave) {
-        return;
-      }
-      e.preventDefault();
-      e.returnValue = "";
-    };
-    window.addEventListener("beforeunload", onBeforeUnload);
-    return () => window.removeEventListener("beforeunload", onBeforeUnload);
-  }, [pendingSave]);
-
-  const runSave = useCallback(async () => {
-    const mine = ++saveTickRef.current;
-    setSaveUi("saving");
-    try {
-      await api.saveDraft(card);
-      if (mine !== saveTickRef.current) {
-        return;
-      }
-      setSaveUi("saved");
-      setPendingSave(false);
-    } catch (err) {
-      if (mine !== saveTickRef.current) {
-        return;
-      }
-      if (err instanceof AppApiError && err.code === "unauthorized") {
-        setSaveUi("error");
-        setDialog("session");
-        dialogOpenerRef.current = document.activeElement as HTMLElement;
-        return;
-      }
-      setSaveUi("error");
-    }
-  }, [api, card]);
-
-  const scheduleSave = useCallback(
-    (ms: number) => {
-      setPendingSave(true);
-      if (saveTimerRef.current) {
-        clearTimeout(saveTimerRef.current);
-      }
-      saveTimerRef.current = setTimeout(() => {
-        runSave();
-      }, ms);
-    },
-    [runSave],
-  );
-
   const onCardChange = useCallback(
     (next: EditorCard) => {
       setCard(next);
@@ -265,79 +139,6 @@ export function AppCardEditor({
     },
     [scheduleSave],
   );
-
-  const checkSlugNow = useCallback(
-    async (value: string) => {
-      const fmt = slugFormatCheck(value);
-      if (fmt) {
-        setSlugStatus({ status: "invalid", value, message: fmt });
-        return;
-      }
-      if (published && value === published.slug) {
-        setSlugStatus({ status: "mine", value });
-        return;
-      }
-      const seq = ++slugSeqRef.current;
-      setSlugStatus({ status: "checking", value });
-      try {
-        const result = await api.checkSlug(value);
-        if (seq !== slugSeqRef.current) {
-          return;
-        }
-        if (result.status === "available") {
-          setSlugStatus({ status: "available", value });
-        } else if (result.status === "reserved") {
-          setSlugStatus({ status: "reserved", value });
-        } else if (result.status === "taken") {
-          setSlugStatus({ status: "taken", value });
-        } else if (result.status === "invalid") {
-          setSlugStatus({ status: "invalid", value, message: result.message });
-        }
-      } catch {
-        if (seq !== slugSeqRef.current) {
-          return;
-        }
-        setSlugStatus({ status: "unknown", value });
-      }
-    },
-    [api, published],
-  );
-
-  const onSlugInput = useCallback(
-    (value: string) => {
-      if (slugTimerRef.current) {
-        clearTimeout(slugTimerRef.current);
-      }
-      slugSeqRef.current += 1;
-      if (!value) {
-        setSlugStatus({ status: "empty" });
-        return;
-      }
-      if (published && value === published.slug) {
-        setSlugStatus({ status: "mine", value });
-        return;
-      }
-      setSlugStatus({ status: "typing", value });
-      slugTimerRef.current = setTimeout(() => {
-        checkSlugNow(value);
-      }, 400);
-    },
-    [checkSlugNow, published],
-  );
-
-  useEffect(() => {
-    const slug = card.slug;
-    if (!slug) {
-      setSlugStatus({ status: "empty" });
-      return;
-    }
-    if (published && slug === published.slug) {
-      setSlugStatus({ status: "mine", value: slug });
-      return;
-    }
-    checkSlugNow(slug);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- initial slug check only when published identity changes
-  }, []);
 
   const updateField = useCallback(
     (path: string, value: string) => {
@@ -355,27 +156,34 @@ export function AppCardEditor({
     [card, onCardChange, onSlugInput, scheduleSave, slugEditing],
   );
 
-  const blockers = useCallback(() => {
-    const out: string[] = [];
-    if (slugEditing) {
-      out.push("tap the check to confirm your new link, or cancel");
-    }
-    if (!card.name.trim()) {
-      out.push("add your name");
-    }
-    if (!card.slug) {
-      out.push("choose your link");
-    } else if (["invalid", "reserved", "taken"].includes(slugStatus.status)) {
-      out.push("choose a link that works");
-    } else if (slugStatus.status === "checking" || slugStatus.status === "typing") {
-      out.push("wait for your link to be checked");
-    }
-    const others = fieldKeys.filter((k) => k !== "slug" && k !== "name" && errFor(k));
-    if (others.length || (card.name.trim() && errFor("name"))) {
-      out.push("fix the fields marked in red");
-    }
-    return out;
-  }, [card.name, card.slug, errFor, fieldKeys, slugEditing, slugStatus.status]);
+  const blockers = useCallback(
+    () =>
+      publishBlockers({
+        slugEditing,
+        name: card.name,
+        slug: card.slug,
+        slugStatus: slugStatus.status,
+        fieldKeys,
+        fieldError: errFor,
+      }),
+    [card.name, card.slug, errFor, fieldKeys, slugEditing, slugStatus.status],
+  );
+
+  const {
+    publishing,
+    publishState,
+    handlePublish: runPublish,
+  } = usePublish(api, card, published, blockers);
+
+  useEffect(() => {
+    fitBar();
+  }, [blockedOpen, fitBar, publishState, saveUi]);
+
+  useEffect(() => {
+    const onResize = () => fitBar();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [fitBar]);
 
   const openDialog = useCallback(
     (name: "crop" | "published" | "session", opener?: HTMLElement) => {
@@ -484,36 +292,28 @@ export function AppCardEditor({
 
   const handlePublish = useCallback(async () => {
     setTriedPublish(true);
-    const b = blockers();
-    if (b.length) {
-      setBlockedOpen(true);
-      setBlockedText(sentence(b));
-      fitBar();
+    const result = await runPublish(
+      (url) => {
+        setBlockedOpen(false);
+        setPublished(structuredClone(card));
+        markMine(card.slug);
+        setPubUrl(url);
+        setPubTitle("Your card is live");
+        setCopyLabel("Copy link");
+        openDialog("published");
+        setAnnounce("Your card is live.");
+      },
+      (message) => {
+        setBlockedOpen(true);
+        setBlockedText(message);
+        fitBar();
+        setTab("edit");
+      },
+    );
+    if (result.blocked) {
       setTab("edit");
-      return;
     }
-    setBlockedOpen(false);
-    setPublishing(true);
-    try {
-      const result = await api.publish(card);
-      setPublished(structuredClone(card));
-      setSlugStatus({ status: "mine", value: card.slug });
-      const url = result.url;
-      setPubUrl(url);
-      setPubTitle("Your card is live");
-      setCopyLabel("Copy link");
-      openDialog("published");
-      setAnnounce("Your card is live.");
-    } catch {
-      setBlockedOpen(true);
-      setBlockedText(
-        "Something went wrong on our end and your card wasn't published. Your changes are saved. Try again?",
-      );
-      fitBar();
-    } finally {
-      setPublishing(false);
-    }
-  }, [api, blockers, card, fitBar, openDialog]);
+  }, [card, fitBar, markMine, openDialog, runPublish]);
 
   const openShare = useCallback(() => {
     if (!published) {
@@ -540,52 +340,6 @@ export function AppCardEditor({
 
   const slugLockable = Boolean(published);
   const slugLocked = slugLockable && !slugEditing;
-
-  const slugStatusHtml = () => {
-    const s = slugStatus.status;
-    if (s === "empty") {
-      return "Lowercase letters, numbers and hyphens.";
-    }
-    if (s === "typing") {
-      return (
-        <>
-          we-met.link/hi/<b>{slugStatus.value}</b>
-        </>
-      );
-    }
-    if (s === "checking") {
-      return (
-        <>
-          <span className="ap-spin" aria-hidden />
-          Checking…
-        </>
-      );
-    }
-    if (s === "available") {
-      return (
-        <>
-          <span className="ap-icon" aria-hidden>
-            <CheckIcon size={16} />
-          </span>
-          Available
-        </>
-      );
-    }
-    if (s === "mine") {
-      return (
-        <>
-          <span className="ap-icon" aria-hidden>
-            <CheckIcon size={16} />
-          </span>
-          This is your current link.
-        </>
-      );
-    }
-    if (s === "unknown") {
-      return "Couldn't check this link. It will be checked again when you publish.";
-    }
-    return null;
-  };
 
   const slugStatusTone =
     slugStatus.status === "available" || slugStatus.status === "mine" ? "ok" : "";
@@ -799,7 +553,7 @@ export function AppCardEditor({
                     data-tone={slugStatusTone}
                     hidden={!showSlugHelp}
                   >
-                    {slugStatusHtml()}
+                    <SlugStatusMessage status={slugStatus} />
                   </p>
                   <div className="ap-meta">
                     <FieldError message={errFor("slug")} id="f-slug-err" />
@@ -1504,329 +1258,47 @@ export function AppCardEditor({
           </div>
           <div className="ap-frame" data-frame>
             <div style={{ position: "absolute", inset: 0, overflow: "auto" }}>
-              <HiPageClient
-                card={previewRecord}
-                photoUrl={card.photo || null}
-                preview
-              />
+              <AppCardPreview theme={appTheme} draft={card} />
             </div>
           </div>
         </aside>
       </div>
 
-      <div className="ap-bar" ref={barRef}>
-        <div className="ap-blocked" hidden={!blockedOpen}>
-          <div className="ap-alert" role="alert">
-            <span className="ap-alert-mark" aria-hidden>
-              !
-            </span>
-            <span className="ap-alert-body">
-              <span>{blockedText}</span>
-            </span>
-          </div>
-        </div>
-        <div className="ap-bar-in">
-          <div className="ap-bar-status">
-            <span
-              className="ap-save"
-              role="status"
-              aria-live="polite"
-              data-tone={saveUi === "error" ? "bad" : undefined}
-            >
-              {saveUi === "saving" ? (
-                <>
-                  <span className="ap-spin" aria-hidden />
-                  Saving…
-                </>
-              ) : saveUi === "saved" ? (
-                <>
-                  <span className="ap-icon" aria-hidden>
-                    <CheckIcon size={14} />
-                  </span>
-                  Saved
-                </>
-              ) : (
-                <>
-                  Couldn&apos;t save.{" "}
-                  <button
-                    type="button"
-                    className="ap-textbtn"
-                    onClick={() => scheduleSave(0)}
-                  >
-                    Retry
-                  </button>
-                </>
-              )}
-            </span>
-          </div>
-          <div className="ap-bar-actions">
-            <button
-              type="button"
-              className="ap-btn ap-btn-outline ap-btn-sm"
-              hidden={!published}
-              onClick={openShare}
-            >
-              <span className="ap-icon" aria-hidden>
-                <ShareIcon size={18} />
-              </span>
-              Share card
-            </button>
-            <button
-              type="button"
-              className="ap-btn"
-              data-state={publishState}
-              aria-busy={publishing}
-              disabled={publishState === "live" || publishing}
-              aria-label={
-                publishState === "live"
-                  ? "Published, nothing new to publish"
-                  : publishState === "changes"
-                    ? "Publish changes"
-                    : "Publish"
-              }
-              onClick={handlePublish}
-            >
-              {publishing ? (
-                <>
-                  <span className="ap-spin" aria-hidden />
-                  Publishing…
-                </>
-              ) : publishState === "live" ? (
-                <>
-                  <span className="ap-btn-dot" aria-hidden />
-                  Published
-                </>
-              ) : publishState === "changes" ? (
-                "Publish changes"
-              ) : (
-                "Publish"
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
+      <AppEditorBottomBar
+        barRef={barRef}
+        blockedOpen={blockedOpen}
+        blockedText={blockedText}
+        saveUi={saveUi}
+        retrySave={retrySave}
+        published={published}
+        openShare={openShare}
+        publishState={publishState}
+        publishing={publishing}
+        onPublish={handlePublish}
+      />
 
-      <div className="ap-dialog" hidden={dialog !== "crop"}>
-        <div className="ap-scrim" onClick={closeDialog} />
-        <div
-          className="ap-panel"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="crop-title"
-        >
-          <div className="ap-panel-head">
-            <h2 className="ap-panel-title" id="crop-title">
-              Crop your photo
-            </h2>
-            <button
-              type="button"
-              className="ap-iconbtn ap-close"
-              aria-label="Close"
-              onClick={closeDialog}
-            >
-              <span className="ap-icon" aria-hidden>
-                <CloseIcon size={20} />
-              </span>
-            </button>
-          </div>
-          <div
-            ref={cropStageRef}
-            className="ap-crop"
-            aria-label="Drag to move the photo"
-            role="img"
-            tabIndex={0}
-            onPointerDown={(e: ReactPointerEvent) => {
-              if (!crop) {
-                return;
-              }
-              panRef.current = { x: e.clientX, y: e.clientY, ox: crop.x, oy: crop.y };
-              e.currentTarget.setPointerCapture(e.pointerId);
-            }}
-            onPointerMove={(e: ReactPointerEvent) => {
-              if (!panRef.current || !crop) {
-                return;
-              }
-              const pan = panRef.current;
-              paintCrop({
-                ...crop,
-                x: pan.ox + e.clientX - pan.x,
-                y: pan.oy + e.clientY - pan.y,
-              });
-            }}
-            onPointerUp={() => {
-              panRef.current = null;
-            }}
-            onKeyDown={(e) => {
-              if (!crop) {
-                return;
-              }
-              const d: Record<string, [number, number]> = {
-                ArrowLeft: [-10, 0],
-                ArrowRight: [10, 0],
-                ArrowUp: [0, -10],
-                ArrowDown: [0, 10],
-              };
-              const delta = d[e.key];
-              if (!delta) {
-                return;
-              }
-              e.preventDefault();
-              paintCrop({ ...crop, x: crop.x + delta[0], y: crop.y + delta[1] });
-            }}
-          >
-            {cropOpenSrc ? (
-              <img
-                ref={cropImgRef}
-                src={cropOpenSrc}
-                alt=""
-                style={cropStyle}
-                onLoad={onCropImageLoad}
-              />
-            ) : null}
-            <span className="ap-crop-mask" aria-hidden />
-            <span className="ap-crop-frame" aria-hidden />
-          </div>
-          <label className="ap-zoom">
-            <span className="ap-icon" aria-hidden>
-              <ZoomOutIcon size={20} />
-            </span>
-            <span className="ap-sr">Zoom</span>
-            <input
-              type="range"
-              min={1}
-              max={3}
-              step={0.01}
-              value={crop?.z ?? 1}
-              onChange={(e) => {
-                if (!crop) {
-                  return;
-                }
-                paintCrop({ ...crop, z: Number(e.target.value) });
-              }}
-            />
-            <span className="ap-icon" aria-hidden>
-              <ZoomInIcon size={20} />
-            </span>
-          </label>
-          <p className="ap-crop-note">
-            Drag to move. Your photo is saved square and shows as a circle on your card.
-          </p>
-          <div className="ap-panel-actions">
-            <button
-              type="button"
-              className="ap-btn ap-btn-lg"
-              onClick={useCroppedPhoto}
-            >
-              Use photo
-            </button>
-            <button
-              type="button"
-              className="ap-btn ap-btn-outline ap-btn-lg"
-              onClick={closeDialog}
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="ap-dialog" hidden={dialog !== "published"}>
-        <div className="ap-scrim" onClick={closeDialog} />
-        <div
-          className="ap-panel"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="pub-title"
-        >
-          <div className="ap-panel-head">
-            <h2 className="ap-panel-title" id="pub-title">
-              {pubTitle}
-            </h2>
-            <button
-              type="button"
-              className="ap-iconbtn ap-close"
-              aria-label="Close"
-              onClick={closeDialog}
-            >
-              <span className="ap-icon" aria-hidden>
-                <CloseIcon size={20} />
-              </span>
-            </button>
-          </div>
-          <p className="ap-panel-text">
-            Share this link, or open your card to show its QR code.
-          </p>
-          <div className="ap-url">
-            <span>{pubUrl.replace(/^https:\/\//, "")}</span>
-            <button type="button" className="ap-btn ap-btn-sm" onClick={copyPubUrl}>
-              <span className="ap-icon" aria-hidden>
-                <CopyIcon size={18} />
-              </span>
-              <span>{copyLabel}</span>
-            </button>
-          </div>
-          <div className="ap-panel-actions">
-            <a
-              className="ap-btn ap-btn-outline ap-btn-lg"
-              href={pubUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <span className="ap-icon" aria-hidden>
-                <ExternalIcon size={18} />
-              </span>
-              Open card
-            </a>
-          </div>
-        </div>
-      </div>
-
-      <div className="ap-dialog" hidden={dialog !== "session"}>
-        <div className="ap-scrim" />
-        <div
-          className="ap-panel"
-          role="alertdialog"
-          aria-modal="true"
-          aria-labelledby="sess-title"
-          aria-describedby="sess-text"
-        >
-          <div className="ap-panel-head">
-            <h2 className="ap-panel-title" id="sess-title">
-              Sign in again to keep editing
-            </h2>
-          </div>
-          <p className="ap-panel-text" id="sess-text">
-            You were signed out. Your changes are kept on this device and will save once
-            you&apos;re back.
-          </p>
-          <div className="ap-panel-actions">
-            <button
-              type="button"
-              className="ap-google"
-              aria-busy={signingIn}
-              disabled={signingIn}
-              onClick={async () => {
-                await onSignIn();
-                const s = await api.getSession();
-                if (s) {
-                  onSessionRestored(s);
-                  closeDialog();
-                  scheduleSave(0);
-                }
-              }}
-            >
-              {signingIn ? (
-                <span className="ap-spin" aria-hidden />
-              ) : (
-                <span className="ap-icon" aria-hidden>
-                  <GoogleGIcon size={20} />
-                </span>
-              )}
-              <span>{signingIn ? "Waiting for Google…" : "Sign in with Google"}</span>
-            </button>
-          </div>
-        </div>
-      </div>
+      <AppEditorDialogs
+        dialog={dialog}
+        closeDialog={closeDialog}
+        cropOpenSrc={cropOpenSrc}
+        crop={crop}
+        cropStyle={cropStyle}
+        cropStageRef={cropStageRef}
+        cropImgRef={cropImgRef}
+        paintCrop={paintCrop}
+        panRef={panRef}
+        onCropImageLoad={onCropImageLoad}
+        useCroppedPhoto={useCroppedPhoto}
+        pubTitle={pubTitle}
+        pubUrl={pubUrl}
+        copyLabel={copyLabel}
+        copyPubUrl={copyPubUrl}
+        signingIn={signingIn}
+        onSignIn={onSignIn}
+        api={api}
+        onSessionRestored={onSessionRestored}
+        scheduleSave={scheduleSave}
+      />
 
       <p className="ap-sr" role="status" aria-live="polite" id={announceId}>
         {announce}
