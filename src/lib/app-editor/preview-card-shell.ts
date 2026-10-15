@@ -48,7 +48,10 @@ export const PREVIEW_PAGE_COPY: CardPageCopy = {
 export function previewCardShell(
   slug: string,
   name: string,
-): Omit<CardRecord, "role" | "about" | "services" | "links" | "alternate"> {
+): Omit<
+  CardRecord,
+  "role" | "about" | "services" | "links" | "alternate" | "photoKey"
+> {
   return {
     id: "preview",
     slug,
