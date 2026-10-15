@@ -1,7 +1,7 @@
 import { HowItWorksSection } from "@/components/landing/HowItWorksSection";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import { LandingHeader } from "@/components/landing/LandingHeader";
-import { PhonePreviewFallback } from "@/components/landing/PhonePreviewFallback";
+import { LandingPhonePreview } from "@/components/landing/LandingPhonePreview";
 import type { LandingUrls } from "@/lib/landing/urls";
 
 type LandingHomeProps = {
@@ -36,7 +36,7 @@ export function LandingHome({ urls, getStartedLabel }: LandingHomeProps) {
               </a>
             </div>
           </div>
-          <PhonePreviewFallback />
+          <LandingPhonePreview />
         </section>
 
         <HowItWorksSection />

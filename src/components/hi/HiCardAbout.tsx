@@ -5,13 +5,19 @@ import { useState } from "react";
 type HiCardAboutProps = {
   title: string;
   paragraphs: string[];
+  interactive?: boolean;
 };
 
-export function HiCardAbout({ title, paragraphs }: HiCardAboutProps) {
+export function HiCardAbout({
+  title,
+  paragraphs,
+  interactive = true,
+}: HiCardAboutProps) {
   const [open, setOpen] = useState(false);
   const first = paragraphs[0] ?? "";
   const rest = paragraphs.slice(1);
-  const showMore = rest.length > 0;
+  const showMore = interactive && rest.length > 0;
+  const showAll = !interactive;
 
   return (
     <div className="flex flex-col gap-3.5">
@@ -21,7 +27,7 @@ export function HiCardAbout({ title, paragraphs }: HiCardAboutProps) {
       <p className="m-0 text-[17px] leading-relaxed text-ink-muted text-pretty">
         {first}
       </p>
-      {open &&
+      {(showAll || open) &&
         rest.map((p) => (
           <p
             key={p.slice(0, 24)}

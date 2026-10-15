@@ -59,9 +59,10 @@ function pillBackground(open: boolean, pressed: boolean, hover: boolean): string
 
 type HiWhatIDoChipsProps = {
   chips: readonly HiChipItem[];
+  interactive?: boolean;
 };
 
-export function HiWhatIDoChips({ chips }: HiWhatIDoChipsProps) {
+export function HiWhatIDoChips({ chips, interactive = true }: HiWhatIDoChipsProps) {
   const { theme } = useTheme();
   const rootRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -307,6 +308,31 @@ export function HiWhatIDoChips({ chips }: HiWhatIDoChipsProps) {
   const popoverShadow = "var(--chip-popover-shadow)";
   const borderLine = "1px solid var(--line)";
   const above = popoverPos?.above ?? false;
+
+  if (!interactive) {
+    return (
+      <div className="relative">
+        <ul className="m-0 flex list-none flex-wrap gap-x-2 gap-y-0 p-0">
+          {chips.map((chip) => (
+            <li key={chip.label} className="flex">
+              <span
+                className="relative inline-flex min-h-8 items-center gap-1.5 rounded-pill px-2.5 py-0 pl-3 text-sm font-medium leading-normal whitespace-nowrap"
+                style={{ background: "var(--accent-soft)", color: "var(--ink)" }}
+              >
+                <span>{chip.label}</span>
+                <span
+                  className="flex h-3.5 w-3.5 items-center justify-center text-ink-muted"
+                  aria-hidden
+                >
+                  <ChipPlusIcon />
+                </span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
 
   return (
     <div ref={rootRef} className="relative">
