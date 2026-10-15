@@ -1,3 +1,4 @@
+import { cardLoadInputToPersisted } from "@/card-data/card-persist";
 import { serializeLeadSinkConfig } from "@/card-data/lead-sink-registry";
 import type {
   CardsLoadFile,
@@ -119,10 +120,11 @@ function buildCardUpsertStatement(
   newId: string,
   updatedAt: string,
 ): string {
-  const linksJson = cardJson(card.links);
-  const pageCopyJson = cardJson(card.pageCopy);
-  const contactJson = cardJson(card.contact);
-  const copyJson = cardJson(card.copy);
+  const persisted = cardLoadInputToPersisted(card);
+  const linksJson = cardJson(persisted.links);
+  const pageCopyJson = cardJson(persisted.pageCopy);
+  const contactJson = cardJson(persisted.contact);
+  const copyJson = cardJson(persisted.copy);
 
   return `INSERT INTO cards (
   id, slug, variant, display_name, email, photo_key,

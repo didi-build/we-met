@@ -48,9 +48,9 @@ function defineContract(
           ...exampleCardInput(),
           slug,
         });
-        expect(saved.photoKey).toBeNull();
+        expect(saved.photoKey).toBe("didi");
         const loaded = await repo.getBySlug(slug);
-        expect(loaded?.displayName).toBe("Demo User");
+        expect(loaded?.displayName).toBe("Didi Shoukralla");
         expect(loaded?.copy.thanksMessage).toContain("{firstName}");
       });
     });

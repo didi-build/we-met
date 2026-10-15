@@ -1,11 +1,5 @@
-import type {
-  BrandVariant,
-  CardContact,
-  CardCopy,
-  CardLinks,
-  CardPageCopy,
-  CardRecord,
-} from "@/card-data/types";
+import { cardRowToRecord } from "@/card-data/card-persist";
+import type { CardRecord } from "@/card-data/types";
 
 export type CardsRow = {
   id: string;
@@ -40,19 +34,7 @@ function parseJson<T>(label: string, raw: string): T {
 }
 
 export function mapCardRow(row: CardsRow): CardRecord {
-  return {
-    id: row.id,
-    slug: row.slug,
-    variant: row.variant as BrandVariant,
-    displayName: row.display_name,
-    email: row.email,
-    photoKey: row.photo_key,
-    links: parseJson<CardLinks>("links", row.links_json),
-    pageCopy: parseJson<CardPageCopy>("page_copy", row.page_copy_json),
-    contact: parseJson<CardContact>("contact", row.contact_json),
-    copy: parseJson<CardCopy>("copy", row.copy_json),
-    updatedAt: row.updated_at,
-  };
+  return cardRowToRecord(row, parseJson);
 }
 
 export function mapLeadSinkRow(

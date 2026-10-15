@@ -1,7 +1,7 @@
 import type {
+  CardBookingLinks,
   CardContact,
   CardCopyFollowUpEmail,
-  CardLinks,
   CardPageCopy,
 } from "@/card-data/types";
 
@@ -34,7 +34,7 @@ export type CardEmailSnapshot = {
   email: string;
   photoKey: string | null;
   contact: CardContact;
-  links: CardLinks;
+  links: CardBookingLinks;
   pageCopy: Pick<CardPageCopy, "emailFromName">;
   copy: {
     followUpEmail: CardCopyFollowUpEmail;

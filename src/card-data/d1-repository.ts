@@ -10,6 +10,7 @@ import {
   type LeadSinksRow,
 } from "@/card-data/row-mapper";
 import { registerBuiltInLeadSinkKinds } from "@/card-data/register-lead-sink-kinds";
+import { cardLoadInputToPersisted } from "@/card-data/card-persist";
 import type {
   CardLoadInput,
   CardRecord,
@@ -59,10 +60,11 @@ export class D1CardRepository implements CardRepository {
   async upsertCard(input: CardLoadInput): Promise<CardRecord> {
     const existing = await this.getBySlug(input.slug);
     const updatedAt = nowIso();
-    const linksJson = JSON.stringify(input.links);
-    const pageCopyJson = JSON.stringify(input.pageCopy);
-    const contactJson = JSON.stringify(input.contact);
-    const copyJson = JSON.stringify(input.copy);
+    const persisted = cardLoadInputToPersisted(input);
+    const linksJson = JSON.stringify(persisted.links);
+    const pageCopyJson = JSON.stringify(persisted.pageCopy);
+    const contactJson = JSON.stringify(persisted.contact);
+    const copyJson = JSON.stringify(persisted.copy);
 
     if (existing) {
       await this.db

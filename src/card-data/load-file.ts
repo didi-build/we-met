@@ -1,3 +1,4 @@
+import { cardLoadInputToPersisted } from "@/card-data/card-persist";
 import { assertValidHostname } from "@/card-data/hostname";
 import {
   LEAD_SINK_ID_PATTERN,
@@ -7,34 +8,45 @@ import {
 import { assertNoControlCharacters } from "@/card-data/load-sql";
 import { parseLeadSinkConfig } from "@/card-data/lead-sink-registry";
 import { registerBuiltInLeadSinkKinds } from "@/card-data/register-lead-sink-kinds";
+import { normalizeBrandVariant } from "@/card-data/normalize-variant";
 import { assertValidSlug, isValidSlug } from "@/card-data/slug";
 import type {
-  BrandVariant,
   CardCopy,
-  CardFooterLink,
-  CardLinks,
-  CardsLoadFile,
   CardLoadInput,
+  CardPlan,
+  CardPublicLink,
+  CardPublicLinkType,
+  CardService,
+  CardsLoadFile,
   ContactUrl,
-  FooterLinkKind,
   LeadSinkLoadInput,
 } from "@/card-data/types";
 
-const VARIANTS = new Set<BrandVariant>(["green", "mono"]);
-const FOOTER_KINDS = new Set<FooterLinkKind>([
-  "site",
+const LINK_TYPES = new Set<CardPublicLinkType>([
+  "website",
   "linkedin",
   "github",
-  "portfolio",
-  "google",
+  "instagram",
 ]);
+
+const PLANS = new Set<CardPlan>(["free", "pro"]);
 
 const BASIC_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PLACEHOLDER_TOKEN = /\{([^}]+)\}/g;
 const URL_TYPE_RE = /^[a-zA-Z0-9]{1,30}$/;
 
 const LIMITS = {
-  displayName: 200,
+  name: 60,
+  role: 100,
+  sectionTitle: 40,
+  aboutParagraphs: 4,
+  aboutParagraph: 500,
+  services: 6,
+  serviceLabel: 40,
+  serviceDescription: 220,
+  links: 8,
+  linkLabel: 40,
+  fallbackLabel: 60,
   email: 254,
   photoKey: 256,
   pageCopyField: 500,
@@ -42,14 +54,8 @@ const LIMITS = {
   contactEmail: 254,
   contactPhone: 64,
   copyLeaf: 1000,
-  chipLabel: 60,
-  chipExplanation: 500,
-  footerLabel: 60,
   url: 2048,
-  expandedParagraphs: 6,
-  chips: 12,
   bodyParagraphs: 6,
-  footerItems: 6,
   contactUrls: 8,
   urlType: 30,
 } as const;
@@ -86,6 +92,17 @@ function requireNonWhitespaceString(
     throw new Error(`${field} exceeds max length ${maxLength}`);
   }
   return value;
+}
+
+function optionalNonWhitespaceString(
+  value: unknown,
+  field: string,
+  maxLength: number,
+): string | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  return requireNonWhitespaceString(value, field, maxLength);
 }
 
 function requireCopyString(
@@ -132,6 +149,14 @@ function requireHttpsUrl(raw: string, field: string): string {
   return raw;
 }
 
+function optionalHttpsUrl(value: unknown, field: string): string | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  const raw = requireNonWhitespaceString(value, field, LIMITS.url);
+  return requireHttpsUrl(raw, field);
+}
+
 function requireEmail(value: string, field: string): string {
   assertNoControlCharacters(value, field);
   if (value.length > LIMITS.email) {
@@ -143,44 +168,93 @@ function requireEmail(value: string, field: string): string {
   return value;
 }
 
-function parseLinks(raw: unknown): CardLinks {
-  if (!isRecord(raw)) {
-    throw new Error("links must be an object");
+function parseStringArray(
+  raw: unknown,
+  field: string,
+  minItems: number,
+  maxItems: number,
+  maxItemLength: number,
+  copyStrings: boolean,
+): string[] | undefined {
+  if (raw === undefined || raw === null) {
+    return undefined;
   }
-  assertAllowedKeys(raw, ["bookingUrl", "footer"], "links");
-  const bookingUrl = requireHttpsUrl(
-    requireNonWhitespaceString(raw.bookingUrl, "links.bookingUrl", LIMITS.url),
-    "links.bookingUrl",
+  if (!Array.isArray(raw)) {
+    throw new Error(`${field} must be an array`);
+  }
+  if (raw.length < minItems) {
+    throw new Error(`${field} must have at least ${minItems} item(s)`);
+  }
+  if (raw.length > maxItems) {
+    throw new Error(`${field} exceeds max length ${maxItems}`);
+  }
+  return raw.map((item, index) =>
+    copyStrings
+      ? requireCopyString(item, `${field}[${index}]`, maxItemLength)
+      : requireNonWhitespaceString(item, `${field}[${index}]`, maxItemLength),
   );
-  if (!Array.isArray(raw.footer)) {
-    throw new Error("links.footer must be an array");
-  }
-  if (raw.footer.length < 1 || raw.footer.length > LIMITS.footerItems) {
-    throw new Error(`links.footer must have 1–${LIMITS.footerItems} items`);
-  }
-  const footer = raw.footer.map((item, index) => parseFooterItem(item, index));
-  return { bookingUrl, footer };
 }
 
-function parseFooterItem(raw: unknown, index: number): CardFooterLink {
-  if (!isRecord(raw)) {
-    throw new Error(`links.footer[${index}] must be an object`);
+function parseServices(raw: unknown): CardService[] | undefined {
+  if (raw === undefined || raw === null) {
+    return undefined;
   }
-  assertAllowedKeys(raw, ["kind", "label", "url"], `links.footer[${index}]`);
-  const kind = requireNonWhitespaceString(raw.kind, `links.footer[${index}].kind`, 32);
-  if (!FOOTER_KINDS.has(kind as FooterLinkKind)) {
-    throw new Error(`Invalid footer kind: ${kind}`);
+  if (!Array.isArray(raw)) {
+    throw new Error("services must be an array");
   }
-  const label = requireNonWhitespaceString(
-    raw.label,
-    `links.footer[${index}].label`,
-    LIMITS.footerLabel,
-  );
-  const url = requireHttpsUrl(
-    requireNonWhitespaceString(raw.url, `links.footer[${index}].url`, LIMITS.url),
-    `links.footer[${index}].url`,
-  );
-  return { kind: kind as FooterLinkKind, label, url };
+  if (raw.length > LIMITS.services) {
+    throw new Error(`services exceeds max length ${LIMITS.services}`);
+  }
+  return raw.map((item, index) => {
+    if (!isRecord(item)) {
+      throw new Error(`services[${index}] must be an object`);
+    }
+    assertAllowedKeys(item, ["label", "description"], `services[${index}]`);
+    return {
+      label: requireNonWhitespaceString(
+        item.label,
+        `services[${index}].label`,
+        LIMITS.serviceLabel,
+      ),
+      description: requireNonWhitespaceString(
+        item.description,
+        `services[${index}].description`,
+        LIMITS.serviceDescription,
+      ),
+    };
+  });
+}
+
+function parsePublicLinks(raw: unknown): CardPublicLink[] | undefined {
+  if (raw === undefined || raw === null) {
+    return undefined;
+  }
+  if (!Array.isArray(raw)) {
+    throw new Error("links must be an array");
+  }
+  if (raw.length > LIMITS.links) {
+    throw new Error(`links exceeds max length ${LIMITS.links}`);
+  }
+  return raw.map((item, index) => {
+    if (!isRecord(item)) {
+      throw new Error(`links[${index}] must be an object`);
+    }
+    assertAllowedKeys(item, ["type", "label", "url"], `links[${index}]`);
+    const type = requireNonWhitespaceString(item.type, `links[${index}].type`, 32);
+    if (!LINK_TYPES.has(type as CardPublicLinkType)) {
+      throw new Error(`Invalid link type: ${type}`);
+    }
+    const label = requireNonWhitespaceString(
+      item.label,
+      `links[${index}].label`,
+      LIMITS.linkLabel,
+    );
+    const url = requireHttpsUrl(
+      requireNonWhitespaceString(item.url, `links[${index}].url`, LIMITS.url),
+      `links[${index}].url`,
+    );
+    return { type: type as CardPublicLinkType, label, url };
+  });
 }
 
 function parseContactName(raw: unknown): CardLoadInput["contact"]["name"] {
@@ -273,15 +347,7 @@ function parsePageCopy(raw: unknown): CardLoadInput["pageCopy"] {
   if (!isRecord(raw)) {
     throw new Error("pageCopy must be an object");
   }
-  const keys = [
-    "pageTitle",
-    "emailFromName",
-    "headshotAlt",
-    "greetingName",
-    "exchangeButton",
-    "bookLink",
-  ];
-  assertAllowedKeys(raw, keys, "pageCopy");
+  assertAllowedKeys(raw, ["pageTitle", "emailFromName", "headshotAlt"], "pageCopy");
   return {
     pageTitle: requireNonWhitespaceString(
       raw.pageTitle,
@@ -298,113 +364,6 @@ function parsePageCopy(raw: unknown): CardLoadInput["pageCopy"] {
       "pageCopy.headshotAlt",
       LIMITS.pageCopyField,
     ),
-    greetingName: requireNonWhitespaceString(
-      raw.greetingName,
-      "pageCopy.greetingName",
-      LIMITS.pageCopyField,
-    ),
-    exchangeButton: requireNonWhitespaceString(
-      raw.exchangeButton,
-      "pageCopy.exchangeButton",
-      LIMITS.pageCopyField,
-    ),
-    bookLink: requireNonWhitespaceString(
-      raw.bookLink,
-      "pageCopy.bookLink",
-      LIMITS.pageCopyField,
-    ),
-  };
-}
-
-function parseStringArray(
-  raw: unknown,
-  field: string,
-  minItems: number,
-  maxItems: number,
-  maxItemLength: number,
-  copyStrings: boolean,
-): string[] {
-  if (!Array.isArray(raw)) {
-    throw new Error(`${field} must be an array`);
-  }
-  if (raw.length < minItems) {
-    throw new Error(`${field} must have at least ${minItems} item(s)`);
-  }
-  if (raw.length > maxItems) {
-    throw new Error(`${field} exceeds max length ${maxItems}`);
-  }
-  return raw.map((item, index) =>
-    copyStrings
-      ? requireCopyString(item, `${field}[${index}]`, maxItemLength)
-      : requireNonWhitespaceString(item, `${field}[${index}]`, maxItemLength),
-  );
-}
-
-function parseAbout(raw: unknown): CardCopy["about"] {
-  if (!isRecord(raw)) {
-    throw new Error("copy.about must be an object");
-  }
-  assertAllowedKeys(
-    raw,
-    [
-      "title",
-      "intro",
-      "expandedParagraphs",
-      "consultationHighlight",
-      "showMore",
-      "showLess",
-      "whatIDoTitle",
-      "chips",
-    ],
-    "copy.about",
-  );
-  const chipsRaw = raw.chips;
-  if (!Array.isArray(chipsRaw)) {
-    throw new Error("copy.about.chips must be an array");
-  }
-  if (chipsRaw.length < 1) {
-    throw new Error("copy.about.chips must have at least 1 item(s)");
-  }
-  if (chipsRaw.length > LIMITS.chips) {
-    throw new Error(`copy.about.chips exceeds max length ${LIMITS.chips}`);
-  }
-  const chips = chipsRaw.map((chip, index) => {
-    if (!isRecord(chip)) {
-      throw new Error(`copy.about.chips[${index}] must be an object`);
-    }
-    assertAllowedKeys(chip, ["label", "explanation"], `copy.about.chips[${index}]`);
-    return {
-      label: requireCopyString(
-        chip.label,
-        `copy.about.chips[${index}].label`,
-        LIMITS.chipLabel,
-      ),
-      explanation: requireCopyString(
-        chip.explanation,
-        `copy.about.chips[${index}].explanation`,
-        LIMITS.chipExplanation,
-      ),
-    };
-  });
-  return {
-    title: requireCopyString(raw.title, "copy.about.title"),
-    intro: requireCopyString(raw.intro, "copy.about.intro"),
-    expandedParagraphs: parseStringArray(
-      raw.expandedParagraphs,
-      "copy.about.expandedParagraphs",
-      1,
-      LIMITS.expandedParagraphs,
-      LIMITS.copyLeaf,
-      true,
-    ),
-    consultationHighlight: requireCopyString(
-      raw.consultationHighlight,
-      "copy.about.consultationHighlight",
-    ),
-    showMore: requireCopyString(raw.showMore, "copy.about.showMore"),
-    showLess: requireCopyString(raw.showLess, "copy.about.showLess"),
-    whatIDoTitle: requireCopyString(raw.whatIDoTitle, "copy.about.whatIDoTitle"),
-    chips,
   };
 }
 
@@ -583,14 +542,15 @@ function parseFollowUpEmail(raw: unknown): CardCopy["followUpEmail"] {
       raw.greetingTemplate,
       "copy.followUpEmail.greetingTemplate",
     ),
-    bodyParagraphs: parseStringArray(
-      raw.bodyParagraphs,
-      "copy.followUpEmail.bodyParagraphs",
-      1,
-      LIMITS.bodyParagraphs,
-      LIMITS.copyLeaf,
-      true,
-    ),
+    bodyParagraphs:
+      parseStringArray(
+        raw.bodyParagraphs,
+        "copy.followUpEmail.bodyParagraphs",
+        1,
+        LIMITS.bodyParagraphs,
+        LIMITS.copyLeaf,
+        true,
+      ) ?? [],
     attachmentLine: requireCopyString(
       raw.attachmentLine,
       "copy.followUpEmail.attachmentLine",
@@ -613,7 +573,6 @@ function parseCopy(raw: unknown): CardCopy {
       "thanksMessage",
       "exchangeAriaLabel",
       "footerNavLabel",
-      "about",
       "exchangeSheet",
       "followUpEmail",
     ],
@@ -626,7 +585,6 @@ function parseCopy(raw: unknown): CardCopy {
       "copy.exchangeAriaLabel",
     ),
     footerNavLabel: requireCopyString(raw.footerNavLabel, "copy.footerNavLabel"),
-    about: parseAbout(raw.about),
     exchangeSheet: parseExchangeSheet(raw.exchangeSheet),
     followUpEmail: parseFollowUpEmail(raw.followUpEmail),
   };
@@ -641,12 +599,21 @@ function parseCard(raw: unknown, seenSinkIds: Set<string>): CardLoadInput {
     [
       "slug",
       "variant",
-      "displayName",
-      "email",
+      "plan",
+      "name",
+      "role",
       "photoKey",
+      "aboutTitle",
+      "about",
+      "servicesTitle",
+      "services",
+      "linksTitle",
       "links",
-      "pageCopy",
+      "fallbackUrl",
+      "fallbackLabel",
+      "email",
       "contact",
+      "pageCopy",
       "copy",
       "leadSinks",
     ],
@@ -654,10 +621,23 @@ function parseCard(raw: unknown, seenSinkIds: Set<string>): CardLoadInput {
   );
   const slug = requireNonWhitespaceString(raw.slug, "slug", 64);
   assertValidSlug(slug);
-  const variant = requireNonWhitespaceString(raw.variant, "variant", 16);
-  if (!VARIANTS.has(variant as BrandVariant)) {
-    throw new Error(`Invalid variant: ${variant}`);
+  const variantRaw = requireNonWhitespaceString(raw.variant, "variant", 16);
+  const variant = normalizeBrandVariant(variantRaw);
+  if (variantRaw !== variant && variantRaw !== "mono") {
+    // unknown variants fall back to mono without error (per ticket)
   }
+
+  let plan: CardPlan = "free";
+  if (raw.plan !== undefined) {
+    const planRaw = requireNonWhitespaceString(raw.plan, "plan", 8);
+    if (!PLANS.has(planRaw as CardPlan)) {
+      throw new Error(`Invalid plan: ${planRaw}`);
+    }
+    plan = planRaw as CardPlan;
+  }
+
+  const name = requireNonWhitespaceString(raw.name, "name", LIMITS.name);
+  const role = optionalNonWhitespaceString(raw.role, "role", LIMITS.role);
   const photoKey =
     raw.photoKey === null
       ? null
@@ -672,31 +652,78 @@ function parseCard(raw: unknown, seenSinkIds: Set<string>): CardLoadInput {
             }
             return raw.photoKey as string;
           })()
-        : (() => {
-            throw new Error("photoKey must be a string or null");
-          })();
+        : raw.photoKey === undefined
+          ? null
+          : (() => {
+              throw new Error("photoKey must be a string or null");
+            })();
+
+  const aboutTitle = optionalNonWhitespaceString(
+    raw.aboutTitle,
+    "aboutTitle",
+    LIMITS.sectionTitle,
+  );
+  const about = parseStringArray(
+    raw.about,
+    "about",
+    0,
+    LIMITS.aboutParagraphs,
+    LIMITS.aboutParagraph,
+    false,
+  );
+  const servicesTitle = optionalNonWhitespaceString(
+    raw.servicesTitle,
+    "servicesTitle",
+    LIMITS.sectionTitle,
+  );
+  const services = parseServices(raw.services);
+  const linksTitle = optionalNonWhitespaceString(
+    raw.linksTitle,
+    "linksTitle",
+    LIMITS.sectionTitle,
+  );
+  const publicLinks = parsePublicLinks(raw.links);
+  const fallbackUrl = optionalHttpsUrl(raw.fallbackUrl, "fallbackUrl");
+  const fallbackLabel = optionalNonWhitespaceString(
+    raw.fallbackLabel,
+    "fallbackLabel",
+    LIMITS.fallbackLabel,
+  );
 
   const leadSinks = parseLeadSinksField(raw.leadSinks, slug, seenSinkIds);
 
-  return {
+  const input: CardLoadInput = {
     slug,
-    variant: variant as BrandVariant,
-    displayName: requireNonWhitespaceString(
-      raw.displayName,
-      "displayName",
-      LIMITS.displayName,
-    ),
+    variant,
+    plan,
+    displayName: name,
     email: requireEmail(
       requireNonWhitespaceString(raw.email, "email", LIMITS.email),
       "email",
     ),
     photoKey,
-    links: parseLinks(raw.links),
+    name,
+    role,
+    aboutTitle,
+    about,
+    servicesTitle,
+    services,
+    linksTitle,
+    publicLinks,
+    fallbackUrl,
+    fallbackLabel,
+    links: {
+      bookingUrl: fallbackUrl ?? "",
+      items: publicLinks ?? [],
+    },
     pageCopy: parsePageCopy(raw.pageCopy),
     contact: parseContact(raw.contact),
     copy: parseCopy(raw.copy),
     ...(leadSinks === undefined ? {} : { leadSinks }),
   };
+
+  cardLoadInputToPersisted(input);
+  return input;
 }
 
 function parseLeadSinksField(

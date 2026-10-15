@@ -65,29 +65,30 @@ Do not break these; each links to the canonical doc.
 
 ## Commands
 
-| Script                                       | Purpose                                                                                                                               |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run check`                              | Format, lint, typecheck, test, theme-colors, build, app + consumer worker dry-runs, deploy guards, secrets, placeholders, attribution |
-| `npm run theme-colors`                       | Fail if raw color literals appear outside `src/theme/tokens/`                                                                         |
-| `npm run dev`                                | Next.js dev server (Turbopack)                                                                                                        |
-| `npm run next:build`                         | Next.js production build (used by OpenNext)                                                                                           |
-| `npm run build`                              | OpenNext build for Cloudflare Workers                                                                                                 |
-| `npm run worker:dry-run`                     | Validate Wrangler deploy without uploading (`wrangler deploy --dry-run`)                                                              |
-| `npm run worker:dry-run:generated`           | Prepare `wrangler.ci.jsonc` with dummy D1 IDs, then `wrangler deploy --dry-run` on that config                                        |
-| `npm run worker:consumer-dry-run:nonprod`    | `wrangler deploy --dry-run` for `we-met-followup-email-consumer-nonprod`                                                              |
-| `npm run worker:consumer-dry-run:production` | `wrangler deploy --dry-run` for `we-met-followup-email-consumer`                                                                      |
-| `npm run deploy:guards`                      | Deploy-time binding guards on `wrangler.jsonc` and both follow-up consumer configs                                                    |
-| `npm run db:migrate`                         | Apply D1 migrations locally                                                                                                           |
-| `npm run db:migrate:remote`                  | Apply D1 migrations to remote `we-met-db-nonprod` only (never production)                                                             |
-| `npm run cards:load`                         | Load gitignored card JSON into local or remote D1 (`--remote`; production needs `--production` + confirm)                             |
-| `npm run lint`                               | ESLint                                                                                                                                |
-| `npm run format`                             | Prettier write                                                                                                                        |
-| `npm run format:check`                       | Prettier check                                                                                                                        |
-| `npm run typecheck`                          | `tsc --noEmit`                                                                                                                        |
-| `npm run test`                               | Vitest (CI uses JUnit output)                                                                                                         |
-| `npm run secrets`                            | Secretlint                                                                                                                            |
-| `npm run secret-usage`                       | Fail if `BOOTSTRAP_TOKEN` appears outside `bootstrap.yml` workflows                                                                   |
-| `npm run actions-policy-workflows`           | Fail if workflow `on:` triggers disagree with `.github/actions-policy-workflows.json` (GitHub Actions policy mirror)                  |
-| `npm run init-project`                       | Replace `{{…}}` placeholders after creating a repo from Launchpad                                                                     |
-| `npm run repo-settings`                      | Dry-run, `--apply`, or `--verify` recommended GitHub repo settings                                                                    |
-| `npm run verify-action-pins`                 | Verify each pinned action SHA matches its version comment (`# vX.Y.Z`)                                                                |
+| Script                                       | Purpose                                                                                                                                               |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run check`                              | theme-palettes, format, lint, typecheck, test, theme-colors, build, app + consumer worker dry-runs, deploy guards, secrets, placeholders, attribution |
+| `npm run theme-palettes`                     | Regenerate hi card palette CSS from `design/palettes.json` into `src/theme/tokens/`                                                                   |
+| `npm run theme-colors`                       | Fail if raw color literals appear outside `src/theme/tokens/`                                                                                         |
+| `npm run dev`                                | Next.js dev server (Turbopack)                                                                                                                        |
+| `npm run next:build`                         | Next.js production build (used by OpenNext)                                                                                                           |
+| `npm run build`                              | OpenNext build for Cloudflare Workers                                                                                                                 |
+| `npm run worker:dry-run`                     | Validate Wrangler deploy without uploading (`wrangler deploy --dry-run`)                                                                              |
+| `npm run worker:dry-run:generated`           | Prepare `wrangler.ci.jsonc` with dummy D1 IDs, then `wrangler deploy --dry-run` on that config                                                        |
+| `npm run worker:consumer-dry-run:nonprod`    | `wrangler deploy --dry-run` for `we-met-followup-email-consumer-nonprod`                                                                              |
+| `npm run worker:consumer-dry-run:production` | `wrangler deploy --dry-run` for `we-met-followup-email-consumer`                                                                                      |
+| `npm run deploy:guards`                      | Deploy-time binding guards on `wrangler.jsonc` and both follow-up consumer configs                                                                    |
+| `npm run db:migrate`                         | Apply D1 migrations locally                                                                                                                           |
+| `npm run db:migrate:remote`                  | Apply D1 migrations to remote `we-met-db-nonprod` only (never production)                                                                             |
+| `npm run cards:load`                         | Load gitignored card JSON into local or remote D1 (`--remote`; production needs `--production` + confirm)                                             |
+| `npm run lint`                               | ESLint                                                                                                                                                |
+| `npm run format`                             | Prettier write                                                                                                                                        |
+| `npm run format:check`                       | Prettier check                                                                                                                                        |
+| `npm run typecheck`                          | `tsc --noEmit`                                                                                                                                        |
+| `npm run test`                               | Vitest (CI uses JUnit output)                                                                                                                         |
+| `npm run secrets`                            | Secretlint                                                                                                                                            |
+| `npm run secret-usage`                       | Fail if `BOOTSTRAP_TOKEN` appears outside `bootstrap.yml` workflows                                                                                   |
+| `npm run actions-policy-workflows`           | Fail if workflow `on:` triggers disagree with `.github/actions-policy-workflows.json` (GitHub Actions policy mirror)                                  |
+| `npm run init-project`                       | Replace `{{…}}` placeholders after creating a repo from Launchpad                                                                                     |
+| `npm run repo-settings`                      | Dry-run, `--apply`, or `--verify` recommended GitHub repo settings                                                                                    |
+| `npm run verify-action-pins`                 | Verify each pinned action SHA matches its version comment (`# vX.Y.Z`)                                                                                |

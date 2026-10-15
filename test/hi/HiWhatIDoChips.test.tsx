@@ -7,7 +7,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CHIPS_OPENED_STORAGE_KEY } from "@/components/hi/hi-chip-popover-position";
 import { HiWhatIDoChips } from "@/components/hi/HiWhatIDoChips";
 
-const baseChips = exampleCardInput().copy.about.chips;
+const baseChips = (exampleCardInput().services ?? []).map((s) => ({
+  label: s.label,
+  explanation: s.description,
+}));
 const chips = [
   ...baseChips,
   { label: "Second chip", explanation: "Second chip detail" },
