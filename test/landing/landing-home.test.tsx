@@ -5,15 +5,13 @@ import { render, screen } from "@testing-library/react";
 import { LandingHome } from "@/components/landing/LandingHome";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { HOW_IT_WORKS_STEPS } from "@/components/landing/how-it-works-steps";
+import { resolveLandingUrls } from "@/lib/landing/urls";
 
-const urls = {
-  siteHome: "https://we-met.link",
-  appHome: "https://app.we-met.link",
-  exampleCard: "https://we-met.link/hi/didi",
-  privacy: "https://we-met.link/privacy",
-  terms: "https://we-met.link/terms",
-  didiBuild: "https://didi.build",
-};
+const urls = resolveLandingUrls({
+  baseUrl: "https://we-met.link",
+  previewHostSuffix: "-we-met.example.workers.dev",
+  weMetEnv: "production",
+});
 
 beforeEach(() => {
   vi.stubGlobal(

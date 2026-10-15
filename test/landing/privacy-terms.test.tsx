@@ -18,6 +18,12 @@ const previewConfig = {
 
 const urls = resolveLandingUrls(previewConfig);
 
+const productionCardUrls = resolveLandingUrls({
+  baseUrl: "https://we-met.link",
+  previewHostSuffix: previewConfig.previewHostSuffix,
+  weMetEnv: "production",
+});
+
 const PRIVACY_H2 = [
   "Who we are",
   "What we collect",
@@ -101,6 +107,13 @@ describe("privacy and terms pages (unit)", () => {
     expect(screen.getByText("Last updated: October 2026")).toBeTruthy();
   });
 
+  it("resolveLandingUrls returns card-site absolute privacy and terms URLs", () => {
+    expect(urls.privacy).toBe(`${previewConfig.baseUrl}/privacy`);
+    expect(urls.terms).toBe(`${previewConfig.baseUrl}/terms`);
+    expect(productionCardUrls.privacy).toBe("https://we-met.link/privacy");
+    expect(productionCardUrls.terms).toBe("https://we-met.link/terms");
+  });
+
   it("sets privacy and terms metadata from base URL config", () => {
     const privacy = resolvePrivacyMetadata(previewConfig);
     expect(privacy.title).toBe("Privacy | We Met");
@@ -115,7 +128,7 @@ describe("privacy and terms pages (unit)", () => {
 });
 
 describe("landing privacy section and footer (unit)", () => {
-  it("footer links to privacy and terms", () => {
+  it("footer links to privacy and terms using urls from a non-production base URL", () => {
     render(
       <ThemeProvider>
         <LandingFooter urls={urls} />
@@ -125,8 +138,10 @@ describe("landing privacy section and footer (unit)", () => {
     const nav = screen.getByRole("navigation", { name: "Legal" });
     const privacy = within(nav).getByRole("link", { name: "Privacy" });
     const terms = within(nav).getByRole("link", { name: "Terms" });
-    expect(privacy.getAttribute("href")).toBe(urls.privacy);
-    expect(terms.getAttribute("href")).toBe(urls.terms);
+    expect(privacy.getAttribute("href")).toBe(`${previewConfig.baseUrl}/privacy`);
+    expect(terms.getAttribute("href")).toBe(`${previewConfig.baseUrl}/terms`);
+    expect(privacy.getAttribute("href")).not.toBe("/privacy");
+    expect(terms.getAttribute("href")).not.toBe("/terms");
   });
 
   it("landing privacy section includes updated copy and page links", () => {
