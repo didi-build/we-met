@@ -107,11 +107,7 @@ function createDeps(
         ownerFromEmail,
         fromDisplayName,
         emailSender,
-        ledger,
         logMalformedLeadSink: logMalformedLeadSinkForHandler,
-        logLedgerRowMissing,
-        logLedgerUpdateFailed,
-        now,
       }),
     });
 
@@ -125,6 +121,7 @@ function createDeps(
     sinkHandlers,
     logLedgerRowMissing,
     logLedgerUpdateFailed,
+    logLeadSinkAppendDeferred: vi.fn(),
     logLeadSinkLedgerRecordFailed: vi.fn(),
     logLeadSinkLedgerMarkFailed: vi.fn(),
     logLeadSinkAttemptFailure: vi.fn(),
@@ -421,7 +418,12 @@ describe("processFollowupQueueBatch (unit)", () => {
 
   it("threads lead_sink_append_details when record email was sent", async () => {
     const ledger = new MemoryConsumerLeadDeliveryLedger();
-    ledger.seedSent("lead-1", "sink-1", "record", "gmail-thread-record");
+    ledger.seedSent(
+      "lead-1",
+      "sink-1",
+      "record",
+      JSON.stringify({ gmailThreadId: "gmail-thread-record", gmailMessageId: "g1" }),
+    );
     ledger.seedQueued("lead-1", "sink-1", "append");
     const message = createMessage({
       type: "lead_sink_append_details",
@@ -512,9 +514,49 @@ describe("processFollowupQueueBatch (unit)", () => {
     expect(bad.retry).toHaveBeenCalledOnce();
   });
 
-  it("sends append unthreaded when record row is not sent", async () => {
+  it("defers append while record row is still queued", async () => {
     const ledger = new MemoryConsumerLeadDeliveryLedger();
     ledger.seedQueued("lead-1", "sink-1", "record");
+    ledger.seedQueued("lead-1", "sink-1", "append");
+    const message = createMessage(
+      {
+        type: "lead_sink_append_details",
+        sinkId: "sink-1",
+        sinkKind: "email",
+        sinkConfig: { to: "owner@example.com" },
+        lead: {
+          leadId: "lead-1",
+          name: "Alex Visitor",
+          email: "visitor@example.com",
+        },
+        details: { jobTitle: null, company: null, note: null },
+        detailsSubmittedAt: "2026-10-12T01:00:00.000Z",
+        cardId: "card-1",
+        cardSlug: "demo",
+        sourceUrl: "https://we-met.link/hi/demo",
+      },
+      { attempts: 2 },
+    );
+    const deps = createDeps({}, ledger);
+
+    await processFollowupQueueBatch({ messages: [message] }, deps);
+
+    expect(deps.emailSender.send).not.toHaveBeenCalled();
+    expect(deps.logLeadSinkAppendDeferred).toHaveBeenCalledWith("lead-1", "sink-1", 2);
+    expect(message.retry).toHaveBeenCalledOnce();
+    expect(message.ack).not.toHaveBeenCalled();
+  });
+
+  it("sends append unthreaded when record row failed", async () => {
+    const ledger = new MemoryConsumerLeadDeliveryLedger();
+    ledger.seedQueued("lead-1", "sink-1", "record");
+    await ledger.markFailed({
+      leadId: "lead-1",
+      sinkId: "sink-1",
+      phase: "record",
+      errorCode: "gmail_network_error",
+      updatedAt: "2026-10-12T12:00:00.000Z",
+    });
     ledger.seedQueued("lead-1", "sink-1", "append");
     const message = createMessage({
       type: "lead_sink_append_details",
@@ -721,12 +763,12 @@ describe("processFollowupQueueBatch (unit)", () => {
     const calls = vi.mocked(deps.emailSender.send).mock.calls;
     expect(calls[0]![0].messageId).toBe("<lead-1.sink-a.record@we-met.link>");
     expect(calls[1]![0].messageId).toBe("<lead-1.sink-b.record@we-met.link>");
-    expect(ledger.getRowState("lead-1", "sink-a", "record")?.gmailThreadId).toBe(
-      "thread-0",
-    );
-    expect(ledger.getRowState("lead-1", "sink-b", "record")?.gmailThreadId).toBe(
-      "thread-1",
-    );
+    expect(
+      JSON.parse(ledger.getRowState("lead-1", "sink-a", "record")!.externalRef!),
+    ).toMatchObject({ gmailThreadId: "thread-0" });
+    expect(
+      JSON.parse(ledger.getRowState("lead-1", "sink-b", "record")!.externalRef!),
+    ).toMatchObject({ gmailThreadId: "thread-1" });
   });
 
   it("does not block visitor follow-up when email sink fails first in batch", async () => {

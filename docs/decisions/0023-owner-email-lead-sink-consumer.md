@@ -2,7 +2,7 @@
 
 - **Status:** accepted
 - **Date:** 2026-10-15
-- **Updates:** [0018](./0018-lead-sink.md), [0021](./0021-followup-email-consumer-worker.md), [0022](./0022-lead-delivery-ledger.md)
+- **Updates:** [0018](./0018-lead-sink.md), [0021](./0021-followup-email-consumer-worker.md), [0022](./0022-lead-delivery-ledger.md), [0024](./0024-sink-agnostic-record-append-correlation.md) (2026-10-15)
 
 ## Context
 
@@ -18,8 +18,8 @@
 6. **Non-prod safety:** production sends to `sinkConfig.to`; other `WE_MET_ENV` redirects to `WE_MET_TEST_MAIL_TO` (fail closed if unset). One function beside `resolveEmailRecipient`. Non-prod subjects/bodies use the existing `[we-met test → …]` prefix and **Test delivery** line naming the **sink destination** (not the visitor).
 7. **Subjects:** record `New lead added: <name>`; append `Re: New lead added: <name>` — one builder with shared non-prod prefix so threading subjects match (replaces web `Details added:`).
 8. **Details token v2** includes signed `visitorName`; **v2 only** (`TOKEN_VERSION` 2). Append queue `lead` is `{ leadId, name, email }` plus `detailsSubmittedAt` on the message (no fabricated `submittedAt` / phone / environment fields).
-9. **Threading:** deterministic `Message-ID` values `<{leadId}.{sinkId}.record@{domain}>` and `.append@`, with `In-Reply-To` / `References` and Gmail `threadId` from the record row when record `status = sent`. Append still sends if record never sent (unthreaded). `{domain}` is the domain part of `WE_MET_OWNER_FROM_EMAIL`.
-10. **Ledger (consumer):** `queued` → `sent` on success (record stores `gmail_message_id`, `gmail_thread_id`, `sent_at`); failed attempts update `attempt_count` and `next_attempt_at`; final failure sets `failed` + `error_code`. Updates are conditional `WHERE status = 'queued'`.
+9. **Threading:** deterministic `Message-ID` values `<{leadId}.{sinkId}.record@{domain}>` and `.append@`, with `In-Reply-To` / `References` when the record delivery succeeded. Gmail may **rewrite** the custom `Message-ID` for the recipient (observed 2026-10-15, [DIDI-601](https://linear.app/didi-build/issue/DIDI-601)); sender-side Gmail `threadId` from the record’s **`external_ref`** still groups mail in the owner mailbox when record `status = sent`. Append still sends if record never sent (unthreaded). `{domain}` is the domain part of `WE_MET_OWNER_FROM_EMAIL`.
+10. **Ledger (consumer):** shared lifecycle in `process-lead-sink.ts` ([0024](./0024-sink-agnostic-record-append-correlation.md)): `queued` → `sent` on success (stores opaque **`external_ref`**, `sent_at`); failed attempts update `attempt_count` and `next_attempt_at`; final failure sets `failed` + `error_code`. Email handlers do not touch the ledger. Updates are conditional `WHERE status = 'queued'`.
 11. **Duplicate-send guard:** `sent` or `failed` → ack without send. Send succeeded but ledger update failed → log `ledger_update_failed`, ack. Missing row → log `ledger_row_missing`, ack.
 12. **Failure rules** match `visitor_followup` (shared retry policy). Malformed known sink messages: log `leadId` only, best-effort ledger `failed`, ack. Unknown `type` or unsupported `sinkKind` → `UnsupportedQueueMessageError`.
 13. **Handler registry:** `sinkKind` maps to handlers; new kinds do not change the dispatcher or card schema.

@@ -9,17 +9,28 @@ export type ParsedLeadSinkAppendMessage = LeadSinkAppendDetailsMessage;
 export type ParsedLeadSinkMessage =
   LeadSinkRecordLeadMessage | LeadSinkAppendDetailsMessage;
 
+export type ParsedExternalRef = Record<string, string | number | boolean | null>;
+
 export type LeadSinkHandlerContext = {
   messageAttempts: number;
 };
 
+export type LeadSinkAppendContext = LeadSinkHandlerContext & {
+  recordRef: ParsedExternalRef | null;
+};
+
+export type LeadSinkDeliveryResult = {
+  externalRef: string | null;
+};
+
 export type LeadSinkHandler = {
-  handleRecord(
+  appendRequiresRecord: boolean;
+  deliverRecord(
     message: ParsedLeadSinkRecordMessage,
     ctx: LeadSinkHandlerContext,
-  ): Promise<void>;
-  handleAppend(
+  ): Promise<LeadSinkDeliveryResult>;
+  deliverAppend(
     message: ParsedLeadSinkAppendMessage,
-    ctx: LeadSinkHandlerContext,
-  ): Promise<void>;
+    ctx: LeadSinkAppendContext,
+  ): Promise<LeadSinkDeliveryResult>;
 };

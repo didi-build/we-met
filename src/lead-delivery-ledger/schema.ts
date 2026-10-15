@@ -14,6 +14,7 @@ export const LEAD_DELIVERY_LEDGER_COLUMNS = [
   "created_at",
   "updated_at",
   "sent_at",
+  "external_ref",
   "gmail_message_id",
   "gmail_thread_id",
 ] as const;

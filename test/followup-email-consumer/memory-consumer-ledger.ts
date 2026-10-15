@@ -22,8 +22,7 @@ export class MemoryConsumerLeadDeliveryLedger implements ConsumerLeadDeliveryLed
   seedQueued(leadId: string, sinkId: string, phase: LeadDeliveryPhase): void {
     this.rows.set(key(leadId, sinkId, phase), {
       status: "queued",
-      gmailMessageId: null,
-      gmailThreadId: null,
+      externalRef: null,
       attemptCount: 0,
       nextAttemptAt: null,
       errorCode: null,
@@ -34,13 +33,14 @@ export class MemoryConsumerLeadDeliveryLedger implements ConsumerLeadDeliveryLed
     leadId: string,
     sinkId: string,
     phase: LeadDeliveryPhase,
-    gmailThreadId: string | null = "thread-1",
-    gmailMessageId: string | null = "gmail-1",
+    externalRef: string | null = JSON.stringify({
+      gmailMessageId: "gmail-1",
+      gmailThreadId: "thread-1",
+    }),
   ): void {
     this.rows.set(key(leadId, sinkId, phase), {
       status: "sent",
-      gmailMessageId,
-      gmailThreadId,
+      externalRef,
       attemptCount: 0,
       nextAttemptAt: null,
       errorCode: null,
@@ -66,8 +66,7 @@ export class MemoryConsumerLeadDeliveryLedger implements ConsumerLeadDeliveryLed
     }
     return {
       status: row.status,
-      gmailMessageId: row.gmailMessageId,
-      gmailThreadId: row.gmailThreadId,
+      externalRef: row.externalRef,
     };
   }
 
@@ -76,8 +75,7 @@ export class MemoryConsumerLeadDeliveryLedger implements ConsumerLeadDeliveryLed
     sinkId: string;
     phase: LeadDeliveryPhase;
     sentAt: string;
-    gmailMessageId: string | null;
-    gmailThreadId: string | null;
+    externalRef: string | null;
   }): Promise<boolean> {
     const row = this.rows.get(key(input.leadId, input.sinkId, input.phase));
     if (!row || row.status !== "queued") {
@@ -85,8 +83,7 @@ export class MemoryConsumerLeadDeliveryLedger implements ConsumerLeadDeliveryLed
     }
     this.rows.set(key(input.leadId, input.sinkId, input.phase), {
       status: "sent",
-      gmailMessageId: input.gmailMessageId,
-      gmailThreadId: input.gmailThreadId,
+      externalRef: input.externalRef,
       attemptCount: row.attemptCount,
       nextAttemptAt: null,
       errorCode: null,
@@ -127,8 +124,7 @@ export class MemoryConsumerLeadDeliveryLedger implements ConsumerLeadDeliveryLed
     }
     this.rows.set(key(input.leadId, input.sinkId, input.phase), {
       status: "failed",
-      gmailMessageId: null,
-      gmailThreadId: null,
+      externalRef: null,
       attemptCount: row.attemptCount,
       nextAttemptAt: null,
       errorCode: input.errorCode,

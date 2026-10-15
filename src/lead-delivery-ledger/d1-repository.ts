@@ -13,8 +13,8 @@ export function createLeadDeliveryLedgerFromD1(db: D1Database): LeadDeliveryLedg
           `INSERT INTO lead_delivery_ledger (
             id, lead_id, card_id, sink_id, sink_kind, phase, status,
             error_code, attempt_count, next_attempt_at, retry_until,
-            created_at, updated_at, sent_at, gmail_message_id, gmail_thread_id
-          ) VALUES (?, ?, ?, ?, ?, ?, 'queued', NULL, 0, NULL, ?, ?, ?, NULL, NULL, NULL)`,
+            created_at, updated_at, sent_at, external_ref, gmail_message_id, gmail_thread_id
+          ) VALUES (?, ?, ?, ?, ?, ?, 'queued', NULL, 0, NULL, ?, ?, ?, NULL, NULL, NULL, NULL)`,
         )
         .bind(
           input.id,
@@ -36,8 +36,8 @@ export function createLeadDeliveryLedgerFromD1(db: D1Database): LeadDeliveryLedg
           `INSERT INTO lead_delivery_ledger (
             id, lead_id, card_id, sink_id, sink_kind, phase, status,
             error_code, attempt_count, next_attempt_at, retry_until,
-            created_at, updated_at, sent_at, gmail_message_id, gmail_thread_id
-          ) VALUES (?, ?, ?, ?, ?, 'append', 'queued', NULL, 0, NULL, ?, ?, ?, NULL, NULL, NULL)
+            created_at, updated_at, sent_at, external_ref, gmail_message_id, gmail_thread_id
+          ) VALUES (?, ?, ?, ?, ?, 'append', 'queued', NULL, 0, NULL, ?, ?, ?, NULL, NULL, NULL, NULL)
           ON CONFLICT(lead_id, sink_id, phase) DO NOTHING`,
         )
         .bind(

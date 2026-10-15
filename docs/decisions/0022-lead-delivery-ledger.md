@@ -2,7 +2,7 @@
 
 - **Status:** accepted
 - **Date:** 2026-10-15
-- **Updates:** [0018](./0018-lead-sink.md), [0016](./0016-queue-message-snapshot.md)
+- **Updates:** [0018](./0018-lead-sink.md), [0016](./0016-queue-message-snapshot.md), [0024](./0024-sink-agnostic-record-append-correlation.md) (2026-10-15)
 
 ## Context
 
@@ -10,7 +10,7 @@ Lead sink delivery is async (one queue message per sink). Operators need deliver
 
 ## Decision
 
-- **`lead_delivery_ledger` table** (migration `0002_lead_delivery_ledger.sql`): metadata only — `lead_id`, `card_id`, `sink_id`, `sink_kind`, `phase` (`record` | `append`), `status`, `error_code`, retry fields, timestamps, optional `gmail_message_id` / `gmail_thread_id` for threading. **No** visitor name, email, phone, message body, or destination address. **`UNIQUE (lead_id, sink_id, phase)`**.
+- **`lead_delivery_ledger` table** (migration `0002_lead_delivery_ledger.sql`, extended by `0003_lead_delivery_ledger_external_ref.sql`): metadata only — `lead_id`, `card_id`, `sink_id`, `sink_kind`, `phase` (`record` | `append`), `status`, `error_code`, retry fields, timestamps, optional **`external_ref`** (opaque sink correlation ids; [0024](./0024-sink-agnostic-record-append-correlation.md)). Legacy `gmail_message_id` / `gmail_thread_id` columns remain but are **deprecated** (consumer writes `external_ref` only). **No** visitor name, email, phone, message body, or destination address. **`UNIQUE (lead_id, sink_id, phase)`**.
 - **Exchange (app Worker):** for each enabled sink, insert `phase=record` row (`queued`) **before** enqueueing `lead_sink_record`; on enqueue failure mark `failed` with `enqueue_failed`. Visitor follow-up path unchanged.
 - **Details (app Worker):** insert `phase=append` if absent; skip enqueue when row already exists (any status). Duplicate HTTP submit returns **200** `{ ok: true }` without extra mail.
 - **`retry_until`:** enqueue time plus **`FOLLOWUP_RETRY_RETENTION_BUDGET_SECONDS`** from `scripts/lib/queue-retry-policy.mjs` (shared with consumer retry guards).

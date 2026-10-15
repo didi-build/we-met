@@ -20,6 +20,14 @@ function collectTsSourceFiles(dir: string): string[] {
 }
 
 describe("follow-up consumer D1 boundary (static)", () => {
+  it("lead sink handlers do not import the consumer ledger module", () => {
+    const handlerDir = join(process.cwd(), "src/followup-email-consumer/lead-sink");
+    for (const file of collectTsSourceFiles(handlerDir)) {
+      const source = readFileSync(file, "utf8");
+      expect(source).not.toContain("lead-delivery-ledger");
+    }
+  });
+
   it("touches D1 only through the ledger module and never references lead_sinks or cards", () => {
     const consumerDir = join(process.cwd(), "src/followup-email-consumer");
     const ledgerFile = join(consumerDir, "lead-delivery-ledger.ts");
