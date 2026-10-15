@@ -14,6 +14,7 @@ This file is the single source of truth for how agents work in this repository. 
 Do not break these; each links to the canonical doc.
 
 - **Theme colors** only under `src/theme/tokens/` (`npm run theme-colors` in `npm run check`): [0004](docs/decisions/0004-card-data-and-branding.md), [overview](docs/architecture/overview.md#theming).
+- **`design/`** holds reference design exports and is excluded from format, lint, and the theme-colors check; do not edit it by hand.
 - **No hardcoded hostnames:** use `WE_MET_BASE_URL` ([0003](docs/decisions/0003-urls-and-lookup.md)).
 - **No runtime dependency on `didi-build/web`:** [0002](docs/decisions/0002-hosting-workers-opennext.md).
 - **Non-prod builds never bind production** queue, consumer, D1, or R2: [0006](docs/decisions/0006-non-prod-safety.md), [environments](docs/architecture/environments.md).

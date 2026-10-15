@@ -11,6 +11,7 @@ const SKIP_DIRS = new Set([
   "dist",
   "coverage",
   "test-results",
+  "design",
 ]);
 
 const CSS_LITERAL_PATTERNS = [

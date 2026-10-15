@@ -21,6 +21,7 @@ const eslintConfig = [
       ".wrangler/**",
       "out/**",
       "next-env.d.ts",
+      "design/**",
     ],
   },
   ...compat.extends("next/core-web-vitals", "next/typescript", "prettier"),

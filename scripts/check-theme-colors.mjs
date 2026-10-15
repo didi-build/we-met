@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+import { pathToFileURL } from "node:url";
 import { scanFileContent, SKIP_DIRS } from "./lib/theme-color-scan.mjs";
 
 const repoRoot = process.cwd();
 
-function walk(dir, files = []) {
+export function walk(dir, files = []) {
   for (const entry of readdirSync(dir)) {
     if (entry.startsWith(".")) {
       continue;
@@ -24,8 +25,8 @@ function walk(dir, files = []) {
   return files;
 }
 
-function scanFile(path) {
-  const rel = relative(repoRoot, path).replace(/\\/g, "/");
+export function scanFile(path, root = repoRoot) {
+  const rel = relative(root, path).replace(/\\/g, "/");
   if (rel.startsWith("test/fixtures/")) {
     return [];
   }
@@ -37,14 +38,22 @@ function scanFile(path) {
   return reasons.length ? [{ file: rel, reasons }] : [];
 }
 
-const offenders = walk(repoRoot).flatMap(scanFile);
-
-if (offenders.length > 0) {
-  console.error("Raw color literals found outside src/theme/tokens/:\n");
-  for (const { file, reasons } of offenders) {
-    console.error(`  ${file} (${reasons.join(", ")})`);
-  }
-  process.exit(1);
+export function collectThemeColorOffenders(root = repoRoot) {
+  return walk(root).flatMap((path) => scanFile(path, root));
 }
 
-console.log("theme-colors: OK");
+const isMain = import.meta.url === pathToFileURL(process.argv[1] ?? "").href;
+
+if (isMain) {
+  const offenders = collectThemeColorOffenders(repoRoot);
+
+  if (offenders.length > 0) {
+    console.error("Raw color literals found outside src/theme/tokens/:\n");
+    for (const { file, reasons } of offenders) {
+      console.error(`  ${file} (${reasons.join(", ")})`);
+    }
+    process.exit(1);
+  }
+
+  console.log("theme-colors: OK");
+}
