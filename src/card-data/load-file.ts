@@ -1,5 +1,12 @@
 import { assertValidHostname } from "@/card-data/hostname";
+import {
+  LEAD_SINK_ID_PATTERN,
+  MAX_EMAIL_SINKS_PER_CARD,
+  MAX_LEAD_SINKS_PER_CARD,
+} from "@/card-data/load-limits";
 import { assertNoControlCharacters } from "@/card-data/load-sql";
+import { parseLeadSinkConfig } from "@/card-data/lead-sink-registry";
+import { registerBuiltInLeadSinkKinds } from "@/card-data/register-lead-sink-kinds";
 import { assertValidSlug, isValidSlug } from "@/card-data/slug";
 import type {
   BrandVariant,
@@ -10,6 +17,7 @@ import type {
   CardLoadInput,
   ContactUrl,
   FooterLinkKind,
+  LeadSinkLoadInput,
 } from "@/card-data/types";
 
 const VARIANTS = new Set<BrandVariant>(["green", "mono"]);
@@ -624,7 +632,7 @@ function parseCopy(raw: unknown): CardCopy {
   };
 }
 
-function parseCard(raw: unknown): CardLoadInput {
+function parseCard(raw: unknown, seenSinkIds: Set<string>): CardLoadInput {
   if (!isRecord(raw)) {
     throw new Error("Each card must be an object");
   }
@@ -640,6 +648,7 @@ function parseCard(raw: unknown): CardLoadInput {
       "pageCopy",
       "contact",
       "copy",
+      "leadSinks",
     ],
     "card",
   );
@@ -667,6 +676,8 @@ function parseCard(raw: unknown): CardLoadInput {
             throw new Error("photoKey must be a string or null");
           })();
 
+  const leadSinks = parseLeadSinksField(raw.leadSinks, slug, seenSinkIds);
+
   return {
     slug,
     variant: variant as BrandVariant,
@@ -684,7 +695,122 @@ function parseCard(raw: unknown): CardLoadInput {
     pageCopy: parsePageCopy(raw.pageCopy),
     contact: parseContact(raw.contact),
     copy: parseCopy(raw.copy),
+    ...(leadSinks === undefined ? {} : { leadSinks }),
   };
+}
+
+function parseLeadSinksField(
+  raw: unknown,
+  slug: string,
+  seenSinkIds: Set<string>,
+): LeadSinkLoadInput[] | undefined {
+  if (raw === undefined) {
+    return undefined;
+  }
+  if (!Array.isArray(raw)) {
+    throw new Error(`Card "${slug}" leadSinks must be an array`);
+  }
+  if (raw.length > MAX_LEAD_SINKS_PER_CARD) {
+    throw new Error(
+      `Card "${slug}" has more than ${MAX_LEAD_SINKS_PER_CARD} lead sinks`,
+    );
+  }
+  const sinks = raw.map((entry, index) =>
+    parseLeadSinkEntry(entry, slug, index, seenSinkIds),
+  );
+  const emailCount = sinks.filter((s) => s.kind === "email").length;
+  if (emailCount > MAX_EMAIL_SINKS_PER_CARD) {
+    throw new Error(
+      `Card "${slug}" has more than ${MAX_EMAIL_SINKS_PER_CARD} email lead sinks`,
+    );
+  }
+  return sinks;
+}
+
+function parseLeadSinkEntry(
+  raw: unknown,
+  slug: string,
+  index: number,
+  seenSinkIds: Set<string>,
+): LeadSinkLoadInput {
+  if (!isRecord(raw)) {
+    throw new Error(`Card "${slug}" leadSinks[${index}] must be an object`);
+  }
+  assertAllowedKeys(raw, ["id", "kind", "enabled", "config"], `leadSinks[${index}]`);
+  const id = requireNonWhitespaceString(raw.id, `leadSinks[${index}].id`, 63);
+  if (!LEAD_SINK_ID_PATTERN.test(id)) {
+    throw new Error(
+      `Card "${slug}" leadSinks[${index}].id must match ${LEAD_SINK_ID_PATTERN}`,
+    );
+  }
+  const requiredIdPrefix = `${slug}-`;
+  if (!id.startsWith(requiredIdPrefix)) {
+    throw new Error(
+      `Card "${slug}" leadSinks[${index}].id must start with "${requiredIdPrefix}"`,
+    );
+  }
+  if (seenSinkIds.has(id)) {
+    throw new Error(`Duplicate lead sink id "${id}" in load file`);
+  }
+  seenSinkIds.add(id);
+  const kind = requireNonWhitespaceString(raw.kind, `leadSinks[${index}].kind`, 64);
+  const enabled =
+    raw.enabled === undefined
+      ? true
+      : (() => {
+          if (typeof raw.enabled !== "boolean") {
+            throw new Error(`leadSinks[${index}].enabled must be a boolean`);
+          }
+          return raw.enabled;
+        })();
+  if (raw.config === undefined) {
+    throw new Error(`Card "${slug}" leadSinks[${index}] requires config`);
+  }
+  const config = parseLeadSinkConfig(kind, raw.config);
+  return { id, kind, enabled, config };
+}
+
+function loadFileHasEmailSink(loadFile: CardsLoadFile): boolean {
+  for (const card of loadFile.cards) {
+    if (!card.leadSinks) {
+      continue;
+    }
+    for (const sink of card.leadSinks) {
+      if (sink.kind === "email") {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+export function validateNonProdEmailSinkDestinations(
+  loadFile: CardsLoadFile,
+  testMailTo: string,
+): void {
+  if (!loadFileHasEmailSink(loadFile)) {
+    return;
+  }
+  const expected = testMailTo.trim();
+  if (!expected) {
+    throw new Error("WE_MET_TEST_MAIL_TO must be set for non-prod remote load");
+  }
+  for (const card of loadFile.cards) {
+    if (!card.leadSinks) {
+      continue;
+    }
+    for (const sink of card.leadSinks) {
+      if (sink.kind !== "email") {
+        continue;
+      }
+      const config = sink.config as { to?: string };
+      if (config.to?.trim() !== expected) {
+        throw new Error(
+          `Non-prod load: email sink "${sink.id}" on card "${card.slug}" must use WE_MET_TEST_MAIL_TO as config.to`,
+        );
+      }
+    }
+  }
 }
 
 function parseHostnameMapping(raw: unknown): CardsLoadFile["hostnames"][number] {
@@ -706,11 +832,14 @@ function parseHostnameMapping(raw: unknown): CardsLoadFile["hostnames"][number] 
 }
 
 export function parseCardsLoadFile(raw: unknown): CardsLoadFile {
+  registerBuiltInLeadSinkKinds();
   if (!isRecord(raw)) {
     throw new Error("Load file must be a JSON object");
   }
   if (raw.leadSinks !== undefined) {
-    throw new Error("leadSinks are not loaded in step 1");
+    throw new Error(
+      "leadSinks belong on each card object, not at the root of the load file",
+    );
   }
   assertAllowedKeys(raw, ["cards", "hostnames"], "load file");
   if (!Array.isArray(raw.cards)) {
@@ -719,8 +848,9 @@ export function parseCardsLoadFile(raw: unknown): CardsLoadFile {
   if (!Array.isArray(raw.hostnames)) {
     throw new Error("Load file must include a hostnames array");
   }
+  const seenSinkIds = new Set<string>();
   return {
-    cards: raw.cards.map(parseCard),
+    cards: raw.cards.map((card) => parseCard(card, seenSinkIds)),
     hostnames: raw.hostnames.map(parseHostnameMapping),
   };
 }

@@ -229,6 +229,17 @@ function checkConsumerQueueConsumerSettings(consumerRow) {
   }
 }
 
+function checkConsumerPublicUrlSettings(config) {
+  if (config.workers_dev !== false) {
+    fail("consumer workers_dev must be false (no public workers.dev route)");
+  }
+  if (config.preview_urls !== false) {
+    fail(
+      "consumer preview_urls must be false (no Version URLs on follow-up consumers)",
+    );
+  }
+}
+
 function checkConsumerD1Binding(config, expectedDatabaseName) {
   const rows = config.d1_databases ?? [];
   if (rows.length !== 1) {
@@ -260,6 +271,7 @@ function checkConsumerVarsAllowlist(config) {
 }
 
 function checkConsumerNonprod(config) {
+  checkConsumerPublicUrlSettings(config);
   checkConsumerVarsAllowlist(config);
   if (config.name !== NONPROD_RESOURCE_MARKERS.consumerWorkerName) {
     fail(
@@ -295,6 +307,7 @@ function checkConsumerNonprod(config) {
 }
 
 function checkConsumerProduction(config) {
+  checkConsumerPublicUrlSettings(config);
   checkConsumerVarsAllowlist(config);
   if (config.name !== "we-met-followup-email-consumer") {
     fail('production consumer Worker name must be "we-met-followup-email-consumer"');

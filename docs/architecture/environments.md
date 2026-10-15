@@ -87,7 +87,9 @@ The follow-up email consumer is a **separate Worker** (not the OpenNext `we-met`
 | `we-met-followup-email-consumer-nonprod` | `we-met-followup-email-nonprod` | `we-met-db-nonprod` | `we-met-assets-nonprod`     |
 | `we-met-followup-email-consumer`         | `we-met-followup-email`         | `we-met-db`         | `we-met-assets`             |
 
-The consumer registers on the queue in **its own** Wrangler config; it is not an app Worker binding. **D1** is bound for a future metadata-only delivery ledger ([DIDI-586](https://linear.app/didi-build/issue/DIDI-586)); step 1 consumer code does **not** query D1. R2 bindings cannot be read-only in Cloudflare; the consumer code **only calls `get`** on `WE_MET_ASSETS` ([0016](../decisions/0016-queue-message-snapshot.md)).
+The consumer registers on the queue in **its own** Wrangler config; it is not an app Worker binding. **D1:** the **app** Worker writes **`lead_delivery_ledger`** on exchange/details ([0022](../decisions/0022-lead-delivery-ledger.md)). The consumer binds **`WE_MET_DB`** for ledger use in a later PR; until the email sink ships it does **not** query D1. Consumer Workers have **no public URL** (`workers_dev: false`, `preview_urls: false`). R2 bindings cannot be read-only in Cloudflare; the consumer code **only calls `get`** on `WE_MET_ASSETS` ([0016](../decisions/0016-queue-message-snapshot.md)).
+
+**Warning:** do **not** load enabled **email** sinks into production until the consumer implements sink delivery (DIDI-586 PR4). Until then, sink queue messages retry as unsupported types.
 
 **Consumer mail safety:** redirect and fail-closed behavior use the consumer’s own `vars.WE_MET_ENV` and the secret `WE_MET_TEST_MAIL_TO` (non-prod only). Queue fields such as `lead.environment` are ignored for recipient selection.
 

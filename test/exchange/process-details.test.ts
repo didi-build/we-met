@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { MemoryCardRepository } from "@/card-data/memory-repository";
+import { MemoryLeadDeliveryLedger } from "@/lead-delivery-ledger/memory-repository";
 import { processDetails } from "@/exchange/process-details";
 import { createDetailsToken } from "@/exchange/token";
 import { exampleCardInput } from "../helpers/example-card";
@@ -46,6 +47,12 @@ describe("processDetails (unit)", () => {
           },
         },
         leadSinkLogger: { logSinkEnqueueFailure: vi.fn() },
+        deliveryLedger: new MemoryLeadDeliveryLedger(),
+        deliveryLogger: {
+          logLedgerWriteFailed: vi.fn(),
+          logLedgerEnqueueFailed: vi.fn(),
+        },
+        createLedgerId: () => "ledger-1",
         now: () => new Date("2026-10-12T12:00:00.000Z"),
       },
     );
@@ -67,6 +74,12 @@ describe("processDetails (unit)", () => {
         environment: "local",
         leadSinkQueue: { enqueueLeadSink: async () => {} },
         leadSinkLogger: { logSinkEnqueueFailure: vi.fn() },
+        deliveryLedger: new MemoryLeadDeliveryLedger(),
+        deliveryLogger: {
+          logLedgerWriteFailed: vi.fn(),
+          logLedgerEnqueueFailed: vi.fn(),
+        },
+        createLedgerId: () => "ledger-1",
         now: () => new Date(),
       },
     );

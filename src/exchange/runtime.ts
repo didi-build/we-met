@@ -1,3 +1,4 @@
+import type { D1Database } from "@cloudflare/workers-types";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { readWeMetHostConfig } from "@/config/we-met";
 import type { CloudflareRateLimitBinding } from "@/exchange/rate-limit";
@@ -15,6 +16,7 @@ import {
 import type { ProcessDetailsDeps } from "@/exchange/process-details";
 import type { ProcessExchangeDeps } from "@/exchange/process-exchange";
 import type { TurnstileLogger } from "@/exchange/turnstile";
+import { createLeadDeliveryLedgerFromD1 } from "@/lead-delivery-ledger/d1-repository";
 
 type ExchangeBindings = {
   WE_MET_FOLLOWUP_EMAIL_QUEUE?: CloudflareQueueBinding;
@@ -36,6 +38,25 @@ function consoleSinkLogger() {
   return {
     logSinkEnqueueFailure(sinkId: string, error: unknown) {
       console.error("lead sink enqueue failed", { sinkId, error });
+    },
+  };
+}
+
+function consoleDeliveryLogger() {
+  return {
+    logLedgerWriteFailed(leadId: string, sinkId: string, errorCode: string) {
+      console.error("lead_delivery_ledger_write_failed", {
+        leadId,
+        sinkId,
+        errorCode,
+      });
+    },
+    logLedgerEnqueueFailed(leadId: string, sinkId: string, errorCode: string) {
+      console.error("lead_delivery_ledger_enqueue_failed", {
+        leadId,
+        sinkId,
+        errorCode,
+      });
     },
   };
 }
@@ -70,17 +91,25 @@ export async function createProcessExchangeDeps(
 
   const followupQueue = createCloudflareFollowupEmailQueueProducer(queue);
   const leadSinkQueue = createCloudflareLeadSinkQueueProducer(queue);
+  const db = (env as { WE_MET_DB?: D1Database }).WE_MET_DB;
+  if (!db) {
+    throw new Error("WE_MET_DB binding is not configured");
+  }
+  const deliveryLedger = createLeadDeliveryLedgerFromD1(db);
 
   return {
     turnstile,
     rateLimiter,
     followupQueue,
     leadSinkQueue,
+    deliveryLedger,
+    deliveryLogger: consoleDeliveryLogger(),
     tokenSecret,
     environment: hostConfig.weMetEnv,
     clientIp,
     leadSinkLogger: consoleSinkLogger(),
     createLeadId: () => crypto.randomUUID(),
+    createLedgerId: () => crypto.randomUUID(),
     now: () => new Date(),
   };
 }
@@ -100,12 +129,20 @@ export async function createProcessDetailsDeps(): Promise<ProcessDetailsDeps> {
     bindings.WE_MET_TOKEN_SECRET,
   );
   const leadSinkQueue = createCloudflareLeadSinkQueueProducer(queue);
+  const db = (env as { WE_MET_DB?: D1Database }).WE_MET_DB;
+  if (!db) {
+    throw new Error("WE_MET_DB binding is not configured");
+  }
+  const deliveryLedger = createLeadDeliveryLedgerFromD1(db);
 
   return {
     tokenSecret,
     environment: hostConfig.weMetEnv,
     leadSinkQueue,
+    deliveryLedger,
+    deliveryLogger: consoleDeliveryLogger(),
     leadSinkLogger: consoleSinkLogger(),
+    createLedgerId: () => crypto.randomUUID(),
     now: () => new Date(),
   };
 }

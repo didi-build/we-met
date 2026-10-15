@@ -12,7 +12,8 @@ Preview and local runs exercise real code paths that enqueue email. **Step 1** h
 
 - **Preview** and **local** (when using remote bindings) share one **non-prod queue** (`we-met-followup-email-nonprod`) and **non-prod consumer** (`we-met-followup-email-consumer-nonprod`).
 - The non-prod consumer **redirects all outbound mail** to **`WE_MET_TEST_MAIL_TO`**.
-- **Lead sinks in step 1:** `lead_sinks` rows may exist, but **no sink kinds are implemented**; dispatch enqueues nothing for sinks until step 2. Cards with zero enabled sinks behave the same.
+- **Lead sinks in step 1:** `lead_sinks` rows may exist, but the **follow-up email consumer delivers nothing for sink messages** until the email sink ships ([DIDI-586](https://linear.app/didi-build/issue/DIDI-586)); the app may still enqueue per-sink queue messages. Cards with zero enabled sinks behave the same.
+- **Follow-up consumer Workers** (`we-met-followup-email-consumer` / `-nonprod`) have **no public URL**: `workers_dev: false` and `preview_urls: false` in Wrangler (deploy guards enforce both). Only the OpenNext **`we-met`** Worker uses preview URLs for PR testing.
 - **When Linear (and other) sinks exist (step 2+):** non-prod test cards should use test projects and marking documented in [test-leads.md](../runbooks/test-leads.md). Linear auth uses **per-user OAuth** via `connectionId`, not Worker secrets.
 - PR environments use **Cloudflare Previews** on Worker **`we-met`** (non-prod bindings in the `previews` block). **Version URLs** share the Worker’s own resources and are not used for PR testing; previews isolate per PR.
 

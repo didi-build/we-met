@@ -1,8 +1,11 @@
 import type { CardRecord, LeadSinkRecord } from "@/card-data/types";
 import {
   dispatchDetailsAppend,
+  type LeadDeliveryDispatchLogger,
+  type LeadSinkDispatchDeps,
   type LeadSinkDispatchLogger,
 } from "@/exchange/lead-sink/dispatcher";
+import type { LeadDeliveryLedger } from "@/lead-delivery-ledger/types";
 import type { LeadSinkQueueProducer } from "@/exchange/queue/producer";
 import { verifyDetailsToken } from "@/exchange/token";
 import type { VisitorLead, VisitorLeadDetails } from "@/exchange/types";
@@ -12,7 +15,10 @@ export type ProcessDetailsDeps = {
   tokenSecret: string;
   environment: string;
   leadSinkQueue: LeadSinkQueueProducer;
+  deliveryLedger: LeadDeliveryLedger;
+  deliveryLogger: LeadDeliveryDispatchLogger;
   leadSinkLogger: LeadSinkDispatchLogger;
+  createLedgerId: () => string;
   now: () => Date;
 };
 
@@ -66,14 +72,22 @@ export async function processDetails(
 
   const lead = leadFromToken(verified.payload, deps.environment, deps.now());
 
+  const sinkDispatchDeps: LeadSinkDispatchDeps = {
+    producer: deps.leadSinkQueue,
+    sinkLogger: deps.leadSinkLogger,
+    ledger: deps.deliveryLedger,
+    deliveryLogger: deps.deliveryLogger,
+    now: deps.now,
+    createLedgerId: deps.createLedgerId,
+  };
+
   await dispatchDetailsAppend(
     sinks,
     lead,
     details,
     card.id,
     card.slug,
-    deps.leadSinkQueue,
-    deps.leadSinkLogger,
+    sinkDispatchDeps,
   );
 
   return { status: "success" };

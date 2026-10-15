@@ -466,4 +466,82 @@ describe("check-deploy-guards (unit)", () => {
     expect(result.status).toBe(1);
     expect(result.stderr).toMatch(/WE_MET_TEST_MAIL_TO|consumer vars may only/);
   });
+
+  const consumerPublicUrlCases = [
+    {
+      label: "workers_dev missing",
+      mutate: (config: Record<string, unknown>) => {
+        delete config.workers_dev;
+      },
+      message: "workers_dev must be false",
+    },
+    {
+      label: "workers_dev true",
+      mutate: (config: Record<string, unknown>) => {
+        config.workers_dev = true;
+      },
+      message: "workers_dev must be false",
+    },
+    {
+      label: "preview_urls missing",
+      mutate: (config: Record<string, unknown>) => {
+        delete config.preview_urls;
+      },
+      message: "preview_urls must be false",
+    },
+    {
+      label: "preview_urls true",
+      mutate: (config: Record<string, unknown>) => {
+        config.preview_urls = true;
+      },
+      message: "preview_urls must be false",
+    },
+  ] as const;
+
+  for (const target of ["consumer-nonprod", "consumer-production"] as const) {
+    const source =
+      target === "consumer-nonprod" ? CONSUMER_NONPROD : CONSUMER_PRODUCTION;
+    for (const { label, mutate, message } of consumerPublicUrlCases) {
+      it(`fails ${target} when ${label}`, () => {
+        const path = writeTempConsumerConfig(source, mutate);
+        const result = runGuards(target, path);
+        expect(result.status).toBe(1);
+        expect(result.stderr).toContain(message);
+      });
+    }
+  }
+
+  it("keeps consumer public URL flags on prepared nonprod consumer config", () => {
+    const outputPath = `workers/we-met-followup-email-consumer/wrangler.guards-test-${process.pid}.ci.jsonc`;
+    const prep = spawnSync(
+      "node",
+      [
+        "scripts/prepare-wrangler-config.mjs",
+        "--target",
+        "consumer-nonprod",
+        "--output",
+        outputPath,
+      ],
+      {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          WE_MET_D1_DATABASE_ID_NONPROD: "22222222-2222-2222-2222-222222222222",
+        },
+      },
+    );
+    expect(prep.status).toBe(0);
+    try {
+      const prepared = parseJsonc(readFileSync(outputPath, "utf8")) as Record<
+        string,
+        unknown
+      >;
+      expect(prepared.workers_dev).toBe(false);
+      expect(prepared.preview_urls).toBe(false);
+      const result = runGuards("consumer-nonprod", outputPath);
+      expect(result.status).toBe(0);
+    } finally {
+      rmSync(outputPath, { force: true });
+    }
+  });
 });
