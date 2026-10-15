@@ -65,6 +65,7 @@ a:hover {
 
 button:not(:disabled):not([aria-busy="true"]),
 [role="button"]:not([aria-disabled="true"]),
+[role="switch"]:not([aria-disabled="true"]),
 summary,
 select:not(:disabled),
 label:has(input[type="checkbox"]:not(:disabled)),
