@@ -1,5 +1,7 @@
 # Environments
 
+<!-- Throwaway preview trigger (DIDI-602); close PR without merging. -->
+
 Three environments share one codebase. Worker name is always **`we-met`**: production bindings at the top level of Wrangler config, **non-prod bindings** in the **`previews`** block (previews do not inherit production settings). **Non-prod never uses the production queue, consumer, rate limiter namespace, D1 database, or R2 bucket.**
 
 |                     | **Local**                                                                                    | **Preview**                                                                          | **Production**                                                                                      |
