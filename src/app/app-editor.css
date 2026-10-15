@@ -884,7 +884,7 @@ textarea.ap-input {
   align-items: center;
   justify-content: center;
   background: var(--crop-mask-fill);
-  color: #fafafa;
+  color: var(--accent-ink);
 }
 .ap-photo-actions {
   display: flex;

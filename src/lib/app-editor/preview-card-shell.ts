@@ -55,7 +55,6 @@ export function previewCardShell(
     variant: "mono",
     displayName: name || "Preview",
     email: "preview@we-met.link",
-    photoKey: null,
     name,
     bookingLinks: { bookingUrl: "https://we-met.link" },
     pageCopy: {
