@@ -112,8 +112,6 @@ export function createEmailLeadSinkHandler(
         jobTitle: message.details.jobTitle,
         company: message.details.company,
         note: message.details.note,
-        sourceUrl: message.sourceUrl,
-        detailsSubmittedAtIso: message.detailsSubmittedAt,
         nonProdSinkDestinationLabel: nonProdLabel,
       });
 

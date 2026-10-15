@@ -1,3 +1,4 @@
+import { readWeMetHostConfig } from "@/config/we-met";
 import { buildVisitorFollowUpEmail } from "@/email/format-visitor-follow-up";
 import {
   followupEmailErrorLogFields,
@@ -47,6 +48,7 @@ export type FollowupQueueBatch = {
 
 export type FollowupConsumerEnv = {
   WE_MET_ENV: string;
+  WE_MET_BASE_URL: string;
   GMAIL_SENDER: string;
   GMAIL_SERVICE_ACCOUNT_JSON: string;
   WE_MET_TEST_MAIL_TO?: string;
@@ -58,6 +60,7 @@ export type FollowupConsumerEnv = {
 
 export type FollowupConsumerDeps = {
   weMetEnv: string;
+  baseUrl: string;
   testMailTo?: string;
   emailSender: EmailSender;
   assets: ReadOnlyR2Assets;
@@ -136,9 +139,11 @@ export function createFollowupConsumerDepsFromEnv(
     console.error("lead_sink_ledger_mark_failed", { leadId, sinkId, errorCode });
   };
   const now = () => new Date();
+  const { baseUrl } = readWeMetHostConfig(env);
 
   return {
     weMetEnv: env.WE_MET_ENV,
+    baseUrl,
     testMailTo: env.WE_MET_TEST_MAIL_TO,
     emailSender,
     assets: createReadOnlyConsumerAssets(env.WE_MET_ASSETS),
@@ -235,6 +240,7 @@ async function sendVisitorFollowup(
   const content = buildVisitorFollowUpEmail({
     card: message.card,
     visitorName: message.lead.name,
+    baseUrl: deps.baseUrl,
     nonProdVisitorEmailLabel: nonProdLabel,
   });
 

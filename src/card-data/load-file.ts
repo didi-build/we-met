@@ -148,10 +148,13 @@ function parseLinks(raw: unknown): CardLinks {
     throw new Error("links must be an object");
   }
   assertAllowedKeys(raw, ["bookingUrl", "footer"], "links");
-  const bookingUrl = requireHttpsUrl(
-    requireNonWhitespaceString(raw.bookingUrl, "links.bookingUrl", LIMITS.url),
-    "links.bookingUrl",
-  );
+  const bookingUrl =
+    raw.bookingUrl === undefined
+      ? undefined
+      : requireHttpsUrl(
+          requireNonWhitespaceString(raw.bookingUrl, "links.bookingUrl", LIMITS.url),
+          "links.bookingUrl",
+        );
   if (!Array.isArray(raw.footer)) {
     throw new Error("links.footer must be an array");
   }
@@ -308,11 +311,14 @@ function parsePageCopy(raw: unknown): CardLoadInput["pageCopy"] {
       "pageCopy.exchangeButton",
       LIMITS.pageCopyField,
     ),
-    bookLink: requireNonWhitespaceString(
-      raw.bookLink,
-      "pageCopy.bookLink",
-      LIMITS.pageCopyField,
-    ),
+    bookLink:
+      raw.bookLink === undefined
+        ? undefined
+        : requireNonWhitespaceString(
+            raw.bookLink,
+            "pageCopy.bookLink",
+            LIMITS.pageCopyField,
+          ),
   };
 }
 
@@ -558,77 +564,31 @@ function parseExchangeSheet(raw: unknown): CardCopy["exchangeSheet"] {
   };
 }
 
-function parseFollowUpEmail(raw: unknown): CardCopy["followUpEmail"] {
-  if (!isRecord(raw)) {
-    throw new Error("copy.followUpEmail must be an object");
-  }
-  assertAllowedKeys(
-    raw,
-    [
-      "subjectTemplate",
-      "greetingTemplate",
-      "bodyParagraphs",
-      "attachmentLine",
-      "bookCtaLabel",
-      "closingLine",
-    ],
-    "copy.followUpEmail",
-  );
-  return {
-    subjectTemplate: requireCopyString(
-      raw.subjectTemplate,
-      "copy.followUpEmail.subjectTemplate",
-    ),
-    greetingTemplate: requireCopyString(
-      raw.greetingTemplate,
-      "copy.followUpEmail.greetingTemplate",
-    ),
-    bodyParagraphs: parseStringArray(
-      raw.bodyParagraphs,
-      "copy.followUpEmail.bodyParagraphs",
-      1,
-      LIMITS.bodyParagraphs,
-      LIMITS.copyLeaf,
-      true,
-    ),
-    attachmentLine: requireCopyString(
-      raw.attachmentLine,
-      "copy.followUpEmail.attachmentLine",
-    ),
-    bookCtaLabel: requireCopyString(
-      raw.bookCtaLabel,
-      "copy.followUpEmail.bookCtaLabel",
-    ),
-    closingLine: requireCopyString(raw.closingLine, "copy.followUpEmail.closingLine"),
-  };
-}
-
 function parseCopy(raw: unknown): CardCopy {
   if (!isRecord(raw)) {
     throw new Error("copy must be an object");
   }
+  if (raw.followUpEmail !== undefined) {
+    console.warn(
+      "copy.followUpEmail is ignored (follow-up email copy is fixed in v1); remove it from the card file",
+    );
+  }
+  const copyInput = { ...raw };
+  delete copyInput.followUpEmail;
   assertAllowedKeys(
-    raw,
-    [
-      "thanksMessage",
-      "exchangeAriaLabel",
-      "footerNavLabel",
-      "about",
-      "exchangeSheet",
-      "followUpEmail",
-    ],
+    copyInput,
+    ["thanksMessage", "exchangeAriaLabel", "footerNavLabel", "about", "exchangeSheet"],
     "copy",
   );
   return {
-    thanksMessage: requireCopyString(raw.thanksMessage, "copy.thanksMessage"),
+    thanksMessage: requireCopyString(copyInput.thanksMessage, "copy.thanksMessage"),
     exchangeAriaLabel: requireCopyString(
-      raw.exchangeAriaLabel,
+      copyInput.exchangeAriaLabel,
       "copy.exchangeAriaLabel",
     ),
-    footerNavLabel: requireCopyString(raw.footerNavLabel, "copy.footerNavLabel"),
-    about: parseAbout(raw.about),
-    exchangeSheet: parseExchangeSheet(raw.exchangeSheet),
-    followUpEmail: parseFollowUpEmail(raw.followUpEmail),
+    footerNavLabel: requireCopyString(copyInput.footerNavLabel, "copy.footerNavLabel"),
+    about: parseAbout(copyInput.about),
+    exchangeSheet: parseExchangeSheet(copyInput.exchangeSheet),
   };
 }
 
@@ -677,6 +637,14 @@ function parseCard(raw: unknown, seenSinkIds: Set<string>): CardLoadInput {
           })();
 
   const leadSinks = parseLeadSinksField(raw.leadSinks, slug, seenSinkIds);
+  const links = parseLinks(raw.links);
+  const pageCopy = parsePageCopy(raw.pageCopy);
+  if (links.bookingUrl && !pageCopy.bookLink) {
+    throw new Error("pageCopy.bookLink is required when links.bookingUrl is set");
+  }
+  if (!links.bookingUrl && pageCopy.bookLink) {
+    throw new Error("links.bookingUrl is required when pageCopy.bookLink is set");
+  }
 
   return {
     slug,
@@ -691,8 +659,8 @@ function parseCard(raw: unknown, seenSinkIds: Set<string>): CardLoadInput {
       "email",
     ),
     photoKey,
-    links: parseLinks(raw.links),
-    pageCopy: parsePageCopy(raw.pageCopy),
+    links,
+    pageCopy,
     contact: parseContact(raw.contact),
     copy: parseCopy(raw.copy),
     ...(leadSinks === undefined ? {} : { leadSinks }),

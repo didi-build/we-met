@@ -9,7 +9,7 @@ export type CardFooterLink = {
 };
 
 export type CardLinks = {
-  bookingUrl: string;
+  bookingUrl?: string;
   footer: CardFooterLink[];
 };
 
@@ -41,7 +41,7 @@ export type CardPageCopy = {
   headshotAlt: string;
   greetingName: string;
   exchangeButton: string;
-  bookLink: string;
+  bookLink?: string;
 };
 
 export type CardCopyAboutChip = {
@@ -95,22 +95,12 @@ export type CardCopyExchangeSheet = {
   errors: CardCopyExchangeSheetErrors;
 };
 
-export type CardCopyFollowUpEmail = {
-  subjectTemplate: string;
-  greetingTemplate: string;
-  bodyParagraphs: string[];
-  attachmentLine: string;
-  bookCtaLabel: string;
-  closingLine: string;
-};
-
 export type CardCopy = {
   thanksMessage: string;
   exchangeAriaLabel: string;
   footerNavLabel: string;
   about: CardCopyAbout;
   exchangeSheet: CardCopyExchangeSheet;
-  followUpEmail: CardCopyFollowUpEmail;
 };
 
 export type CardRecord = {

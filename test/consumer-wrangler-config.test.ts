@@ -62,9 +62,15 @@ describe("follow-up email consumer wrangler configs (unit)", () => {
     expect(strings).not.toContain(NONPROD_RESOURCE_MARKERS.queue);
   });
 
-  it("allows only WE_MET_ENV in consumer vars", () => {
-    expect(Object.keys(nonprod.vars as object).sort()).toEqual(["WE_MET_ENV"]);
-    expect(Object.keys(production.vars as object).sort()).toEqual(["WE_MET_ENV"]);
+  it("allows only WE_MET_ENV and WE_MET_BASE_URL in consumer vars", () => {
+    expect(Object.keys(nonprod.vars as object).sort()).toEqual([
+      "WE_MET_BASE_URL",
+      "WE_MET_ENV",
+    ]);
+    expect(Object.keys(production.vars as object).sort()).toEqual([
+      "WE_MET_BASE_URL",
+      "WE_MET_ENV",
+    ]);
   });
 
   it("sets max_retries on queue consumers to match the shared attempt limit", () => {

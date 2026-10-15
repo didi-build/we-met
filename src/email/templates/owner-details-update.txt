@@ -1,0 +1,15 @@
+{{#if test_sink}}Test delivery (sink destination): {{test_sink}}
+
+{{/if}}Details added
+
+{{lead_name}}
+{{lead_email}}
+{{#if job_title}}
+Job title: {{job_title}}{{/if}}{{#if company}}
+Company:   {{company}}{{/if}}{{#if note}}
+
+Note:
+{{note}}{{/if}}
+
+--
+Sent by We Met because {{lead_first_name}} added details after exchanging contacts.

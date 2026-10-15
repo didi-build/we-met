@@ -98,14 +98,6 @@
             "emailRequired": "Email required",
             "emailInvalid": "Invalid email"
           }
-        },
-        "followUpEmail": {
-          "subjectTemplate": "Nice meeting you",
-          "greetingTemplate": "Hi {firstName},",
-          "bodyParagraphs": ["Line one.", "Line two."],
-          "attachmentLine": "VCard attached",
-          "bookCtaLabel": "Book time",
-          "closingLine": "Cheers"
         }
       }
     }

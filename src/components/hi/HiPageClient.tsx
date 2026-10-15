@@ -89,14 +89,16 @@ export function HiPageClient({ card, photoUrl }: HiPageClientProps) {
             >
               {pageCopy.exchangeButton}
             </Button>
-            <a
-              href={links.bookingUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex min-h-11 items-center self-center px-2 text-[15px] font-medium text-ink-muted underline decoration-1 underline-offset-[3px] hover:text-ink"
-            >
-              {pageCopy.bookLink}
-            </a>
+            {links.bookingUrl && pageCopy.bookLink ? (
+              <a
+                href={links.bookingUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex min-h-11 items-center self-center px-2 text-[15px] font-medium text-ink-muted underline decoration-1 underline-offset-[3px] hover:text-ink"
+              >
+                {pageCopy.bookLink}
+              </a>
+            ) : null}
             {thanksLine && (
               <p
                 role="status"

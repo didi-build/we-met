@@ -29,18 +29,7 @@ const card: CardEmailSnapshot = {
     vcardNote: "note",
     urls: [],
   },
-  links: { bookingUrl: "https://example.com/book", footer: [] },
   pageCopy: { emailFromName: "Demo at Example" },
-  copy: {
-    followUpEmail: {
-      subjectTemplate: "Hello {firstName}",
-      greetingTemplate: "Hi {firstName}",
-      bodyParagraphs: ["One"],
-      attachmentLine: "Attached",
-      bookCtaLabel: "Book",
-      closingLine: "Bye",
-    },
-  },
 };
 
 function visitorBody(overrides: Record<string, unknown> = {}) {
@@ -113,6 +102,7 @@ function createDeps(
 
   return {
     weMetEnv,
+    baseUrl: overrides.baseUrl ?? "https://we-met.link",
     testMailTo,
     ownerFromEmail,
     fromDisplayName,
