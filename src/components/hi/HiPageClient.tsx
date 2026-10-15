@@ -19,8 +19,10 @@ import {
   WE_MET_CARD_HOME_URL,
 } from "@/lib/hi-card/card-content";
 import { substituteFirstName } from "@/lib/copy/substitute-first-name";
+import { captureSheetOpener, restoreSheetFocus } from "@/lib/hi-card/sheet-focus";
 import Image from "next/image";
-import { useCallback, useEffect, useRef, useState } from "react";
+import type { MouseEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 type HiPageClientProps = {
   card: CardRecord;
@@ -60,34 +62,49 @@ export function HiPageClient({ card, photoUrl, plan = "free" }: HiPageClientProp
   const showBanner = plan === "free";
 
   const exchangeButtonRef = useRef<HTMLButtonElement>(null);
+  const stickyExchangeButtonRef = useRef<HTMLButtonElement>(null);
   const ctaRef = useRef<HTMLDivElement>(null);
+  const sheetOpenerRef = useRef<HTMLElement | null>(null);
+  const pendingSheetFocusRestoreRef = useRef(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [connected, setConnected] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [leadToken, setLeadToken] = useState("");
   const [stickyVisible, setStickyVisible] = useState(false);
 
-  const openSheet = useCallback(() => {
+  const updateStickyFromScroll = useCallback(() => {
+    const el = ctaRef.current;
+    if (!el) {
+      return;
+    }
+    setStickyVisible(el.getBoundingClientRect().top < 0);
+  }, []);
+
+  const openSheet = useCallback((event: MouseEvent<HTMLButtonElement>) => {
+    sheetOpenerRef.current = captureSheetOpener(event.currentTarget);
+    pendingSheetFocusRestoreRef.current = true;
     setSheetOpen(true);
   }, []);
 
   const closeSheet = useCallback(() => {
+    updateStickyFromScroll();
     setSheetOpen(false);
-    exchangeButtonRef.current?.focus();
-  }, []);
+  }, [updateStickyFromScroll]);
+
+  useLayoutEffect(() => {
+    if (sheetOpen || !pendingSheetFocusRestoreRef.current) {
+      return;
+    }
+    pendingSheetFocusRestoreRef.current = false;
+    restoreSheetFocus(sheetOpenerRef.current, exchangeButtonRef.current);
+  }, [sheetOpen]);
 
   useEffect(() => {
     if (sheetOpen) {
       setStickyVisible(false);
       return;
     }
-    const onScroll = () => {
-      const el = ctaRef.current;
-      if (!el) {
-        return;
-      }
-      setStickyVisible(el.getBoundingClientRect().top < 0);
-    };
+    const onScroll = () => updateStickyFromScroll();
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll);
@@ -95,7 +112,7 @@ export function HiPageClient({ card, photoUrl, plan = "free" }: HiPageClientProp
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
     };
-  }, [sheetOpen]);
+  }, [sheetOpen, updateStickyFromScroll]);
 
   const thanksLine =
     connected && !sheetOpen
@@ -120,6 +137,7 @@ export function HiPageClient({ card, photoUrl, plan = "free" }: HiPageClientProp
         initials={initials}
         photoUrl={photoUrl}
         photoAlt={pageCopy.headshotAlt}
+        exchangeButtonRef={stickyExchangeButtonRef}
         onExchange={openSheet}
       />
 

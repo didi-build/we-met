@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/Button";
 import Image from "next/image";
+import type { Ref } from "react";
 
 type HiStickyExchangeBarProps = {
   visible: boolean;
@@ -10,7 +11,8 @@ type HiStickyExchangeBarProps = {
   initials: string;
   photoUrl: string | null;
   photoAlt: string;
-  onExchange: () => void;
+  exchangeButtonRef?: Ref<HTMLButtonElement>;
+  onExchange: (event: React.MouseEvent<HTMLButtonElement>) => void;
 };
 
 export function HiStickyExchangeBar({
@@ -20,6 +22,7 @@ export function HiStickyExchangeBar({
   initials,
   photoUrl,
   photoAlt,
+  exchangeButtonRef,
   onExchange,
 }: HiStickyExchangeBarProps) {
   return (
@@ -67,7 +70,12 @@ export function HiStickyExchangeBar({
                 : undefined,
             }}
           />
-          <Button type="button" onClick={onExchange} className="min-h-10 px-6 text-sm">
+          <Button
+            ref={exchangeButtonRef}
+            type="button"
+            onClick={onExchange}
+            className="min-h-10 px-6 text-sm"
+          >
             Exchange
           </Button>
         </div>

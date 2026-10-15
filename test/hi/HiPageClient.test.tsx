@@ -7,8 +7,24 @@ import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { WE_MET_CARD_HOME_URL } from "@/lib/hi-card/card-content";
 import { exampleCardInput } from "../helpers/example-card";
 import type { CardRecord } from "@/card-data/types";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@marsidev/react-turnstile", () => ({
+  Turnstile: () => null,
+}));
+
+vi.mock("@/components/hi/hi-sheet-motion", async (importOriginal) => {
+  const mod = await importOriginal<typeof import("@/components/hi/hi-sheet-motion")>();
+  return {
+    ...mod,
+    prefersReducedMotion: () => true,
+    runSheetCloseAnimation: ({ onComplete }: { onComplete: () => void }) => {
+      onComplete();
+      return () => {};
+    },
+  };
+});
 
 function stubMatchMedia() {
   vi.stubGlobal(
@@ -112,6 +128,57 @@ describe("HiPageClient (component)", () => {
     expect(getComputedStyle(cardSurface!).getPropertyValue("--surface").trim()).toBe(
       rootSurface,
     );
+  });
+
+  it("restores focus to the sticky exchange opener without scrolling when the sheet closes", () => {
+    const rectSpy = vi
+      .spyOn(Element.prototype, "getBoundingClientRect")
+      .mockImplementation(function (this: Element) {
+        if (
+          this.getAttribute("aria-label")?.includes("Exchange") ||
+          (this instanceof HTMLElement && this.className.includes("-mt-1"))
+        ) {
+          return {
+            top: -100,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            width: 0,
+            height: 0,
+            x: 0,
+            y: 0,
+            toJSON: () => ({}),
+          } as DOMRect;
+        }
+        return {
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          width: 0,
+          height: 0,
+          x: 0,
+          y: 0,
+          toJSON: () => ({}),
+        } as DOMRect;
+      });
+
+    renderCard();
+    fireEvent.scroll(window);
+
+    const stickyExchange = screen.getByRole("button", { name: /^Exchange$/i });
+    const focusSpy = vi.spyOn(stickyExchange, "focus");
+
+    fireEvent.click(stickyExchange);
+    expect(screen.getByRole("dialog")).toBeTruthy();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+
+    expect(focusSpy).toHaveBeenCalled();
+    expect(focusSpy.mock.calls.at(-1)?.[0]).toEqual({ preventScroll: true });
+
+    rectSpy.mockRestore();
   });
 
   it.each([["light"], ["dark"]] as const)("renders in %s theme", (theme) => {
