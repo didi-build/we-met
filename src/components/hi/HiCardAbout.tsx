@@ -35,7 +35,7 @@ export function HiCardAbout({ title, paragraphs }: HiCardAboutProps) {
           type="button"
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
-          className="-my-2 inline-flex min-h-11 cursor-pointer items-center gap-1.5 self-start border-0 bg-transparent p-0 text-[15px] font-semibold text-accent-text underline decoration-1 underline-offset-[3px] hover:text-ink-muted"
+          className="-my-2 inline-flex min-h-11 cursor-pointer items-center gap-1.5 self-start border-0 bg-transparent p-0 text-[15px] font-semibold text-ink underline decoration-1 underline-offset-[3px] hover:text-ink-muted"
         >
           {open ? "Show less" : "Show more"}
         </button>

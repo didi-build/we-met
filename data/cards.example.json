@@ -2,68 +2,57 @@
   "cards": [
     {
       "slug": "didi",
-      "variant": "green",
+      "variant": "mono",
       "plan": "free",
       "name": "Didi Shoukralla",
       "role": "Software Engineer and Technical Advisor",
       "photoKey": "didi",
-      "fallbackUrl": "https://didi.build/book",
-      "fallbackLabel": "or book a time directly",
-      "aboutTitle": "About me",
-      "about": [
-        "I'm a software engineer in Toronto. I help founders who built their app with AI get it ready for real users, paying customers, or investors.",
-        "I've shipped software at startups and on production teams, so I know what breaks once people actually show up.",
-        "If you're building something, I'm happy to give you an honest, straight read during your free consultation."
-      ],
-      "servicesTitle": "What I do",
-      "linksTitle": "Links",
-      "services": [
-        {
-          "label": "System audit",
-          "description": "I review your app and give you a written summary: what's solid, what's risky, and what to do next."
-        },
-        {
-          "label": "Custom development",
-          "description": "I build what your product needs, whether that's a new feature or a custom tool made just for you."
-        },
-        {
-          "label": "Technical advisory",
-          "description": "I answer your technical questions in plain English and help you decide what to build, what to skip, and what to ask your developers."
-        },
-        {
-          "label": "Fractional CTO",
-          "description": "I act as your part-time technical lead: I guide the technical decisions and the team, without a full-time hire."
-        },
-        {
-          "label": "AI Integrations",
-          "description": "I add AI to your product where it helps, like a chat assistant, smarter search, or an agent that handles tasks for you."
-        }
-      ],
-      "links": [
-        {
-          "type": "website",
-          "label": "didi.build",
-          "url": "https://didi.build"
-        },
-        {
-          "type": "linkedin",
-          "label": "LinkedIn",
-          "url": "https://www.linkedin.com/in/diadem-shoukralla/"
-        },
-        {
-          "type": "github",
-          "label": "GitHub",
-          "url": "https://github.com/DiademShoukralla/"
-        },
-        {
-          "type": "instagram",
-          "label": "Instagram",
-          "url": "https://instagram.com/didi.build"
-        }
-      ],
+      "about": {
+        "title": "About me",
+        "paragraphs": [
+          "I'm a software engineer in Toronto. I help founders who built their app with AI get it ready for real users, paying customers, or investors.",
+          "I've shipped software at startups and on production teams, so I know what breaks once people actually show up.",
+          "If you're building something, I'm happy to give you an honest, straight read during your free consultation."
+        ]
+      },
+      "services": {
+        "title": "What I do",
+        "items": [
+          {
+            "title": "System audit",
+            "description": "I review your app and give you a written summary: what's solid, what's risky, and what to do next."
+          },
+          {
+            "title": "Custom development",
+            "description": "I build what your product needs, whether that's a new feature or a custom tool made just for you."
+          },
+          {
+            "title": "Technical advisory",
+            "description": "I answer your technical questions in plain English and help you decide what to build, what to skip, and what to ask your developers."
+          },
+          {
+            "title": "Fractional CTO",
+            "description": "I act as your part-time technical lead: I guide the technical decisions and the team, without a full-time hire."
+          },
+          {
+            "title": "AI Integrations",
+            "description": "I add AI to your product where it helps, like a chat assistant, smarter search, or an agent that handles tasks for you."
+          }
+        ]
+      },
+      "links": {
+        "website": "https://didi.build",
+        "linkedin": "https://www.linkedin.com/in/diadem-shoukralla/",
+        "github": "https://github.com/DiademShoukralla/",
+        "instagram": "https://instagram.com/didi.build"
+      },
+      "alternate": {
+        "url": "https://didi.build/book",
+        "label": "or book a time directly"
+      },
       "email": "didi@didi.build",
       "pageCopy": {
-        "pageTitle": "Didi Shoukralla — We Met",
+        "pageTitle": "Didi Shoukralla · We Met",
         "emailFromName": "Didi Shoukralla",
         "headshotAlt": "Didi Shoukralla"
       },
@@ -117,9 +106,9 @@
           "exchangeNotSavedEmail": "help@didi.build",
           "exchangeNotSavedSuffix": " and we'll connect you manually.",
           "errors": {
-            "nameRequired": "Enter your name",
-            "emailRequired": "Enter your email",
-            "emailInvalid": "Enter a valid email"
+            "nameRequired": "Add your name so I know who you are.",
+            "emailRequired": "Add your email so I can reach you.",
+            "emailInvalid": "That email doesn't look quite right. Check for a typo?"
           }
         },
         "followUpEmail": {

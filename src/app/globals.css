@@ -1,10 +1,6 @@
 @import "tailwindcss";
 @import "../theme/tokens/mono.light.css";
 @import "../theme/tokens/mono.dark.css";
-@import "../theme/tokens/green.light.css";
-@import "../theme/tokens/green.dark.css";
-@import "../theme/tokens/blue.light.css";
-@import "../theme/tokens/blue.dark.css";
 
 @custom-variant dark (&:where([data-theme=dark] *));
 
@@ -143,13 +139,21 @@ select:focus-visible {
 
 @keyframes hi-ring-pulse {
   0% {
-    box-shadow: 0 0 0 0 color-mix(in oklch, var(--accent) 40%, transparent);
+    box-shadow: 0 0 0 0 var(--ring);
   }
-  50% {
-    box-shadow: 0 0 0 12px color-mix(in oklch, var(--accent) 0%, transparent);
-  }
+  50%,
   100% {
-    box-shadow: 0 0 0 12px transparent;
+    box-shadow: 0 0 0 12px var(--ring-0);
+  }
+}
+
+@keyframes hi-ring-pulse-sm {
+  0% {
+    box-shadow: 0 0 0 0 var(--ring);
+  }
+  50%,
+  100% {
+    box-shadow: 0 0 0 8px var(--ring-0);
   }
 }
 

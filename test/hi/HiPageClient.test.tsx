@@ -31,14 +31,7 @@ function injectGeneratedPaletteCss() {
     return;
   }
   const dir = join(process.cwd(), "src/theme/tokens");
-  const files = [
-    "mono.light.css",
-    "mono.dark.css",
-    "green.light.css",
-    "green.dark.css",
-    "blue.light.css",
-    "blue.dark.css",
-  ];
+  const files = ["mono.light.css", "mono.dark.css"];
   const style = document.createElement("style");
   style.id = "test-palette-tokens";
   style.textContent = files.map((f) => readFileSync(join(dir, f), "utf8")).join("\n");
@@ -52,14 +45,14 @@ beforeAll(() => {
 beforeEach(() => {
   stubMatchMedia();
   document.documentElement.setAttribute("data-theme", "light");
-  document.documentElement.setAttribute("data-palette", "green");
+  document.documentElement.setAttribute("data-palette", "mono");
 });
 
 afterEach(() => {
   cleanup();
 });
 
-function renderCard(overrides: Partial<CardRecord> = {}) {
+function renderCard(overrides: Partial<CardRecord> = {}, plan = "free" as const) {
   const input = exampleCardInput();
   const card: CardRecord = {
     id: "test-id",
@@ -69,7 +62,7 @@ function renderCard(overrides: Partial<CardRecord> = {}) {
   };
   return render(
     <ThemeProvider>
-      <HiPageClient card={card} photoUrl={null} />
+      <HiPageClient card={card} photoUrl={null} plan={plan} />
     </ThemeProvider>,
   );
 }
@@ -85,11 +78,9 @@ describe("HiPageClient (component)", () => {
   it("renders without optional sections", () => {
     renderCard({
       about: undefined,
-      aboutTitle: undefined,
       services: undefined,
-      servicesTitle: undefined,
-      publicLinks: [],
-      fallbackLabel: undefined,
+      links: undefined,
+      alternate: undefined,
     });
     expect(screen.queryByText("About me")).toBeNull();
     expect(screen.queryByText("What I do")).toBeNull();
@@ -101,7 +92,7 @@ describe("HiPageClient (component)", () => {
   });
 
   it("links the free-plan banner to we-met.link", () => {
-    renderCard({ plan: "free" });
+    renderCard({}, "free");
     const banners = screen.getAllByRole("link", { name: /Get your own card/i });
     for (const link of banners) {
       expect(link.getAttribute("href")).toBe(WE_MET_CARD_HOME_URL);
@@ -110,7 +101,7 @@ describe("HiPageClient (component)", () => {
 
   it("does not override document dark theme with a nested data-theme", () => {
     document.documentElement.setAttribute("data-theme", "dark");
-    document.documentElement.setAttribute("data-palette", "green");
+    document.documentElement.setAttribute("data-palette", "mono");
     renderCard();
     expect(document.querySelector('[data-theme="light"]')).toBeNull();
     const rootSurface = getComputedStyle(document.documentElement)
@@ -123,17 +114,10 @@ describe("HiPageClient (component)", () => {
     );
   });
 
-  it.each([
-    ["mono", "light"],
-    ["mono", "dark"],
-    ["green", "light"],
-    ["green", "dark"],
-    ["blue", "light"],
-    ["blue", "dark"],
-  ] as const)("renders with palette %s in %s theme", (palette, theme) => {
-    document.documentElement.setAttribute("data-palette", palette);
+  it.each([["light"], ["dark"]] as const)("renders in %s theme", (theme) => {
+    document.documentElement.setAttribute("data-palette", "mono");
     document.documentElement.setAttribute("data-theme", theme);
-    renderCard({ variant: palette === "blue" ? "green" : palette });
+    renderCard();
     const bg = getComputedStyle(document.documentElement)
       .getPropertyValue("--bg")
       .trim();

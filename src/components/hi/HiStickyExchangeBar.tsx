@@ -63,7 +63,7 @@ export function HiStickyExchangeBar({
             className="pointer-events-none absolute inset-0 -z-10 rounded-pill"
             style={{
               animation: visible
-                ? "hi-ring-pulse 2.6s 0.4s ease-in-out infinite"
+                ? "hi-ring-pulse-sm 2.6s 0.4s linear infinite"
                 : undefined,
             }}
           />

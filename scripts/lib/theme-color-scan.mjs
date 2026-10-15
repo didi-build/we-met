@@ -1,6 +1,7 @@
 const ALLOWLIST = new Set([
   "src/theme/tokens/green.light.css",
   "src/theme/tokens/green.dark.css",
+  "src/components/hi/icons/HiCardIcons.tsx",
   "design/Hi.dc.html",
 ]);
 

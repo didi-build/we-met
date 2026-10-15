@@ -1,14 +1,19 @@
-import type { CardPublicLink, CardRecord, CardService } from "@/card-data/types";
+import type {
+  CardPublicLinkType,
+  CardPublicLinksMap,
+  CardRecord,
+  CardServiceItem,
+} from "@/card-data/types";
 
 export function cardInitials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) {
     return "?";
   }
-  if (parts.length === 1) {
-    return parts[0].slice(0, 2).toUpperCase();
-  }
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  return parts
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .join("");
 }
 
 export function cardGreeting(name: string): string {
@@ -25,41 +30,57 @@ export function firstNameFromFullName(name: string): string {
   return trimmed.split(/\s+/)[0] ?? "there";
 }
 
+const LINK_ORDER: CardPublicLinkType[] = ["website", "linkedin", "github", "instagram"];
+
+const LINK_LABELS: Record<CardPublicLinkType, string> = {
+  website: "Website",
+  linkedin: "LinkedIn",
+  github: "GitHub",
+  instagram: "Instagram",
+};
+
+export type CardLinkEntry = {
+  type: CardPublicLinkType;
+  url: string;
+  label: string;
+};
+
+export function cardLinkEntries(map?: CardPublicLinksMap): CardLinkEntry[] {
+  if (!map) {
+    return [];
+  }
+  return LINK_ORDER.filter((type) => map[type]?.trim()).map((type) => ({
+    type,
+    url: map[type]!,
+    label: LINK_LABELS[type],
+  }));
+}
+
 export type CardContentFlags = {
   hasPhoto: boolean;
   hasRole: boolean;
-  hasFallback: boolean;
+  hasAlternate: boolean;
   hasAbout: boolean;
   hasServices: boolean;
   hasLinks: boolean;
-  hasSocialLinks: boolean;
 };
 
 export function cardContentFlags(card: CardRecord): CardContentFlags {
-  const services = card.services?.filter((s) => s.label?.trim()) ?? [];
-  const publicLinks = card.publicLinks?.filter((l) => l.url?.trim()) ?? [];
-  const social = publicLinks.filter((l) => l.type !== "website");
+  const paragraphs = card.about?.paragraphs?.filter((p) => p.trim()) ?? [];
+  const serviceItems = card.services?.items?.filter((s) => s.title?.trim()) ?? [];
+  const linkEntries = cardLinkEntries(card.links);
   return {
     hasPhoto: Boolean(card.photoKey),
     hasRole: Boolean(card.role?.trim()),
-    hasFallback: Boolean(card.fallbackUrl?.trim() && card.fallbackLabel?.trim()),
-    hasAbout: Boolean(card.aboutTitle?.trim() && card.about?.some((p) => p.trim())),
-    hasServices: services.length > 0,
-    hasLinks: publicLinks.length > 0,
-    hasSocialLinks: social.length > 0,
+    hasAlternate: Boolean(card.alternate?.url?.trim() && card.alternate?.label?.trim()),
+    hasAbout: Boolean(card.about?.title?.trim() && paragraphs.length),
+    hasServices: serviceItems.length > 0,
+    hasLinks: linkEntries.length > 0,
   };
 }
 
-export function servicesForChips(services?: CardService[]): CardService[] {
-  return (services ?? []).filter((s) => s.label?.trim());
-}
-
-export function websiteLinks(links?: CardPublicLink[]): CardPublicLink[] {
-  return (links ?? []).filter((l) => l.type === "website" && l.url?.trim());
-}
-
-export function socialLinks(links?: CardPublicLink[]): CardPublicLink[] {
-  return (links ?? []).filter((l) => l.type !== "website" && l.url?.trim());
+export function servicesForChips(services?: CardServiceItem[]): CardServiceItem[] {
+  return (services ?? []).filter((s) => s.title?.trim());
 }
 
 export const WE_MET_CARD_HOME_URL = "https://we-met.link";

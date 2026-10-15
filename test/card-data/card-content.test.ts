@@ -27,39 +27,38 @@ describe("card content helpers (unit)", () => {
     expect(cardGreeting("Didi Shoukralla")).toBe("I'm Didi");
   });
 
-  it("normalizes unknown stored variant to mono at render", () => {
+  it("normalizes any stored variant to mono at render", () => {
     expect(normalizeBrandVariant("nope")).toBe("mono");
-    expect(normalizeBrandVariant("blue")).toBe("mono");
+    expect(normalizeBrandVariant("green")).toBe("mono");
   });
 
-  it("loads mono and green variants from the example file", () => {
-    const green = parseCardsLoadFile(exampleLoadRaw());
-    expect(green.cards[0].variant).toBe("green");
+  it("loads mono variant and defaults when omitted", () => {
+    const file = parseCardsLoadFile(exampleLoadRaw());
+    expect(file.cards[0].variant).toBe("mono");
 
-    const monoRaw = JSON.parse(JSON.stringify(exampleLoadRaw())) as {
+    const raw = JSON.parse(JSON.stringify(exampleLoadRaw())) as {
       cards: Record<string, unknown>[];
     };
-    monoRaw.cards[0].variant = "mono";
-    const mono = parseCardsLoadFile(monoRaw);
-    expect(mono.cards[0].variant).toBe("mono");
+    delete raw.cards[0].variant;
+    const omitted = parseCardsLoadFile(raw);
+    expect(omitted.cards[0].variant).toBe("mono");
   });
 
   it("flags optional sections from example card", () => {
     const flags = cardContentFlags(minimalCard());
     expect(flags.hasAbout).toBe(true);
     expect(flags.hasServices).toBe(true);
-    expect(flags.hasSocialLinks).toBe(true);
-    expect(flags.hasFallback).toBe(true);
+    expect(flags.hasLinks).toBe(true);
+    expect(flags.hasAlternate).toBe(true);
   });
 
   it("hides sections when data is missing", () => {
     const flags = cardContentFlags(
       minimalCard({
         about: undefined,
-        aboutTitle: undefined,
-        services: [],
-        publicLinks: [],
-        fallbackLabel: undefined,
+        services: undefined,
+        links: undefined,
+        alternate: undefined,
         photoKey: null,
       }),
     );
@@ -67,7 +66,7 @@ describe("card content helpers (unit)", () => {
     expect(flags.hasServices).toBe(false);
     expect(flags.hasLinks).toBe(false);
     expect(flags.hasPhoto).toBe(false);
-    expect(flags.hasFallback).toBe(false);
+    expect(flags.hasAlternate).toBe(false);
   });
 
   it("uses the We Met marketing URL", () => {

@@ -1,31 +1,109 @@
 import type {
   BrandVariant,
+  CardAbout,
+  CardAlternate,
   CardBookingLinks,
   CardContact,
   CardCopy,
   CardLoadInput,
   CardPageCopy,
-  CardPlan,
+  CardPublicLinksMap,
   CardRecord,
-  CardService,
+  CardServices,
 } from "@/card-data/types";
 import { normalizeBrandVariant } from "@/card-data/normalize-variant";
 
 export type CardPageCopyStored = CardPageCopy & {
-  plan: CardPlan;
   name: string;
   role?: string;
-  aboutTitle?: string;
-  about?: string[];
-  servicesTitle?: string;
-  services?: CardService[];
-  linksTitle?: string;
-  fallbackLabel?: string;
+  about?: CardAbout;
+  services?: CardServices;
+  links?: CardPublicLinksMap;
+  alternate?: CardAlternate;
 };
 
-export type CardLinksStored = CardBookingLinks & {
-  fallbackUrl?: string;
-};
+export type CardLinksStored = CardBookingLinks;
+
+function normalizeAboutFromLegacy(
+  pageStored: CardPageCopyStored,
+): CardAbout | undefined {
+  if (
+    pageStored.about &&
+    Array.isArray((pageStored.about as { paragraphs?: unknown }).paragraphs)
+  ) {
+    return pageStored.about as CardAbout;
+  }
+  const legacyTitle = (pageStored as { aboutTitle?: string }).aboutTitle;
+  const legacyParas = (pageStored as { about?: string[] }).about;
+  if (legacyTitle && Array.isArray(legacyParas) && legacyParas.some((p) => p?.trim())) {
+    return { title: legacyTitle, paragraphs: legacyParas.filter((p) => p?.trim()) };
+  }
+  return undefined;
+}
+
+function normalizeServicesFromLegacy(
+  pageStored: CardPageCopyStored,
+): CardServices | undefined {
+  if (
+    pageStored.services &&
+    Array.isArray((pageStored.services as CardServices).items)
+  ) {
+    return pageStored.services as CardServices;
+  }
+  const legacyTitle = (pageStored as { servicesTitle?: string }).servicesTitle;
+  const legacyItems = (
+    pageStored as { services?: { label: string; description: string }[] }
+  ).services;
+  if (legacyItems?.length) {
+    return {
+      title: legacyTitle ?? "What I do",
+      items: legacyItems
+        .filter((s) => s?.label?.trim())
+        .map((s) => ({ title: s.label, description: s.description ?? "" })),
+    };
+  }
+  return undefined;
+}
+
+function normalizeLinksFromLegacy(
+  pageStored: CardPageCopyStored,
+  linksStored: CardLinksStored & { items?: { type: string; url: string }[] },
+): CardPublicLinksMap | undefined {
+  if (
+    pageStored.links &&
+    typeof pageStored.links === "object" &&
+    !Array.isArray(pageStored.links)
+  ) {
+    return pageStored.links;
+  }
+  const items = linksStored.items;
+  if (!items?.length) {
+    return undefined;
+  }
+  const map: CardPublicLinksMap = {};
+  for (const item of items) {
+    if (item.type === "website") map.website = item.url;
+    if (item.type === "linkedin") map.linkedin = item.url;
+    if (item.type === "github") map.github = item.url;
+    if (item.type === "instagram") map.instagram = item.url;
+  }
+  return Object.keys(map).length ? map : undefined;
+}
+
+function normalizeAlternateFromLegacy(
+  pageStored: CardPageCopyStored,
+  linksStored: CardLinksStored & { fallbackUrl?: string },
+): CardAlternate | undefined {
+  if (pageStored.alternate?.url && pageStored.alternate?.label) {
+    return pageStored.alternate;
+  }
+  const fallbackUrl = linksStored.fallbackUrl;
+  const fallbackLabel = (pageStored as { fallbackLabel?: string }).fallbackLabel;
+  if (fallbackUrl?.trim() && fallbackLabel?.trim()) {
+    return { url: fallbackUrl, label: fallbackLabel };
+  }
+  return undefined;
+}
 
 export function cardLoadInputToPersisted(input: CardLoadInput): {
   pageCopy: CardPageCopyStored;
@@ -33,25 +111,18 @@ export function cardLoadInputToPersisted(input: CardLoadInput): {
   contact: CardContact;
   copy: CardCopy;
 } {
-  const { pageCopy, links, contact, copy, ...content } = input;
+  const { pageCopy, bookingLinks, contact, copy, ...content } = input;
   return {
     pageCopy: {
       ...pageCopy,
-      plan: content.plan,
       name: content.name,
       role: content.role,
-      aboutTitle: content.aboutTitle,
       about: content.about,
-      servicesTitle: content.servicesTitle,
       services: content.services,
-      linksTitle: content.linksTitle,
-      fallbackLabel: content.fallbackLabel,
+      links: content.links,
+      alternate: content.alternate,
     },
-    links: {
-      bookingUrl: links.bookingUrl,
-      items: links.items,
-      fallbackUrl: content.fallbackUrl,
-    },
+    links: { bookingUrl: bookingLinks.bookingUrl },
     contact,
     copy,
   };
@@ -74,33 +145,32 @@ export function cardRowToRecord(
   parseJson: <T>(label: string, raw: string) => T,
 ): CardRecord {
   const pageStored = parseJson<CardPageCopyStored>("page_copy", row.page_copy_json);
-  const linksStored = parseJson<CardLinksStored>("links", row.links_json);
+  const linksStored = parseJson<
+    CardLinksStored & { items?: { type: string; url: string }[]; fallbackUrl?: string }
+  >("links", row.links_json);
   const contact = parseJson<CardContact>("contact", row.contact_json);
   const copy = parseJson<CardCopy>("copy", row.copy_json);
 
-  const publicLinks = linksStored.items?.length ? linksStored.items : undefined;
+  const about = normalizeAboutFromLegacy(pageStored);
+  const services = normalizeServicesFromLegacy(pageStored);
+  const links = normalizeLinksFromLegacy(pageStored, linksStored);
+  const alternate = normalizeAlternateFromLegacy(pageStored, linksStored);
 
   return {
     id: row.id,
     slug: row.slug,
     variant: normalizeBrandVariant(row.variant),
-    plan: pageStored.plan ?? "free",
     displayName: row.display_name,
     email: row.email,
     photoKey: row.photo_key,
     name: pageStored.name ?? row.display_name,
     role: pageStored.role,
-    aboutTitle: pageStored.aboutTitle,
-    about: pageStored.about,
-    servicesTitle: pageStored.servicesTitle,
-    services: pageStored.services,
-    linksTitle: pageStored.linksTitle,
-    publicLinks,
-    fallbackUrl: linksStored.fallbackUrl,
-    fallbackLabel: pageStored.fallbackLabel,
-    links: {
-      bookingUrl: linksStored.bookingUrl,
-      items: linksStored.items ?? [],
+    about,
+    services,
+    links,
+    alternate,
+    bookingLinks: {
+      bookingUrl: linksStored.bookingUrl ?? alternate?.url ?? "",
     },
     pageCopy: {
       pageTitle: pageStored.pageTitle,
@@ -124,26 +194,25 @@ export function cardLoadInputFromPersisted(
   contact: CardContact,
   copy: CardCopy,
 ): CardLoadInput {
+  const about = normalizeAboutFromLegacy(pageStored);
+  const services = normalizeServicesFromLegacy(pageStored);
+  const links = normalizeLinksFromLegacy(pageStored, linksStored);
+  const alternate = normalizeAlternateFromLegacy(pageStored, linksStored);
+
   return {
     slug,
     variant,
-    plan: pageStored.plan ?? "free",
     displayName,
     email,
     photoKey,
     name: pageStored.name,
     role: pageStored.role,
-    aboutTitle: pageStored.aboutTitle,
-    about: pageStored.about,
-    servicesTitle: pageStored.servicesTitle,
-    services: pageStored.services,
-    linksTitle: pageStored.linksTitle,
-    publicLinks: linksStored.items,
-    fallbackUrl: linksStored.fallbackUrl,
-    fallbackLabel: pageStored.fallbackLabel,
-    links: {
-      bookingUrl: linksStored.bookingUrl,
-      items: linksStored.items ?? [],
+    about,
+    services,
+    links,
+    alternate,
+    bookingLinks: {
+      bookingUrl: linksStored.bookingUrl ?? alternate?.url ?? "",
     },
     pageCopy: {
       pageTitle: pageStored.pageTitle,

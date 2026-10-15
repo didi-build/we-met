@@ -29,7 +29,7 @@ const card: CardEmailSnapshot = {
     vcardNote: "note",
     urls: [],
   },
-  links: { bookingUrl: "https://example.com/book", items: [] },
+  links: { bookingUrl: "https://example.com/book" },
   pageCopy: { emailFromName: "Demo at Example" },
   copy: {
     followUpEmail: {

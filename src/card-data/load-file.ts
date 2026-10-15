@@ -11,23 +11,20 @@ import { registerBuiltInLeadSinkKinds } from "@/card-data/register-lead-sink-kin
 import { parseCardVariantForLoad } from "@/card-data/normalize-variant";
 import { assertValidSlug, isValidSlug } from "@/card-data/slug";
 import type {
+  BrandVariant,
+  CardAbout,
+  CardAlternate,
   CardCopy,
   CardLoadInput,
   CardPlan,
-  CardPublicLink,
-  CardPublicLinkType,
-  CardService,
+  CardPublicLinksMap,
+  CardServices,
   CardsLoadFile,
   ContactUrl,
   LeadSinkLoadInput,
 } from "@/card-data/types";
 
-const LINK_TYPES = new Set<CardPublicLinkType>([
-  "website",
-  "linkedin",
-  "github",
-  "instagram",
-]);
+const LINK_KEYS = ["website", "linkedin", "github", "instagram"] as const;
 
 const PLANS = new Set<CardPlan>(["free", "pro"]);
 
@@ -187,66 +184,111 @@ function parseStringArray(
   );
 }
 
-function parseServices(raw: unknown): CardService[] | undefined {
+function parseAbout(raw: unknown): CardAbout | undefined {
   if (raw === undefined || raw === null) {
     return undefined;
   }
-  if (!Array.isArray(raw)) {
-    throw new Error("services must be an array");
+  if (!isRecord(raw)) {
+    throw new Error("about must be an object");
   }
-  if (raw.length > LIMITS.services) {
-    throw new Error(`services exceeds max length ${LIMITS.services}`);
+  assertAllowedKeys(raw, ["title", "paragraphs"], "about");
+  const paragraphs = parseStringArray(
+    raw.paragraphs,
+    "about.paragraphs",
+    1,
+    LIMITS.aboutParagraphs,
+    LIMITS.aboutParagraph,
+    false,
+  );
+  if (!paragraphs?.length) {
+    return undefined;
   }
-  return raw.map((item, index) => {
+  return {
+    title: requireNonWhitespaceString(raw.title, "about.title", LIMITS.sectionTitle),
+    paragraphs,
+  };
+}
+
+function parseServicesBlock(raw: unknown): CardServices | undefined {
+  if (raw === undefined || raw === null) {
+    return undefined;
+  }
+  if (!isRecord(raw)) {
+    throw new Error("services must be an object");
+  }
+  assertAllowedKeys(raw, ["title", "items"], "services");
+  if (!Array.isArray(raw.items)) {
+    throw new Error("services.items must be an array");
+  }
+  if (raw.items.length > LIMITS.services) {
+    throw new Error(`services.items exceeds max length ${LIMITS.services}`);
+  }
+  const items = raw.items.map((item, index) => {
     if (!isRecord(item)) {
-      throw new Error(`services[${index}] must be an object`);
+      throw new Error(`services.items[${index}] must be an object`);
     }
-    assertAllowedKeys(item, ["label", "description"], `services[${index}]`);
+    assertAllowedKeys(item, ["title", "description"], `services.items[${index}]`);
     return {
-      label: requireNonWhitespaceString(
-        item.label,
-        `services[${index}].label`,
+      title: requireNonWhitespaceString(
+        item.title,
+        `services.items[${index}].title`,
         LIMITS.serviceLabel,
       ),
       description: requireNonWhitespaceString(
         item.description,
-        `services[${index}].description`,
+        `services.items[${index}].description`,
         LIMITS.serviceDescription,
       ),
     };
   });
+  if (!items.length) {
+    return undefined;
+  }
+  return {
+    title: requireNonWhitespaceString(raw.title, "services.title", LIMITS.sectionTitle),
+    items,
+  };
 }
 
-function parsePublicLinks(raw: unknown): CardPublicLink[] | undefined {
+function parseLinksMap(raw: unknown): CardPublicLinksMap | undefined {
   if (raw === undefined || raw === null) {
     return undefined;
   }
-  if (!Array.isArray(raw)) {
-    throw new Error("links must be an array");
+  if (!isRecord(raw)) {
+    throw new Error("links must be an object");
   }
-  if (raw.length > LIMITS.links) {
-    throw new Error(`links exceeds max length ${LIMITS.links}`);
+  assertAllowedKeys(raw, LINK_KEYS, "links");
+  const map: CardPublicLinksMap = {};
+  for (const key of LINK_KEYS) {
+    if (raw[key] === undefined) {
+      continue;
+    }
+    map[key] = requireHttpsUrl(
+      requireNonWhitespaceString(raw[key], `links.${key}`, LIMITS.url),
+      `links.${key}`,
+    );
   }
-  return raw.map((item, index) => {
-    if (!isRecord(item)) {
-      throw new Error(`links[${index}] must be an object`);
-    }
-    assertAllowedKeys(item, ["type", "label", "url"], `links[${index}]`);
-    const type = requireNonWhitespaceString(item.type, `links[${index}].type`, 32);
-    if (!LINK_TYPES.has(type as CardPublicLinkType)) {
-      throw new Error(`Invalid link type: ${type}`);
-    }
-    const label = requireNonWhitespaceString(
-      item.label,
-      `links[${index}].label`,
-      LIMITS.linkLabel,
-    );
-    const url = requireHttpsUrl(
-      requireNonWhitespaceString(item.url, `links[${index}].url`, LIMITS.url),
-      `links[${index}].url`,
-    );
-    return { type: type as CardPublicLinkType, label, url };
-  });
+  return Object.keys(map).length ? map : undefined;
+}
+
+function parseAlternate(raw: unknown): CardAlternate | undefined {
+  if (raw === undefined || raw === null) {
+    return undefined;
+  }
+  if (!isRecord(raw)) {
+    throw new Error("alternate must be an object");
+  }
+  assertAllowedKeys(raw, ["url", "label"], "alternate");
+  const url = requireHttpsUrl(
+    requireNonWhitespaceString(raw.url, "alternate.url", LIMITS.url),
+    "alternate.url",
+  );
+  const label = requireNonWhitespaceString(
+    raw.label,
+    "alternate.label",
+    LIMITS.fallbackLabel,
+  );
+  return { url, label };
 }
 
 function parseContactName(raw: unknown): CardLoadInput["contact"]["name"] {
@@ -595,14 +637,10 @@ function parseCard(raw: unknown, seenSinkIds: Set<string>): CardLoadInput {
       "name",
       "role",
       "photoKey",
-      "aboutTitle",
       "about",
-      "servicesTitle",
       "services",
-      "linksTitle",
       "links",
-      "fallbackUrl",
-      "fallbackLabel",
+      "alternate",
       "email",
       "contact",
       "pageCopy",
@@ -613,16 +651,17 @@ function parseCard(raw: unknown, seenSinkIds: Set<string>): CardLoadInput {
   );
   const slug = requireNonWhitespaceString(raw.slug, "slug", 64);
   assertValidSlug(slug);
-  const variantRaw = requireNonWhitespaceString(raw.variant, "variant", 16);
-  const variant = parseCardVariantForLoad(variantRaw);
+  let variant: BrandVariant = "mono";
+  if (raw.variant !== undefined) {
+    const variantRaw = requireNonWhitespaceString(raw.variant, "variant", 16);
+    variant = parseCardVariantForLoad(variantRaw);
+  }
 
-  let plan: CardPlan = "free";
   if (raw.plan !== undefined) {
     const planRaw = requireNonWhitespaceString(raw.plan, "plan", 8);
     if (!PLANS.has(planRaw as CardPlan)) {
       throw new Error(`Invalid plan: ${planRaw}`);
     }
-    plan = planRaw as CardPlan;
   }
 
   const name = requireNonWhitespaceString(raw.name, "name", LIMITS.name);
@@ -647,47 +686,16 @@ function parseCard(raw: unknown, seenSinkIds: Set<string>): CardLoadInput {
               throw new Error("photoKey must be a string or null");
             })();
 
-  const aboutTitle = optionalNonWhitespaceString(
-    raw.aboutTitle,
-    "aboutTitle",
-    LIMITS.sectionTitle,
-  );
-  const about = parseStringArray(
-    raw.about,
-    "about",
-    0,
-    LIMITS.aboutParagraphs,
-    LIMITS.aboutParagraph,
-    false,
-  );
-  const servicesTitle = optionalNonWhitespaceString(
-    raw.servicesTitle,
-    "servicesTitle",
-    LIMITS.sectionTitle,
-  );
-  const services = parseServices(raw.services);
-  const linksTitle = optionalNonWhitespaceString(
-    raw.linksTitle,
-    "linksTitle",
-    LIMITS.sectionTitle,
-  );
-  const publicLinks = parsePublicLinks(raw.links);
-  const fallbackUrl = requireHttpsUrl(
-    requireNonWhitespaceString(raw.fallbackUrl, "fallbackUrl", LIMITS.url),
-    "fallbackUrl",
-  );
-  const fallbackLabel = optionalNonWhitespaceString(
-    raw.fallbackLabel,
-    "fallbackLabel",
-    LIMITS.fallbackLabel,
-  );
+  const about = parseAbout(raw.about);
+  const services = parseServicesBlock(raw.services);
+  const links = parseLinksMap(raw.links);
+  const alternate = parseAlternate(raw.alternate);
 
   const leadSinks = parseLeadSinksField(raw.leadSinks, slug, seenSinkIds);
 
   const input: CardLoadInput = {
     slug,
     variant,
-    plan,
     displayName: name,
     email: requireEmail(
       requireNonWhitespaceString(raw.email, "email", LIMITS.email),
@@ -696,17 +704,12 @@ function parseCard(raw: unknown, seenSinkIds: Set<string>): CardLoadInput {
     photoKey,
     name,
     role,
-    aboutTitle,
     about,
-    servicesTitle,
     services,
-    linksTitle,
-    publicLinks,
-    fallbackUrl,
-    fallbackLabel,
-    links: {
-      bookingUrl: fallbackUrl,
-      items: publicLinks ?? [],
+    links,
+    alternate,
+    bookingLinks: {
+      bookingUrl: alternate?.url ? alternate.url : "",
     },
     pageCopy: parsePageCopy(raw.pageCopy),
     contact: parseContact(raw.contact),

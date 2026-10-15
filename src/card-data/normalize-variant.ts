@@ -1,38 +1,28 @@
-import type { BrandVariant, CardPalette } from "@/card-data/types";
-
-/** Stored in D1 `cards.variant` (CHECK allows only mono and green). */
-const STORABLE_VARIANTS: BrandVariant[] = ["mono", "green"];
-
-/** All generated palette CSS files (including blue for preview/tests). */
-const CARD_PALETTES: CardPalette[] = ["mono", "green", "blue"];
+import type { BrandVariant } from "@/card-data/types";
 
 /**
  * Render-time normalization for values read from D1. Unknown strings (including
- * `blue` if ever present) fall back to mono so the UI never crashes.
+ * `green`) map to mono for the v1 card redesign.
  */
-export function normalizeBrandVariant(raw: string): BrandVariant {
-  if (STORABLE_VARIANTS.includes(raw as BrandVariant)) {
-    return raw as BrandVariant;
-  }
+export function normalizeBrandVariant(_raw: string): BrandVariant {
   return "mono";
 }
 
 /**
- * Load-file validation. `blue` is in generated palette CSS but cannot be stored
- * until `cards.variant` CHECK is widened without rebuilding the table.
+ * Load-file validation. V1 accepts only mono (variant may be omitted).
  */
 export function parseCardVariantForLoad(raw: string): BrandVariant {
-  if (raw === "blue") {
+  if (raw === "mono") {
+    return "mono";
+  }
+  if (raw === "green") {
     throw new Error(
-      'Invalid variant: blue (palette exists in CSS but is not storable in D1 yet; use "mono" or "green")',
+      'Invalid variant: green (v1 public cards are mono only; use "mono" or omit variant)',
     );
   }
-  if (!STORABLE_VARIANTS.includes(raw as BrandVariant)) {
-    throw new Error(`Invalid variant: ${raw} (use "mono" or "green")`);
-  }
-  return raw as BrandVariant;
+  throw new Error(`Invalid variant: ${raw} (use "mono" or omit variant)`);
 }
 
-export function isCardPalette(value: string): value is CardPalette {
-  return CARD_PALETTES.includes(value as CardPalette);
+export function isCardPalette(value: string): value is "mono" {
+  return value === "mono";
 }

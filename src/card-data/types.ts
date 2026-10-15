@@ -1,30 +1,43 @@
 /** Values storable in D1 `cards.variant` (see migrations/0001). */
 export type BrandVariant = "green" | "mono";
 
-/** CSS `data-palette` values (includes blue for generated tokens; not loadable as variant yet). */
-export type CardPalette = "green" | "mono" | "blue";
-
 export type CardPlan = "free" | "pro";
+
+/** @deprecated Legacy footer kinds; not used on the v1 public card. */
+export type FooterLinkKind = "site" | "linkedin" | "github" | "portfolio" | "google";
 
 export type CardPublicLinkType = "website" | "linkedin" | "github" | "instagram";
 
-export type CardPublicLink = {
-  type: CardPublicLinkType;
-  label: string;
-  url: string;
+export type CardPublicLinksMap = {
+  website?: string;
+  linkedin?: string;
+  github?: string;
+  instagram?: string;
 };
 
-export type CardService = {
+export type CardAlternate = {
+  url: string;
   label: string;
+};
+
+export type CardAbout = {
+  title: string;
+  paragraphs: string[];
+};
+
+export type CardServiceItem = {
+  title: string;
   description: string;
 };
 
-/** @deprecated Footer links removed from load file; kept for persisted JSON compatibility. */
-export type FooterLinkKind = "site" | "linkedin" | "github" | "portfolio" | "google";
+export type CardServices = {
+  title: string;
+  items: CardServiceItem[];
+};
 
+/** Email / snapshot pipeline booking URL (derived from alternate when present). */
 export type CardBookingLinks = {
   bookingUrl: string;
-  items: CardPublicLink[];
 };
 
 export type ContactName = {
@@ -111,21 +124,16 @@ export type CardRecord = {
   id: string;
   slug: string;
   variant: BrandVariant;
-  plan: CardPlan;
   displayName: string;
   email: string;
   photoKey: string | null;
   name: string;
   role?: string;
-  aboutTitle?: string;
-  about?: string[];
-  servicesTitle?: string;
-  services?: CardService[];
-  linksTitle?: string;
-  publicLinks?: CardPublicLink[];
-  fallbackUrl?: string;
-  fallbackLabel?: string;
-  links: CardBookingLinks;
+  about?: CardAbout;
+  services?: CardServices;
+  links?: CardPublicLinksMap;
+  alternate?: CardAlternate;
+  bookingLinks: CardBookingLinks;
   pageCopy: CardPageCopy;
   contact: CardContact;
   copy: CardCopy;

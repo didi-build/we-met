@@ -5,21 +5,20 @@ import {
 } from "@/card-data/normalize-variant";
 
 describe("card variant normalization (unit)", () => {
-  it("accepts mono and green at load", () => {
+  it("accepts mono at load", () => {
     expect(parseCardVariantForLoad("mono")).toBe("mono");
-    expect(parseCardVariantForLoad("green")).toBe("green");
   });
 
-  it("rejects blue at load with a clear message", () => {
-    expect(() => parseCardVariantForLoad("blue")).toThrow(/blue.*not storable/i);
+  it("rejects green at load with a clear message", () => {
+    expect(() => parseCardVariantForLoad("green")).toThrow(/mono only/i);
   });
 
   it("rejects unknown variants at load", () => {
     expect(() => parseCardVariantForLoad("purple")).toThrow(/Invalid variant: purple/);
   });
 
-  it("falls back unknown stored values to mono at render", () => {
+  it("always renders mono from stored values", () => {
     expect(normalizeBrandVariant("purple")).toBe("mono");
-    expect(normalizeBrandVariant("blue")).toBe("mono");
+    expect(normalizeBrandVariant("green")).toBe("mono");
   });
 });

@@ -29,18 +29,20 @@ describe("parseCardsLoadFile validation (unit)", () => {
     );
   });
 
-  it("rejects missing fallbackUrl", () => {
-    expectReject((raw) => {
-      const card = (raw.cards as Record<string, unknown>[])[0];
-      delete card.fallbackUrl;
-    }, /fallbackUrl/);
+  it("accepts cards without alternate", () => {
+    const raw = cloneLoadFile();
+    const card = (raw.cards as Record<string, unknown>[])[0];
+    delete card.alternate;
+    const parsed = parseCardsLoadFile(raw);
+    expect(parsed.cards[0].alternate).toBeUndefined();
+    expect(parsed.cards[0].bookingLinks.bookingUrl).toBe("");
   });
 
-  it("rejects blue variant", () => {
+  it("rejects green variant", () => {
     expectReject((raw) => {
       const card = (raw.cards as Record<string, unknown>[])[0];
-      card.variant = "blue";
-    }, /blue.*not storable/i);
+      card.variant = "green";
+    }, /mono only/i);
   });
 
   it("rejects unknown variant", () => {
@@ -56,10 +58,11 @@ describe("parseCardsLoadFile validation (unit)", () => {
     pattern: RegExp;
   }[] = [
     {
-      label: "http fallbackUrl",
+      label: "http alternate url",
       mutate: (raw) => {
         const card = (raw.cards as Record<string, unknown>[])[0];
-        card.fallbackUrl = "http://example.com";
+        const alt = card.alternate as { url: string };
+        alt.url = "http://example.com";
       },
       pattern: /https/,
     },
@@ -67,8 +70,8 @@ describe("parseCardsLoadFile validation (unit)", () => {
       label: "http public link url",
       mutate: (raw) => {
         const card = (raw.cards as Record<string, unknown>[])[0];
-        const links = card.links as { url: string }[];
-        links[0].url = "http://x.com";
+        const links = card.links as { website: string };
+        links.website = "http://x.com";
       },
       pattern: /https/,
     },
@@ -81,35 +84,11 @@ describe("parseCardsLoadFile validation (unit)", () => {
       pattern: /https/,
     },
     {
-      label: "unknown link type",
+      label: "unknown key in links object",
       mutate: (raw) => {
         const card = (raw.cards as Record<string, unknown>[])[0];
-        const links = card.links as { type: string }[];
-        links[0].type = "twitter";
-      },
-      pattern: /Invalid link type/,
-    },
-    {
-      label: "too many public links",
-      mutate: (raw) => {
-        const card = (raw.cards as Record<string, unknown>[])[0];
-        const links = card.links as unknown[];
-        while (links.length <= 8) {
-          links.push({
-            type: "website",
-            label: "Site",
-            url: "https://example.com/x",
-          });
-        }
-      },
-      pattern: /links exceeds max length/,
-    },
-    {
-      label: "unknown key in links item",
-      mutate: (raw) => {
-        const card = (raw.cards as Record<string, unknown>[])[0];
-        const links = card.links as Record<string, unknown>[];
-        links[0].extra = true;
+        const links = card.links as Record<string, unknown>;
+        links.twitter = "https://example.com";
       },
       pattern: /Unknown key/,
     },
@@ -175,12 +154,12 @@ describe("parseCardsLoadFile validation (unit)", () => {
       label: "too many about paragraphs",
       mutate: (raw) => {
         const card = (raw.cards as Record<string, unknown>[])[0];
-        const about = card.about as string[];
-        while (about.length <= 4) {
-          about.push("Another paragraph.");
+        const about = card.about as { paragraphs: string[] };
+        while (about.paragraphs.length <= 4) {
+          about.paragraphs.push("Another paragraph.");
         }
       },
-      pattern: /about exceeds max length/,
+      pattern: /about.paragraphs exceeds max length/,
     },
     {
       label: "empty bodyParagraphs",
