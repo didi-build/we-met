@@ -177,6 +177,7 @@ describe("HiPageClient (component)", () => {
 
     expect(focusSpy).toHaveBeenCalled();
     expect(focusSpy.mock.calls.at(-1)?.[0]).toEqual({ preventScroll: true });
+    expect(document.activeElement).toBe(stickyExchange);
 
     rectSpy.mockRestore();
   });

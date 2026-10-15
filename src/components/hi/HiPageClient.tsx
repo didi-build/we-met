@@ -88,6 +88,10 @@ export function HiPageClient({ card, photoUrl, plan = "free" }: HiPageClientProp
 
   const closeSheet = useCallback(() => {
     updateStickyFromScroll();
+    const opener = sheetOpenerRef.current;
+    if (stickyExchangeButtonRef.current && opener === stickyExchangeButtonRef.current) {
+      setStickyVisible(true);
+    }
     setSheetOpen(false);
   }, [updateStickyFromScroll]);
 
