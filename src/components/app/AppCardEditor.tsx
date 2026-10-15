@@ -346,9 +346,7 @@ export function AppCardEditor({
         const next = { ...card, slug: clean };
         setCard(next);
         onSlugInput(clean);
-        if (!slugEditing) {
-          scheduleSave(800);
-        }
+        scheduleSave(800);
         return;
       }
       const next = setPath(card, path, value);
