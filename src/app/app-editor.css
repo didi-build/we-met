@@ -54,12 +54,13 @@ body {
 .ap ol {
   margin: 0;
 }
-.ap a {
+/* Editor chrome only — not the embedded hi-card preview (see globals .hi-card-page link rules). */
+.ap :where(.ap-header, .ap-bar, .ap-dialog) a {
   color: var(--ink);
   text-underline-offset: 3px;
   text-decoration-thickness: 1px;
 }
-.ap a:hover {
+.ap :where(.ap-header, .ap-bar, .ap-dialog) a:hover {
   color: var(--ink-muted);
 }
 .ap a:focus-visible,

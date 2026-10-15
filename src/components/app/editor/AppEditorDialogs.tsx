@@ -257,7 +257,7 @@ export function AppEditorDialogs({
             </h2>
           </div>
           <p className="ap-panel-text" id="sess-text">
-            You were signed out. Your changes are kept on this device and will save once
+            You were signed out. Your changes are kept on this page and will save once
             you&apos;re back.
           </p>
           <div className="ap-panel-actions">
