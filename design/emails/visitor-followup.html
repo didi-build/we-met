@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="x-apple-disable-message-reformatting">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
+<title>Great meeting you, {{visitor_first_name}}</title>
+<style>
+body{margin:0;padding:0;width:100%!important;-webkit-text-size-adjust:100%}
+a{color:#171717}
+@media (max-width:480px){.wm-stack{display:block!important;width:100%!important;padding:0!important}.wm-stack-btn{padding:16px 0 0!important}.wm-foot{padding:24px 23px 0!important}.wm-pad{padding:28px 22px!important}.wm-outer{padding:16px 10px!important}}
+@media (prefers-color-scheme:dark){
+.wm-page{background:#141414!important}.wm-card{background:#1b1b1b!important;border-color:#333333!important}
+.wm-ink,.wm-ink a{color:#f1f1f1!important}.wm-muted,.wm-muted a{color:#aaaaaa!important}
+.wm-promo{background:#2a2a2a!important}.wm-promo-ink{color:#f1f1f1!important}.wm-promo-muted{color:#aaaaaa!important}.wm-btn{background:#f1f1f1!important;border-color:#f1f1f1!important}.wm-btn a{color:#141414!important}
+.wm-test{background:#242424!important;color:#f1f1f1!important;border-color:#333333!important}
+.wm-photo{background:#242424!important}
+}
+[data-ogsc] .wm-ink,[data-ogsc] .wm-ink a{color:#f1f1f1!important}
+[data-ogsc] .wm-muted,[data-ogsc] .wm-muted a{color:#aaaaaa!important}
+[data-ogsc] .wm-promo-ink{color:#f1f1f1!important}
+[data-ogsc] .wm-btn a{color:#141414!important}
+[data-ogsb] .wm-btn{background:#f1f1f1!important}
+</style>
+</head>
+<body class="wm-page" style="margin:0;padding:0;background:#f3f3f3">
+<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#f3f3f3">{{owner_name}} sent you their contact card. Save it to your phone in one tap.&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;</div>
+<table role="presentation" class="wm-page" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f3f3f3">
+<tr><td class="wm-outer" align="center" style="padding:32px 16px">
+<!--[if mso]><table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%">
+{{#if test_sink}}
+<tr><td class="wm-test" style="padding:10px 16px;margin:0;border:1px dashed #b3b3b3;border-radius:12px;background:#ebebeb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:13px;line-height:18px;mso-line-height-rule:exactly;color:#171717">Test delivery (sink destination): {{test_sink}}</td></tr>
+<tr><td height="12" style="font-size:0;line-height:0">&nbsp;</td></tr>
+{{/if}}
+<tr><td class="wm-promo wm-pad" bgcolor="#171717" style="padding:28px 40px;background:#171717;border-radius:24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+<td class="wm-stack" valign="middle" style="padding:0 16px 0 0">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+<tr><td style="padding:0 0 6px"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td width="20" valign="middle" style="padding:0 8px 0 0"><img src="{{logo_url}}" width="20" height="20" alt="" style="display:block;width:20px;height:20px;border:0"></td><td class="wm-promo-muted" valign="middle" style="font-size:14px;line-height:20px;mso-line-height-rule:exactly;font-weight:700;color:#b9b9b9">We Met</td></tr></table></td></tr>
+<tr><td class="wm-promo-ink" style="font-size:20px;line-height:26px;mso-line-height-rule:exactly;font-weight:600;letter-spacing:-0.3px;color:#fafafa">Get your own card for free</td></tr>
+</table>
+</td>
+<td class="wm-stack wm-stack-btn" align="right" valign="middle" style="white-space:nowrap">
+<table role="presentation" align="right" cellpadding="0" cellspacing="0" border="0"><tr>
+<td class="wm-btn" bgcolor="#fafafa" style="background:#fafafa;border:1px solid #fafafa;border-radius:999px;mso-padding-alt:12px 24px">
+<a href="https://we-met.link" style="display:inline-block;padding:12px 24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:16px;line-height:20px;mso-line-height-rule:exactly;font-weight:600;color:#171717;text-decoration:none;border-radius:999px">Get started</a>
+</td></tr></table>
+</td>
+</tr></table>
+</td></tr>
+</table>
+</td></tr>
+<tr><td height="16" style="font-size:0;line-height:0">&nbsp;</td></tr>
+<tr><td class="wm-card wm-pad" style="padding:40px 40px 36px;background:#fdfdfd;border:1px solid #dfdfdf;border-radius:24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+<tr><td class="wm-ink" style="font-size:17px;line-height:26px;mso-line-height-rule:exactly;color:#171717;padding:0 0 16px">Hi {{visitor_first_name}},</td></tr>
+<tr><td class="wm-ink" style="font-size:17px;line-height:26px;mso-line-height-rule:exactly;color:#171717;padding:0 0 16px">Great meeting you, and thanks for sharing your details with me.</td></tr>
+<tr><td class="wm-ink" style="font-size:17px;line-height:26px;mso-line-height-rule:exactly;color:#171717;padding:0 0 32px">My contact card is attached to this email, so you can save it to your phone in one tap.</td></tr>
+<tr><td style="border-top:1px solid #dfdfdf;padding:24px 0 0;font-size:0;line-height:0" class="wm-card">&nbsp;</td></tr>
+<tr><td>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+{{#if owner_photo_url}}
+<td width="48" valign="middle" style="padding:0 14px 0 0"><img class="wm-photo" src="{{owner_photo_url}}" width="48" height="48" alt="" style="display:block;width:48px;height:48px;border-radius:24px;background:#f0f0f0;border:0"></td>
+{{/if}}
+<td valign="middle" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif">
+<div class="wm-ink" style="font-size:16px;line-height:22px;mso-line-height-rule:exactly;font-weight:600;color:#171717">{{owner_name}}</div>
+{{#if owner_role}}<div class="wm-muted" style="font-size:14px;line-height:20px;mso-line-height-rule:exactly;color:#555555">{{owner_role}}</div>{{/if}}
+</td>
+</tr></table>
+</td></tr>
+</table>
+</td></tr>
+<tr><td class="wm-muted wm-foot" align="left" style="padding:24px 41px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:13px;line-height:20px;mso-line-height-rule:exactly;color:#555555">You're getting this because you exchanged contact info at <a href="{{card_url}}" style="color:#555555;text-decoration:underline">{{card_url_display}}</a>.<br><br>This is the only email you'll get from this exchange unless you reply.</td></tr>
+<tr><td class="wm-muted" align="center" style="padding:12px 16px 8px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:13px;line-height:20px;mso-line-height-rule:exactly;color:#555555">Sent with We Met &middot; <a href="https://we-met.link" style="color:#555555;text-decoration:underline">Get your own card</a></td></tr>
+</table>
+<!--[if mso]></td></tr></table><![endif]-->
+</td></tr>
+</table>
+</body>
+</html>

@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<title>We Met emails</title>
+<link rel="stylesheet" href="_ds/didi-build-design-system-b51779c8-dac0-4a13-a587-18bef5d1ac59/tokens/fonts.css">
+<style>html,body{margin:0;padding:0;background:#e9e9e9}a{color:#171717}a:hover{color:#555555}</style>
+</helmet>
+<div style="padding:64px;font-family:Figtree,-apple-system,sans-serif;color:#171717;display:flex;flex-direction:column;gap:72px">
+  <div style="display:flex;flex-direction:column;gap:8px">
+    <h1 style="margin:0;font-size:32px;font-weight:600;letter-spacing:-0.02em">We Met emails</h1>
+    <p style="margin:0;max-width:70ch;font-size:16px;line-height:1.55;color:#555555">Live renders of the send-ready templates in emails/, filled with sample values. Dark previews force the templates' prefers-color-scheme rules, which is how Apple Mail and iOS Mail render them.</p>
+  </div>
+
+  <sc-for list="{{ emails }}" as="e" hint-placeholder-count="3">
+    <section id="{{ e.id }}" data-screen-label="{{ e.title }}" style="display:flex;flex-direction:column;gap:24px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <span style="padding:4px 12px;border-radius:999px;background:#171717;color:#fafafa;font-size:15px;font-weight:600">{{ e.id }}</span>
+        <h2 style="margin:0;font-size:24px;font-weight:600;letter-spacing:-0.02em">{{ e.title }}</h2>
+        <span style="font-size:14px;color:#555555">{{ e.file }}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:6px 16px;max-width:760px;padding:18px 22px;border-radius:16px;background:#fdfdfd;border:1px solid #dfdfdf;font-size:15px;line-height:1.45">
+        <span style="color:#555555">Subject</span><span style="font-weight:600">{{ e.subject }}</span>
+        <span style="color:#555555">From</span><span>{{ e.from }}</span>
+        <span style="color:#555555">To</span><span>{{ e.to }}</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;align-items:flex-start;gap:32px">
+        <sc-for list="{{ e.frames }}" as="f" hint-placeholder-count="4">
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <span style="font-size:14px;font-weight:600">{{ f.label }}</span>
+            <iframe srcdoc="{{ f.html }}" title="{{ f.label }}" ref="{{ fitRef }}" style="display:block;width:{{ f.w }};height:600px;border:0;border-radius:12px;background:{{ f.bg }}"></iframe>
+          </div>
+        </sc-for>
+        <div style="display:flex;flex-direction:column;gap:10px;width:420px">
+          <span style="font-size:14px;font-weight:600">Plain-text version</span>
+          <pre style="margin:0;padding:20px 22px;border-radius:12px;background:#fdfdfd;border:1px solid #dfdfdf;font:13px/1.6 'JetBrains Mono',ui-monospace,Menlo,monospace;white-space:pre-wrap;word-break:break-word">{{ e.text }}</pre>
+        </div>
+      </div>
+    </section>
+  </sc-for>
+
+  <section id="spec" data-screen-label="Spec" style="display:flex;flex-wrap:wrap;gap:24px">
+    <div style="flex:1 1 420px;max-width:560px;display:flex;flex-direction:column;gap:14px;padding:28px;border-radius:24px;background:#fdfdfd;border:1px solid #dfdfdf">
+      <h2 style="margin:0;font-size:20px;font-weight:600">Colors (hex, from the mono palette)</h2>
+      <sc-for list="{{ colors }}" as="c" hint-placeholder-count="9">
+        <div style="display:grid;grid-template-columns:1fr 104px 104px;align-items:center;gap:12px;font-size:14px">
+          <span>{{ c.role }}</span>
+          <span style="display:flex;align-items:center;gap:8px"><span style="width:18px;height:18px;border-radius:6px;border:1px solid #cfcfcf;background:{{ c.light }}"></span><code>{{ c.light }}</code></span>
+          <span style="display:flex;align-items:center;gap:8px"><span style="width:18px;height:18px;border-radius:6px;border:1px solid #cfcfcf;background:{{ c.dark }}"></span><code>{{ c.dark }}</code></span>
+        </div>
+      </sc-for>
+      <p style="margin:6px 0 0;font-size:13px;line-height:1.5;color:#555555">Columns: light, dark. Ink on card is about 17.5:1 light and 15:1 dark; muted on card about 7.3:1 and 7.4:1; banner text on banner fill about 17:1 light and 13:1 dark; promo button text about 17:1 in both.</p>
+    </div>
+    <div style="flex:1 1 420px;max-width:560px;display:flex;flex-direction:column;gap:12px;padding:28px;border-radius:24px;background:#fdfdfd;border:1px solid #dfdfdf;font-size:15px;line-height:1.55">
+      <h2 style="margin:0;font-size:20px;font-weight:600">Type</h2>
+      <p style="margin:0">-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif. Figtree is not used in email. Sizes: 28/34 lead name (24/30 on phones), 18/26 lead email, 17/26 body, 16/20 button, 15/22 rows, 13/20 footer.</p>
+      <h2 style="margin:12px 0 0;font-size:20px;font-weight:600">Not safe in email</h2>
+      <sc-for list="{{ unsafe }}" as="u" hint-placeholder-count="6"><p style="margin:0">{{ u }}</p></sc-for>
+    </div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;testMode&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;State&quot;},&quot;ownerPhoto&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Visitor email&quot;},&quot;ownerRole&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Visitor email&quot;},&quot;leadPhone&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Lead emails&quot;},&quot;leadNote&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Lead emails&quot;}}">
+class Component extends DCLogic {
+  state = { src: null };
+  componentDidMount() {
+    const names = ['visitor-followup', 'owner-new-lead', 'owner-details-update'];
+    Promise.all(names.flatMap((n) => ['html', 'txt'].map((x) => fetch('emails/' + n + '.' + x).then((r) => r.text()))))
+      .then((a) => { const src = {}; names.forEach((n, i) => { src[n] = { html: a[i * 2], txt: a[i * 2 + 1] }; }); this.setState({ src }); })
+      .catch((e) => console.warn('[emails] load failed', e));
+  }
+  fitRef = (el) => {
+    if (!el || el._fit) return;
+    el._fit = true;
+    const fit = () => {
+      if (!el.isConnected) return clearInterval(el._fitT);
+      try {
+        const d = el.contentDocument, b = d && d.body;
+        const h = b ? Math.ceil(Math.max(b.scrollHeight, b.offsetHeight)) : 0;
+        if (h > 0 && Math.abs(el.offsetHeight - h) > 1) el.style.height = h + 'px';
+      } catch (e) {}
+    };
+    el.addEventListener('load', fit);
+    el._fitT = setInterval(fit, 500);
+  };
+  render(t, data, html) {
+    const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    let out = t, prev;
+    do { prev = out; out = out.replace(/\{\{#if (\w+)\}\}((?:(?!\{\{#if)[\s\S])*?)\{\{\/if\}\}/, (m, k, body) => { const p = body.split('{{else}}'); return data[k] ? p[0] : (p[1] || ''); }); } while (out !== prev);
+    return out.replace(/\{\{(\w+)\}\}/g, (m, k) => (data[k] == null ? '' : html ? esc(data[k]) : String(data[k])));
+  }
+  frames(t, data) {
+    const dark = t.replace('@media (prefers-color-scheme:dark)', '@media all');
+    const html = (s) => this.render(s, data, true);
+    return [
+      { label: '390 · light', w: '390px', bg: '#f3f3f3', html: html(t) },
+      { label: '390 · dark', w: '390px', bg: '#141414', html: html(dark) },
+      { label: '600 · light', w: '640px', bg: '#f3f3f3', html: html(t) },
+      { label: '600 · dark', w: '640px', bg: '#141414', html: html(dark) }
+    ];
+  }
+  renderVals() {
+    const src = this.state.src, test = !!this.props.testMode;
+    const sink = test ? 'sink@we-met.test' : '';
+    const pre = test ? '[we-met test → sink@we-met.test] ' : '';
+    const owner = { owner_name: 'Didi Shoukralla', owner_role: this.props.ownerRole === false ? '' : 'Software Engineer and Technical Advisor', owner_photo_url: this.props.ownerPhoto === false ? '' : 'assets/didi.png', logo_url: 'emails/assets/wemet-mark-light-96.png', card_url: 'https://we-met.link/hi/didi', card_url_display: 'we-met.link/hi/didi' };
+    const lead = { lead_name: 'Sam Rivera', lead_first_name: 'Sam', lead_email: 'sam@studio.co', lead_phone: this.props.leadPhone === false ? '' : '+1 416 555 0134', lead_phone_tel: '+14165550134', received_at: 'Oct 15, 2026, 1:25 a.m. (America/Toronto)' };
+    const upd = { job_title: 'Product designer', company: 'Studio Co', note: this.props.leadNote === false ? '' : 'We met at the founders breakfast. Keen to talk about getting my app ready for launch.' };
+    const from = 'Didi Shoukralla at We Met <hello@we-met.link>';
+    const defs = [
+      { id: '1', title: 'Visitor follow-up', file: 'emails/visitor-followup.html', key: 'visitor-followup', subject: pre + 'Great meeting you, Sam', to: 'Sam Rivera <sam@studio.co>', data: Object.assign({ visitor_first_name: 'Sam', test_sink: sink }, owner) },
+      { id: '2a', title: 'Owner: new lead', file: 'emails/owner-new-lead.html', key: 'owner-new-lead', subject: pre + 'New lead added: Sam Rivera', to: 'Didi Shoukralla <owner inbox>', data: Object.assign({ test_sink: sink }, owner, lead) },
+      { id: '2b', title: 'Owner: details update (reply)', file: 'emails/owner-details-update.html', key: 'owner-details-update', subject: pre + 'Re: New lead added: Sam Rivera', to: 'Didi Shoukralla <owner inbox>', data: Object.assign({ test_sink: sink }, owner, lead, upd) }
+    ];
+    const emails = defs.map((d) => {
+      const s = src && src[d.key];
+      return { id: d.id, title: d.title, file: d.file, subject: d.subject, from, to: d.to, frames: s ? this.frames(s.html, d.data) : [], text: s ? this.render(s.txt, d.data, false) : '' };
+    });
+    return {
+      emails, fitRef: this.fitRef,
+      colors: [
+        { role: 'Page background', light: '#f3f3f3', dark: '#141414' },
+        { role: 'Card', light: '#fdfdfd', dark: '#1b1b1b' },
+        { role: 'Panel (note, photo fallback)', light: '#f0f0f0', dark: '#242424' },
+        { role: 'Ink (text, links)', light: '#171717', dark: '#f1f1f1' },
+        { role: 'Muted text', light: '#555555', dark: '#aaaaaa' },
+        { role: 'Lines, card border', light: '#dfdfdf', dark: '#333333' },
+        { role: 'Promo banner fill', light: '#171717', dark: '#2a2a2a' },
+        { role: 'Promo banner text', light: '#fafafa', dark: '#f1f1f1' },
+        { role: 'Promo banner label', light: '#b9b9b9', dark: '#aaaaaa' },
+        { role: 'Promo button fill', light: '#fafafa', dark: '#f1f1f1' },
+        { role: 'Promo button text', light: '#171717', dark: '#141414' },
+        { role: 'Test line fill / border', light: '#ebebeb / #b3b3b3', dark: '#242424 / #333333' }
+      ],
+      unsafe: [
+        'Dark mode is not controllable everywhere. Apple Mail and iOS Mail use the dark rules; Outlook.com uses the [data-ogsc] rules; Gmail apps ignore both and invert colors themselves, so the light design is built to invert cleanly.',
+        'Rounded corners on the card and button are ignored by Outlook for Windows, which shows square corners.',
+        'The owner photo is blocked by default in many clients and needs a hosted https URL. It has empty alt text and nothing depends on it.',
+        'The logo in the visitor banner is a PNG (emails/assets/wemet-mark-light-96.png) that must be hosted at an https URL and passed as logo_url. SVG is stripped by Gmail and Outlook. With images blocked the banner still reads, since the mark is decorative (empty alt).',
+        'Phone numbers and dates can be auto-linked by iOS Mail; format-detection is turned off in the lead emails, but some clients still restyle them.',
+        'Media queries for the 390 px layout are dropped by some Gmail accounts, which then keep the 600 px padding. The layout stays readable either way.'
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>
