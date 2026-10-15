@@ -1,4 +1,14 @@
 import { FollowupEmailError } from "@/email/followup-email-error";
+import { isPlainSingleEmailAddress } from "@/email/plain-email";
+
+/** Non-prod consumer redirect target; never derived from queue fields. */
+export function resolveNonProdTestMailTo(testMailTo: string | undefined): string {
+  const redirect = testMailTo?.trim();
+  if (!redirect) {
+    throw new FollowupEmailError("nonprod_mail_redirect_unset");
+  }
+  return redirect;
+}
 
 export type ResolveEmailRecipientInput = {
   /** Consumer Wrangler var only — never from queue messages. */
@@ -23,14 +33,43 @@ export function resolveEmailRecipient(
     return { mode: "production", to: input.visitorEmail };
   }
 
-  const redirect = input.testMailTo?.trim();
-  if (!redirect) {
-    throw new FollowupEmailError("nonprod_mail_redirect_unset");
-  }
+  const redirect = resolveNonProdTestMailTo(input.testMailTo);
 
   return {
     mode: "nonprod",
     to: redirect,
     visitorEmailForContent: input.visitorEmail,
+  };
+}
+
+export type ResolveSinkEmailRecipientInput = {
+  weMetEnv: string;
+  sinkDestinationEmail: string;
+  testMailTo: string | undefined;
+};
+
+export type ResolveSinkEmailRecipientResult =
+  | { mode: "production"; to: string }
+  | { mode: "nonprod"; to: string; sinkDestinationForContent: string };
+
+/** Sink owner mail: production → `sinkConfig.to`; non-prod → test inbox. */
+export function resolveSinkEmailRecipient(
+  input: ResolveSinkEmailRecipientInput,
+): ResolveSinkEmailRecipientResult {
+  const destination = input.sinkDestinationEmail.trim();
+  if (!isPlainSingleEmailAddress(destination)) {
+    throw new FollowupEmailError("malformed_sink_email_config");
+  }
+
+  if (input.weMetEnv === "production") {
+    return { mode: "production", to: destination };
+  }
+
+  const redirect = resolveNonProdTestMailTo(input.testMailTo);
+
+  return {
+    mode: "nonprod",
+    to: redirect,
+    sinkDestinationForContent: destination,
   };
 }

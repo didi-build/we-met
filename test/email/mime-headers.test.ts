@@ -3,7 +3,9 @@ import {
   encodeEmailSubject,
   formatEmailFromHeader,
   sanitizeEmailHeaderValue,
+  sanitizeRfc5322MessageId,
 } from "@/email/mime-headers";
+import { FollowupEmailError } from "@/email/followup-email-error";
 
 describe("mime headers (unit)", () => {
   it("strips control characters from header values", () => {
@@ -19,6 +21,13 @@ describe("mime headers (unit)", () => {
   it("escapes quotes and backslashes in quoted display names", () => {
     expect(formatEmailFromHeader("sender@example.com", 'Demo "Nick" \\ Co')).toBe(
       '"Demo \\"Nick\\" \\\\ Co" <sender@example.com>',
+    );
+  });
+
+  it("rejects invalid RFC 5322 message ids", () => {
+    expect(() => sanitizeRfc5322MessageId("bad-id")).toThrow(FollowupEmailError);
+    expect(() => sanitizeRfc5322MessageId("bad-id")).toThrowError(
+      expect.objectContaining({ code: "invalid_rfc5322_message_id" }),
     );
   });
 

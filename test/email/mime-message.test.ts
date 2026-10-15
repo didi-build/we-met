@@ -144,6 +144,67 @@ describe("buildRawEmailMessage (unit)", () => {
     expect(bccHeaders).toHaveLength(0);
   });
 
+  it("emits Message-ID, In-Reply-To, and References when provided", () => {
+    const raw = buildRawEmailMessage({
+      from: "hello@we-met.link",
+      to: "owner@example.com",
+      subject: "Re: New lead added: Sam",
+      textPlain: "Body",
+      textHtml: "<p>Body</p>",
+      messageId: "<lead.sink.append@we-met.link>",
+      inReplyTo: "<lead.sink.record@we-met.link>",
+      references: "<lead.sink.record@we-met.link>",
+    });
+    const mime = decodeRawEmailMessage(raw);
+    expect(headerValue(mime, "Message-ID")).toBe("<lead.sink.append@we-met.link>");
+    expect(headerValue(mime, "In-Reply-To")).toBe("<lead.sink.record@we-met.link>");
+    expect(headerValue(mime, "References")).toBe("<lead.sink.record@we-met.link>");
+  });
+
+  it("omits Message-ID headers when not provided (multipart/alternative only)", () => {
+    const raw = buildRawEmailMessage({
+      from: "hello@we-met.link",
+      to: "owner@example.com",
+      subject: "New lead added: Sam",
+      textPlain: "Body",
+      textHtml: "<p>Body</p>",
+    });
+    const mime = decodeRawEmailMessage(raw);
+    expect(headerValue(mime, "Message-ID")).toBeUndefined();
+    expect(headerValue(mime, "In-Reply-To")).toBeUndefined();
+    expect(headerValue(mime, "References")).toBeUndefined();
+  });
+
+  it("omits Message-ID headers when not provided (multipart with attachment)", () => {
+    const raw = buildRawEmailMessage(baseEmail);
+    const mime = decodeRawEmailMessage(raw);
+    expect(headerValue(mime, "Message-ID")).toBeUndefined();
+    expect(headerValue(mime, "In-Reply-To")).toBeUndefined();
+    expect(headerValue(mime, "References")).toBeUndefined();
+  });
+
+  it("emits Message-ID on multipart/mixed when provided", () => {
+    const raw = buildRawEmailMessage({
+      ...baseEmail,
+      messageId: "<lead.sink.record@we-met.link>",
+    });
+    const mime = decodeRawEmailMessage(raw);
+    expect(headerValue(mime, "Message-ID")).toBe("<lead.sink.record@we-met.link>");
+  });
+
+  it("rejects invalid Message-ID values", () => {
+    expect(() =>
+      buildRawEmailMessage({
+        from: "hello@we-met.link",
+        to: "owner@example.com",
+        subject: "Hi",
+        textPlain: "Body",
+        textHtml: "<p>Body</p>",
+        messageId: "not-wrapped",
+      }),
+    ).toThrowError(expect.objectContaining({ code: "invalid_rfc5322_message_id" }));
+  });
+
   it("does not allow header injection via subject, display name, or filename", () => {
     const raw = buildRawEmailMessage({
       ...baseEmail,

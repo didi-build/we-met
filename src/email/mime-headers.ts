@@ -1,3 +1,5 @@
+import { FollowupEmailError } from "@/email/followup-email-error";
+
 const CONTROL_CHAR_PATTERN = /[\u0000-\u001f\u007f]/g;
 
 function isAsciiOnly(value: string): boolean {
@@ -40,6 +42,17 @@ export function formatEmailFromHeader(email: string, displayName?: string): stri
     ? `"${escapeQuotedDisplayName(sanitizedName)}"`
     : `"=?UTF-8?B?${base64EncodeUtf8(sanitizedName)}?="`;
   return `${encodedName} <${sanitizedEmail}>`;
+}
+
+const RFC5322_MESSAGE_ID = /^<[^<>\s\u0000-\u001f\u007f]+>$/;
+
+/** Validate a Message-ID / In-Reply-To / References token. */
+export function sanitizeRfc5322MessageId(value: string): string {
+  const trimmed = value.trim();
+  if (!RFC5322_MESSAGE_ID.test(trimmed)) {
+    throw new FollowupEmailError("invalid_rfc5322_message_id");
+  }
+  return trimmed;
 }
 
 /** Encode Subject per RFC 2047 when non-ASCII characters are present. */

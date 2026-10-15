@@ -1,6 +1,21 @@
 import { describe, expect, it } from "vitest";
 import { FollowupEmailError } from "@/email/followup-email-error";
-import { resolveEmailRecipient } from "@/email/recipient";
+import {
+  resolveEmailRecipient,
+  resolveNonProdTestMailTo,
+  resolveSinkEmailRecipient,
+} from "@/email/recipient";
+
+describe("resolveNonProdTestMailTo (unit)", () => {
+  it("returns trimmed redirect address", () => {
+    expect(resolveNonProdTestMailTo("  inbox@example.com  ")).toBe("inbox@example.com");
+  });
+
+  it("fails closed when unset", () => {
+    expect(() => resolveNonProdTestMailTo(undefined)).toThrow(FollowupEmailError);
+    expect(() => resolveNonProdTestMailTo("")).toThrow(FollowupEmailError);
+  });
+});
 
 describe("resolveEmailRecipient (unit)", () => {
   const cases = [
@@ -73,4 +88,30 @@ describe("resolveEmailRecipient (unit)", () => {
       expect(result).toEqual(row.expect);
     });
   }
+});
+
+describe("resolveSinkEmailRecipient (unit)", () => {
+  it("production sends to sink destination", () => {
+    expect(
+      resolveSinkEmailRecipient({
+        weMetEnv: "production",
+        sinkDestinationEmail: "owner@example.com",
+        testMailTo: undefined,
+      }),
+    ).toEqual({ mode: "production", to: "owner@example.com" });
+  });
+
+  it("preview redirects sink mail to test inbox", () => {
+    expect(
+      resolveSinkEmailRecipient({
+        weMetEnv: "preview",
+        sinkDestinationEmail: "owner@example.com",
+        testMailTo: "test-inbox@example.com",
+      }),
+    ).toEqual({
+      mode: "nonprod",
+      to: "test-inbox@example.com",
+      sinkDestinationForContent: "owner@example.com",
+    });
+  });
 });

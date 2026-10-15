@@ -4,6 +4,19 @@ import { resetGmailTokenCacheForTests } from "@/email/gmail-sender";
 import { generateTestServiceAccount } from "../helpers/gmail-test-service-account";
 import followupEmailConsumer from "../../workers/we-met-followup-email-consumer/index";
 import type { FollowupConsumerEnv } from "@/followup-email-consumer/process-batch";
+import type { D1Database } from "@cloudflare/workers-types";
+
+function createNoopConsumerD1(): D1Database {
+  const stmt = {
+    bind: () => ({
+      run: async () => ({ meta: { changes: 0 } }),
+      first: async () => null,
+    }),
+  };
+  return {
+    prepare: () => stmt,
+  } as unknown as D1Database;
+}
 
 const card: CardEmailSnapshot = {
   slug: "demo",
@@ -125,8 +138,10 @@ describe("follow-up email consumer worker queue (integration)", () => {
       WE_MET_ENV: "preview",
       GMAIL_SENDER: "sender@example.com",
       GMAIL_SERVICE_ACCOUNT_JSON: json,
+      WE_MET_OWNER_FROM_EMAIL: "hello@we-met.link",
       WE_MET_TEST_MAIL_TO: "test-inbox@example.com",
       WE_MET_ASSETS: bucket as never,
+      WE_MET_DB: createNoopConsumerD1(),
     };
 
     await followupEmailConsumer.queue(
@@ -162,6 +177,8 @@ describe("follow-up email consumer worker queue (integration)", () => {
 
     const mime = base64UrlDecodeToString(capturedRaw);
     expect(headerValue(mime, "To")).toBe("test-inbox@example.com");
+    expect(headerValue(mime, "From")).toContain("hello@we-met.link");
+    expect(headerValue(mime, "Reply-To")).toBe("owner@example.com");
     expect(extractPlainTextFromMime(mime)).toContain("visitor@example.com");
     const vcardBody = decodeAllMimeBase64Bodies(mime).find((part) =>
       part.includes("BEGIN:VCARD"),
@@ -182,8 +199,10 @@ describe("follow-up email consumer worker queue (integration)", () => {
       WE_MET_ENV: "preview",
       GMAIL_SENDER: "",
       GMAIL_SERVICE_ACCOUNT_JSON: json,
+      WE_MET_OWNER_FROM_EMAIL: "hello@we-met.link",
       WE_MET_TEST_MAIL_TO: "test-inbox@example.com",
       WE_MET_ASSETS: { get: vi.fn() } as never,
+      WE_MET_DB: createNoopConsumerD1(),
     };
 
     await followupEmailConsumer.queue(

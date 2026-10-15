@@ -11,6 +11,8 @@ import type { VisitorLead } from "@/exchange/types";
 
 const NOW = new Date("2026-10-12T12:00:00.000Z");
 
+const SOURCE_URL = "https://we-met.link/hi/demo";
+
 const lead: VisitorLead = {
   leadId: "lead-1",
   submittedAt: NOW.toISOString(),
@@ -88,6 +90,7 @@ describe("lead delivery dispatch (unit)", () => {
       lead,
       "card-1",
       "demo",
+      SOURCE_URL,
       deps,
     );
 
@@ -103,7 +106,7 @@ describe("lead delivery dispatch (unit)", () => {
 
   it("writes no ledger rows when no sinks are enabled", async () => {
     const deps = createDispatchDeps();
-    await dispatchLeadOnExchange([], lead, "card-1", "demo", deps);
+    await dispatchLeadOnExchange([], lead, "card-1", "demo", SOURCE_URL, deps);
     expect(deps.ledger.rows).toHaveLength(0);
     expect(deps.sinkMessages).toHaveLength(0);
   });
@@ -120,6 +123,7 @@ describe("lead delivery dispatch (unit)", () => {
       lead,
       "card-1",
       "demo",
+      SOURCE_URL,
       deps,
     );
 
@@ -140,6 +144,7 @@ describe("lead delivery dispatch (unit)", () => {
       lead,
       "card-1",
       "demo",
+      SOURCE_URL,
       deps,
     );
 
@@ -158,8 +163,28 @@ describe("lead delivery dispatch (unit)", () => {
     const sinks = [sink("sink-a", "a@example.com")];
     const details = { jobTitle: "CTO", company: "Co", note: "Hi" };
 
-    await dispatchDetailsAppend(sinks, lead, details, "card-1", "demo", deps);
-    await dispatchDetailsAppend(sinks, lead, details, "card-1", "demo", deps);
+    const appendLead = { leadId: lead.leadId, name: lead.name, email: lead.email };
+    const submittedAt = NOW.toISOString();
+    await dispatchDetailsAppend(
+      sinks,
+      appendLead,
+      details,
+      "card-1",
+      "demo",
+      SOURCE_URL,
+      submittedAt,
+      deps,
+    );
+    await dispatchDetailsAppend(
+      sinks,
+      appendLead,
+      details,
+      "card-1",
+      "demo",
+      SOURCE_URL,
+      submittedAt,
+      deps,
+    );
 
     expect(deps.sinkMessages).toHaveLength(1);
     expect(deps.ledger.rows.filter((r) => r.phase === "append")).toHaveLength(1);
@@ -170,9 +195,29 @@ describe("lead delivery dispatch (unit)", () => {
     const sinks = [sink("sink-a", "a@example.com")];
     const details = { jobTitle: null, company: null, note: null };
 
-    await dispatchDetailsAppend(sinks, lead, details, "card-1", "demo", deps);
+    const appendLead = { leadId: lead.leadId, name: lead.name, email: lead.email };
+    const submittedAt = NOW.toISOString();
+    await dispatchDetailsAppend(
+      sinks,
+      appendLead,
+      details,
+      "card-1",
+      "demo",
+      SOURCE_URL,
+      submittedAt,
+      deps,
+    );
     const failing = createDispatchDeps({ ledger: deps.ledger });
-    await dispatchDetailsAppend(sinks, lead, details, "card-1", "demo", failing);
+    await dispatchDetailsAppend(
+      sinks,
+      appendLead,
+      details,
+      "card-1",
+      "demo",
+      SOURCE_URL,
+      submittedAt,
+      failing,
+    );
 
     expect(deps.sinkMessages).toHaveLength(0);
     expect(failing.sinkMessages).toHaveLength(0);

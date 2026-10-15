@@ -3,7 +3,22 @@ import {
   encodeEmailSubject,
   formatEmailFromHeader,
   sanitizeEmailHeaderValue,
+  sanitizeRfc5322MessageId,
 } from "@/email/mime-headers";
+
+function optionalMessageIdHeaders(email: OutboundEmail): string[] {
+  const lines: string[] = [];
+  if (email.messageId) {
+    lines.push(`Message-ID: ${sanitizeRfc5322MessageId(email.messageId)}`);
+  }
+  if (email.inReplyTo) {
+    lines.push(`In-Reply-To: ${sanitizeRfc5322MessageId(email.inReplyTo)}`);
+  }
+  if (email.references) {
+    lines.push(`References: ${sanitizeRfc5322MessageId(email.references)}`);
+  }
+  return lines;
+}
 
 function base64UrlEncode(data: Uint8Array | string): string {
   const bytes = typeof data === "string" ? new TextEncoder().encode(data) : data;
@@ -96,6 +111,7 @@ export function buildRawEmailMessage(email: OutboundEmail): string {
       ...(email.replyTo
         ? [`Reply-To: ${sanitizeEmailHeaderValue(email.replyTo)}`]
         : []),
+      ...optionalMessageIdHeaders(email),
       `Subject: ${subject}`,
       "MIME-Version: 1.0",
       `Content-Type: multipart/alternative; boundary="${boundary}"`,
@@ -127,6 +143,7 @@ export function buildRawEmailMessage(email: OutboundEmail): string {
     `From: ${from}`,
     `To: ${to}`,
     ...(email.replyTo ? [`Reply-To: ${sanitizeEmailHeaderValue(email.replyTo)}`] : []),
+    ...optionalMessageIdHeaders(email),
     `Subject: ${subject}`,
     "MIME-Version: 1.0",
     `Content-Type: multipart/mixed; boundary="${mixedBoundary}"`,

@@ -30,8 +30,8 @@ Use this after changing the mail or consumer path:
    - **Preview:** complete the **real** Turnstile challenge (widget **we-met nonprod**).
 3. Confirm exchange returns **200** and a non-empty signed token; optional details step returns **200**.
 4. Confirm jobs on **`we-met-followup-email-nonprod`**.
-5. Check **`WE_MET_TEST_MAIL_TO`** for redirected **visitor** follow-up mail.
-6. No Linear verification in step 1.
+5. Check **`WE_MET_TEST_MAIL_TO`** for redirected **visitor** follow-up mail and **email** sink owner notifications (subject/body label the sink destination in non-prod).
+6. No Linear verification until the Linear sink kind ships.
 
 ## Deliberate end-to-end test (with Linear sink, step 2+)
 

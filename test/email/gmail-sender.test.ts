@@ -203,6 +203,72 @@ describe("gmail sender (unit)", () => {
     expect(fetchFn).toHaveBeenCalledTimes(1);
   });
 
+  it("includes threadId in send body and returns Gmail ids from response", async () => {
+    const { json } = await generateTestServiceAccount();
+    const fetchFn = vi.fn(async (url, init) => {
+      if (String(url).includes("oauth2.googleapis.com")) {
+        return new Response(
+          JSON.stringify({ access_token: "send-token", expires_in: 3600 }),
+          { status: 200 },
+        );
+      }
+      const body = JSON.parse(init?.body as string) as {
+        raw?: string;
+        threadId?: string;
+      };
+      expect(body.threadId).toBe("existing-thread");
+      expect(typeof body.raw).toBe("string");
+      return new Response(
+        JSON.stringify({ id: "gmail-msg-99", threadId: "gmail-thread-99" }),
+        { status: 200 },
+      );
+    });
+
+    const sender = createGmailEmailSender({
+      serviceAccountJson: json,
+      senderEmail: "owner@example.com",
+      fetchFn,
+    });
+
+    const result = await sender.send({
+      from: "owner@example.com",
+      to: "visitor@example.com",
+      subject: "Hi",
+      textPlain: "plain",
+      textHtml: "<p>html</p>",
+      threadId: "existing-thread",
+    });
+    expect(result).toEqual({ messageId: "gmail-msg-99", threadId: "gmail-thread-99" });
+  });
+
+  it("returns null ids on send 200 with unparseable body", async () => {
+    const { json } = await generateTestServiceAccount();
+    const fetchFn = vi.fn(async (url) => {
+      if (String(url).includes("oauth2.googleapis.com")) {
+        return new Response(
+          JSON.stringify({ access_token: "send-token", expires_in: 3600 }),
+          { status: 200 },
+        );
+      }
+      return new Response("not-json", { status: 200 });
+    });
+
+    const sender = createGmailEmailSender({
+      serviceAccountJson: json,
+      senderEmail: "owner@example.com",
+      fetchFn,
+    });
+
+    const result = await sender.send({
+      from: "owner@example.com",
+      to: "visitor@example.com",
+      subject: "Hi",
+      textPlain: "plain",
+      textHtml: "<p>html</p>",
+    });
+    expect(result).toEqual({ messageId: null, threadId: null });
+  });
+
   it("maps network failures to gmail_network_error", async () => {
     const { json } = await generateTestServiceAccount();
     const fetchFn = vi.fn(async () => {
