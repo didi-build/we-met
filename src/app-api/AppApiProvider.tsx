@@ -2,7 +2,7 @@
 
 import type { AppApi } from "@/app-api/app-api";
 import { createContext, useContext, useMemo } from "react";
-import { createStubApi } from "@/app-api/stub-api";
+import { createRuntimeAppApi } from "@/app-api/runtime-api";
 
 const AppApiContext = createContext<AppApi | null>(null);
 
@@ -15,7 +15,8 @@ export function AppApiProvider({
 }) {
   const value = useMemo(
     () =>
-      api ?? createStubApi(typeof window !== "undefined" ? window.location.search : ""),
+      api ??
+      createRuntimeAppApi(typeof window !== "undefined" ? window.location.search : ""),
     [api],
   );
   return <AppApiContext.Provider value={value}>{children}</AppApiContext.Provider>;

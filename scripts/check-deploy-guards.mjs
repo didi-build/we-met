@@ -20,6 +20,7 @@ import {
 import {
   NONPROD_RESOURCE_MARKERS,
   PRODUCTION_RESOURCE_MARKERS,
+  RATE_LIMIT_BINDINGS,
 } from "./lib/wrangler-placeholders.mjs";
 
 function usage() {
@@ -112,11 +113,57 @@ function assertEveryPreviewQueue(previews, predicate, message) {
   }
 }
 
-function assertEveryPreviewRateLimit(previews, predicate, message) {
-  const rows = previews?.ratelimits ?? [];
-  if (rows.length === 0) fail("previews.ratelimits is required");
-  for (const row of rows) {
-    if (!predicate(row)) fail(message);
+function expectedRateLimitNamespace(bindingName, isProduction) {
+  const markers = isProduction ? PRODUCTION_RESOURCE_MARKERS : NONPROD_RESOURCE_MARKERS;
+  switch (bindingName) {
+    case RATE_LIMIT_BINDINGS.exchange:
+      return markers.exchangeRateLimiterNamespaceId;
+    case RATE_LIMIT_BINDINGS.auth:
+      return markers.authRateLimiterNamespaceId;
+    case RATE_LIMIT_BINDINGS.app:
+      return markers.appRateLimiterNamespaceId;
+    default:
+      return null;
+  }
+}
+
+function checkRateLimitBindings(ratelimits, isProduction) {
+  const rows = ratelimits ?? [];
+  const required = [
+    RATE_LIMIT_BINDINGS.exchange,
+    RATE_LIMIT_BINDINGS.auth,
+    RATE_LIMIT_BINDINGS.app,
+  ];
+  if (rows.length < required.length) {
+    fail(
+      `${isProduction ? "production" : "preview"} ratelimits must include exchange, auth, and app bindings`,
+    );
+  }
+  for (const bindingName of required) {
+    const row = rows.find((entry) => entry.name === bindingName);
+    if (!row) {
+      fail(
+        `${isProduction ? "production" : "preview"} missing rate limit binding ${bindingName}`,
+      );
+    }
+    const expected = expectedRateLimitNamespace(bindingName, isProduction);
+    if (row.namespace_id !== expected) {
+      fail(
+        `${isProduction ? "production" : "preview"} rate limiter namespace for ${bindingName}`,
+      );
+    }
+  }
+  const productionMarkers = [
+    PRODUCTION_RESOURCE_MARKERS.exchangeRateLimiterNamespaceId,
+    PRODUCTION_RESOURCE_MARKERS.authRateLimiterNamespaceId,
+    PRODUCTION_RESOURCE_MARKERS.appRateLimiterNamespaceId,
+  ];
+  if (!isProduction) {
+    for (const row of rows) {
+      if (productionMarkers.includes(row.namespace_id)) {
+        fail("preview rate limiter namespace must not use production namespace ids");
+      }
+    }
   }
 }
 
@@ -164,7 +211,9 @@ function checkPreviewBlock(previews) {
     PRODUCTION_RESOURCE_MARKERS.d1Name,
     PRODUCTION_RESOURCE_MARKERS.r2Bucket,
     PRODUCTION_RESOURCE_MARKERS.queue,
-    PRODUCTION_RESOURCE_MARKERS.rateLimiterNamespaceId,
+    PRODUCTION_RESOURCE_MARKERS.exchangeRateLimiterNamespaceId,
+    PRODUCTION_RESOURCE_MARKERS.authRateLimiterNamespaceId,
+    PRODUCTION_RESOURCE_MARKERS.appRateLimiterNamespaceId,
   ];
   for (const marker of productionMarkers) {
     if (strings.includes(marker)) {
@@ -200,11 +249,7 @@ function checkPreviewBlock(previews) {
     (row) => row.queue === NONPROD_RESOURCE_MARKERS.queue,
     "preview queue",
   );
-  assertEveryPreviewRateLimit(
-    previews,
-    (row) => row.namespace_id === NONPROD_RESOURCE_MARKERS.rateLimiterNamespaceId,
-    "preview rate limiter namespace",
-  );
+  checkRateLimitBindings(previews?.ratelimits, false);
 }
 
 const ALLOWED_CONSUMER_VAR_KEYS = new Set(["WE_MET_ENV", "WE_MET_BASE_URL"]);
@@ -386,11 +431,7 @@ function checkProductionBlock(config) {
       fail("production queue");
     }
   }
-  for (const row of rlRows) {
-    if (row.namespace_id !== PRODUCTION_RESOURCE_MARKERS.rateLimiterNamespaceId) {
-      fail("production rate limiter namespace");
-    }
-  }
+  checkRateLimitBindings(rlRows, true);
 }
 
 function main() {

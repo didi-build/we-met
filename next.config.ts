@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {};
+const nextConfig: NextConfig = {
+  env: {
+    NEXT_PUBLIC_WE_MET_ENV: process.env.WE_MET_ENV ?? "production",
+  },
+};
 
 export default nextConfig;
 

@@ -10,7 +10,9 @@ export const PRODUCTION_RESOURCE_MARKERS = {
   d1Name: "we-met-db",
   r2Bucket: "we-met-assets",
   queue: "we-met-followup-email",
-  rateLimiterNamespaceId: "2002",
+  exchangeRateLimiterNamespaceId: "2002",
+  authRateLimiterNamespaceId: "2004",
+  appRateLimiterNamespaceId: "2006",
   workerName: "we-met",
 };
 
@@ -18,6 +20,14 @@ export const NONPROD_RESOURCE_MARKERS = {
   d1Name: "we-met-db-nonprod",
   r2Bucket: "we-met-assets-nonprod",
   queue: "we-met-followup-email-nonprod",
-  rateLimiterNamespaceId: "2001",
+  exchangeRateLimiterNamespaceId: "2001",
+  authRateLimiterNamespaceId: "2003",
+  appRateLimiterNamespaceId: "2005",
   consumerWorkerName: "we-met-followup-email-consumer-nonprod",
+};
+
+export const RATE_LIMIT_BINDINGS = {
+  exchange: "WE_MET_EXCHANGE_RATE_LIMITER",
+  auth: "WE_MET_AUTH_RATE_LIMITER",
+  app: "WE_MET_APP_RATE_LIMITER",
 };

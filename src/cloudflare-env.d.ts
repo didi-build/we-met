@@ -13,6 +13,17 @@ declare global {
     WE_MET_EXCHANGE_RATE_LIMITER?: {
       limit(options: { key: string }): Promise<{ success: boolean }>;
     };
+    WE_MET_AUTH_RATE_LIMITER?: {
+      limit(options: { key: string }): Promise<{ success: boolean }>;
+    };
+    WE_MET_APP_RATE_LIMITER?: {
+      limit(options: { key: string }): Promise<{ success: boolean }>;
+    };
+    GOOGLE_CLIENT_ID?: string;
+    GOOGLE_CLIENT_SECRET?: string;
+    WE_MET_APP_ORIGIN?: string;
+    WE_MET_PREVIEW_LOGIN_SECRET?: string;
+    WE_MET_PREVIEW_LOGIN_EMAIL?: string;
   }
 }
 
