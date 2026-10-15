@@ -10,10 +10,22 @@ export function HiSocialLinkIcon({ type, large }: HiSocialLinkIconProps) {
   switch (type) {
     case "website":
       return (
-        <span
+        <svg
           aria-hidden
-          className="block h-3 w-3 rounded-[12px_2px_12px_2px] bg-current"
-        />
+          width={size}
+          height={size}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <circle cx="12" cy="12" r="10" />
+          <path d="M2 12h20" />
+          <path d="M12 2a15 15 0 0 1 0 20" />
+          <path d="M12 2a15 15 0 0 0 0 20" />
+        </svg>
       );
     case "github":
       return (

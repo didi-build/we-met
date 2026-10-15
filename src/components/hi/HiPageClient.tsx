@@ -5,6 +5,7 @@ import { HiExchangeSheet } from "@/components/hi/HiExchangeSheet";
 import { HiSocialLinkIcon } from "@/components/hi/HiSocialLinkIcon";
 import { HiStickyExchangeBar } from "@/components/hi/HiStickyExchangeBar";
 import { HiThemeSwitch } from "@/components/hi/HiThemeSwitch";
+import { LeafMark } from "@/components/hi/LeafMark";
 import { HiWeMetBannerBand, HiWeMetBannerTop } from "@/components/hi/HiWeMetBanner";
 import { HiWhatIDoChips } from "@/components/hi/HiWhatIDoChips";
 import { Button } from "@/components/ui/Button";
@@ -33,17 +34,6 @@ function ExchangeRing() {
       className="pointer-events-none absolute inset-0 -z-10 rounded-pill shadow-[0_0_0_0_color-mix(in_oklch,var(--accent)_40%,transparent)]"
       style={{ animation: "hi-ring-pulse 2.6s 0.4s ease-in-out infinite" }}
     />
-  );
-}
-
-function LeafMark() {
-  return (
-    <svg aria-hidden width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
-      <path
-        d="M8 1.5c-3 2.5-4.5 5.5-4.5 8.5 0 2.2 1.8 4 4 4s4-1.8 4-4c0-3-1.5-6-3.5-8.5z"
-        opacity="0.9"
-      />
-    </svg>
   );
 }
 
@@ -95,7 +85,7 @@ export function HiPageClient({ card, photoUrl }: HiPageClientProps) {
       ? substituteFirstName(copy.thanksMessage, firstName || "there")
       : null;
 
-  const cardMarginTop = showBanner ? "mt-0" : "mt-[clamp(16px,5svh,48px)]";
+  const cardMarginTop = showBanner ? "mt-[84px]" : "mt-[clamp(16px,5svh,48px)]";
 
   return (
     <div className="relative isolate min-h-svh overflow-hidden bg-bg text-ink [container-type:inline-size]">
@@ -120,7 +110,7 @@ export function HiPageClient({ card, photoUrl }: HiPageClientProps) {
         <div className="flex w-full flex-col items-center gap-6">
           <section
             aria-label={card.name}
-            className={`relative w-full rounded-[24px] border border-line bg-surface px-6 py-7 text-left ${cardMarginTop}`}
+            className={`relative flex w-full flex-col gap-6 rounded-[24px] border border-line bg-surface px-6 py-7 text-left ${cardMarginTop}`}
           >
             <div className="-mt-24 flex flex-col gap-6">
               <section
@@ -133,7 +123,7 @@ export function HiPageClient({ card, photoUrl }: HiPageClientProps) {
                     alt={pageCopy.headshotAlt}
                     width={136}
                     height={136}
-                    className="block h-[136px] w-[136px] shrink-0 rounded-full object-cover bg-surface-2 shadow-[0_0_0_6px_var(--bg)]"
+                    className="block h-[136px] w-[136px] shrink-0 rounded-full object-cover bg-surface-2 shadow-[0_0_0_6px_var(--bg)] ring-0"
                     priority
                     unoptimized
                   />
@@ -178,7 +168,7 @@ export function HiPageClient({ card, photoUrl }: HiPageClientProps) {
                     href={card.fallbackUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex min-h-11 items-center self-center px-2 text-[15px] font-medium text-ink-muted underline decoration-1 underline-offset-[3px] hover:text-ink"
+                    className="hi-fallback-link inline-flex min-h-11 items-center self-center px-2 text-[15px] font-medium"
                   >
                     {card.fallbackLabel}
                   </a>
@@ -224,7 +214,7 @@ export function HiPageClient({ card, photoUrl }: HiPageClientProps) {
                         rel="noopener noreferrer"
                         aria-label={link.label}
                         title={link.label}
-                        className="flex h-11 w-11 items-center justify-center rounded-pill border border-line text-ink no-underline transition-colors hover:bg-ink hover:text-bg"
+                        className="flex h-11 w-11 items-center justify-center rounded-pill border border-line text-ink no-underline transition-[background-color,color] duration-[120ms] ease-[cubic-bezier(.4,0,.2,1)] hover:bg-ink hover:text-bg"
                       >
                         <HiSocialLinkIcon type={link.type} large />
                       </a>

@@ -1,4 +1,9 @@
-import type { CardPublicLink, CardRecord, CardService } from "@/card-data/types";
+import type {
+  CardPublicLink,
+  CardPublicLinkType,
+  CardRecord,
+  CardService,
+} from "@/card-data/types";
 
 export function cardInitials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -25,6 +30,14 @@ export function firstNameFromFullName(name: string): string {
   return trimmed.split(/\s+/)[0] ?? "there";
 }
 
+/** Public link types shown as icon buttons (matches design/Contact-Card.dc.html). */
+const HI_ICON_LINK_TYPES = new Set<CardPublicLinkType>([
+  "website",
+  "linkedin",
+  "github",
+  "instagram",
+]);
+
 export type CardContentFlags = {
   hasPhoto: boolean;
   hasRole: boolean;
@@ -38,7 +51,7 @@ export type CardContentFlags = {
 export function cardContentFlags(card: CardRecord): CardContentFlags {
   const services = card.services?.filter((s) => s.label?.trim()) ?? [];
   const publicLinks = card.publicLinks?.filter((l) => l.url?.trim()) ?? [];
-  const social = publicLinks.filter((l) => l.type !== "website");
+  const social = publicLinks.filter((l) => HI_ICON_LINK_TYPES.has(l.type));
   return {
     hasPhoto: Boolean(card.photoKey),
     hasRole: Boolean(card.role?.trim()),
@@ -59,7 +72,7 @@ export function websiteLinks(links?: CardPublicLink[]): CardPublicLink[] {
 }
 
 export function socialLinks(links?: CardPublicLink[]): CardPublicLink[] {
-  return (links ?? []).filter((l) => l.type !== "website" && l.url?.trim());
+  return (links ?? []).filter((l) => l.url?.trim() && HI_ICON_LINK_TYPES.has(l.type));
 }
 
 export const WE_MET_CARD_HOME_URL = "https://we-met.link";

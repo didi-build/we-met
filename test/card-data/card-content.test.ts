@@ -6,6 +6,7 @@ import {
   cardContentFlags,
   cardGreeting,
   cardInitials,
+  socialLinks,
   WE_MET_CARD_HOME_URL,
 } from "@/lib/hi-card/card-content";
 import { exampleCardInput } from "../helpers/example-card";
@@ -72,5 +73,11 @@ describe("card content helpers (unit)", () => {
 
   it("uses the We Met marketing URL", () => {
     expect(WE_MET_CARD_HOME_URL).toBe("https://we-met.link");
+  });
+
+  it("includes website links in social icon list", () => {
+    const links = socialLinks(minimalCard().publicLinks);
+    expect(links.some((l) => l.type === "website")).toBe(true);
+    expect(links.length).toBeGreaterThanOrEqual(4);
   });
 });

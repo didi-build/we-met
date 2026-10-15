@@ -25,8 +25,10 @@ export function HiStickyExchangeBar({
   return (
     <div
       aria-hidden={!visible}
-      className={`fixed inset-x-0 top-0 z-10 flex justify-center border-b border-line bg-bg transition-transform duration-200 ${
-        visible ? "translate-y-0 visible" : "-translate-y-full invisible"
+      className={`fixed inset-x-0 top-0 z-10 flex justify-center border-b border-line bg-bg ${
+        visible
+          ? "visible translate-y-0 transition-transform duration-[280ms] ease-[cubic-bezier(.2,.7,.2,1)]"
+          : "invisible -translate-y-[101%] transition-[transform,visibility] duration-200 ease-in"
       }`}
     >
       <div className="flex w-full max-w-[420px] items-center gap-3 px-4 py-2.5 pl-5">

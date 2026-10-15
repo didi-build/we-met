@@ -100,6 +100,14 @@ describe("HiPageClient (component)", () => {
     expect(screen.getAllByText("DS").length).toBeGreaterThan(0);
   });
 
+  it("renders website globe with other social icon links", () => {
+    renderCard();
+    expect(screen.getByRole("link", { name: "didi.build" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "LinkedIn" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "GitHub" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Instagram" })).toBeTruthy();
+  });
+
   it("links the free-plan banner to we-met.link", () => {
     renderCard({ plan: "free" });
     const banners = screen.getAllByRole("link", { name: /Get your own card/i });
