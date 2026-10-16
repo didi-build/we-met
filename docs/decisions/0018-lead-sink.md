@@ -2,7 +2,7 @@
 
 - **Status:** accepted
 - **Date:** 2026-10-11
-- **Updates:** [0004](./0004-card-data-and-branding.md), [0010](./0010-card-data-d1-and-load-script.md), [0022](./0022-lead-delivery-ledger.md)
+- **Updates:** [0004](./0004-card-data-and-branding.md), [0010](./0010-card-data-d1-and-load-script.md), [0022](./0022-lead-delivery-ledger.md). **Amended by [0025](./0025-we-met-mvp-accounts-sign-in-and-app-backend.md):** a live card requires exactly one enabled email sink (`account_email` sentinel); zero sinks is not live.
 
 ## Context
 

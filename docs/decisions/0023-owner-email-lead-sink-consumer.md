@@ -2,7 +2,7 @@
 
 - **Status:** accepted
 - **Date:** 2026-10-15
-- **Updates:** [0018](./0018-lead-sink.md), [0021](./0021-followup-email-consumer-worker.md), [0022](./0022-lead-delivery-ledger.md), [0024](./0024-sink-agnostic-record-append-correlation.md) (2026-10-15)
+- **Updates:** [0018](./0018-lead-sink.md), [0021](./0021-followup-email-consumer-worker.md), [0022](./0022-lead-delivery-ledger.md), [0024](./0024-sink-agnostic-record-append-correlation.md) (2026-10-15). **Extended by [0025](./0025-we-met-mvp-accounts-sign-in-and-app-backend.md) phase 4:** consumer reads `lead_email_enabled` and drops queued sink mail with `lead_email_paused`; visitor follow-up is acked without send when paused.
 
 ## Context
 

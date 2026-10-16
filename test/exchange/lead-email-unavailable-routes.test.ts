@@ -215,6 +215,7 @@ describe("exchange and details routes lead_email_unavailable (integration)", () 
         .bind(card.id)
         .run();
 
+      const tokenNowSeconds = Math.floor(Date.now() / 1000);
       const token = createDetailsToken(
         "secret",
         {
@@ -224,7 +225,7 @@ describe("exchange and details routes lead_email_unavailable (integration)", () 
           visitorEmail: "visitor@example.com",
           visitorName: "Visitor",
         },
-        Math.floor(new Date("2026-10-16T12:00:00.000Z").getTime() / 1000),
+        tokenNowSeconds,
       );
 
       const response = await detailsPost(

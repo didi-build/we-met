@@ -19,11 +19,14 @@ Do not break these; each links to the canonical doc.
 - **No runtime dependency on `didi-build/web`:** [0002](docs/decisions/0002-hosting-workers-opennext.md).
 - **Non-prod builds never bind production** queue, consumer, D1, or R2: [0006](docs/decisions/0006-non-prod-safety.md), [environments](docs/architecture/environments.md).
 - **Lead delivery** uses **`lead_sinks`** rows and per-sink queue dispatch; sink handlers are pure delivery functions and **`process-lead-sink.ts`** owns the ledger lifecycle; correlation uses opaque id-only **`external_ref`** ([0024](docs/decisions/0024-sink-agnostic-record-append-correlation.md)): [0018](docs/decisions/0018-lead-sink.md), [0023](docs/decisions/0023-owner-email-lead-sink-consumer.md).
+- **App API host guard:** `/api/app/*` and `/api/auth/*` return **404** unless the request host is the production app host (`app.we-met.link`), a PR preview host (suffix `WE_MET_PREVIEW_HOST_SUFFIX`), or `localhost` / `127.0.0.1` with `WE_MET_ENV=local` ([0025](docs/decisions/0025-we-met-mvp-accounts-sign-in-and-app-backend.md), `src/config/app-api-host.ts`).
+- **Preview test login** (`POST /api/auth/preview-login`) is **preview-only** and must never be reachable on production or local Worker config. CI enforces this via `scripts/check-deploy-guards.mjs` and `test/app-auth/preview-login-guard.test.ts` ([0025](docs/decisions/0025-we-met-mvp-accounts-sign-in-and-app-backend.md)).
 - **Production deploys** require GitHub **`production`** environment approval (merge to `main` starts the job): [0007](docs/decisions/0007-production-deploy-manual.md), [deploy](docs/runbooks/deploy.md).
 - **Email templates are fixed**; user-supplied fields are escaped plain text: [0004](docs/decisions/0004-card-data-and-branding.md).
-- **Card images** enter only through the single image ingestion function; nothing else writes to R2: [0012](docs/decisions/0012-r2-images-single-ingestion.md).
-- **No public write endpoints** in step 1 (no API to create or update cards): [0010](docs/decisions/0010-card-data-d1-and-load-script.md).
-- **No personal card data or card images** in git; load from gitignored files per environment: [0010](docs/decisions/0010-card-data-d1-and-load-script.md).
+- **Owner email** lives only on **`accounts.email`**. Email lead sinks use config `{ "to": "account_email" }`; the app resolves that sentinel at enqueue ([0025](docs/decisions/0025-we-met-mvp-accounts-sign-in-and-app-backend.md)).
+- **Card photos** enter only through **`ingestCardPhotoFromRequest`** (`src/images/ingest-card-photo.ts`); nothing else writes to R2 ([0012](docs/decisions/0012-r2-images-single-ingestion.md)). **`saveDraft`** updates `card_drafts.draft_json` only — it does not change `photo_key` (photo POST/DELETE only).
+- **`cards:load` never targets production**; publish production cards through the app editor ([card-loading](docs/runbooks/card-loading.md), [0025](docs/decisions/0025-we-met-mvp-accounts-sign-in-and-app-backend.md)).
+- **No personal card data or card images** in git; load from gitignored files into **local or non-prod D1 only**: [0010](docs/decisions/0010-card-data-d1-and-load-script.md).
 
 ## Engineering standards
 
@@ -82,7 +85,7 @@ Do not break these; each links to the canonical doc.
 | `npm run deploy:guards`                      | Deploy-time binding guards on `wrangler.jsonc` and both follow-up consumer configs                                                                                         |
 | `npm run db:migrate`                         | Apply D1 migrations locally                                                                                                                                                |
 | `npm run db:migrate:remote`                  | Apply D1 migrations to remote `we-met-db-nonprod` only (never production)                                                                                                  |
-| `npm run cards:load`                         | Load gitignored card JSON into local or remote D1 (`--remote`; production needs `--production` + confirm)                                                                  |
+| `npm run cards:load`                         | Load gitignored card JSON into local or remote **non-prod** D1 (`--remote`; `--production` is rejected)                                                                    |
 | `npm run lint`                               | ESLint                                                                                                                                                                     |
 | `npm run format`                             | Prettier write                                                                                                                                                             |
 | `npm run format:check`                       | Prettier check                                                                                                                                                             |

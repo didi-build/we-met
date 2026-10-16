@@ -2,7 +2,7 @@
 
 - **Status:** accepted
 - **Date:** 2026-10-15
-- **Updates:** [0018](./0018-lead-sink.md), [0016](./0016-queue-message-snapshot.md), [0024](./0024-sink-agnostic-record-append-correlation.md) (2026-10-15)
+- **Updates:** [0018](./0018-lead-sink.md), [0016](./0016-queue-message-snapshot.md), [0024](./0024-sink-agnostic-record-append-correlation.md) (2026-10-15). **Extended by [0025](./0025-we-met-mvp-accounts-sign-in-and-app-backend.md) phase 4:** kill switch and daily caps gate exchange/details before ledger insert; `daily_send_counts` increments at enqueue.
 
 ## Context
 
