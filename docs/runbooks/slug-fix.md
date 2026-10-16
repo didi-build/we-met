@@ -32,7 +32,17 @@ If the statement affects **0 rows**, stop and reconcile `account_id` / slug.
 
 ## Follow-up email and old links
 
-Owner notification emails already sent include the **old** card URL (`/hi/<wrong_slug>`). After this fix, that link **404**s; there is no redirect in v1. Tell the owner to use the corrected link in future outreach.
+Both outbound emails reference the card by **slug** at send time ([`src/email/email-template-vars.ts`](../../src/email/email-template-vars.ts), [`design/emails/`](../../design/emails/)):
+
+- **Owner notification (email sink):** the **Business card** row links to `/hi/<slug>` (`cardPageUrl`).
+- **Visitor follow-up:** the template embeds the owner headshot at `/hi/<slug>/photo.jpg` (`ownerPhotoUrl`); the body may also reference the card URL depending on copy.
+
+After this slug fix, **already-sent** mail still points at the **wrong** slug:
+
+- Owner emails: the Business card link **404**s.
+- Visitor emails: the embedded photo URL **404**s (broken image); any card link in that message **404**s the same way.
+
+There is **no redirect** in v1. Tell the owner the corrected `/hi/<correct_slug>` link for future outreach; you cannot repair links inside mail that already left the queue.
 
 ## Verify
 
