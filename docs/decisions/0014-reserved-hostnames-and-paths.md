@@ -11,7 +11,7 @@ Lookup must not treat infrastructure hostnames or framework routes as card slugs
 ## Decision
 
 - **Reserved hostnames:** `app`, `www`, and `api` **never** resolve to a card (no hostname → card mapping for these).
-- **Reserved paths on the card host:** the root domain’s own paths — `/`, `/api`, and framework paths (e.g. `/_next/*`) — are **never** card slugs. Card pages live under `/hi/<slug>` only.
+- **Reserved paths on the card host:** the root domain’s own paths — `/`, `/api`, `/privacy`, `/terms`, and framework paths (e.g. `/_next/*`) — are **never** card slugs. Card pages live under `/hi/<slug>` only.
 
 ## Reasons
 

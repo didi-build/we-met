@@ -17,6 +17,10 @@ export function LandingFooter({ urls }: { urls: LandingUrls }) {
             </LandingIcon>
             We Met
           </span>
+          <nav className="lp-footer-nav" aria-label="Legal">
+            <a href={urls.privacy}>Privacy</a>
+            <a href={urls.terms}>Terms</a>
+          </nav>
           <span className="lp-credit">
             Free digital business cards, made by{" "}
             <a className="lp-credit-link" href={urls.didiBuild}>
