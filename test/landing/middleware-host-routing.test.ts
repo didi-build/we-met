@@ -63,6 +63,17 @@ describe("landing middleware host routing (unit)", () => {
     expect(response?.status).toBe(404);
   });
 
+  it("returns 404 for /app on the production card host", () => {
+    const response = middleware(request("/app", "we-met.link"));
+    expect(response?.status).toBe(404);
+  });
+
+  it("allows /app on preview hosts", () => {
+    process.env.WE_MET_ENV = "preview";
+    const response = middleware(request("/app", "pr-42-we-met.example.workers.dev"));
+    expect(response?.status).not.toBe(404);
+  });
+
   it("does not rewrite www or api hosts on /", () => {
     for (const host of ["www.we-met.link", "api.we-met.link"]) {
       const response = middleware(request("/", host));

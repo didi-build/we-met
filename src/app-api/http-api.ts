@@ -40,6 +40,9 @@ async function readApiError(response: Response): Promise<AppApiError> {
     if (code === "invalid-fields") {
       return new AppApiError("invalid-fields", undefined, body.error?.fields);
     }
+    if (code === "invalid-photo") {
+      return new AppApiError("invalid-photo");
+    }
   } catch {
     // fall through
   }
@@ -128,6 +131,13 @@ export function createHttpApi(): AppApi {
       }
       if (response.status === 429) {
         throw new AppApiError("rate-limited");
+      }
+      if (
+        response.status === 413 ||
+        response.status === 415 ||
+        response.status === 422
+      ) {
+        throw await readApiError(response);
       }
       if (!response.ok) {
         throw new AppApiError("network");

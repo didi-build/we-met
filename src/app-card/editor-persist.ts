@@ -117,23 +117,6 @@ export function editorCardToPersistedJson(draft: EditorCard, photoKey: string | 
   return cardLoadInputToPersisted(input);
 }
 
-export function photoKeyFromDraftPhotoUrl(photo: string): string | null {
-  const trimmed = photo.trim();
-  if (!trimmed) {
-    return null;
-  }
-  if (!trimmed.includes("/api/app/photo")) {
-    return trimmed;
-  }
-  try {
-    const url = new URL(trimmed, "https://we-met.link");
-    const key = url.searchParams.get("v");
-    return key?.trim() || null;
-  } catch {
-    return null;
-  }
-}
-
 export function draftPhotoUrl(key: string | null): string {
   if (!key) {
     return "";

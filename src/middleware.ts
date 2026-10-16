@@ -1,4 +1,8 @@
-import { isAppServingHost, readWeMetHostConfig } from "@/config/we-met";
+import {
+  isAppServingHost,
+  isCardServingHost,
+  readWeMetHostConfig,
+} from "@/config/we-met";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
@@ -27,6 +31,14 @@ export function middleware(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/app";
     return NextResponse.rewrite(url);
+  }
+
+  if (
+    hostConfig.weMetEnv === "production" &&
+    isCardServingHost(hostname, hostConfig) &&
+    pathname.startsWith("/app")
+  ) {
+    return new NextResponse(null, { status: 404 });
   }
 
   if (pathname === APP_COMING_SOON_PATH && !onAppHost) {

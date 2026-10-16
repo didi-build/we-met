@@ -29,7 +29,7 @@ export const DEFAULT_MVP_CARD_COPY: CardCopy = {
     detailsSaved: "Details saved",
     networkErrorMessage: "Network error. Please try again.",
     exchangeNotSavedPrefix: "We could not save your details. Email ",
-    exchangeNotSavedEmail: "help@didi.build",
+    exchangeNotSavedEmail: "hello@we-met.link",
     exchangeNotSavedSuffix: " and we'll connect you manually.",
     errors: {
       nameRequired: "Add your name so I know who you are.",

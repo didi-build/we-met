@@ -43,7 +43,8 @@ export type AppApiErrorCode =
   | "slug-locked"
   | "name-missing"
   | "rate-limited"
-  | "invalid-fields";
+  | "invalid-fields"
+  | "invalid-photo";
 
 export class AppApiError extends Error {
   readonly code: AppApiErrorCode;

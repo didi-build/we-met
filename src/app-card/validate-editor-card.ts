@@ -22,27 +22,19 @@ function fieldLimitMessage(key: string, max: number): string {
   return `Keep this to ${max} characters or fewer.`;
 }
 
-function collectLimitAndUrlViolations(card: EditorCard): Record<string, string> {
+/** Hard size and count limits only (draft saves allow incomplete slug/URLs). */
+function collectDraftLimitViolations(card: EditorCard): Record<string, string> {
   const fields: Record<string, string> = {};
 
   if (card.name.length > CARD_FIELD_LIMITS.name) {
     fields.name = fieldLimitMessage("name", CARD_FIELD_LIMITS.name);
   }
-
-  const slug = card.slug.trim();
-  if (slug) {
-    const slugFmt = slugFormatCheck(slug);
-    if (slugFmt || !isValidSlug(slug)) {
-      fields.slug = slugFmt || "Choose your link to publish.";
-    } else if (isReservedSlug(slug)) {
-      fields.slug = "That name is reserved. Try another.";
-    }
+  if (card.slug.length > CARD_FIELD_LIMITS.slugMax) {
+    fields.slug = fieldLimitMessage("slug", CARD_FIELD_LIMITS.slugMax);
   }
-
   if (card.role.length > CARD_FIELD_LIMITS.role) {
     fields.role = fieldLimitMessage("role", CARD_FIELD_LIMITS.role);
   }
-
   if (card.about.length > CARD_FIELD_LIMITS.aboutParagraphs) {
     fields.about = `Use at most ${CARD_FIELD_LIMITS.aboutParagraphs} paragraphs.`;
   }
@@ -54,7 +46,6 @@ function collectLimitAndUrlViolations(card: EditorCard): Record<string, string> 
       );
     }
   });
-
   if (card.services.length > CARD_FIELD_LIMITS.services) {
     fields.services = `Use at most ${CARD_FIELD_LIMITS.services} services.`;
   }
@@ -71,6 +62,38 @@ function collectLimitAndUrlViolations(card: EditorCard): Record<string, string> 
         CARD_FIELD_LIMITS.serviceDescription,
       );
     }
+  });
+
+  for (const key of ["website", "linkedin", "github", "instagram"] as const) {
+    const value = card.links[key] ?? "";
+    if (value.length > CARD_FIELD_LIMITS.publicUrlMaxLength) {
+      fields[`links.${key}`] = fieldLimitMessage(
+        `links.${key}`,
+        CARD_FIELD_LIMITS.publicUrlMaxLength,
+      );
+    }
+  }
+
+  if (card.alternate.label.length > CARD_FIELD_LIMITS.alternateLabel) {
+    fields["alternate.label"] = fieldLimitMessage(
+      "alternate.label",
+      CARD_FIELD_LIMITS.alternateLabel,
+    );
+  }
+  if (card.alternate.url.length > CARD_FIELD_LIMITS.publicUrlMaxLength) {
+    fields["alternate.url"] = fieldLimitMessage(
+      "alternate.url",
+      CARD_FIELD_LIMITS.publicUrlMaxLength,
+    );
+  }
+
+  return fields;
+}
+
+function collectPublishLimitAndUrlViolations(card: EditorCard): Record<string, string> {
+  const fields = collectDraftLimitViolations(card);
+
+  card.services.forEach((s, i) => {
     if (!s.title.trim() && s.description.trim()) {
       fields[`services.${i}.title`] = "Add a title for this service.";
     }
@@ -81,24 +104,12 @@ function collectLimitAndUrlViolations(card: EditorCard): Record<string, string> 
     if (value && !isHttpsUrl(value)) {
       fields[`links.${key}`] = "Use a full link that starts with https://";
     }
-    if (value.length > CARD_FIELD_LIMITS.publicUrlMaxLength) {
-      fields[`links.${key}`] = fieldLimitMessage(
-        `links.${key}`,
-        CARD_FIELD_LIMITS.publicUrlMaxLength,
-      );
-    }
   }
 
   const altUrl = card.alternate.url.trim();
   const altLabel = card.alternate.label.trim();
   if (altUrl && !isHttpsUrl(altUrl)) {
     fields["alternate.url"] = "Use a full link that starts with https://";
-  }
-  if (altLabel.length > CARD_FIELD_LIMITS.alternateLabel) {
-    fields["alternate.label"] = fieldLimitMessage(
-      "alternate.label",
-      CARD_FIELD_LIMITS.alternateLabel,
-    );
   }
   if (!altUrl && altLabel) {
     fields["alternate.url"] = "Add the link this text should open.";
@@ -108,7 +119,7 @@ function collectLimitAndUrlViolations(card: EditorCard): Record<string, string> 
 }
 
 export function validateEditorCardForDraft(card: EditorCard): EditorValidationResult {
-  const fields = collectLimitAndUrlViolations(card);
+  const fields = collectDraftLimitViolations(card);
   if (Object.keys(fields).length > 0) {
     return { ok: false, code: "invalid-fields", fields };
   }
@@ -130,7 +141,7 @@ export function validateEditorCardForPublish(card: EditorCard): EditorValidation
     return { ok: false, code: "slug-reserved" };
   }
 
-  const fields = collectLimitAndUrlViolations(card);
+  const fields = collectPublishLimitAndUrlViolations(card);
   if (Object.keys(fields).length > 0) {
     return { ok: false, code: "invalid-fields", fields };
   }

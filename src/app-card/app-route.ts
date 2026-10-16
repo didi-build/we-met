@@ -1,7 +1,7 @@
-import { apiError } from "@/app-auth/guards";
-import { guardMutationRequest } from "@/app-auth/guards";
+import { apiError, clientIp, guardMutationRequest } from "@/app-auth/guards";
 import { ensureAppApiHost, readAppAuthBindings } from "@/app-auth/route-context";
 import { requireCardRouteAuth, withSessionCookie } from "@/app-card/route-auth";
+import { headers } from "next/headers";
 
 export async function readAppCardRouteContext() {
   const ctx = await readAppAuthBindings();
@@ -17,6 +17,14 @@ export async function authorizeActiveAppCardRoute(routeKey: string) {
     return base;
   }
   const { ctx } = base;
+  const headerList = await headers();
+  const ipAllowed = await ctx.authRateLimiter.check(
+    `app-card:${routeKey}`,
+    clientIp(headerList),
+  );
+  if (!ipAllowed) {
+    return { ok: false as const, response: apiError("rate-limited", 429) };
+  }
   const auth = await requireCardRouteAuth(ctx.env.WE_MET_DB, ctx.sessionToken);
   if (!auth.ok) {
     return { ok: false as const, response: auth.response };

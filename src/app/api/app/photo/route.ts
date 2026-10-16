@@ -3,12 +3,13 @@ import {
   guardAppMutation,
   refreshSessionCookie,
 } from "@/app-card/app-route";
-import { loadDraftPhotoKey } from "@/app-card/card-store";
-import {
-  isPhotoUploadRateLimited,
-  recordPhotoUpload,
-} from "@/app-card/photo-upload-cap";
+import { loadDraftPhotoKey, setDraftPhotoKey } from "@/app-card/card-store";
 import { draftPhotoUrl } from "@/app-card/editor-persist";
+import { isValidPhotoKey } from "@/app-card/photo-key";
+import {
+  releasePhotoUploadReservation,
+  reservePhotoUploadSlot,
+} from "@/app-card/photo-upload-cap";
 import { jsonOk } from "@/app-card/route-auth";
 import { CARD_PHOTO_JPEG_CONTENT_TYPE } from "@/assets/card-photo";
 import { getAssetStorage } from "@/assets/get-storage";
@@ -17,6 +18,21 @@ import { ingestCardPhotoFromRequest } from "@/images/ingest-card-photo";
 
 const POST_ROUTE_KEY = "photo-upload";
 const GET_ROUTE_KEY = "photo-get";
+
+function mapIngestErrorToResponse(
+  error: import("@/images/ingest-card-photo").IngestCardPhotoError,
+): Response {
+  if (error === "too-large") {
+    return new Response(null, { status: 413 });
+  }
+  if (error === "unsupported-type") {
+    return new Response(null, { status: 415 });
+  }
+  if (error === "images-unavailable") {
+    return new Response(null, { status: 503 });
+  }
+  return apiError("invalid-photo", 422);
+}
 
 export async function POST(request: Request) {
   const authResult = await authorizeActiveAppCardRoute(POST_ROUTE_KEY);
@@ -29,7 +45,8 @@ export async function POST(request: Request) {
     return blocked;
   }
 
-  if (await isPhotoUploadRateLimited(ctx.env.WE_MET_DB, auth.account.id)) {
+  const reservation = await reservePhotoUploadSlot(ctx.env.WE_MET_DB, auth.account.id);
+  if (!reservation) {
     return apiError("rate-limited", 429);
   }
 
@@ -40,19 +57,15 @@ export async function POST(request: Request) {
   });
 
   if (!result.ok) {
-    if (result.error === "too-large") {
-      return new Response(null, { status: 413 });
-    }
-    if (result.error === "unsupported-type") {
-      return new Response(null, { status: 415 });
-    }
-    if (result.error === "images-unavailable") {
-      return new Response(null, { status: 503 });
-    }
-    return apiError("forbidden", 403);
+    await releasePhotoUploadReservation(
+      ctx.env.WE_MET_DB,
+      auth.account.id,
+      reservation,
+    );
+    return mapIngestErrorToResponse(result.error);
   }
 
-  await recordPhotoUpload(ctx.env.WE_MET_DB, auth.account.id);
+  await setDraftPhotoKey(ctx.env.WE_MET_DB, auth.account.id, result.key);
   const url = draftPhotoUrl(result.key);
   const response = jsonOk({ url });
   return refreshSessionCookie(response, auth);
@@ -65,7 +78,7 @@ export async function GET(request: Request) {
   }
   const { ctx, auth } = authResult;
   const key = new URL(request.url).searchParams.get("v")?.trim() ?? "";
-  if (!key) {
+  if (!isValidPhotoKey(key)) {
     return new Response(null, { status: 404 });
   }
   const draftKey = await loadDraftPhotoKey(ctx.env.WE_MET_DB, auth.account.id);

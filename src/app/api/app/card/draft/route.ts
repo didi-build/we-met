@@ -4,10 +4,11 @@ import {
   refreshSessionCookie,
 } from "@/app-card/app-route";
 import { saveDraft } from "@/app-card/card-store";
+import { parseEditorCardWire } from "@/app-card/parse-editor-card";
+import { readJsonBodyWithCap } from "@/app-card/read-json-body";
 import { jsonOk } from "@/app-card/route-auth";
 import { validateEditorCardForDraft } from "@/app-card/validate-editor-card";
 import { apiError, apiJson } from "@/app-auth/guards";
-import type { EditorCard } from "@/app-api/types";
 
 const ROUTE_KEY = "card-draft";
 
@@ -21,20 +22,27 @@ export async function PUT(request: Request) {
   if (blocked) {
     return blocked;
   }
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return apiError("forbidden", 403);
+
+  const bodyRead = await readJsonBodyWithCap(request);
+  if (!bodyRead.ok) {
+    if (bodyRead.reason === "invalid-json") {
+      return apiError("invalid-json", 400);
+    }
+    if (bodyRead.reason === "too-large") {
+      return new Response(null, { status: 413 });
+    }
+    return apiError("invalid-json", 400);
   }
-  if (!body || typeof body !== "object") {
-    return apiError("forbidden", 403);
+
+  const parsed = parseEditorCardWire(bodyRead.json);
+  if (!parsed.ok) {
+    return apiJson(
+      { error: { code: "invalid-fields", fields: parsed.fields } },
+      { status: 422 },
+    );
   }
-  const card = (body as { card?: EditorCard }).card;
-  if (!card) {
-    return apiError("forbidden", 403);
-  }
-  const validation = validateEditorCardForDraft(card);
+
+  const validation = validateEditorCardForDraft(parsed.card);
   if (!validation.ok) {
     if (validation.code === "invalid-fields") {
       return apiJson(
@@ -44,7 +52,7 @@ export async function PUT(request: Request) {
     }
     return apiError(validation.code, 422);
   }
-  const updatedAt = await saveDraft(ctx.env.WE_MET_DB, auth.account.id, card);
+  const updatedAt = await saveDraft(ctx.env.WE_MET_DB, auth.account.id, parsed.card);
   const response = jsonOk({ updatedAt });
   return refreshSessionCookie(response, auth);
 }

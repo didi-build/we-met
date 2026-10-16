@@ -1,9 +1,10 @@
 import {
   draftJsonToEditorCard,
   editorCardToPersistedJson,
-  photoKeyFromDraftPhotoUrl,
   publishedRowToEditorCard,
 } from "@/app-card/editor-persist";
+import { draftJsonFromEditorCard } from "@/app-card/parse-editor-card";
+import { PublishCardError } from "@/app-card/publish-errors";
 import { emptyEditorCard } from "@/app-card/route-auth";
 import { ACCOUNT_EMAIL_SENTINEL } from "@/card-data/account-email";
 import type { EditorCard } from "@/app-api/types";
@@ -12,6 +13,10 @@ import type { D1Database } from "@cloudflare/workers-types";
 
 function parseJson<T>(raw: string): T {
   return JSON.parse(raw) as T;
+}
+
+function isD1UniqueError(message: string, index: string): boolean {
+  return message.includes(index);
 }
 
 export async function loadCardBundle(
@@ -64,27 +69,38 @@ export async function saveDraft(
   card: EditorCard,
 ): Promise<string> {
   const updatedAt = nowIso();
-  const photoKey =
-    photoKeyFromDraftPhotoUrl(card.photo) ??
-    (card.photo.trim() ? card.photo.trim() : null);
-  const draftJson = JSON.stringify({
-    ...card,
-    photo: "",
-  });
+  const draftJson = draftJsonFromEditorCard(card);
 
   await db
     .prepare(
       `INSERT INTO card_drafts (account_id, draft_json, photo_key, updated_at)
-       VALUES (?, ?, ?, ?)
+       VALUES (?, ?, NULL, ?)
        ON CONFLICT(account_id) DO UPDATE SET
          draft_json = excluded.draft_json,
-         photo_key = excluded.photo_key,
          updated_at = excluded.updated_at`,
     )
-    .bind(accountId, draftJson, photoKey, updatedAt)
+    .bind(accountId, draftJson, updatedAt)
     .run();
 
   return updatedAt;
+}
+
+export async function setDraftPhotoKey(
+  db: D1Database,
+  accountId: string,
+  photoKey: string,
+): Promise<void> {
+  const updatedAt = nowIso();
+  await db
+    .prepare(
+      `INSERT INTO card_drafts (account_id, draft_json, photo_key, updated_at)
+       VALUES (?, '{}', ?, ?)
+       ON CONFLICT(account_id) DO UPDATE SET
+         photo_key = excluded.photo_key,
+         updated_at = excluded.updated_at`,
+    )
+    .bind(accountId, photoKey, updatedAt)
+    .run();
 }
 
 export async function slugTakenByOther(
@@ -113,12 +129,31 @@ export async function loadPublishedSlug(
   return row?.slug ?? null;
 }
 
-export async function publishCard(
+async function loadExistingCard(
+  db: D1Database,
+  accountId: string,
+): Promise<{ id: string; slug: string; status: string } | null> {
+  const row = await db
+    .prepare("SELECT id, slug, status FROM cards WHERE account_id = ?")
+    .bind(accountId)
+    .first<{ id: string; slug: string; status: string }>();
+  return row ?? null;
+}
+
+async function updatePublishedCard(
   db: D1Database,
   accountId: string,
   card: EditorCard,
   photoKey: string | null,
-): Promise<{ url: string; slug: string }> {
+  existing: { id: string; slug: string; status: string },
+): Promise<{ path: string; slug: string }> {
+  if (existing.status !== "live") {
+    throw new PublishCardError("forbidden");
+  }
+  if (existing.slug !== card.slug.trim()) {
+    throw new PublishCardError("slug-locked");
+  }
+
   const persisted = editorCardToPersistedJson(card, photoKey);
   const linksJson = JSON.stringify(persisted.links);
   const pageCopyJson = JSON.stringify(persisted.pageCopy);
@@ -127,18 +162,67 @@ export async function publishCard(
   const updatedAt = nowIso();
   const slug = card.slug.trim();
   const displayName = card.name.trim();
+  const draftJson = draftJsonFromEditorCard(card);
 
-  const existing = await db
-    .prepare("SELECT id, slug FROM cards WHERE account_id = ?")
-    .bind(accountId)
-    .first<{ id: string; slug: string }>();
+  await db.batch([
+    db
+      .prepare(
+        `UPDATE cards SET
+          variant = 'mono',
+          display_name = ?,
+          photo_key = ?,
+          links_json = ?,
+          page_copy_json = ?,
+          contact_json = ?,
+          copy_json = ?,
+          updated_at = ?
+         WHERE account_id = ?`,
+      )
+      .bind(
+        displayName,
+        photoKey,
+        linksJson,
+        pageCopyJson,
+        contactJson,
+        copyJson,
+        updatedAt,
+        accountId,
+      ),
+    db
+      .prepare(
+        `INSERT INTO card_drafts (account_id, draft_json, photo_key, updated_at)
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT(account_id) DO UPDATE SET
+           draft_json = excluded.draft_json,
+           photo_key = excluded.photo_key,
+           updated_at = excluded.updated_at`,
+      )
+      .bind(accountId, draftJson, photoKey, updatedAt),
+  ]);
 
-  const draftJson = JSON.stringify({ ...card, photo: "" });
+  return { path: `/hi/${slug}`, slug };
+}
 
-  if (!existing) {
-    const cardId = crypto.randomUUID();
-    const sinkId = `${slug}-owner-inbox`;
-    const sinkConfig = JSON.stringify({ to: ACCOUNT_EMAIL_SENTINEL });
+async function insertPublishedCard(
+  db: D1Database,
+  accountId: string,
+  card: EditorCard,
+  photoKey: string | null,
+): Promise<{ path: string; slug: string }> {
+  const persisted = editorCardToPersistedJson(card, photoKey);
+  const linksJson = JSON.stringify(persisted.links);
+  const pageCopyJson = JSON.stringify(persisted.pageCopy);
+  const contactJson = JSON.stringify(persisted.contact);
+  const copyJson = JSON.stringify(persisted.copy);
+  const updatedAt = nowIso();
+  const slug = card.slug.trim();
+  const displayName = card.name.trim();
+  const draftJson = draftJsonFromEditorCard(card);
+  const cardId = crypto.randomUUID();
+  const sinkId = `${slug}-owner-inbox`;
+  const sinkConfig = JSON.stringify({ to: ACCOUNT_EMAIL_SENTINEL });
+
+  try {
     await db.batch([
       db
         .prepare(
@@ -176,51 +260,41 @@ export async function publishCard(
         )
         .bind(accountId, draftJson, photoKey, updatedAt),
     ]);
-    return { url: `/hi/${slug}`, slug };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (
+      isD1UniqueError(message, "cards_slug_unique") ||
+      /UNIQUE constraint failed:\s*cards\.slug/i.test(message)
+    ) {
+      throw new PublishCardError("slug-taken");
+    }
+    if (
+      isD1UniqueError(message, "cards_one_per_account") ||
+      /UNIQUE constraint failed:\s*cards\.account_id/i.test(message)
+    ) {
+      const existing = await loadExistingCard(db, accountId);
+      if (!existing) {
+        throw err;
+      }
+      return updatePublishedCard(db, accountId, card, photoKey, existing);
+    }
+    throw err;
   }
 
-  if (existing.slug !== slug) {
-    throw new Error("slug-locked");
+  return { path: `/hi/${slug}`, slug };
+}
+
+export async function publishCard(
+  db: D1Database,
+  accountId: string,
+  card: EditorCard,
+  photoKey: string | null,
+): Promise<{ path: string; slug: string }> {
+  const existing = await loadExistingCard(db, accountId);
+  if (!existing) {
+    return insertPublishedCard(db, accountId, card, photoKey);
   }
-
-  await db.batch([
-    db
-      .prepare(
-        `UPDATE cards SET
-          variant = 'mono',
-          display_name = ?,
-          status = 'live',
-          photo_key = ?,
-          links_json = ?,
-          page_copy_json = ?,
-          contact_json = ?,
-          copy_json = ?,
-          updated_at = ?
-         WHERE account_id = ?`,
-      )
-      .bind(
-        displayName,
-        photoKey,
-        linksJson,
-        pageCopyJson,
-        contactJson,
-        copyJson,
-        updatedAt,
-        accountId,
-      ),
-    db
-      .prepare(
-        `INSERT INTO card_drafts (account_id, draft_json, photo_key, updated_at)
-         VALUES (?, ?, ?, ?)
-         ON CONFLICT(account_id) DO UPDATE SET
-           draft_json = excluded.draft_json,
-           photo_key = excluded.photo_key,
-           updated_at = excluded.updated_at`,
-      )
-      .bind(accountId, draftJson, photoKey, updatedAt),
-  ]);
-
-  return { url: `/hi/${slug}`, slug };
+  return updatePublishedCard(db, accountId, card, photoKey, existing);
 }
 
 export async function loadDraftPhotoKey(

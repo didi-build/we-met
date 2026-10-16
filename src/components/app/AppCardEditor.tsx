@@ -1,7 +1,7 @@
 "use client";
 
 import { useAppApi } from "@/app-api/AppApiProvider";
-import type { AppSession, EditorCard } from "@/app-api/types";
+import { AppApiError, type AppSession, type EditorCard } from "@/app-api/types";
 import { CARD_FIELD_LIMITS } from "@/card-data/limits";
 import { AppEditorBottomBar } from "@/components/app/editor/AppEditorBottomBar";
 import { AppCardPreview } from "@/components/app/editor/AppCardPreview";
@@ -294,8 +294,22 @@ export function AppCardEditor({
       const next = { ...card, photo: url };
       onCardChange(next);
       setAnnounce("Photo added.");
-    } catch {
-      setPhotoError("The upload didn't finish. Check your connection and try again.");
+    } catch (err) {
+      if (err instanceof AppApiError) {
+        if (err.code === "rate-limited") {
+          setPhotoError("You've reached the photo upload limit. Try again later.");
+        } else if (err.code === "invalid-photo") {
+          setPhotoError(
+            "That image could not be used. Use a square JPG, PNG, or WebP between 128×128 and 4096×4096 pixels.",
+          );
+        } else {
+          setPhotoError(
+            "The upload didn't finish. Check your connection and try again.",
+          );
+        }
+      } else {
+        setPhotoError("The upload didn't finish. Check your connection and try again.");
+      }
     } finally {
       setPhotoUploading(false);
     }

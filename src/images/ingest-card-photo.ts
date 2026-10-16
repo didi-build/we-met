@@ -5,7 +5,16 @@ import { CARD_FIELD_LIMITS } from "@/card-data/limits";
 import type { ImagesBinding, R2Bucket } from "@cloudflare/workers-types";
 
 export type IngestCardPhotoError =
-  "too-large" | "unsupported-type" | "not-square" | "corrupt" | "images-unavailable";
+  | "too-large"
+  | "unsupported-type"
+  | "not-square"
+  | "corrupt"
+  | "images-unavailable"
+  | "invalid-dimensions";
+
+/** Square card photos must be within these bounds before resize to 512×512. */
+export const CARD_PHOTO_MIN_SIDE = 128;
+export const CARD_PHOTO_MAX_SIDE = 4096;
 
 export type IngestCardPhotoResult =
   { ok: true; key: string; size: number } | { ok: false; error: IngestCardPhotoError };
@@ -70,6 +79,15 @@ export async function ingestCardPhotoFromRequest(
 
   if (info.width !== info.height) {
     return { ok: false, error: "not-square" };
+  }
+
+  if (
+    info.width < CARD_PHOTO_MIN_SIDE ||
+    info.height < CARD_PHOTO_MIN_SIDE ||
+    info.width > CARD_PHOTO_MAX_SIDE ||
+    info.height > CARD_PHOTO_MAX_SIDE
+  ) {
+    return { ok: false, error: "invalid-dimensions" };
   }
 
   let jpegBytes: Uint8Array;
