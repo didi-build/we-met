@@ -33,6 +33,7 @@ export type SlugCheckResult =
 export type AppApiErrorCode =
   | "network"
   | "unauthorized"
+  | "forbidden"
   | "canceled"
   | "closed"
   | "failed"

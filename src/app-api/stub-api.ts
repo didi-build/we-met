@@ -138,7 +138,8 @@ export function createStubApi(search = ""): AppApi {
       return session;
     },
 
-    async signIn() {
+    async signIn(mode?: "redirect" | "popup") {
+      void mode;
       await wait(1200);
       if (flags.has("login-error")) {
         throw new AppApiError("canceled");

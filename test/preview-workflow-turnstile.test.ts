@@ -10,6 +10,12 @@ describe("Cloudflare credentials in deploy workflows (unit)", () => {
     expect(preview).not.toContain("WE_MET_TURNSTILE_SITE_KEY_PRODUCTION");
   });
 
+  it("preview OpenNext build sets WE_MET_ENV=preview for client bundle", () => {
+    expect(preview).toMatch(
+      /Build OpenNext[\s\S]*?WE_MET_ENV:\s*preview[\s\S]*?npm run build/,
+    );
+  });
+
   it("production workflow uses production Turnstile variable", () => {
     expect(production).toContain("vars.WE_MET_TURNSTILE_SITE_KEY_PRODUCTION");
     expect(production).not.toContain("WE_MET_TURNSTILE_SITE_KEY_NONPROD");

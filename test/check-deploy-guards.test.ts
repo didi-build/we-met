@@ -62,6 +62,26 @@ describe("check-deploy-guards (unit)", () => {
     expect(result.status).toBe(0);
   });
 
+  it("fails when top-level WE_MET_PREVIEW_LOGIN_SECRET is set on production config", () => {
+    const { path } = writeTempConfig((config) => {
+      const vars = config.vars as Record<string, string>;
+      vars.WE_MET_PREVIEW_LOGIN_SECRET = "must-not-be-in-top-level-vars";
+    });
+    const result = runGuards("production", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("WE_MET_PREVIEW_LOGIN_SECRET");
+  });
+
+  it("fails when top-level WE_MET_ENV is preview (preview-login must not use production Worker vars)", () => {
+    const { path } = writeTempConfig((config) => {
+      const vars = config.vars as Record<string, string>;
+      vars.WE_MET_ENV = "preview";
+    });
+    const result = runGuards("production", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('top-level WE_MET_ENV must be "production"');
+  });
+
   it("passes production guards on production-prepared config with nonprod placeholder left in", () => {
     const configPath = `wrangler.guards-test-${process.pid}.ci.jsonc`;
     const prep = spawnSync(

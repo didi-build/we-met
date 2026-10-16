@@ -3,6 +3,13 @@
 
 WE_MET_ENV=local
 
+# Local app origin for OAuth redirects and API Origin checks (e.g. http://localhost:3000).
+WE_MET_APP_ORIGIN=http://localhost:3000
+
+# Google OAuth (separate dev client; set in .dev.vars, not committed).
+# GOOGLE_CLIENT_ID=
+# GOOGLE_CLIENT_SECRET=
+
 # Any random string works locally (details-step token signing).
 WE_MET_TOKEN_SECRET=
 

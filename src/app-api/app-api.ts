@@ -17,7 +17,7 @@ export interface AppApi {
    * Starts Google sign-in and returns the session on success.
    * @throws {AppApiError} `canceled` | `closed` | `failed` | `network`
    */
-  signIn(): Promise<AppSession>;
+  signIn(mode?: "redirect" | "popup"): Promise<AppSession>;
 
   /** Clears the session. */
   signOut(): Promise<void>;

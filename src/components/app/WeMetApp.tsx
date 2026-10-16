@@ -26,6 +26,8 @@ export function WeMetApp() {
   const [booting, setBooting] = useState(true);
   const [signingIn, setSigningIn] = useState(false);
   const [loginError, setLoginError] = useState(false);
+  const [previewSecret, setPreviewSecret] = useState("");
+  const isPreviewEnv = process.env.NEXT_PUBLIC_WE_MET_ENV === "preview";
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const menuBtnRef = useRef<HTMLButtonElement>(null);
@@ -56,6 +58,20 @@ export function WeMetApp() {
     },
     [loadCard],
   );
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("auth_error")) {
+      setLoginError(true);
+      params.delete("auth_error");
+      const url = new URL(window.location.href);
+      url.search = params.toString();
+      window.history.replaceState({}, "", url.pathname + url.search);
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -99,22 +115,54 @@ export function WeMetApp() {
     };
   }, [menuOpen]);
 
-  const handleSignIn = useCallback(async () => {
+  const handleSignIn = useCallback(
+    async (mode: "redirect" | "popup" = "redirect") => {
+      if (isPreviewEnv) {
+        return;
+      }
+      setLoginError(false);
+      setSigningIn(true);
+      try {
+        const s = await api.signIn(mode);
+        setSigningIn(false);
+        await routeSession(s);
+      } catch (err) {
+        setSigningIn(false);
+        if (err instanceof AppApiError && err.code === "canceled") {
+          setLoginError(true);
+        } else if (!(err instanceof AppApiError)) {
+          setLoginError(true);
+        }
+      }
+    },
+    [api, isPreviewEnv, routeSession],
+  );
+
+  const handlePreviewLogin = useCallback(async () => {
     setLoginError(false);
     setSigningIn(true);
     try {
-      const s = await api.signIn();
+      const response = await fetch("/api/auth/preview-login", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "content-type": "application/json",
+          "sec-fetch-site": "same-origin",
+        },
+        body: JSON.stringify({ secret: previewSecret }),
+      });
       setSigningIn(false);
-      await routeSession(s);
-    } catch (err) {
-      setSigningIn(false);
-      if (err instanceof AppApiError && err.code === "canceled") {
+      if (!response.ok) {
         setLoginError(true);
-      } else if (!(err instanceof AppApiError)) {
-        setLoginError(true);
+        return;
       }
+      const body = (await response.json()) as { session: AppSession };
+      await routeSession(body.session);
+    } catch {
+      setSigningIn(false);
+      setLoginError(true);
     }
-  }, [api, routeSession]);
+  }, [previewSecret, routeSession]);
 
   const handleSignOut = useCallback(async () => {
     setMenuOpen(false);
@@ -221,22 +269,49 @@ export function WeMetApp() {
                 account.
               </span>
             </div>
-            <button
-              type="button"
-              className="ap-google"
-              aria-busy={signingIn}
-              disabled={signingIn}
-              onClick={handleSignIn}
-            >
-              {signingIn ? (
-                <span className="ap-spin" aria-hidden />
-              ) : (
-                <span className="ap-icon" aria-hidden>
-                  <GoogleGIcon size={20} />
-                </span>
-              )}
-              <span>{signingIn ? "Waiting for Google…" : "Sign in with Google"}</span>
-            </button>
+            {isPreviewEnv ? (
+              <>
+                <p className="ap-login-note ap-login-preview-google-off">
+                  Google sign-in is turned off on previews. Use Preview sign-in below.
+                </p>
+                <label className="ap-field">
+                  <span className="ap-field-label">Preview sign-in</span>
+                  <input
+                    type="password"
+                    className="ap-input"
+                    autoComplete="off"
+                    value={previewSecret}
+                    onChange={(event) => setPreviewSecret(event.target.value)}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="ap-btn ap-btn-block"
+                  aria-busy={signingIn}
+                  disabled={signingIn || previewSecret.length === 0}
+                  onClick={handlePreviewLogin}
+                >
+                  {signingIn ? "Signing in…" : "Sign in with preview secret"}
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="ap-google"
+                aria-busy={signingIn}
+                disabled={signingIn}
+                onClick={() => handleSignIn("redirect")}
+              >
+                {signingIn ? (
+                  <span className="ap-spin" aria-hidden />
+                ) : (
+                  <span className="ap-icon" aria-hidden>
+                    <GoogleGIcon size={20} />
+                  </span>
+                )}
+                <span>{signingIn ? "Waiting for Google…" : "Sign in with Google"}</span>
+              </button>
+            )}
             <p className="ap-login-note">
               Leads from your card are emailed to your Google address.
             </p>
@@ -272,7 +347,7 @@ export function WeMetApp() {
           initialDraft={draft}
           initialPublished={published}
           onSessionRestored={handleSessionRestored}
-          onSignIn={handleSignIn}
+          onSignIn={() => handleSignIn("popup")}
           signingIn={signingIn}
         />
       ) : null}

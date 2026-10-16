@@ -6,14 +6,18 @@ const PRODUCTION_MARKERS = {
   d1: "we-met-db",
   r2: "we-met-assets",
   queue: "we-met-followup-email",
-  rateLimiterNamespaceId: "2002",
+  exchangeRateLimiterNamespaceId: "2002",
+  authRateLimiterNamespaceId: "2004",
+  appRateLimiterNamespaceId: "2006",
 };
 
 const NONPROD_MARKERS = {
   d1: "we-met-db-nonprod",
   r2: "we-met-assets-nonprod",
   queue: "we-met-followup-email-nonprod",
-  rateLimiterNamespaceId: "2001",
+  exchangeRateLimiterNamespaceId: "2001",
+  authRateLimiterNamespaceId: "2003",
+  appRateLimiterNamespaceId: "2005",
 };
 
 function collectPreviewStrings(previews: Record<string, unknown>): string[] {
@@ -36,27 +40,44 @@ function collectPreviewStrings(previews: Record<string, unknown>): string[] {
   return out;
 }
 
+function namespaceByName(
+  rows: { name: string; namespace_id: string }[] | undefined,
+  name: string,
+): string | undefined {
+  return rows?.find((row) => row.name === name)?.namespace_id;
+}
+
 describe("wrangler config isolation (unit)", () => {
   const config = parseJsonc(readFileSync("wrangler.jsonc", "utf8")) as {
     vars?: Record<string, string>;
     d1_databases?: { database_name: string }[];
     r2_buckets?: { bucket_name: string }[];
     queues?: { producers?: { queue: string }[] };
-    ratelimits?: { namespace_id: string }[];
+    ratelimits?: { name: string; namespace_id: string }[];
     previews?: Record<string, unknown>;
   };
 
-  it("uses production rate limiter namespace 2002 at top level and 2001 in previews", () => {
-    expect(config.ratelimits?.[0]?.namespace_id).toBe(
-      PRODUCTION_MARKERS.rateLimiterNamespaceId,
+  it("uses distinct production and preview rate limiter namespaces per binding", () => {
+    expect(namespaceByName(config.ratelimits, "WE_MET_EXCHANGE_RATE_LIMITER")).toBe(
+      PRODUCTION_MARKERS.exchangeRateLimiterNamespaceId,
     );
+    expect(namespaceByName(config.ratelimits, "WE_MET_AUTH_RATE_LIMITER")).toBe(
+      PRODUCTION_MARKERS.authRateLimiterNamespaceId,
+    );
+    expect(namespaceByName(config.ratelimits, "WE_MET_APP_RATE_LIMITER")).toBe(
+      PRODUCTION_MARKERS.appRateLimiterNamespaceId,
+    );
+
     const previewLimits = config.previews?.ratelimits as
-      { namespace_id: string }[] | undefined;
-    expect(previewLimits?.[0]?.namespace_id).toBe(
-      NONPROD_MARKERS.rateLimiterNamespaceId,
+      { name: string; namespace_id: string }[] | undefined;
+    expect(namespaceByName(previewLimits, "WE_MET_EXCHANGE_RATE_LIMITER")).toBe(
+      NONPROD_MARKERS.exchangeRateLimiterNamespaceId,
     );
-    expect(config.ratelimits?.[0]?.namespace_id).not.toBe(
-      previewLimits?.[0]?.namespace_id,
+    expect(namespaceByName(previewLimits, "WE_MET_AUTH_RATE_LIMITER")).toBe(
+      NONPROD_MARKERS.authRateLimiterNamespaceId,
+    );
+    expect(namespaceByName(previewLimits, "WE_MET_APP_RATE_LIMITER")).toBe(
+      NONPROD_MARKERS.appRateLimiterNamespaceId,
     );
   });
 
@@ -71,7 +92,11 @@ describe("wrangler config isolation (unit)", () => {
     expect(previewStrings).not.toContain(PRODUCTION_MARKERS.d1);
     expect(previewStrings).not.toContain(PRODUCTION_MARKERS.r2);
     expect(previewStrings).not.toContain(PRODUCTION_MARKERS.queue);
-    expect(previewStrings).not.toContain(PRODUCTION_MARKERS.rateLimiterNamespaceId);
+    expect(previewStrings).not.toContain(
+      PRODUCTION_MARKERS.exchangeRateLimiterNamespaceId,
+    );
+    expect(previewStrings).not.toContain(PRODUCTION_MARKERS.authRateLimiterNamespaceId);
+    expect(previewStrings).not.toContain(PRODUCTION_MARKERS.appRateLimiterNamespaceId);
   });
 
   it("uses non-prod resource names in the previews block", () => {
