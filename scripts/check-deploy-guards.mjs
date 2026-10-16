@@ -19,6 +19,7 @@ import {
 } from "./lib/queue-retry-policy.mjs";
 import {
   NONPROD_RESOURCE_MARKERS,
+  PRODUCTION_APP_HOST,
   PRODUCTION_RESOURCE_MARKERS,
   RATE_LIMIT_BINDINGS,
 } from "./lib/wrangler-placeholders.mjs";
@@ -206,7 +207,28 @@ function checkDistinctD1Ids(config) {
   }
 }
 
+function routePatterns(config) {
+  return (config.routes ?? [])
+    .map((row) => row?.pattern)
+    .filter((pattern) => typeof pattern === "string");
+}
+
+function checkProductionAppHostRoute(config) {
+  const patterns = routePatterns(config);
+  if (!patterns.includes(PRODUCTION_APP_HOST)) {
+    fail(`production routes must include custom domain ${PRODUCTION_APP_HOST}`);
+  }
+}
+
+function checkPreviewBlockNoAppHostRoute(previews) {
+  const patterns = routePatterns(previews ?? {});
+  if (patterns.includes(PRODUCTION_APP_HOST)) {
+    fail(`previews.routes must not include production app host ${PRODUCTION_APP_HOST}`);
+  }
+}
+
 function checkPreviewBlock(previews) {
+  checkPreviewBlockNoAppHostRoute(previews);
   const strings = collectStrings(previews ?? {});
   const productionMarkers = [
     PRODUCTION_RESOURCE_MARKERS.d1Name,
@@ -446,6 +468,7 @@ function checkProductionBlock(config) {
     }
   }
   checkRateLimitBindings(rlRows, true);
+  checkProductionAppHostRoute(config);
 }
 
 function main() {

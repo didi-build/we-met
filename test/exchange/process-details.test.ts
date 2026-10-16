@@ -4,6 +4,7 @@ import { MemoryLeadDeliveryLedger } from "@/lead-delivery-ledger/memory-reposito
 import { processDetails } from "@/exchange/process-details";
 import { createDetailsToken } from "@/exchange/token";
 import { exampleCardInput } from "../helpers/example-card";
+import { leadEmailCapacityAlwaysAllowed } from "../helpers/lead-email-deps";
 
 describe("processDetails (unit)", () => {
   it("dispatches append-details sink messages", async () => {
@@ -56,6 +57,7 @@ describe("processDetails (unit)", () => {
         createLedgerId: () => "ledger-1",
         now: () => new Date("2026-10-12T12:00:00.000Z"),
         baseUrl: "https://we-met.link",
+        ...leadEmailCapacityAlwaysAllowed,
       },
     );
 
@@ -84,6 +86,7 @@ describe("processDetails (unit)", () => {
         createLedgerId: () => "ledger-1",
         now: () => new Date(),
         baseUrl: "https://we-met.link",
+        ...leadEmailCapacityAlwaysAllowed,
       },
     );
     expect(result.status).toBe("invalid_token");

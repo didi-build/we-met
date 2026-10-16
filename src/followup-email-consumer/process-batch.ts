@@ -25,6 +25,7 @@ import { createEmailLeadSinkHandler } from "@/followup-email-consumer/lead-sink/
 import { createLeadSinkHandlerRegistry } from "@/followup-email-consumer/lead-sink/registry";
 import { processLeadSinkQueueMessage } from "@/followup-email-consumer/process-lead-sink";
 import { UnsupportedQueueMessageError } from "@/followup-email-consumer/unsupported-queue-message";
+import { readLeadEmailEnabled } from "@/app-settings/caps";
 import {
   isLeadSinkQueueMessageType,
   isUnsupportedQueueMessageType,
@@ -59,6 +60,7 @@ export type FollowupConsumerEnv = {
 };
 
 export type FollowupConsumerDeps = {
+  isLeadEmailEnabled: () => Promise<boolean>;
   weMetEnv: string;
   baseUrl: string;
   testMailTo?: string;
@@ -75,6 +77,7 @@ export type FollowupConsumerDeps = {
     error: FollowupEmailErrorLogFields,
   ): void;
   logMalformedVisitorFollowup(leadId: string | null): void;
+  logVisitorFollowupDroppedPaused(leadId: string): void;
   logUnsupportedType(typeLabel: string): void;
   logMissingPhoto(key: string): void;
   logNonJpegPhoto(key: string): void;
@@ -142,6 +145,7 @@ export function createFollowupConsumerDepsFromEnv(
   const { baseUrl } = readWeMetHostConfig(env);
 
   return {
+    isLeadEmailEnabled: () => readLeadEmailEnabled(env.WE_MET_DB),
     weMetEnv: env.WE_MET_ENV,
     baseUrl,
     testMailTo: env.WE_MET_TEST_MAIL_TO,
@@ -165,6 +169,9 @@ export function createFollowupConsumerDepsFromEnv(
     },
     logMalformedVisitorFollowup(leadId) {
       console.error("visitor_followup_malformed", { leadId });
+    },
+    logVisitorFollowupDroppedPaused(leadId) {
+      console.error("visitor_followup_dropped_paused", { leadId });
     },
     logUnsupportedType(typeLabel) {
       console.error("followup_unsupported_queue_type", { typeLabel });
@@ -295,6 +302,12 @@ async function processQueueMessage(
         ? (message.body as { lead: { leadId: string } }).lead.leadId
         : null;
     deps.logMalformedVisitorFollowup(leadId);
+    message.ack();
+    return;
+  }
+
+  if (!(await deps.isLeadEmailEnabled())) {
+    deps.logVisitorFollowupDroppedPaused(parsed.lead.leadId);
     message.ack();
     return;
   }

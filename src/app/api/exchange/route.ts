@@ -54,6 +54,8 @@ export async function POST(request: Request) {
       return Response.json({ error: "rate_limited" }, { status: 429 });
     case "card_not_found":
       return Response.json({ error: "card_not_found" }, { status: 404 });
+    case "lead_email_unavailable":
+      return Response.json({ error: "lead_email_unavailable" }, { status: 503 });
     case "enqueue_failed":
       return Response.json({ error: "server_error" }, { status: 500 });
     default:

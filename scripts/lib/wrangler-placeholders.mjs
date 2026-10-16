@@ -6,6 +6,8 @@ export const WRANGLER_D1_NONPROD_CI_CONFIG = "wrangler.d1-nonprod.ci.jsonc";
 export const D1_PLACEHOLDER_PRODUCTION = "00000000-0000-0000-0000-000000000001";
 export const D1_PLACEHOLDER_NONPROD = "00000000-0000-0000-0000-000000000002";
 
+export const PRODUCTION_APP_HOST = "app.we-met.link";
+
 export const PRODUCTION_RESOURCE_MARKERS = {
   d1Name: "we-met-db",
   r2Bucket: "we-met-assets",

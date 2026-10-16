@@ -11,6 +11,7 @@ function createNoopConsumerD1(): D1Database {
     bind: () => ({
       run: async () => ({ meta: { changes: 0 } }),
       first: async () => null,
+      all: async () => ({ results: [] }),
     }),
   };
   return {

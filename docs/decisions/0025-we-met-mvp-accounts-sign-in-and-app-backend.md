@@ -24,7 +24,7 @@ Facts this design rests on (read from the repo on 2026-10-15):
 
 - **Open sign-up** for any Google account, controlled by the flag `signups_open`.
 - **Launch controls:**
-  - Kill switch: rows in `app_settings`, checked when a lead email is enqueued and again by the consumer before each send.
+  - Kill switch: rows in `app_settings`, checked on exchange and details **before** any ledger row or enqueue, and again by the consumer before each send.
   - Daily caps on lead email only (owner and visitor emails), global and per card, stored in `app_settings`. The numbers are set at launch, under Google's current Workspace sending limit (UNVERIFIED, checked in the maintainer ticket).
   - The existing Turnstile, honeypot and rate limit on the card forms stay as they are.
   - Every user field is validated server-side with `CARD_FIELD_LIMITS`.
@@ -142,9 +142,17 @@ Routes (all JSON; served only on the app host, preview hosts and localhost, and 
 - **Photo cap:** five uploads per hour per account, counted in D1 `photo_upload_log` when an upload reaches the Images binding (migration `0006`).
 - **Image ingestion:** implemented in phase 3 (`src/images/ingest-card-photo.ts`); the only writer to `WE_MET_ASSETS`.
 
+## Phase 4 implementation notes (DIDI-617)
+
+- **Refusal at submit:** when `lead_email_enabled` is off or a daily cap would be exceeded, exchange and details return **503** with `lead_email_unavailable` and create no ledger row, queue message, or counter change. The response does not reveal which limit applied.
+- **Fail-closed caps:** missing, non-numeric, or non-positive `daily_cap_global` or `daily_cap_per_card` rejects new submissions the same way. Missing `lead_email_enabled` still defaults to enabled (`src/app-settings/defaults.ts`).
+- **Counters:** `daily_send_counts` increments for `owner` and/or `visitor` in the same D1 batch as the ledger insert (exchange reserves two sends; details append uses `changes() > 0` in-batch so duplicate append does not bump counts). UTC calendar day. **Verified locally (2026-10-16):** isolated D1 batch with conditional increment after `ON CONFLICT DO NOTHING` append insert.
+- **Consumer:** when the switch is off, queued sink mail is marked ledger `failed` with `lead_email_paused`, nothing is sent, and the message is acked (no retry). Visitor follow-up messages are acked without send. Caps are not rechecked in the consumer.
+- **Holding / retry when capped:** out of scope ([DIDI-609](https://linear.app/didi-build/issue/DIDI-609)).
+
 ## Assumptions and UNVERIFIED items
 
-- **A1 (needs the maintainer's review):** when the kill switch is off or a daily cap is reached, the exchange still returns 200 so visitors are not blocked. The lead's ledger row is marked `failed` with error code `lead_email_paused` or `daily_cap_reached`, no lead or visitor email is sent, and the consumer drops (does not hold) messages that were already queued. Visitors may therefore get no follow-up, and the owner sees a failed ledger row.
+- **A1 (decided 2026-10-16):** when the kill switch is off or a daily cap is reached, **new** exchange and details submissions are rejected up front with **503** `lead_email_unavailable` (no ledger row, enqueue, or counter change). Messages already on the queue when the switch turns off are dropped by the consumer: sink deliveries mark the ledger row `failed` with `lead_email_paused`; visitor follow-up is acked without send. Holding and retrying capped submissions stays in [DIDI-609](https://linear.app/didi-build/issue/DIDI-609).
 - D1 batch atomicity and whether the migration script wraps each migration in a transaction.
 - That the photo and vCard routes share the lookup used by the page.
 - That `hostnames` is empty in production.

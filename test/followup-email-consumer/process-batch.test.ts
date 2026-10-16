@@ -14,6 +14,7 @@ import {
   type FollowupQueueMessage,
 } from "@/followup-email-consumer/process-batch";
 import { MemoryConsumerLeadDeliveryLedger } from "../followup-email-consumer/memory-consumer-ledger";
+import { leadEmailConsumerEnabled } from "../helpers/lead-email-deps";
 
 const card: CardEmailSnapshot = {
   slug: "demo",
@@ -100,6 +101,7 @@ function createDeps(
     });
 
   return {
+    ...leadEmailConsumerEnabled,
     weMetEnv,
     baseUrl: overrides.baseUrl ?? "https://we-met.link",
     testMailTo,
@@ -131,6 +133,7 @@ function createDeps(
     logVisitorFollowupAttemptFailure: vi.fn(),
     logVisitorFollowupPermanentFailure: vi.fn(),
     logMalformedVisitorFollowup: vi.fn(),
+    logVisitorFollowupDroppedPaused: vi.fn(),
     logUnsupportedType: vi.fn(),
     logMissingPhoto: vi.fn(),
     logNonJpegPhoto: vi.fn(),

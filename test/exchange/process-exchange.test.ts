@@ -5,6 +5,7 @@ import { exampleCardInput } from "../helpers/example-card";
 import { processExchange } from "@/exchange/process-exchange";
 import type { ProcessExchangeDeps } from "@/exchange/process-exchange";
 import type { ValidatedExchangeInput } from "@/exchange/validation";
+import { leadEmailCapacityAlwaysAllowed } from "../helpers/lead-email-deps";
 
 function baseInput(
   overrides: Partial<ValidatedExchangeInput> = {},
@@ -54,12 +55,26 @@ function createDeps(
     createLedgerId: () => "ledger-1",
     now: () => new Date("2026-10-12T12:00:00.000Z"),
     baseUrl: "https://we-met.link",
+    ...leadEmailCapacityAlwaysAllowed,
     ...overrides,
   };
   return { ...deps, followupMessages, sinkMessages };
 }
 
 describe("processExchange (unit)", () => {
+  it("returns rate_limited before lead email capacity is checked", async () => {
+    const repo = new MemoryCardRepository();
+    const card = await repo.upsertCard(exampleCardInput());
+    const capacityCheck = vi.fn(async () => true);
+    const deps = createDeps({
+      rateLimiter: { check: async () => ({ allowed: false }) },
+      assertLeadEmailCapacity: capacityCheck,
+    });
+    const result = await processExchange(baseInput(), card, [], deps);
+    expect(result.status).toBe("rate_limited");
+    expect(capacityCheck).not.toHaveBeenCalled();
+  });
+
   it("enqueues visitor follow-up and returns a token on success", async () => {
     const repo = new MemoryCardRepository();
     const card = await repo.upsertCard(exampleCardInput());

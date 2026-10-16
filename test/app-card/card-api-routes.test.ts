@@ -52,6 +52,33 @@ describe("app card API routes (integration)", () => {
     setRequestHeaders({ host: "localhost:3000" });
   });
 
+  it("returns 403 for suspended accounts on card routes", async () => {
+    await withIsolatedLocalD1(async (db) => {
+      routeMocks.env.WE_MET_DB = db;
+      const now = new Date().toISOString();
+      await db
+        .prepare(
+          `INSERT INTO accounts (id, google_sub, email, name, status, created_at, updated_at)
+           VALUES ('a-susp', 'sub-susp', 'owner@example.com', 'Owner', 'suspended', ?, ?)`,
+        )
+        .bind(now, now)
+        .run();
+      const session = await createSession(db, "a-susp");
+      setRequestHeaders({
+        host: "localhost:3000",
+        cookie: `${SESSION_COOKIE_NAME}=${session.token}`,
+      });
+      const response = await draftPut(
+        new Request("http://localhost/api/app/card/draft", {
+          method: "PUT",
+          headers: mutationHeaders(),
+          body: JSON.stringify({ slug: "", name: "X" }),
+        }),
+      );
+      expect(response.status).toBe(403);
+    });
+  });
+
   it("returns 403 for waitlisted accounts on card routes", async () => {
     await withIsolatedLocalD1(async (db) => {
       routeMocks.env.WE_MET_DB = db;
