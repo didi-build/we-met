@@ -23,6 +23,28 @@ export function incrementDailySendStatements(
   );
 }
 
+/**
+ * Increments only when the immediately preceding statement in the same D1 batch
+ * inserted a row (SQLite changes() > 0). Used with append ledger ON CONFLICT DO NOTHING.
+ */
+export function incrementDailySendAfterLedgerInsertStatements(
+  db: D1Database,
+  day: string,
+  cardId: string,
+  kinds: readonly DailySendKind[],
+): D1PreparedStatement[] {
+  return kinds.map((kind) =>
+    db
+      .prepare(
+        `INSERT INTO daily_send_counts (day, card_id, kind, count)
+         SELECT ?, ?, ?, 1
+         WHERE changes() > 0
+         ON CONFLICT(day, card_id, kind) DO UPDATE SET count = count + 1`,
+      )
+      .bind(day, cardId, kind),
+  );
+}
+
 export async function sumGlobalDailySendCount(
   db: D1Database,
   day: string,

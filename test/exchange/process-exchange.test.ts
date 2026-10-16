@@ -62,6 +62,19 @@ function createDeps(
 }
 
 describe("processExchange (unit)", () => {
+  it("returns rate_limited before lead email capacity is checked", async () => {
+    const repo = new MemoryCardRepository();
+    const card = await repo.upsertCard(exampleCardInput());
+    const capacityCheck = vi.fn(async () => true);
+    const deps = createDeps({
+      rateLimiter: { check: async () => ({ allowed: false }) },
+      assertLeadEmailCapacity: capacityCheck,
+    });
+    const result = await processExchange(baseInput(), card, [], deps);
+    expect(result.status).toBe("rate_limited");
+    expect(capacityCheck).not.toHaveBeenCalled();
+  });
+
   it("enqueues visitor follow-up and returns a token on success", async () => {
     const repo = new MemoryCardRepository();
     const card = await repo.upsertCard(exampleCardInput());

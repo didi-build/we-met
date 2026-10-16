@@ -1,5 +1,8 @@
 import type { D1Database } from "@cloudflare/workers-types";
-import { incrementDailySendStatements } from "@/lead-email/daily-send-counts";
+import {
+  incrementDailySendAfterLedgerInsertStatements,
+  incrementDailySendStatements,
+} from "@/lead-email/daily-send-counts";
 import type {
   DailySendCountIncrement,
   InsertQueuedLeadDeliveryInput,
@@ -89,22 +92,18 @@ export function createLeadDeliveryLedgerFromD1(db: D1Database): LeadDeliveryLedg
       input: InsertQueuedLeadDeliveryInput,
       increments: DailySendCountIncrement,
     ): Promise<boolean> {
-      const insertResult = await ledgerAppendInsertStatement(db, input).run();
-      const inserted = (insertResult.meta.changes ?? 0) > 0;
-      if (!inserted) {
-        return false;
-      }
-      if (increments.kinds.length > 0) {
-        await db.batch(
-          incrementDailySendStatements(
-            db,
-            increments.day,
-            increments.cardId,
-            increments.kinds,
-          ),
-        );
-      }
-      return true;
+      const statements = [
+        ledgerAppendInsertStatement(db, input),
+        ...incrementDailySendAfterLedgerInsertStatements(
+          db,
+          increments.day,
+          increments.cardId,
+          increments.kinds,
+        ),
+      ];
+      const results = await db.batch(statements);
+      const insertResult = results[0];
+      return (insertResult.meta.changes ?? 0) > 0;
     },
 
     async markFailed(

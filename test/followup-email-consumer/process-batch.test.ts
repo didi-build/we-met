@@ -133,6 +133,7 @@ function createDeps(
     logVisitorFollowupAttemptFailure: vi.fn(),
     logVisitorFollowupPermanentFailure: vi.fn(),
     logMalformedVisitorFollowup: vi.fn(),
+    logVisitorFollowupDroppedPaused: vi.fn(),
     logUnsupportedType: vi.fn(),
     logMissingPhoto: vi.fn(),
     logNonJpegPhoto: vi.fn(),

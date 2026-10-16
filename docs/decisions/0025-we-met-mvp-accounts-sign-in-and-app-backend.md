@@ -146,7 +146,7 @@ Routes (all JSON; served only on the app host, preview hosts and localhost, and 
 
 - **Refusal at submit:** when `lead_email_enabled` is off or a daily cap would be exceeded, exchange and details return **503** with `lead_email_unavailable` and create no ledger row, queue message, or counter change. The response does not reveal which limit applied.
 - **Fail-closed caps:** missing, non-numeric, or non-positive `daily_cap_global` or `daily_cap_per_card` rejects new submissions the same way. Missing `lead_email_enabled` still defaults to enabled (`src/app-settings/defaults.ts`).
-- **Counters:** `daily_send_counts` increments for `owner` and/or `visitor` in the same D1 batch as the ledger insert (exchange reserves two sends; details one). UTC calendar day.
+- **Counters:** `daily_send_counts` increments for `owner` and/or `visitor` in the same D1 batch as the ledger insert (exchange reserves two sends; details append uses `changes() > 0` in-batch so duplicate append does not bump counts). UTC calendar day. **Verified locally (2026-10-16):** isolated D1 batch with conditional increment after `ON CONFLICT DO NOTHING` append insert.
 - **Consumer:** when the switch is off, queued sink mail is marked ledger `failed` with `lead_email_paused`, nothing is sent, and the message is acked (no retry). Visitor follow-up messages are acked without send. Caps are not rechecked in the consumer.
 - **Holding / retry when capped:** out of scope ([DIDI-609](https://linear.app/didi-build/issue/DIDI-609)).
 

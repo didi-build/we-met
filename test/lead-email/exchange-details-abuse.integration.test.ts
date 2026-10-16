@@ -257,6 +257,256 @@ describe("exchange and details abuse controls (D1 integration)", () => {
     });
   });
 
+  it("rejects exchange and details at global cap with no side effects", async () => {
+    await withIsolatedLocalD1(async (db) => {
+      await seedSettings(db, {
+        [APP_SETTING_LEAD_EMAIL_ENABLED]: "1",
+        [APP_SETTING_DAILY_CAP_GLOBAL]: "2",
+        [APP_SETTING_DAILY_CAP_PER_CARD]: "100",
+      });
+      await db
+        .prepare(
+          `INSERT INTO daily_send_counts (day, card_id, kind, count) VALUES ('2026-10-16', 'other-card', 'owner', 2)`,
+        )
+        .run();
+      const repo = new MemoryCardRepository();
+      const card = await repo.upsertCard(exampleCardInput());
+      const sinks = [
+        {
+          id: "sink-1",
+          cardId: card.id,
+          kind: "email",
+          config: { to: "owner@example.com" },
+          enabled: true,
+          createdAt: "",
+          updatedAt: "",
+        },
+      ];
+      const sinkMessages: unknown[] = [];
+      const deps = exchangeDeps(db, sinkMessages);
+      const exchange = await processExchange(
+        {
+          slug: card.slug,
+          name: "Visitor",
+          email: "visitor@example.com",
+          phone: null,
+          turnstileToken: "tok",
+        },
+        card,
+        sinks,
+        deps,
+      );
+      expect(exchange.status).toBe("lead_email_unavailable");
+      expect(sinkMessages).toHaveLength(0);
+      expect(deps._followup).toHaveLength(0);
+
+      const token = createDetailsToken(
+        "secret",
+        {
+          leadId: "lead-abuse-1",
+          cardId: card.id,
+          cardSlug: card.slug,
+          visitorEmail: "visitor@example.com",
+          visitorName: "Visitor",
+        },
+        Math.floor(new Date("2026-10-16T12:00:00.000Z").getTime() / 1000),
+      );
+      const details = await processDetails(
+        { token, jobTitle: "CTO", company: "Co", note: "Hi" },
+        card,
+        sinks,
+        {
+          tokenSecret: "secret",
+          environment: "preview",
+          leadSinkQueue: deps.leadSinkQueue,
+          deliveryLedger: deps.deliveryLedger,
+          deliveryLogger: deps.deliveryLogger,
+          leadSinkLogger: deps.leadSinkLogger,
+          createLedgerId: () => "ledger-details-global",
+          now: deps.now,
+          baseUrl: "https://we-met.link",
+          assertLeadEmailCapacity: deps.assertLeadEmailCapacity,
+        },
+      );
+      expect(details.status).toBe("lead_email_unavailable");
+      const ledgerCount = await db
+        .prepare("SELECT COUNT(*) AS c FROM lead_delivery_ledger")
+        .first<{ c: number }>();
+      expect(ledgerCount?.c).toBe(0);
+      const counterCount = await db
+        .prepare(
+          "SELECT COALESCE(SUM(count), 0) AS c FROM daily_send_counts WHERE card_id = ?",
+        )
+        .bind(card.id)
+        .first<{ c: number }>();
+      expect(counterCount?.c).toBe(0);
+    });
+  });
+
+  it("starts new counts on a new UTC day with a fixed clock", async () => {
+    await withIsolatedLocalD1(async (db) => {
+      await seedSettings(db, {
+        [APP_SETTING_LEAD_EMAIL_ENABLED]: "1",
+        [APP_SETTING_DAILY_CAP_GLOBAL]: "500",
+        [APP_SETTING_DAILY_CAP_PER_CARD]: "100",
+      });
+      const repo = new MemoryCardRepository();
+      const card = await repo.upsertCard(exampleCardInput());
+      const sinks = [
+        {
+          id: "sink-1",
+          cardId: card.id,
+          kind: "email",
+          config: { to: "owner@example.com" },
+          enabled: true,
+          createdAt: "",
+          updatedAt: "",
+        },
+      ];
+      let nowMs = new Date("2026-10-16T23:59:00.000Z").getTime();
+      const sinkMessages: unknown[] = [];
+      const ledger = createLeadDeliveryLedgerFromD1(db);
+      const buildDeps = () => ({
+        turnstile: { verify: async () => ({ success: true }) },
+        rateLimiter: { check: async () => ({ allowed: true }) },
+        followupQueue: { enqueueVisitorFollowup: async () => undefined },
+        leadSinkQueue: {
+          enqueueLeadSink: async (message: unknown) => {
+            sinkMessages.push(message);
+          },
+        },
+        deliveryLedger: ledger,
+        deliveryLogger: {
+          logLedgerWriteFailed: vi.fn(),
+          logLedgerEnqueueFailed: vi.fn(),
+        },
+        tokenSecret: "secret",
+        environment: "preview",
+        clientIp: "203.0.113.1",
+        leadSinkLogger: { logSinkEnqueueFailure: vi.fn() },
+        createLeadId: () => `lead-day-${nowMs}`,
+        createLedgerId: () => `ledger-day-${nowMs}`,
+        now: () => new Date(nowMs),
+        baseUrl: "https://we-met.link",
+        assertLeadEmailCapacity: (cardId: string, needed: number) =>
+          assertLeadEmailCapacity(db, cardId, needed, new Date(nowMs)),
+        incrementDailySendCounts: async () => undefined,
+      });
+
+      await processExchange(
+        {
+          slug: card.slug,
+          name: "Visitor",
+          email: "visitor@example.com",
+          phone: null,
+          turnstileToken: "tok",
+        },
+        card,
+        sinks,
+        buildDeps(),
+      );
+      nowMs = new Date("2026-10-17T00:01:00.000Z").getTime();
+      sinkMessages.length = 0;
+      const second = await processExchange(
+        {
+          slug: card.slug,
+          name: "Visitor Two",
+          email: "visitor2@example.com",
+          phone: null,
+          turnstileToken: "tok",
+        },
+        card,
+        sinks,
+        buildDeps(),
+      );
+      expect(second.status).toBe("success");
+      const day16 = await db
+        .prepare(
+          `SELECT COALESCE(SUM(count), 0) AS c FROM daily_send_counts WHERE day = '2026-10-16' AND card_id = ?`,
+        )
+        .bind(card.id)
+        .first<{ c: number }>();
+      const day17 = await db
+        .prepare(
+          `SELECT COALESCE(SUM(count), 0) AS c FROM daily_send_counts WHERE day = '2026-10-17' AND card_id = ?`,
+        )
+        .bind(card.id)
+        .first<{ c: number }>();
+      expect(day16?.c).toBe(2);
+      expect(day17?.c).toBe(2);
+    });
+  });
+
+  it("details increments owner counter once and not on duplicate append", async () => {
+    await withIsolatedLocalD1(async (db) => {
+      await seedSettings(db, {
+        [APP_SETTING_LEAD_EMAIL_ENABLED]: "1",
+        [APP_SETTING_DAILY_CAP_GLOBAL]: "500",
+        [APP_SETTING_DAILY_CAP_PER_CARD]: "100",
+      });
+      const repo = new MemoryCardRepository();
+      const card = await repo.upsertCard(exampleCardInput());
+      const sinks = [
+        {
+          id: "sink-1",
+          cardId: card.id,
+          kind: "email",
+          config: { to: "owner@example.com" },
+          enabled: true,
+          createdAt: "",
+          updatedAt: "",
+        },
+      ];
+      const sinkMessages: unknown[] = [];
+      const deps = exchangeDeps(db, sinkMessages);
+      const token = createDetailsToken(
+        "secret",
+        {
+          leadId: "lead-abuse-1",
+          cardId: card.id,
+          cardSlug: card.slug,
+          visitorEmail: "visitor@example.com",
+          visitorName: "Visitor",
+        },
+        Math.floor(new Date("2026-10-16T12:00:00.000Z").getTime() / 1000),
+      );
+      const detailsDeps = {
+        tokenSecret: "secret",
+        environment: "preview",
+        leadSinkQueue: deps.leadSinkQueue,
+        deliveryLedger: deps.deliveryLedger,
+        deliveryLogger: deps.deliveryLogger,
+        leadSinkLogger: deps.leadSinkLogger,
+        createLedgerId: () => "ledger-details-dup",
+        now: deps.now,
+        baseUrl: "https://we-met.link",
+        assertLeadEmailCapacity: deps.assertLeadEmailCapacity,
+      };
+      const first = await processDetails(
+        { token, jobTitle: "CTO", company: "Co", note: "Hi" },
+        card,
+        sinks,
+        detailsDeps,
+      );
+      const second = await processDetails(
+        { token, jobTitle: "CTO", company: "Co", note: "Hi again" },
+        card,
+        sinks,
+        detailsDeps,
+      );
+      expect(first.status).toBe("success");
+      expect(second.status).toBe("success");
+      const owner = await db
+        .prepare(
+          `SELECT count FROM daily_send_counts WHERE day = '2026-10-16' AND card_id = ? AND kind = 'owner'`,
+        )
+        .bind(card.id)
+        .first<{ count: number }>();
+      expect(owner?.count).toBe(1);
+      expect(sinkMessages).toHaveLength(1);
+    });
+  });
+
   it("still runs turnstile before lead email checks", async () => {
     await withIsolatedLocalD1(async (db) => {
       await seedSettings(db, {

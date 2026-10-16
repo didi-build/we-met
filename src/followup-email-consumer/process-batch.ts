@@ -77,6 +77,7 @@ export type FollowupConsumerDeps = {
     error: FollowupEmailErrorLogFields,
   ): void;
   logMalformedVisitorFollowup(leadId: string | null): void;
+  logVisitorFollowupDroppedPaused(leadId: string): void;
   logUnsupportedType(typeLabel: string): void;
   logMissingPhoto(key: string): void;
   logNonJpegPhoto(key: string): void;
@@ -168,6 +169,9 @@ export function createFollowupConsumerDepsFromEnv(
     },
     logMalformedVisitorFollowup(leadId) {
       console.error("visitor_followup_malformed", { leadId });
+    },
+    logVisitorFollowupDroppedPaused(leadId) {
+      console.error("visitor_followup_dropped_paused", { leadId });
     },
     logUnsupportedType(typeLabel) {
       console.error("followup_unsupported_queue_type", { typeLabel });
@@ -303,6 +307,7 @@ async function processQueueMessage(
   }
 
   if (!(await deps.isLeadEmailEnabled())) {
+    deps.logVisitorFollowupDroppedPaused(parsed.lead.leadId);
     message.ack();
     return;
   }

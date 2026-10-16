@@ -5,10 +5,19 @@ import { leadEmailEnabledFromSettingValue } from "@/app-settings/defaults";
 describe("lead email caps (unit)", () => {
   it("parses positive integer caps only", () => {
     expect(parsePositiveCapValue("100")).toBe(100);
-    expect(parsePositiveCapValue("0")).toBeNull();
-    expect(parsePositiveCapValue("-1")).toBeNull();
-    expect(parsePositiveCapValue("abc")).toBeNull();
+    expect(parsePositiveCapValue("1")).toBe(1);
+  });
+
+  it.each(["0", "", "-5", "100abc", "1e3", "12.5", "abc"])(
+    "rejects invalid cap string %s",
+    (value) => {
+      expect(parsePositiveCapValue(value)).toBeNull();
+    },
+  );
+
+  it("rejects null and undefined cap values", () => {
     expect(parsePositiveCapValue(null)).toBeNull();
+    expect(parsePositiveCapValue(undefined)).toBeNull();
   });
 
   it("defaults missing lead_email_enabled to enabled", () => {

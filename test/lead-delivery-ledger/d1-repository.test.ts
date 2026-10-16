@@ -25,6 +25,40 @@ describe("lead delivery ledger D1 (integration)", () => {
     });
   });
 
+  it("does not increment daily_send_counts when append ledger insert conflicts", async () => {
+    await withIsolatedLocalD1(async (db) => {
+      const ledger = createLeadDeliveryLedgerFromD1(db);
+      const base = {
+        id: "row-1",
+        leadId: "lead-1",
+        cardId: "card-1",
+        sinkId: "sink-1",
+        sinkKind: "email",
+        phase: "append" as const,
+        retryUntil: "2026-10-13T12:00:00.000Z",
+        createdAt: "2026-10-12T12:00:00.000Z",
+      };
+      const inserted = await ledger.insertAppendIfAbsentWithDailySendIncrements(base, {
+        day: "2026-10-12",
+        cardId: "card-1",
+        kinds: ["owner"],
+      });
+      expect(inserted).toBe(true);
+      const skipped = await ledger.insertAppendIfAbsentWithDailySendIncrements(
+        { ...base, id: "row-2" },
+        { day: "2026-10-12", cardId: "card-1", kinds: ["owner"] },
+      );
+      expect(skipped).toBe(false);
+      const row = await db
+        .prepare(
+          `SELECT count FROM daily_send_counts WHERE day = ? AND card_id = ? AND kind = 'owner'`,
+        )
+        .bind("2026-10-12", "card-1")
+        .first<{ count: number }>();
+      expect(row?.count).toBe(1);
+    });
+  });
+
   it("rejects invalid phase via CHECK constraint", async () => {
     await withIsolatedLocalD1(async (db) => {
       await expect(

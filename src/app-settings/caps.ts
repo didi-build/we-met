@@ -12,12 +12,18 @@ export type LeadEmailControls = {
   dailyCapPerCard: number | null;
 };
 
+const POSITIVE_CAP_DIGITS = /^\d+$/;
+
 export function parsePositiveCapValue(value: string | null | undefined): number | null {
-  if (value === undefined || value === null || value.trim() === "") {
+  if (value === undefined || value === null) {
     return null;
   }
-  const parsed = Number.parseInt(value.trim(), 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
+  const trimmed = value.trim();
+  if (trimmed === "" || !POSITIVE_CAP_DIGITS.test(trimmed)) {
+    return null;
+  }
+  const parsed = Number.parseInt(trimmed, 10);
+  if (parsed <= 0) {
     return null;
   }
   return parsed;
