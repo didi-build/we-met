@@ -1,6 +1,8 @@
 /** App settings keys in D1 `app_settings` (ADR 0025). */
 export const APP_SETTING_SIGNUPS_OPEN = "signups_open";
 export const APP_SETTING_LEAD_EMAIL_ENABLED = "lead_email_enabled";
+export const APP_SETTING_DAILY_CAP_GLOBAL = "daily_cap_global";
+export const APP_SETTING_DAILY_CAP_PER_CARD = "daily_cap_per_card";
 
 /**
  * Missing or empty `signups_open` is treated as closed (sign-ups off).

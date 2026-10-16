@@ -5,6 +5,7 @@ import { exampleCardInput } from "../helpers/example-card";
 import { processExchange } from "@/exchange/process-exchange";
 import type { ProcessExchangeDeps } from "@/exchange/process-exchange";
 import type { ValidatedExchangeInput } from "@/exchange/validation";
+import { leadEmailCapacityAlwaysAllowed } from "../helpers/lead-email-deps";
 
 function baseInput(
   overrides: Partial<ValidatedExchangeInput> = {},
@@ -54,6 +55,7 @@ function createDeps(
     createLedgerId: () => "ledger-1",
     now: () => new Date("2026-10-12T12:00:00.000Z"),
     baseUrl: "https://we-met.link",
+    ...leadEmailCapacityAlwaysAllowed,
     ...overrides,
   };
   return { ...deps, followupMessages, sinkMessages };

@@ -183,6 +183,25 @@ describe("check-deploy-guards (unit)", () => {
     expect(result.stderr).toContain('previews.vars.WE_MET_ENV must be "preview"');
   });
 
+  it("fails when production routes omit app.we-met.link", () => {
+    const { path } = writeTempConfig((config) => {
+      config.routes = [{ pattern: "we-met.link", custom_domain: true }];
+    });
+    const result = runGuards("production", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("app.we-met.link");
+  });
+
+  it("fails when previews.routes includes app.we-met.link", () => {
+    const { path } = writeTempConfig((config) => {
+      const previews = config.previews as Record<string, unknown>;
+      previews.routes = [{ pattern: "app.we-met.link", custom_domain: true }];
+    });
+    const result = runGuards("preview", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("app.we-met.link");
+  });
+
   it("fails when production Worker name is wrong", () => {
     const { path } = writeTempConfig((config) => {
       config.name = "wrong-worker";

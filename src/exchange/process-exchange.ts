@@ -18,6 +18,8 @@ import type { TurnstileVerifier } from "@/exchange/turnstile";
 import { absoluteUrl } from "@/config/we-met";
 import type { ExchangeSuccessResponse, VisitorLead } from "@/exchange/types";
 import type { ValidatedExchangeInput } from "@/exchange/validation";
+import type { DailySendKind } from "@/lead-email/daily-send-counts";
+import { utcDayFromDate } from "@/lead-email/daily-send-counts";
 
 export type ProcessExchangeDeps = {
   turnstile: TurnstileVerifier;
@@ -34,6 +36,11 @@ export type ProcessExchangeDeps = {
   createLedgerId: () => string;
   now: () => Date;
   baseUrl: string;
+  assertLeadEmailCapacity: (cardId: string, needed: number) => Promise<boolean>;
+  incrementDailySendCounts: (
+    cardId: string,
+    kinds: readonly DailySendKind[],
+  ) => Promise<void>;
 };
 
 export type ProcessExchangeResult =
@@ -41,6 +48,7 @@ export type ProcessExchangeResult =
   | { status: "turnstile_failed" }
   | { status: "rate_limited" }
   | { status: "card_not_found" }
+  | { status: "lead_email_unavailable" }
   | { status: "enqueue_failed" };
 
 function buildVisitorLead(
@@ -81,10 +89,16 @@ export async function processExchange(
     return { status: "rate_limited" };
   }
 
+  if (!(await deps.assertLeadEmailCapacity(card.id, 2))) {
+    return { status: "lead_email_unavailable" };
+  }
+
   const leadId = deps.createLeadId();
   const lead = buildVisitorLead(input, leadId, deps.environment, deps.now());
   const cardSnapshot = buildCardEmailSnapshot(card);
 
+  const day = utcDayFromDate(deps.now());
+  const enabledSinks = sinks.filter((s) => s.enabled);
   const sinkDispatchDeps: LeadSinkDispatchDeps = {
     producer: deps.leadSinkQueue,
     sinkLogger: deps.leadSinkLogger,
@@ -92,6 +106,10 @@ export async function processExchange(
     deliveryLogger: deps.deliveryLogger,
     now: deps.now,
     createLedgerId: deps.createLedgerId,
+    dailySendOnFirstLedger:
+      enabledSinks.length > 0
+        ? { day, cardId: card.id, kinds: ["owner", "visitor"] }
+        : undefined,
   };
 
   const sourceUrl = absoluteUrl(deps.baseUrl, `/hi/${card.slug}`);
@@ -103,6 +121,10 @@ export async function processExchange(
     sourceUrl,
     sinkDispatchDeps,
   );
+
+  if (enabledSinks.length === 0) {
+    await deps.incrementDailySendCounts(card.id, ["owner", "visitor"]);
+  }
 
   try {
     await deps.followupQueue.enqueueVisitorFollowup({

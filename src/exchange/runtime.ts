@@ -17,6 +17,11 @@ import type { ProcessDetailsDeps } from "@/exchange/process-details";
 import type { ProcessExchangeDeps } from "@/exchange/process-exchange";
 import type { TurnstileLogger } from "@/exchange/turnstile";
 import { createLeadDeliveryLedgerFromD1 } from "@/lead-delivery-ledger/d1-repository";
+import { assertLeadEmailCapacity } from "@/lead-email/availability";
+import {
+  incrementDailySendCounts,
+  utcDayFromDate,
+} from "@/lead-email/daily-send-counts";
 
 type ExchangeBindings = {
   WE_MET_FOLLOWUP_EMAIL_QUEUE?: CloudflareQueueBinding;
@@ -96,6 +101,7 @@ export async function createProcessExchangeDeps(
     throw new Error("WE_MET_DB binding is not configured");
   }
   const deliveryLedger = createLeadDeliveryLedgerFromD1(db);
+  const now = () => new Date();
 
   return {
     turnstile,
@@ -110,8 +116,12 @@ export async function createProcessExchangeDeps(
     leadSinkLogger: consoleSinkLogger(),
     createLeadId: () => crypto.randomUUID(),
     createLedgerId: () => crypto.randomUUID(),
-    now: () => new Date(),
+    now,
     baseUrl: hostConfig.baseUrl,
+    assertLeadEmailCapacity: (cardId, needed) =>
+      assertLeadEmailCapacity(db, cardId, needed, now()),
+    incrementDailySendCounts: (cardId, kinds) =>
+      incrementDailySendCounts(db, utcDayFromDate(now()), cardId, kinds),
   };
 }
 
@@ -135,6 +145,7 @@ export async function createProcessDetailsDeps(): Promise<ProcessDetailsDeps> {
     throw new Error("WE_MET_DB binding is not configured");
   }
   const deliveryLedger = createLeadDeliveryLedgerFromD1(db);
+  const now = () => new Date();
 
   return {
     tokenSecret,
@@ -144,7 +155,9 @@ export async function createProcessDetailsDeps(): Promise<ProcessDetailsDeps> {
     deliveryLogger: consoleDeliveryLogger(),
     leadSinkLogger: consoleSinkLogger(),
     createLedgerId: () => crypto.randomUUID(),
-    now: () => new Date(),
+    now,
     baseUrl: hostConfig.baseUrl,
+    assertLeadEmailCapacity: (cardId, needed) =>
+      assertLeadEmailCapacity(db, cardId, needed, now()),
   };
 }

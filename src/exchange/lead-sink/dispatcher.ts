@@ -1,6 +1,9 @@
 import type { LeadSinkRecord } from "@/card-data/types";
 import { computeLeadDeliveryRetryUntilIso } from "@/lead-delivery-ledger/retry-until";
-import type { LeadDeliveryLedger } from "@/lead-delivery-ledger/types";
+import type {
+  DailySendCountIncrement,
+  LeadDeliveryLedger,
+} from "@/lead-delivery-ledger/types";
 import type { LeadSinkQueueProducer } from "@/exchange/queue/producer";
 import type {
   LeadSinkAppendLead,
@@ -24,6 +27,8 @@ export type LeadSinkDispatchDeps = {
   deliveryLogger: LeadDeliveryDispatchLogger;
   now: () => Date;
   createLedgerId: () => string;
+  /** When set, the first ledger insert in this dispatch also increments daily_send_counts. */
+  dailySendOnFirstLedger?: DailySendCountIncrement;
 };
 
 export async function dispatchLeadOnExchange(
@@ -43,18 +48,28 @@ export async function dispatchLeadOnExchange(
   const createdAt = now.toISOString();
   const retryUntil = computeLeadDeliveryRetryUntilIso(now);
 
+  let dailySendApplied = false;
   for (const sink of enabled) {
     try {
-      await deps.ledger.insertQueuedRow({
+      const ledgerInput = {
         id: deps.createLedgerId(),
         leadId: lead.leadId,
         cardId,
         sinkId: sink.id,
         sinkKind: sink.kind,
-        phase: "record",
+        phase: "record" as const,
         retryUntil,
         createdAt,
-      });
+      };
+      if (deps.dailySendOnFirstLedger && !dailySendApplied) {
+        await deps.ledger.insertQueuedRowWithDailySendIncrements(
+          ledgerInput,
+          deps.dailySendOnFirstLedger,
+        );
+        dailySendApplied = true;
+      } else {
+        await deps.ledger.insertQueuedRow(ledgerInput);
+      }
     } catch {
       deps.deliveryLogger.logLedgerWriteFailed(
         lead.leadId,
@@ -119,16 +134,24 @@ export async function dispatchDetailsAppend(
   for (const sink of enabled) {
     let inserted = false;
     try {
-      inserted = await deps.ledger.insertAppendIfAbsent({
+      const ledgerInput = {
         id: deps.createLedgerId(),
         leadId: lead.leadId,
         cardId,
         sinkId: sink.id,
         sinkKind: sink.kind,
-        phase: "append",
+        phase: "append" as const,
         retryUntil,
         createdAt,
-      });
+      };
+      if (deps.dailySendOnFirstLedger) {
+        inserted = await deps.ledger.insertAppendIfAbsentWithDailySendIncrements(
+          ledgerInput,
+          deps.dailySendOnFirstLedger,
+        );
+      } else {
+        inserted = await deps.ledger.insertAppendIfAbsent(ledgerInput);
+      }
     } catch {
       deps.deliveryLogger.logLedgerWriteFailed(
         lead.leadId,

@@ -12,6 +12,7 @@ import { verifyDetailsToken } from "@/exchange/token";
 import { absoluteUrl } from "@/config/we-met";
 import type { LeadSinkAppendLead, VisitorLeadDetails } from "@/exchange/types";
 import type { ValidatedDetailsInput } from "@/exchange/validation";
+import { utcDayFromDate } from "@/lead-email/daily-send-counts";
 
 export type ProcessDetailsDeps = {
   tokenSecret: string;
@@ -23,10 +24,14 @@ export type ProcessDetailsDeps = {
   createLedgerId: () => string;
   now: () => Date;
   baseUrl: string;
+  assertLeadEmailCapacity: (cardId: string, needed: number) => Promise<boolean>;
 };
 
 export type ProcessDetailsResult =
-  { status: "success" } | { status: "invalid_token" } | { status: "card_not_found" };
+  | { status: "success" }
+  | { status: "invalid_token" }
+  | { status: "card_not_found" }
+  | { status: "lead_email_unavailable" };
 
 function leadFromToken(payload: {
   leadId: string;
@@ -63,6 +68,10 @@ export async function processDetails(
     return { status: "card_not_found" };
   }
 
+  if (!(await deps.assertLeadEmailCapacity(card.id, 1))) {
+    return { status: "lead_email_unavailable" };
+  }
+
   const details: VisitorLeadDetails = {
     jobTitle: input.jobTitle,
     company: input.company,
@@ -73,6 +82,7 @@ export async function processDetails(
   const sourceUrl = absoluteUrl(deps.baseUrl, `/hi/${card.slug}`);
   const detailsSubmittedAt = deps.now().toISOString();
 
+  const day = utcDayFromDate(deps.now());
   const sinkDispatchDeps: LeadSinkDispatchDeps = {
     producer: deps.leadSinkQueue,
     sinkLogger: deps.leadSinkLogger,
@@ -80,6 +90,7 @@ export async function processDetails(
     deliveryLogger: deps.deliveryLogger,
     now: deps.now,
     createLedgerId: deps.createLedgerId,
+    dailySendOnFirstLedger: { day, cardId: card.id, kinds: ["owner"] },
   };
 
   await dispatchDetailsAppend(

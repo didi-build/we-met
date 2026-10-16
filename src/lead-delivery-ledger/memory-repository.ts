@@ -1,4 +1,5 @@
 import type {
+  DailySendCountIncrement,
   InsertQueuedLeadDeliveryInput,
   LeadDeliveryLedger,
   LeadDeliveryPhase,
@@ -20,6 +21,13 @@ export class MemoryLeadDeliveryLedger implements LeadDeliveryLedger {
     this.rows.push({ ...input, status: "queued", errorCode: null });
   }
 
+  async insertQueuedRowWithDailySendIncrements(
+    input: InsertQueuedLeadDeliveryInput,
+    _increments: DailySendCountIncrement,
+  ): Promise<void> {
+    await this.insertQueuedRow(input);
+  }
+
   async insertAppendIfAbsent(input: InsertQueuedLeadDeliveryInput): Promise<boolean> {
     const key = rowKey(input.leadId, input.sinkId, "append");
     if (this.rows.some((r) => rowKey(r.leadId, r.sinkId, r.phase) === key)) {
@@ -27,6 +35,13 @@ export class MemoryLeadDeliveryLedger implements LeadDeliveryLedger {
     }
     this.rows.push({ ...input, phase: "append", status: "queued", errorCode: null });
     return true;
+  }
+
+  async insertAppendIfAbsentWithDailySendIncrements(
+    input: InsertQueuedLeadDeliveryInput,
+    _increments: DailySendCountIncrement,
+  ): Promise<boolean> {
+    return this.insertAppendIfAbsent(input);
   }
 
   async markFailed(

@@ -68,10 +68,27 @@ After the production Worker exists, set secrets while still on `wrangler login` 
 ```bash
 npx wrangler secret put WE_MET_TOKEN_SECRET
 npx wrangler secret put TURNSTILE_SECRET_KEY
+npx wrangler secret put GOOGLE_CLIENT_ID
+npx wrangler secret put GOOGLE_CLIENT_SECRET
 
 npx wrangler preview base-config secret put WE_MET_TOKEN_SECRET
 npx wrangler preview base-config secret put TURNSTILE_SECRET_KEY
 ```
+
+**Local development:** copy `WE_MET_APP_ORIGIN` from `.env.example` into `.env.local` (typically `http://localhost:3000`). Google OAuth uses a separate dev client with redirect URI on that origin.
+
+### App host route (`app.we-met.link`)
+
+Production `wrangler.jsonc` attaches **two** custom domains to Worker **`we-met`**: `we-met.link` (public cards) and **`app.we-met.link`** (editor SPA and `/api/app/*` + `/api/auth/*`). PR previews use **workers.dev** only; they never receive the `app.we-met.link` route (`check-deploy-guards.mjs` enforces this).
+
+**At MVP cutover ([DIDI-618](https://linear.app/didi-build/issue/DIDI-618)), not in phase 4 alone:**
+
+1. Ensure production Worker secrets include `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` (names only above).
+2. Merge phase 4+ code so the production config lists the `app.we-met.link` route (no production deploy until cutover approval).
+3. On the approved production deploy, Cloudflare binds `app.we-met.link` to the same Worker as `we-met.link`. DNS for `app.we-met.link` must already point at Cloudflare (UNVERIFIED whether a placeholder page exists on that host before bind).
+4. Sign in on `app.we-met.link`, publish cards, and verify exchange still works on `we-met.link`.
+
+Until that deploy, visitors hitting `app.we-met.link` may see whatever was configured before the route attached (placeholder or 404 — UNVERIFIED).
 
 **UNVERIFIED:** Whether preview base-config secrets (`WE_MET_TOKEN_SECRET`, `TURNSTILE_SECRET_KEY`, set with `wrangler preview base-config secret put`) are inherited and readable by a preview. The placeholder app does not read them. The first real test is the exchange API smoke test after [DIDI-575](https://linear.app/didi-build/issue/DIDI-575/exchange-api-exchange-and-details-endpoints-turnstile-rate-limit-lead) and [DIDI-577](https://linear.app/didi-build/issue/DIDI-577/email-consumer-own-queue-consumer-gmail-sender-behind-an-interface) ship.
 

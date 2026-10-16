@@ -9,6 +9,7 @@ import type { FollowupQueueMessage } from "@/followup-email-consumer/process-bat
 import type { LeadSinkConsumerDeps } from "@/followup-email-consumer/process-lead-sink";
 import { createFakeLeadSinkHandler } from "./fake-lead-sink-handler";
 import { MemoryConsumerLeadDeliveryLedger } from "./memory-consumer-ledger";
+import { leadEmailConsumerEnabled } from "../helpers/lead-email-deps";
 
 function sinkRecordBody() {
   return {
@@ -67,6 +68,7 @@ function createDeps(
 ): LeadSinkConsumerDeps {
   const resolvedLedger = overrides.ledger ?? ledger;
   return {
+    ...leadEmailConsumerEnabled,
     sinkHandlers: new Map([["fake", handler]]),
     ledger: resolvedLedger,
     logUnsupportedType: vi.fn(),

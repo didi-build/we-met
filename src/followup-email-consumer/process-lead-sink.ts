@@ -20,8 +20,10 @@ import {
 import { parseLeadSinkMessage } from "@/followup-email-consumer/validate";
 import type { FollowupQueueMessage } from "@/followup-email-consumer/process-batch";
 import { UnsupportedQueueMessageError } from "@/followup-email-consumer/unsupported-queue-message";
+import { LEAD_EMAIL_PAUSED_ERROR } from "@/lead-email/paused";
 
 export type LeadSinkConsumerDeps = {
+  isLeadEmailEnabled: () => Promise<boolean>;
   sinkHandlers: Map<string, LeadSinkHandler>;
   ledger: ConsumerLeadDeliveryLedger;
   logUnsupportedType(typeLabel: string): void;
@@ -247,6 +249,11 @@ async function processQueuedLeadSink(
   }
   if (row.status === "sent" || row.status === "failed") {
     message.ack();
+    return;
+  }
+
+  if (!(await deps.isLeadEmailEnabled())) {
+    await markNonRetryableFailure(message, parsed, LEAD_EMAIL_PAUSED_ERROR, deps);
     return;
   }
 

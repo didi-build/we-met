@@ -25,6 +25,7 @@ import { createEmailLeadSinkHandler } from "@/followup-email-consumer/lead-sink/
 import { createLeadSinkHandlerRegistry } from "@/followup-email-consumer/lead-sink/registry";
 import { processLeadSinkQueueMessage } from "@/followup-email-consumer/process-lead-sink";
 import { UnsupportedQueueMessageError } from "@/followup-email-consumer/unsupported-queue-message";
+import { readLeadEmailEnabled } from "@/app-settings/caps";
 import {
   isLeadSinkQueueMessageType,
   isUnsupportedQueueMessageType,
@@ -59,6 +60,7 @@ export type FollowupConsumerEnv = {
 };
 
 export type FollowupConsumerDeps = {
+  isLeadEmailEnabled: () => Promise<boolean>;
   weMetEnv: string;
   baseUrl: string;
   testMailTo?: string;
@@ -142,6 +144,7 @@ export function createFollowupConsumerDepsFromEnv(
   const { baseUrl } = readWeMetHostConfig(env);
 
   return {
+    isLeadEmailEnabled: () => readLeadEmailEnabled(env.WE_MET_DB),
     weMetEnv: env.WE_MET_ENV,
     baseUrl,
     testMailTo: env.WE_MET_TEST_MAIL_TO,
@@ -295,6 +298,11 @@ async function processQueueMessage(
         ? (message.body as { lead: { leadId: string } }).lead.leadId
         : null;
     deps.logMalformedVisitorFollowup(leadId);
+    message.ack();
+    return;
+  }
+
+  if (!(await deps.isLeadEmailEnabled())) {
     message.ack();
     return;
   }
