@@ -4,7 +4,7 @@ import type { AppApi } from "@/app-api/app-api";
 import { AppApiError, type EditorCard } from "@/app-api/types";
 import { useAutosave } from "@/lib/app-editor/hooks/useAutosave";
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 const BASE: EditorCard = {
   slug: "ada",
@@ -32,19 +32,34 @@ function mockApi(saveDraft: AppApi["saveDraft"]): AppApi {
 }
 
 describe("useAutosave (unit)", () => {
-  it("runs save after scheduleSave(0)", async () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("saves the card that was current when the debounce timer fires", async () => {
+    vi.useFakeTimers();
     const saveDraft = vi.fn(async () => ({ updatedAt: new Date().toISOString() }));
     const onExpired = vi.fn();
-    const { result } = renderHook(() =>
-      useAutosave(mockApi(saveDraft), BASE, onExpired),
+    const cardA = { ...BASE, name: "Card A" };
+    const cardB = { ...BASE, name: "Card B" };
+
+    const { result, rerender } = renderHook(
+      ({ c }) => useAutosave(mockApi(saveDraft), c, onExpired),
+      { initialProps: { c: cardA } },
     );
 
-    await act(async () => {
-      result.current.scheduleSave(0);
+    act(() => {
+      result.current.scheduleSave(800);
     });
 
-    await waitFor(() => expect(saveDraft).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(result.current.saveUi).toBe("saved"));
+    rerender({ c: cardB });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(800);
+    });
+
+    expect(saveDraft).toHaveBeenCalledTimes(1);
+    expect(saveDraft).toHaveBeenCalledWith(expect.objectContaining({ name: "Card B" }));
   });
 
   it("calls onSessionExpired for unauthorized", async () => {
@@ -64,57 +79,37 @@ describe("useAutosave (unit)", () => {
     expect(result.current.saveUi).toBe("error");
   });
 
-  it("saves the latest card after rapid changes", async () => {
-    const saveDraft = vi.fn(async () => ({ updatedAt: new Date().toISOString() }));
+  it("flushSave returns false when save fails", async () => {
+    const saveDraft = vi.fn(async () => {
+      throw new AppApiError("unavailable");
+    });
     const onExpired = vi.fn();
-    let card = BASE;
-    const { result, rerender } = renderHook(
-      ({ c }) => useAutosave(mockApi(saveDraft), c, onExpired),
-      { initialProps: { c: card } },
+    const { result } = renderHook(() =>
+      useAutosave(mockApi(saveDraft), BASE, onExpired),
     );
 
-    card = { ...card, name: "Ada Lovelace" };
-    rerender({ c: card });
-    card = { ...card, role: "Mathematician" };
-    rerender({ c: card });
-
+    let ok = true;
     await act(async () => {
-      result.current.scheduleSave(0);
+      ok = await result.current.flushSave();
     });
 
-    await waitFor(() =>
-      expect(saveDraft).toHaveBeenCalledWith(
-        expect.objectContaining({ name: "Ada Lovelace", role: "Mathematician" }),
-      ),
-    );
+    expect(ok).toBe(false);
+    expect(result.current.saveUi).toBe("error");
   });
 
-  it("persists an edit made immediately after a photo upload save", async () => {
+  it("flushSave returns true when save succeeds", async () => {
     const saveDraft = vi.fn(async () => ({ updatedAt: new Date().toISOString() }));
     const onExpired = vi.fn();
-    let card: EditorCard = {
-      ...BASE,
-      photo: "/api/app/photo?v=" + "a".repeat(64),
-    };
-    const { result, rerender } = renderHook(
-      ({ c }) => useAutosave(mockApi(saveDraft), c, onExpired),
-      { initialProps: { c: card } },
+    const { result } = renderHook(() =>
+      useAutosave(mockApi(saveDraft), BASE, onExpired),
     );
 
-    card = { ...card, name: "After upload" };
-    rerender({ c: card });
-
+    let ok = false;
     await act(async () => {
-      result.current.scheduleSave(0);
+      ok = await result.current.flushSave();
     });
 
-    await waitFor(() =>
-      expect(saveDraft).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: "After upload",
-          photo: expect.stringContaining("/api/app/photo"),
-        }),
-      ),
-    );
+    expect(ok).toBe(true);
+    expect(result.current.saveUi).toBe("saved");
   });
 });

@@ -98,6 +98,15 @@ describe("AppCardEditor behavior", () => {
     expect(preview.className).toContain("ap-card-preview-shell");
   });
 
+  it("puts chip popover boundary on the preview scroll container", () => {
+    renderEditor();
+    const preview = screen.getByTestId("app-card-preview");
+    const boundary = preview.closest("[data-chip-popover-boundary]");
+    expect(boundary).toBeTruthy();
+    expect(boundary).not.toBe(preview);
+    expect((boundary as HTMLElement).style.overflow).toBe("auto");
+  });
+
   it("debounces autosave and shows Saving then Saved", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     renderEditor();
@@ -136,7 +145,7 @@ describe("AppCardEditor behavior", () => {
           /Your card is live/,
         );
       },
-      { timeout: 15_000 },
+      { timeout: 10_000 },
     );
     const liveDialog = document
       .getElementById("pub-title")!
@@ -144,7 +153,7 @@ describe("AppCardEditor behavior", () => {
     fireEvent.click(within(liveDialog as HTMLElement).getByLabelText(/^Close$/i));
     await waitFor(
       () => expect(screen.getByRole("button", { name: /Share card/i })).toBeTruthy(),
-      { timeout: 15_000 },
+      { timeout: 10_000 },
     );
     fireEvent.change(screen.getByLabelText(/^Name$/i), {
       target: { value: "Ada L." },
@@ -176,7 +185,7 @@ describe("AppCardEditor behavior", () => {
           /Your card is live/,
         );
       },
-      { timeout: 15_000 },
+      { timeout: 10_000 },
     );
     const liveDialog = document
       .getElementById("pub-title")!

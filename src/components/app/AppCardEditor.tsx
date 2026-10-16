@@ -631,9 +631,7 @@ export function AppCardEditor({
                               setPhotoError("");
                               setAnnounce("Photo removed.");
                             } catch {
-                              setPhotoError(
-                                "The upload didn't finish. Check your connection and try again.",
-                              );
+                              setPhotoError("Couldn't remove the photo. Try again.");
                             }
                           })();
                         }}
@@ -1246,7 +1244,10 @@ export function AppCardEditor({
             <span className="ap-preview-note">Exchange is off in the preview.</span>
           </div>
           <div className="ap-frame" data-frame>
-            <div style={{ position: "absolute", inset: 0, overflow: "auto" }}>
+            <div
+              style={{ position: "absolute", inset: 0, overflow: "auto" }}
+              data-chip-popover-boundary
+            >
               <AppCardPreview theme={appTheme} draft={card} />
             </div>
           </div>

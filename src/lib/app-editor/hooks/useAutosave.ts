@@ -30,28 +30,30 @@ export function useAutosave(
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [pendingSave, saveUi]);
 
-  const runSave = useCallback(async () => {
+  const runSave = useCallback(async (): Promise<boolean> => {
     const mine = ++saveTickRef.current;
     const cardToSave = cardRef.current;
     setSaveUi("saving");
     try {
       await api.saveDraft(cardToSave);
       if (mine !== saveTickRef.current) {
-        return;
+        return true;
       }
       setSaveUi("saved");
       setPendingSave(false);
+      return true;
     } catch (err) {
       if (mine !== saveTickRef.current) {
-        return;
+        return true;
       }
       if (err instanceof AppApiError && err.code === "unauthorized") {
         setSaveUi("error");
         onSessionExpired();
-        return;
+        return false;
       }
       setSaveUi("error");
       setPendingSave(true);
+      return false;
     }
   }, [api, onSessionExpired]);
 
@@ -68,13 +70,13 @@ export function useAutosave(
     [runSave],
   );
 
-  const flushSave = useCallback(async () => {
+  const flushSave = useCallback(async (): Promise<boolean> => {
     if (saveTimerRef.current) {
       clearTimeout(saveTimerRef.current);
       saveTimerRef.current = null;
     }
     setPendingSave(true);
-    await runSave();
+    return runSave();
   }, [runSave]);
 
   const retrySave = useCallback(() => {

@@ -85,49 +85,59 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const authResult = await authorizeActiveAppCardRoute(DELETE_ROUTE_KEY);
-  if (!authResult.ok) {
-    return authResult.response;
-  }
-  const { ctx, auth } = authResult;
-  const blocked = guardAppMutation(request, ctx, "application/json");
-  if (blocked) {
-    return blocked;
-  }
+  try {
+    const authResult = await authorizeActiveAppCardRoute(DELETE_ROUTE_KEY);
+    if (!authResult.ok) {
+      return authResult.response;
+    }
+    const { ctx, auth } = authResult;
+    const blocked = guardAppMutation(request, ctx, "application/json");
+    if (blocked) {
+      return blocked;
+    }
 
-  await clearDraftPhotoKey(ctx.env.WE_MET_DB, auth.account.id);
-  const response = jsonOk({ ok: true });
-  return refreshSessionCookie(response, auth);
+    await clearDraftPhotoKey(ctx.env.WE_MET_DB, auth.account.id);
+    const response = jsonOk({ ok: true });
+    return refreshSessionCookie(response, auth);
+  } catch (err) {
+    console.error("app photo DELETE failed", err instanceof Error ? err.name : "error");
+    return apiError("unavailable", 503);
+  }
 }
 
 export async function GET(request: Request) {
-  const authResult = await authorizeActiveAppCardRoute(GET_ROUTE_KEY);
-  if (!authResult.ok) {
-    return authResult.response;
+  try {
+    const authResult = await authorizeActiveAppCardRoute(GET_ROUTE_KEY);
+    if (!authResult.ok) {
+      return authResult.response;
+    }
+    const { ctx, auth } = authResult;
+    const key = new URL(request.url).searchParams.get("v")?.trim() ?? "";
+    if (!isValidPhotoKey(key)) {
+      return new Response(null, { status: 404 });
+    }
+    const draftKey = await loadDraftPhotoKey(ctx.env.WE_MET_DB, auth.account.id);
+    if (!draftKey || draftKey !== key) {
+      return new Response(null, { status: 404 });
+    }
+    const storage = await getAssetStorage();
+    const asset = await storage.getObject(key);
+    if (!asset || asset.contentType !== CARD_PHOTO_JPEG_CONTENT_TYPE) {
+      return new Response(null, { status: 404 });
+    }
+    const response = withNoStoreHeaders(
+      new Response(asset.body, {
+        status: 200,
+        headers: {
+          "content-type": CARD_PHOTO_JPEG_CONTENT_TYPE,
+          "content-length": String(asset.size),
+          "x-content-type-options": "nosniff",
+        },
+      }),
+    );
+    return refreshSessionCookie(response, auth);
+  } catch (err) {
+    console.error("app photo GET failed", err instanceof Error ? err.name : "error");
+    return apiError("unavailable", 503);
   }
-  const { ctx, auth } = authResult;
-  const key = new URL(request.url).searchParams.get("v")?.trim() ?? "";
-  if (!isValidPhotoKey(key)) {
-    return new Response(null, { status: 404 });
-  }
-  const draftKey = await loadDraftPhotoKey(ctx.env.WE_MET_DB, auth.account.id);
-  if (!draftKey || draftKey !== key) {
-    return new Response(null, { status: 404 });
-  }
-  const storage = await getAssetStorage();
-  const asset = await storage.getObject(key);
-  if (!asset || asset.contentType !== CARD_PHOTO_JPEG_CONTENT_TYPE) {
-    return new Response(null, { status: 404 });
-  }
-  const response = withNoStoreHeaders(
-    new Response(asset.body, {
-      status: 200,
-      headers: {
-        "content-type": CARD_PHOTO_JPEG_CONTENT_TYPE,
-        "content-length": String(asset.size),
-        "x-content-type-options": "nosniff",
-      },
-    }),
-  );
-  return refreshSessionCookie(response, auth);
 }

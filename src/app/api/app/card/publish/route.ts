@@ -67,6 +67,7 @@ export async function POST(request: Request) {
     return apiError("slug-locked", 409);
   }
 
+  // Published card content comes from this request body; the photo is the draft photo_key (not body.photo).
   let photoKey = await loadDraftPhotoKey(ctx.env.WE_MET_DB, auth.account.id);
   if (photoKey && !isValidPhotoKey(photoKey)) {
     photoKey = null;
