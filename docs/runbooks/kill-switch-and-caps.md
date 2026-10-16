@@ -4,13 +4,15 @@
 
 **Schema check:** `app_settings` and `daily_send_counts` from `migrations/0004_mvp_accounts_additive.sql`; ledger columns from `migrations/0002_lead_delivery_ledger.sql` (checked **2026-10-16**).
 
+**D1 access:** [Running SQL against D1](./d1-operator-sql.md).
+
 ## Settings keys (`app_settings`)
 
-| Key                  | Role                                                                                                                     |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `lead_email_enabled` | Kill switch. `0` / `false` = off; missing or empty defaults to **enabled** in app code (`src/app-settings/defaults.ts`). |
-| `daily_cap_global`   | Max **enqueue** slots per UTC day across all cards (owner + visitor kinds summed).                                       |
-| `daily_cap_per_card` | Max **enqueue** slots per UTC day for one `card_id` (owner + visitor kinds summed).                                      |
+| Key                  | Role                                                                                                                                                                                                                                                                                             |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `lead_email_enabled` | Kill switch. **On** only when the value is **`1`** or **`true`** (case-insensitive). **Missing or empty** defaults to **enabled**. Any other **non-empty** value (for example `0`, `false`, `off`) is treated as **off** (`leadEmailEnabledFromSettingValue` in `src/app-settings/defaults.ts`). |
+| `daily_cap_global`   | Max **enqueue** slots per UTC day across all cards (owner + visitor kinds summed).                                                                                                                                                                                                               |
+| `daily_cap_per_card` | Max **enqueue** slots per UTC day for one `card_id` (owner + visitor kinds summed).                                                                                                                                                                                                              |
 
 Missing, non-numeric, or non-positive cap values **fail closed** (same as kill switch off) — new submissions get **503** `lead_email_unavailable`.
 

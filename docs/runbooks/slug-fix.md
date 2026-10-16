@@ -4,6 +4,8 @@
 
 **Schema check:** `cards.slug` and unique index `cards_slug_unique` from `migrations/0005_cards_rebuild_mvp.sql` (checked **2026-10-16**).
 
+**D1 access:** [Running SQL against D1](./d1-operator-sql.md).
+
 ## Preconditions
 
 - Support ticket confirms a **first-publish typo**, not a rebrand.
@@ -24,16 +26,13 @@ WHERE account_id = '<account_id>' AND slug = '<wrong_slug>';
 
 If the statement affects **0 rows**, stop and reconcile `account_id` / slug.
 
-## Lead sink ids (if needed)
+## Lead sink ids
 
-Loader and publish use sink ids prefixed with `{slug}-`. If sinks were created with the wrong prefix, update ids consistently (example — adjust ids to match your row):
+**Leave `lead_sinks.id` unchanged.** The `{slug}-` id prefix is enforced only in **`cards:load`** (`src/card-data/load-file.ts`), not at runtime. Renaming sink ids would not match **`lead_delivery_ledger.sink_id`** or messages already on the queue.
 
-```sql
-SELECT id, card_id FROM lead_sinks WHERE card_id = '<card_id>';
--- UPDATE lead_sinks SET id = '<correct_slug>-owner-inbox' WHERE id = '<wrong_slug>-owner-inbox';
-```
+## Follow-up email and old links
 
-Only run sink id updates when ids actually embed the typo; email sink config stays `{ "to": "account_email" }`.
+Owner notification emails already sent include the **old** card URL (`/hi/<wrong_slug>`). After this fix, that link **404**s; there is no redirect in v1. Tell the owner to use the corrected link in future outreach.
 
 ## Verify
 

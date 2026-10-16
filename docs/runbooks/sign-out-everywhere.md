@@ -4,6 +4,8 @@
 
 **Schema check:** `sessions` columns from `migrations/0004_mvp_accounts_additive.sql` (checked **2026-10-16**).
 
+**D1 access:** [Running SQL against D1](./d1-operator-sql.md).
+
 ## Delete session rows
 
 ```sql

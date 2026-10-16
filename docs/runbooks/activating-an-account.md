@@ -4,6 +4,8 @@
 
 **Schema check:** `accounts.status` enum from `migrations/0004_mvp_accounts_additive.sql`; `signups_open` in `app_settings` seeded in `migrations/0005_cards_rebuild_mvp.sql` (checked **2026-10-16**).
 
+**D1 access:** [Running SQL against D1](./d1-operator-sql.md).
+
 ## Waitlist behavior
 
 When `signups_open` is `0` / false / missing:
