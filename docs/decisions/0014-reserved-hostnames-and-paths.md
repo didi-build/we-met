@@ -2,7 +2,7 @@
 
 - **Status:** accepted
 - **Date:** 2026-10-11
-- **Updates:** [0003](./0003-urls-and-lookup.md)
+- **Updates:** [0003](./0003-urls-and-lookup.md). **Extended by [0025](./0025-we-met-mvp-accounts-sign-in-and-app-backend.md)** (reserved **slug** list at publish time; hostname reservations unchanged).
 
 ## Context
 

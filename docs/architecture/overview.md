@@ -2,7 +2,7 @@
 
 ## Purpose
 
-**We Met** hosts digital exchange-contact cards: a visitor opens a card URL, shares their details, and both sides get email with the exchange. Step 1 is a single hosted card, behavior-identical to `didi.build/hi`, with clear seams so multi-user cards can follow without rewriting the core.
+**We Met** hosts digital exchange-contact cards: a visitor opens a card URL, shares their details, and both sides get email with the exchange. The MVP adds Google sign-in, a card editor on the app host, and per-account published cards on `/hi/<slug>` ([0025](../decisions/0025-we-met-mvp-accounts-sign-in-and-app-backend.md)).
 
 ## Boundaries
 
@@ -16,32 +16,37 @@
 
 - The `didi-build/web` monolith at runtime (no imports or live API calls into `web`).
 - General company site, marketing CMS, or unrelated Didi Build products.
-- Account billing, custom DNS, and multi-tenant admin (backlog; see [open questions](#open-questions)).
+- Account billing, custom DNS, and multi-tenant admin UI (backlog; see [open questions](#open-questions)).
 
 ## Seams
 
 Agents should extend behavior only through these interfaces, not ad hoc fetches or hardcoded hosts.
 
-| Seam             | Responsibility                                                                        | Shape                                                                                                                                                                                                                                            |
-| ---------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Card data**    | Load the card record and its **lead sinks** for the current request.                  | Async adapter: lookup context → typed card + validated **`lead_sinks`** rows ([0010](../decisions/0010-card-data-d1-and-load-script.md), [0018](../decisions/0018-lead-sink.md)).                                                                |
-| **Lead sink**    | Deliver a lead to one destination (`kind` implementation).                            | **`LeadSink`**: record lead, append details, note delivery failure. One implementation per **`kind`**; step 1 defines the interface and dispatcher only.                                                                                         |
-| **Email sender** | Send the fixed-template **visitor** follow-up email (step 1).                         | Adapter that accepts rendered plain-text bodies and metadata; production uses the bound queue + consumer; local may noop or log. Owner notification moves to an email sink in step 2 ([DIDI-586](https://linear.app/didi-build/issue/DIDI-586)). |
-| **Base URL**     | One canonical origin for absolute links in email and metadata (`https://…`, no path). | Single config value per environment (see [environments](./environments.md)); never scatter hostnames in code.                                                                                                                                    |
-| **Lookup**       | Resolve which card serves a request.                                                  | Order: **hostname** (custom domain later) → **path** (`/hi/<slug>`) → **card record**. Reserved names: [0014](../decisions/0014-reserved-hostnames-and-paths.md).                                                                                |
+| Seam             | Responsibility                                                                        | Shape                                                                                                                                                                                                                                                                           |
+| ---------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Card data**    | Load the card record and its **lead sinks** for the current request.                  | D1 repository: lookup context → typed card + validated **`lead_sinks`** rows; public lookup requires `cards.status = 'live'` and `accounts.status = 'active'` ([0010](../decisions/0010-card-data-d1-and-load-script.md), [0018](../decisions/0018-lead-sink.md)).              |
+| **Accounts**     | Google identity, waitlist, and owner email.                                           | `accounts` + `sessions` in D1; owner inbox only on `accounts.email`; email sinks use `account_email` sentinel resolved at enqueue ([0025](../decisions/0025-we-met-mvp-accounts-sign-in-and-app-backend.md)).                                                                   |
+| **App API**      | Editor auth and card CRUD.                                                            | JSON routes under `/api/app/*` and `/api/auth/*` on the app host only; client interface **`AppApi`** ([app-api-contract](./app-api-contract.md)).                                                                                                                               |
+| **Lead sink**    | Deliver a lead to one destination (`kind` implementation).                            | **`LeadSink`**: record lead, append details, note delivery failure. **`email`** kind implemented in the follow-up consumer ([0023](../decisions/0023-owner-email-lead-sink-consumer.md)).                                                                                       |
+| **Email sender** | Send fixed-template **visitor** follow-up and owner sink mail.                        | Gmail via follow-up consumer; non-prod redirects to `WE_MET_TEST_MAIL_TO`.                                                                                                                                                                                                      |
+| **Base URL**     | One canonical origin for absolute links in email and metadata (`https://…`, no path). | Single config value per environment (see [environments](./environments.md)); never scatter hostnames in code.                                                                                                                                                                   |
+| **Lookup**       | Resolve which card serves a request.                                                  | Order: **hostname** (custom domain later) → **path** (`/hi/<slug>`) → **live** card record. Reserved hostnames: [0014](../decisions/0014-reserved-hostnames-and-paths.md); reserved slugs at publish: [0025](../decisions/0025-we-met-mvp-accounts-sign-in-and-app-backend.md). |
 
 ## Routes
 
-| Route                    | Role                                                     |
-| ------------------------ | -------------------------------------------------------- |
-| `/`                      | Placeholder landing page.                                |
-| `/hi/<slug>`             | Public card page.                                        |
-| `/hi/<slug>/contact.vcf` | vCard download (inline).                                 |
-| `/hi/<slug>/photo.jpg`   | Card headshot from R2 (`photoKey` on the card record).   |
-| `POST /api/exchange`     | Exchange submit (Turnstile, dispatch lead sinks + mail). |
-| `POST /api/details`      | Optional details (signed token).                         |
+| Route                    | Host            | Role                                                                                                                   |
+| ------------------------ | --------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `/`                      | Card + app      | Landing (card host); editor SPA root on `app.we-met.link`.                                                             |
+| `/app`                   | Local + preview | Editor SPA mount (production uses `/` on app host).                                                                    |
+| `/hi/<slug>`             | Card            | Public card page (live cards only).                                                                                    |
+| `/hi/<slug>/contact.vcf` | Card            | vCard download (inline).                                                                                               |
+| `/hi/<slug>/photo.jpg`   | Card            | Published headshot from R2 (`cards.photo_key`).                                                                        |
+| `POST /api/exchange`     | Card            | Exchange submit (Turnstile, caps, dispatch sinks + mail).                                                              |
+| `POST /api/details`      | Card            | Optional details (signed token).                                                                                       |
+| `/api/auth/*`            | App (+ local)   | Google sign-in, preview test login, logout ([0025](../decisions/0025-we-met-mvp-accounts-sign-in-and-app-backend.md)). |
+| `/api/app/*`             | App (+ local)   | Session, draft, publish, slug check, photo ([app-api-contract](./app-api-contract.md)).                                |
 
-**Step 1 legacy mapping (in this app):** `didi.build/hi` → `/hi/didi`; vCard equivalent. **`didi.build` is not redirected in step 1.** Slug rules and lookup: [0003](../decisions/0003-urls-and-lookup.md). API routes: [0008](../decisions/0008-api-routes-exchange-and-details.md).
+**Legacy mapping:** `didi.build/hi` → `/hi/didi`; vCard equivalent. **`didi.build` is not redirected.** Slug rules: [0003](../decisions/0003-urls-and-lookup.md). Exchange API: [0008](../decisions/0008-api-routes-exchange-and-details.md).
 
 ## Theming
 
@@ -62,7 +67,7 @@ sequenceDiagram
   participant C as Consumers
 
   V->>M: POST /api/exchange (Turnstile + form)
-  M->>M: Turnstile, honeypot, rate limit
+  M->>M: Turnstile, honeypot, rate limit, app_settings caps
   M->>D: Dispatch enabled lead sinks
   D->>Q: One message per enabled sink
   M->>Q: Enqueue visitor_followup (independent)
@@ -73,10 +78,10 @@ sequenceDiagram
   M-->>V: 200
 
   Q->>C: Deliver jobs (per-message retries)
-  C->>C: Visitor follow-up email via Gmail (step 1); sink delivery per kind (step 2+)
+  C->>C: Visitor follow-up + email sink delivery via Gmail
 ```
 
-In **step 1**, the **follow-up email consumer** (`we-met-followup-email-consumer` or `-nonprod`) sends only the **visitor** follow-up message. **Lead sink delivery** uses **one queue message per sink** so retries and failures are independent ([0018](../decisions/0018-lead-sink.md)). Queue payloads for email carry a card field snapshot ([0016](../decisions/0016-queue-message-snapshot.md)). **Step 1:** dispatcher and `lead_sinks` table only — **no sink implementations**; zero enabled sinks means no lead delivery messages.
+The **follow-up email consumer** (`we-met-followup-email-consumer` or `-nonprod`) sends **visitor** follow-up mail and **`email`** lead sink deliveries. **Lead sink delivery** uses **one queue message per sink** so retries and failures are independent ([0018](../decisions/0018-lead-sink.md)). Queue payloads carry a card field snapshot ([0016](../decisions/0016-queue-message-snapshot.md)). A **live** card must have exactly one enabled email sink ([0025](../decisions/0025-we-met-mvp-accounts-sign-in-and-app-backend.md)).
 
 **Failure handling**
 
@@ -85,11 +90,12 @@ In **step 1**, the **follow-up email consumer** (`we-met-followup-email-consumer
 | Honeypot filled (`website` non-empty)         | Fake **200**, empty token; nothing dispatched or enqueued                |
 | Turnstile fails                               | **403**                                                                  |
 | Rate limited                                  | **429**                                                                  |
+| Kill switch off or daily cap exceeded         | **503** `lead_email_unavailable`; no ledger, enqueue, or counter bump    |
 | Visitor follow-up enqueue fails               | **500**, generic message to client                                       |
 | Lead sink dispatch enqueue fails (one sink)   | **Does not** fail other sinks or the HTTP response; that message retries |
 | Lead sink delivery fails (consumer, one sink) | Retries for **that message only**; visitor email unaffected              |
-| Visitor email fails after max attempts        | Acknowledged; **note delivery failure** on sinks when implemented        |
-| Zero enabled lead sinks                       | Exchange **200**; leads go nowhere until sinks are added (step 2+)       |
+| Visitor email fails after max attempts        | Acknowledged; sink handlers may note delivery failure                    |
+| Card not live (suspended/retired or no sink)  | Public card **404**; exchange not reachable for that slug                |
 
 Non-production mail is redirected on the consumer; see [0006](../decisions/0006-non-prod-safety.md) and [environments](./environments.md).
 
@@ -99,9 +105,9 @@ See [environments.md](./environments.md) for queues, secrets names, previews, an
 
 ## Open questions
 
-- **Multi-user:** accounts, per-user cards, storage, and abuse limits ([DIDI-581](https://linear.app/didi-build/issue/DIDI-581)).
+- **Multi-user (remaining):** admin UI, self-serve deletion, pricing, per-recipient cooldown ([DIDI-581](https://linear.app/didi-build/issue/DIDI-581), [DIDI-609](https://linear.app/didi-build/issue/DIDI-609)).
 - **Custom domains:** `card.theirdomain.com` flow and DNS ([DIDI-580](https://linear.app/didi-build/issue/DIDI-580)).
 - **Pricing and packaging** ([DIDI-579](https://linear.app/didi-build/issue/DIDI-579)).
 - **`didi.build/hi` and `/hi/contact.vcf` at cutover:** whether those URLs redirect (decide before [DIDI-566](https://linear.app/didi-build/issue/DIDI-566)).
-- **Square-crop upload UI** arrives with the future editor ([DIDI-581](https://linear.app/didi-build/issue/DIDI-581)); step 1 defines image ingestion only ([0012](../decisions/0012-r2-images-single-ingestion.md)).
+- **Photo orphan cleanup** and advanced abuse tooling ([DIDI-609](https://linear.app/didi-build/issue/DIDI-609)); ingestion is centralized ([0012](../decisions/0012-r2-images-single-ingestion.md)).
 - **Details-step token:** must carry **per-sink** record references (e.g. Linear issue id) so append-details can target each sink; encoding is undecided.

@@ -2,7 +2,7 @@
 
 - **Status:** accepted
 - **Date:** 2026-10-11
-- **Updates:** [0014](./0014-reserved-hostnames-and-paths.md)
+- **Updates:** [0014](./0014-reserved-hostnames-and-paths.md). **Amended by [0025](./0025-we-met-mvp-accounts-sign-in-and-app-backend.md)** (slug length 3–40; public lookup filters `cards.status = 'live'` and active accounts).
 
 ## Context
 

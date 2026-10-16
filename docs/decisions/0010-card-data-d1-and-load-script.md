@@ -2,7 +2,7 @@
 
 - **Status:** accepted
 - **Date:** 2026-10-11
-- **Updates:** [0004](./0004-card-data-and-branding.md), [0018](./0018-lead-sink.md)
+- **Updates:** [0004](./0004-card-data-and-branding.md), [0018](./0018-lead-sink.md). **Superseded in part by [0025](./0025-we-met-mvp-accounts-sign-in-and-app-backend.md):** `accounts` and app write APIs exist; `cards.email` is removed; `cards:load` does not support production.
 
 ## Context
 
