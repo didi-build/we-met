@@ -3,26 +3,13 @@ import {
   assertAppApiHost,
   readHostConfigFromEnv,
   requestHostname,
-  type AppAuthEnv,
 } from "@/app-auth/guards";
 import { createAppRateLimiter, createAuthRateLimiter } from "@/app-auth/rate-limit";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { headers } from "next/headers";
 
 export async function readAppAuthBindings(): Promise<{
-  env: AppAuthEnv & {
-    GOOGLE_CLIENT_ID?: string;
-    GOOGLE_CLIENT_SECRET?: string;
-    WE_MET_PREVIEW_LOGIN_SECRET?: string;
-    WE_MET_PREVIEW_LOGIN_EMAIL?: string;
-    WE_MET_AUTH_RATE_LIMITER?: {
-      limit(options: { key: string }): Promise<{ success: boolean }>;
-    };
-    WE_MET_APP_RATE_LIMITER?: {
-      limit(options: { key: string }): Promise<{ success: boolean }>;
-    };
-    WE_MET_DB: import("@cloudflare/workers-types").D1Database;
-  };
+  env: CloudflareEnv;
   hostname: string;
   hostConfig: ReturnType<typeof readHostConfigFromEnv>;
   cookieHeader: string | null;

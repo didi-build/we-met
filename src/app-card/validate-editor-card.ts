@@ -1,0 +1,139 @@
+import type { EditorCard } from "@/app-api/types";
+import { CARD_FIELD_LIMITS } from "@/card-data/limits";
+import { isReservedSlug } from "@/card-data/reserved-slugs";
+import { isValidSlug } from "@/card-data/slug";
+import { isHttpsUrl } from "@/lib/app-editor/validation";
+import { slugFormatCheck } from "@/lib/app-editor/slug";
+
+export type EditorValidationResult =
+  | { ok: true }
+  | { ok: false; code: "name-missing" }
+  | { ok: false; code: "slug-invalid" }
+  | { ok: false; code: "slug-reserved" }
+  | { ok: false; code: "invalid-fields"; fields: Record<string, string> };
+
+function fieldLimitMessage(key: string, max: number): string {
+  if (key === "name") {
+    return `Keep your name to ${max} characters or fewer.`;
+  }
+  if (key.startsWith("about.")) {
+    return `Keep each paragraph to ${max} characters or fewer.`;
+  }
+  return `Keep this to ${max} characters or fewer.`;
+}
+
+function collectLimitAndUrlViolations(card: EditorCard): Record<string, string> {
+  const fields: Record<string, string> = {};
+
+  if (card.name.length > CARD_FIELD_LIMITS.name) {
+    fields.name = fieldLimitMessage("name", CARD_FIELD_LIMITS.name);
+  }
+
+  const slug = card.slug.trim();
+  if (slug) {
+    const slugFmt = slugFormatCheck(slug);
+    if (slugFmt || !isValidSlug(slug)) {
+      fields.slug = slugFmt || "Choose your link to publish.";
+    } else if (isReservedSlug(slug)) {
+      fields.slug = "That name is reserved. Try another.";
+    }
+  }
+
+  if (card.role.length > CARD_FIELD_LIMITS.role) {
+    fields.role = fieldLimitMessage("role", CARD_FIELD_LIMITS.role);
+  }
+
+  if (card.about.length > CARD_FIELD_LIMITS.aboutParagraphs) {
+    fields.about = `Use at most ${CARD_FIELD_LIMITS.aboutParagraphs} paragraphs.`;
+  }
+  card.about.forEach((p, i) => {
+    if (p.length > CARD_FIELD_LIMITS.aboutParagraph) {
+      fields[`about.${i}`] = fieldLimitMessage(
+        `about.${i}`,
+        CARD_FIELD_LIMITS.aboutParagraph,
+      );
+    }
+  });
+
+  if (card.services.length > CARD_FIELD_LIMITS.services) {
+    fields.services = `Use at most ${CARD_FIELD_LIMITS.services} services.`;
+  }
+  card.services.forEach((s, i) => {
+    if (s.title.length > CARD_FIELD_LIMITS.serviceLabel) {
+      fields[`services.${i}.title`] = fieldLimitMessage(
+        `services.${i}.title`,
+        CARD_FIELD_LIMITS.serviceLabel,
+      );
+    }
+    if (s.description.length > CARD_FIELD_LIMITS.serviceDescription) {
+      fields[`services.${i}.description`] = fieldLimitMessage(
+        `services.${i}.description`,
+        CARD_FIELD_LIMITS.serviceDescription,
+      );
+    }
+    if (!s.title.trim() && s.description.trim()) {
+      fields[`services.${i}.title`] = "Add a title for this service.";
+    }
+  });
+
+  for (const key of ["website", "linkedin", "github", "instagram"] as const) {
+    const value = card.links[key]?.trim() ?? "";
+    if (value && !isHttpsUrl(value)) {
+      fields[`links.${key}`] = "Use a full link that starts with https://";
+    }
+    if (value.length > CARD_FIELD_LIMITS.publicUrlMaxLength) {
+      fields[`links.${key}`] = fieldLimitMessage(
+        `links.${key}`,
+        CARD_FIELD_LIMITS.publicUrlMaxLength,
+      );
+    }
+  }
+
+  const altUrl = card.alternate.url.trim();
+  const altLabel = card.alternate.label.trim();
+  if (altUrl && !isHttpsUrl(altUrl)) {
+    fields["alternate.url"] = "Use a full link that starts with https://";
+  }
+  if (altLabel.length > CARD_FIELD_LIMITS.alternateLabel) {
+    fields["alternate.label"] = fieldLimitMessage(
+      "alternate.label",
+      CARD_FIELD_LIMITS.alternateLabel,
+    );
+  }
+  if (!altUrl && altLabel) {
+    fields["alternate.url"] = "Add the link this text should open.";
+  }
+
+  return fields;
+}
+
+export function validateEditorCardForDraft(card: EditorCard): EditorValidationResult {
+  const fields = collectLimitAndUrlViolations(card);
+  if (Object.keys(fields).length > 0) {
+    return { ok: false, code: "invalid-fields", fields };
+  }
+  return { ok: true };
+}
+
+export function validateEditorCardForPublish(card: EditorCard): EditorValidationResult {
+  const name = card.name.trim();
+  if (!name) {
+    return { ok: false, code: "name-missing" };
+  }
+
+  const slug = card.slug.trim();
+  const slugFmt = slugFormatCheck(slug);
+  if (!slug || slugFmt || !isValidSlug(slug)) {
+    return { ok: false, code: "slug-invalid" };
+  }
+  if (isReservedSlug(slug)) {
+    return { ok: false, code: "slug-reserved" };
+  }
+
+  const fields = collectLimitAndUrlViolations(card);
+  if (Object.keys(fields).length > 0) {
+    return { ok: false, code: "invalid-fields", fields };
+  }
+
+  return { ok: true };
+}

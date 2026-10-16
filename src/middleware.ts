@@ -25,7 +25,7 @@ export function middleware(request: NextRequest) {
 
   if (onAppHost && pathname === "/") {
     const url = request.nextUrl.clone();
-    url.pathname = APP_COMING_SOON_PATH;
+    url.pathname = "/app";
     return NextResponse.rewrite(url);
   }
 
@@ -45,5 +45,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/app-coming-soon", "/hi/:path*"],
+  matcher: ["/", "/app", "/app-coming-soon", "/hi/:path*"],
 };

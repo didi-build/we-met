@@ -40,10 +40,8 @@ function oauthStatesMatch(cookieState: string | undefined, state: string): boole
   return constantTimeEqual(cookieState, state);
 }
 
-const AUTH_FAILED_FALLBACK_LOCATION = "https://we-met.link/app?auth_error=failed";
-
 function authFailedFallbackRedirect(): Response {
-  return redirectResponse(AUTH_FAILED_FALLBACK_LOCATION, {
+  return redirectResponse("/?auth_error=failed", {
     setCookies: [clearOAuthCookieValue()],
   });
 }

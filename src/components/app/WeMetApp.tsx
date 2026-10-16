@@ -265,8 +265,9 @@ export function WeMetApp() {
                 !
               </span>
               <span>
-                Sign-in didn&apos;t finish. Try again, or choose a different Google
-                account.
+                {isPreviewEnv
+                  ? "Preview sign-in didn't work. Check the secret and try again."
+                  : "Sign-in didn't finish. Try again, or choose a different Google account."}
               </span>
             </div>
             {isPreviewEnv ? (
@@ -348,6 +349,9 @@ export function WeMetApp() {
           initialPublished={published}
           onSessionRestored={handleSessionRestored}
           onSignIn={() => handleSignIn("popup")}
+          onPreviewLogin={handlePreviewLogin}
+          previewSecret={previewSecret}
+          isPreviewEnv={isPreviewEnv}
           signingIn={signingIn}
         />
       ) : null}

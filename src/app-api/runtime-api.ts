@@ -1,12 +1,9 @@
 import type { AppApi } from "@/app-api/app-api";
-import { createHttpAuthApi } from "@/app-api/http-auth";
+import { createHttpApi } from "@/app-api/http-api";
 import { createStubApi } from "@/app-api/stub-api";
 
-function shouldUseHttpAuth(): boolean {
+function shouldUseHttpApi(): boolean {
   if (typeof window === "undefined") {
-    return false;
-  }
-  if (window.location.pathname.startsWith("/app-preview")) {
     return false;
   }
   const env = process.env.NEXT_PUBLIC_WE_MET_ENV ?? "production";
@@ -14,15 +11,8 @@ function shouldUseHttpAuth(): boolean {
 }
 
 export function createRuntimeAppApi(search = ""): AppApi {
-  const stub = createStubApi(search);
-  if (!shouldUseHttpAuth()) {
-    return stub;
+  if (!shouldUseHttpApi()) {
+    return createStubApi(search);
   }
-  const auth = createHttpAuthApi();
-  return {
-    ...stub,
-    getSession: auth.getSession,
-    signIn: auth.signIn,
-    signOut: auth.signOut,
-  };
+  return createHttpApi();
 }

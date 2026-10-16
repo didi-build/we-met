@@ -128,6 +128,8 @@ describe("AppCardEditor behavior", () => {
       timeout: 10_000,
     });
     fireEvent.click(screen.getByRole("button", { name: /^Publish$/i }));
+    const confirmDialog = await waitFor(() => screen.getByRole("alertdialog"));
+    fireEvent.click(within(confirmDialog).getByRole("button", { name: /^Publish$/i }));
     await waitFor(
       () => {
         expect(document.getElementById("pub-title")?.textContent).toMatch(
@@ -165,6 +167,8 @@ describe("AppCardEditor behavior", () => {
     const publishBtn = screen.getByRole("button", { name: /^Publish$/i });
     publishBtn.focus();
     fireEvent.click(publishBtn);
+    const confirmDialog = await waitFor(() => screen.getByRole("alertdialog"));
+    fireEvent.click(within(confirmDialog).getByRole("button", { name: /^Publish$/i }));
     await waitFor(
       () => {
         expect(document.getElementById("pub-title")?.textContent).toMatch(

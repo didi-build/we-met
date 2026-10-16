@@ -35,9 +35,9 @@ describe("landing middleware host routing (unit)", () => {
     }
   });
 
-  it("rewrites app host / to the coming-soon page", () => {
+  it("rewrites app host / to the app SPA", () => {
     const response = middleware(request("/", "app.we-met.link"));
-    expect(response?.headers.get("x-middleware-rewrite")).toMatch(/app-coming-soon/);
+    expect(response?.headers.get("x-middleware-rewrite")).toMatch(/\/app/);
   });
 
   it("serves landing on we-met.link / without rewrite", () => {

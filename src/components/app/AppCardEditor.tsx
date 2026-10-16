@@ -20,7 +20,6 @@ import {
   ArrowDownIcon,
   ArrowUpIcon,
   CameraIcon,
-  CheckIcon,
   ChevronDownIcon,
   GithubIcon,
   InstagramIcon,
@@ -39,7 +38,11 @@ import {
   renderCroppedPhotoJpeg,
 } from "@/lib/app-editor/photo-crop";
 import { useAutosave } from "@/lib/app-editor/hooks/useAutosave";
-import { publishBlockers, usePublish } from "@/lib/app-editor/hooks/usePublish";
+import {
+  publishBlockerSentence,
+  publishBlockers,
+  usePublish,
+} from "@/lib/app-editor/hooks/usePublish";
 import { useSlugCheck } from "@/lib/app-editor/hooks/useSlugCheck";
 import { allFieldKeys, fieldError } from "@/lib/app-editor/validation";
 import { cardInitials } from "@/lib/hi-card/card-content";
@@ -61,6 +64,9 @@ type AppCardEditorProps = {
   initialPublished: EditorCard | null;
   onSessionRestored: (session: AppSession) => void;
   onSignIn: () => Promise<void>;
+  onPreviewLogin?: () => Promise<void>;
+  previewSecret?: string;
+  isPreviewEnv?: boolean;
   signingIn: boolean;
 };
 
@@ -70,6 +76,9 @@ export function AppCardEditor({
   initialPublished,
   onSessionRestored,
   onSignIn,
+  onPreviewLogin,
+  previewSecret = "",
+  isPreviewEnv = false,
   signingIn,
 }: AppCardEditorProps) {
   const api = useAppApi();
@@ -79,8 +88,6 @@ export function AppCardEditor({
 
   const [card, setCard] = useState<EditorCard>(initialDraft);
   const [published, setPublished] = useState<EditorCard | null>(initialPublished);
-  const [slugEditing, setSlugEditing] = useState(false);
-  const [slugPrev, setSlugPrev] = useState("");
   const [triedPublish, setTriedPublish] = useState(false);
   const [tab, setTab] = useState<EditorTab>("edit");
   const [blockedOpen, setBlockedOpen] = useState(false);
@@ -89,7 +96,9 @@ export function AppCardEditor({
   const [photoUploading, setPhotoUploading] = useState(false);
   const [announce, setAnnounce] = useState("");
 
-  const [dialog, setDialog] = useState<"crop" | "published" | "session" | null>(null);
+  const [dialog, setDialog] = useState<
+    "crop" | "published" | "session" | "confirm-publish" | null
+  >(null);
   const [pubUrl, setPubUrl] = useState("");
   const [pubTitle, setPubTitle] = useState("Your card is live");
   const [copyLabel, setCopyLabel] = useState("Copy link");
@@ -153,20 +162,19 @@ export function AppCardEditor({
       const next = setPath(card, path, value);
       onCardChange(next);
     },
-    [card, onCardChange, onSlugInput, scheduleSave, slugEditing],
+    [card, onCardChange, onSlugInput, scheduleSave],
   );
 
   const blockers = useCallback(
     () =>
       publishBlockers({
-        slugEditing,
         name: card.name,
         slug: card.slug,
         slugStatus: slugStatus.status,
         fieldKeys,
         fieldError: errFor,
       }),
-    [card.name, card.slug, errFor, fieldKeys, slugEditing, slugStatus.status],
+    [card.name, card.slug, errFor, fieldKeys, slugStatus.status],
   );
 
   const {
@@ -186,7 +194,10 @@ export function AppCardEditor({
   }, [fitBar]);
 
   const openDialog = useCallback(
-    (name: "crop" | "published" | "session", opener?: HTMLElement) => {
+    (
+      name: "crop" | "published" | "session" | "confirm-publish",
+      opener?: HTMLElement,
+    ) => {
       dialogOpenerRef.current = opener ?? (document.activeElement as HTMLElement);
       setDialog(name);
       document.body.style.overflow = "hidden";
@@ -290,7 +301,7 @@ export function AppCardEditor({
     }
   }, [api, card, closeDialog, crop, onCardChange]);
 
-  const handlePublish = useCallback(async () => {
+  const runPublishFlow = useCallback(async () => {
     setTriedPublish(true);
     const result = await runPublish(
       (url) => {
@@ -315,6 +326,23 @@ export function AppCardEditor({
     }
   }, [card, fitBar, markMine, openDialog, runPublish]);
 
+  const handlePublish = useCallback(() => {
+    setTriedPublish(true);
+    const b = blockers();
+    if (b.length) {
+      setBlockedOpen(true);
+      setBlockedText(publishBlockerSentence(b));
+      fitBar();
+      setTab("edit");
+      return;
+    }
+    if (!published) {
+      openDialog("confirm-publish");
+      return;
+    }
+    void runPublishFlow();
+  }, [blockers, fitBar, openDialog, published, runPublishFlow]);
+
   const openShare = useCallback(() => {
     if (!published) {
       return;
@@ -338,8 +366,7 @@ export function AppCardEditor({
     }
   }, [pubUrl]);
 
-  const slugLockable = Boolean(published);
-  const slugLocked = slugLockable && !slugEditing;
+  const slugLocked = Boolean(published);
 
   const slugStatusTone =
     slugStatus.status === "available" || slugStatus.status === "mine" ? "ok" : "";
@@ -348,9 +375,6 @@ export function AppCardEditor({
     slugStatus.status !== "invalid" &&
     slugStatus.status !== "reserved" &&
     slugStatus.status !== "taken";
-
-  const showSlugWarning =
-    Boolean(published && card.slug && card.slug !== published.slug) && !slugEditing;
 
   const initials = cardInitials(card.name);
 
@@ -483,67 +507,11 @@ export function AppCardEditor({
                         onChange={(e) => updateField("slug", e.target.value)}
                       />
                     </span>
-                    <button
-                      type="button"
-                      className="ap-iconbtn ap-box-btn"
-                      hidden={!slugLockable}
-                      data-tone={slugEditing ? "confirm" : undefined}
-                      aria-label={
-                        slugEditing ? "Use this link" : "Unlock to change your link"
-                      }
-                      disabled={
-                        slugEditing &&
-                        !(
-                          slugStatus.status === "available" ||
-                          slugStatus.status === "mine"
-                        )
-                      }
-                      onClick={() => {
-                        if (!slugEditing) {
-                          setSlugEditing(true);
-                          setSlugPrev(card.slug);
-                          setAnnounce("Link unlocked.");
-                          return;
-                        }
-                        if (!(
-                          slugStatus.status === "available" ||
-                          slugStatus.status === "mine"
-                        )) {
-                          return;
-                        }
-                        setSlugEditing(false);
-                        setAnnounce(
-                          card.slug === slugPrev
-                            ? "Link unchanged."
-                            : "New link set. Publish to make it live.",
-                        );
-                        onCardChange(card);
-                      }}
-                    >
-                      <span className="ap-icon" aria-hidden hidden={slugEditing}>
+                    {slugLocked ? (
+                      <span className="ap-icon ap-box-btn" aria-hidden>
                         <LockIcon size={18} />
                       </span>
-                      <span className="ap-icon" aria-hidden hidden={!slugEditing}>
-                        <CheckIcon size={18} />
-                      </span>
-                    </button>
-                  </div>
-                  <div className="ap-slug-edit" hidden={!slugEditing}>
-                    <span className="ap-help">
-                      Type the new address, then tap the check to use it.
-                    </span>
-                    <button
-                      type="button"
-                      className="ap-textbtn"
-                      onClick={() => {
-                        setSlugEditing(false);
-                        const next = { ...card, slug: slugPrev };
-                        setCard(next);
-                        onSlugInput(slugPrev);
-                      }}
-                    >
-                      Cancel
-                    </button>
+                    ) : null}
                   </div>
                   <p
                     className="ap-slug-status"
@@ -557,19 +525,6 @@ export function AppCardEditor({
                   </p>
                   <div className="ap-meta">
                     <FieldError message={errFor("slug")} id="f-slug-err" />
-                  </div>
-                  <div className="ap-alert ap-alert-info" hidden={!showSlugWarning}>
-                    <span className="ap-alert-mark" aria-hidden>
-                      !
-                    </span>
-                    <span className="ap-alert-body">
-                      <span>
-                        When you publish,{" "}
-                        <strong>we-met.link/hi/{published?.slug}</strong> will stop
-                        working. Anyone with the old link or QR code won&apos;t reach
-                        your card.
-                      </span>
-                    </span>
                   </div>
                 </>,
                 Boolean(errFor("slug")),
@@ -1241,6 +1196,9 @@ export function AppCardEditor({
                   Leads go to <strong>{session.email}</strong>
                 </span>
               </p>
+              <p className="ap-help ap-leads-note">
+                Visitors who exchange contacts receive this address.
+              </p>
             </div>
           </section>
         </form>
@@ -1298,6 +1256,14 @@ export function AppCardEditor({
         api={api}
         onSessionRestored={onSessionRestored}
         scheduleSave={scheduleSave}
+        publishSlug={card.slug}
+        onConfirmPublish={() => {
+          closeDialog();
+          void runPublishFlow();
+        }}
+        isPreviewEnv={isPreviewEnv}
+        previewSecret={previewSecret}
+        onPreviewLogin={onPreviewLogin ?? onSignIn}
       />
 
       <p className="ap-sr" role="status" aria-live="polite" id={announceId}>

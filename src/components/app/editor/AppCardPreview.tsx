@@ -4,7 +4,7 @@ import type { EditorCard } from "@/app-api/types";
 import { HiCardPresentation } from "@/components/hi/HiCardPresentation";
 import { MirroredThemeProvider } from "@/components/theme/ThemeProvider";
 import { editorCardToPreviewRecord } from "@/lib/app-editor/draft-to-preview-card";
-import { useCallback, useLayoutEffect, useMemo, useRef } from "react";
+import { useLayoutEffect, useMemo, useRef } from "react";
 
 type AppCardPreviewProps = {
   /** App editor theme (mirrored into the card subtree only). */
@@ -14,9 +14,9 @@ type AppCardPreviewProps = {
 
 const PREVIEW_GREETING_PLACEHOLDER = "Your name here";
 
-/** Block navigation from preview links (capture phase); chips and About stay interactive. */
+/** Block navigation from preview links; chips and About stay interactive. */
 export function blockPreviewLinkNavigation(
-  event: React.MouseEvent | React.KeyboardEvent,
+  event: Event,
   root: HTMLElement | null,
 ): void {
   if (!root) {
@@ -31,7 +31,7 @@ export function blockPreviewLinkNavigation(
     return;
   }
   if (event.type === "keydown") {
-    const key = (event as React.KeyboardEvent).key;
+    const key = (event as KeyboardEvent).key;
     if (key !== "Enter" && key !== " ") {
       return;
     }
@@ -53,14 +53,23 @@ export function AppCardPreview({ theme, draft }: AppCardPreviewProps) {
     if (!root) {
       return;
     }
-    root.querySelectorAll<HTMLAnchorElement>("a[href]").forEach((anchor) => {
+    const anchors = root.querySelectorAll<HTMLAnchorElement>("a[href]");
+    const cleanups: (() => void)[] = [];
+    anchors.forEach((anchor) => {
       anchor.tabIndex = -1;
+      const onClick = (event: Event) => blockPreviewLinkNavigation(event, root);
+      const onKeyDown = (event: Event) => blockPreviewLinkNavigation(event, root);
+      anchor.addEventListener("click", onClick, true);
+      anchor.addEventListener("keydown", onKeyDown, true);
+      cleanups.push(() => {
+        anchor.removeEventListener("click", onClick, true);
+        anchor.removeEventListener("keydown", onKeyDown, true);
+      });
     });
+    return () => {
+      cleanups.forEach((fn) => fn());
+    };
   }, [previewRecord]);
-
-  const onCapture = useCallback((event: React.MouseEvent | React.KeyboardEvent) => {
-    blockPreviewLinkNavigation(event, shellRef.current);
-  }, []);
 
   return (
     <MirroredThemeProvider theme={theme}>
@@ -69,8 +78,6 @@ export function AppCardPreview({ theme, draft }: AppCardPreviewProps) {
         className="ap-card-preview-shell"
         aria-label="Card preview"
         data-testid="app-card-preview"
-        onClickCapture={onCapture}
-        onKeyDownCapture={onCapture}
       >
         <HiCardPresentation
           card={previewRecord}
