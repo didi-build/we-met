@@ -12,6 +12,22 @@
 - Take a one-off export if legal/compliance needs it (not stored in D1).
 - Prefer running against **production** only after cutover; use non-prod to rehearse.
 
+## 0. Suspend the account (block sign-in)
+
+Prevent the user from signing in again and uploading a new photo while you run the steps below. **Tombstoning** (`status = 'deleted'`) still happens in [§7](#7-tombstone-the-account) at the end.
+
+```sql
+UPDATE accounts
+SET status = 'suspended', updated_at = '<iso8601-utc>'
+WHERE id = '<account_id>' AND status = 'active';
+```
+
+Check **rows affected**. **0** means the account was not **active** (for example already **waitlisted**, **suspended**, or **deleted**) — inspect `accounts.status` before continuing:
+
+```sql
+SELECT id, status FROM accounts WHERE id = '<account_id>';
+```
+
 ## 1. End sessions
 
 ```sql
