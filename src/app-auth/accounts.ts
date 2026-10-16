@@ -26,7 +26,7 @@ export async function upsertAccountFromGoogle(
   const signupsOpen = await readSignupsOpen(db);
   const now = nowIso();
 
-  const existing = await db
+  let existing = await db
     .prepare(
       "SELECT id, google_sub, email, name, status FROM accounts WHERE google_sub = ?",
     )
@@ -36,17 +36,28 @@ export async function upsertAccountFromGoogle(
   if (!existing) {
     const id = crypto.randomUUID();
     const status = initialStatus(signupsOpen);
-    await db
+    const insert = await db
       .prepare(
         `INSERT INTO accounts (id, google_sub, email, name, status, created_at, updated_at, last_login_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(id, input.sub, email, name, status, now, now, now)
       .run();
-    return {
-      ok: true,
-      account: { id, google_sub: input.sub, email, name, status },
-    };
+    if (insert.success) {
+      return {
+        ok: true,
+        account: { id, google_sub: input.sub, email, name, status },
+      };
+    }
+    existing = await db
+      .prepare(
+        "SELECT id, google_sub, email, name, status FROM accounts WHERE google_sub = ?",
+      )
+      .bind(input.sub)
+      .first<AccountRow>();
+    if (!existing) {
+      return { ok: false, reason: "deleted" };
+    }
   }
 
   if (existing.status === "suspended" || existing.status === "deleted") {

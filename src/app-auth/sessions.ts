@@ -2,6 +2,7 @@ import { randomToken, sha256Base64Url } from "@/app-auth/crypto";
 import {
   nowIso,
   oauthAttemptExpiresAt,
+  sessionCookieMaxAgeSeconds,
   sessionExpiryFrom,
   shouldTouchSessionLastSeen,
 } from "@/app-auth/time";
@@ -65,23 +66,29 @@ export async function loadSessionByToken(
     .first<SessionRow>();
 }
 
+export type ValidatedSession = {
+  accountId: string;
+  cookieMaxAgeSeconds: number;
+};
+
 export async function validateAndTouchSession(
   db: D1Database,
   token: string,
-): Promise<{ accountId: string } | null> {
+): Promise<ValidatedSession | null> {
   const row = await loadSessionByToken(db, token);
   if (!row) {
     return null;
   }
   const now = nowIso();
-  if (Date.parse(row.expires_at) <= Date.parse(now)) {
+  const nowMs = Date.parse(now);
+  if (Date.parse(row.expires_at) <= nowMs) {
     await db
       .prepare("DELETE FROM sessions WHERE token_hash = ?")
       .bind(row.token_hash)
       .run();
     return null;
   }
-  if (Date.parse(row.absolute_expires_at) <= Date.parse(now)) {
+  if (Date.parse(row.absolute_expires_at) <= nowMs) {
     await db
       .prepare("DELETE FROM sessions WHERE token_hash = ?")
       .bind(row.token_hash)
@@ -89,8 +96,10 @@ export async function validateAndTouchSession(
     return null;
   }
 
+  let slidingExpiresAt = row.expires_at;
   if (shouldTouchSessionLastSeen(row.last_seen_at, now)) {
     const { expiresAt } = sessionExpiryFrom(now);
+    slidingExpiresAt = expiresAt;
     await db
       .prepare(
         "UPDATE sessions SET last_seen_at = ?, expires_at = ? WHERE token_hash = ?",
@@ -99,7 +108,20 @@ export async function validateAndTouchSession(
       .run();
   }
 
-  return { accountId: row.account_id };
+  const cookieMaxAgeSeconds = sessionCookieMaxAgeSeconds(
+    row.absolute_expires_at,
+    slidingExpiresAt,
+    nowMs,
+  );
+  if (cookieMaxAgeSeconds <= 0) {
+    await db
+      .prepare("DELETE FROM sessions WHERE token_hash = ?")
+      .bind(row.token_hash)
+      .run();
+    return null;
+  }
+
+  return { accountId: row.account_id, cookieMaxAgeSeconds };
 }
 
 export type OAuthAttemptMode = "redirect" | "popup";
@@ -141,21 +163,16 @@ export async function consumeOAuthAttempt(
   const stateHash = await sha256Base64Url(state);
   const row = await db
     .prepare(
-      "SELECT state_hash, nonce, pkce_verifier, mode, expires_at FROM oauth_attempts WHERE state_hash = ?",
+      `DELETE FROM oauth_attempts WHERE state_hash = ?
+       RETURNING nonce, pkce_verifier, mode, expires_at`,
     )
     .bind(stateHash)
     .first<{
-      state_hash: string;
       nonce: string;
       pkce_verifier: string;
       mode: OAuthAttemptMode;
       expires_at: string;
     }>();
-
-  await db
-    .prepare("DELETE FROM oauth_attempts WHERE state_hash = ?")
-    .bind(stateHash)
-    .run();
 
   if (!row) {
     return { ok: false };

@@ -1,7 +1,7 @@
 export const SESSION_COOKIE_NAME = "__Host-wm_session";
 export const OAUTH_COOKIE_NAME = "__Host-wm_oauth";
 
-const SESSION_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
+export const SESSION_SLIDING_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
 
 export function parseCookieHeader(header: string | null): Map<string, string> {
   const map = new Map<string, string>();
@@ -24,14 +24,18 @@ export function parseCookieHeader(header: string | null): Map<string, string> {
   return map;
 }
 
-export function sessionCookieValue(token: string): string {
+export function sessionCookieValue(token: string, maxAgeSeconds?: number): string {
+  const maxAge = Math.max(
+    0,
+    Math.floor(maxAgeSeconds ?? SESSION_SLIDING_MAX_AGE_SECONDS),
+  );
   return [
     `${SESSION_COOKIE_NAME}=${encodeURIComponent(token)}`,
     "Path=/",
     "HttpOnly",
     "Secure",
     "SameSite=Lax",
-    `Max-Age=${SESSION_MAX_AGE_SECONDS}`,
+    `Max-Age=${maxAge}`,
   ].join("; ");
 }
 

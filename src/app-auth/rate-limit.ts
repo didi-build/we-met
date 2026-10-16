@@ -1,7 +1,7 @@
 import type { CloudflareRateLimitBinding } from "@/exchange/rate-limit";
 
 export type AuthRateLimiter = {
-  check(clientIp: string): Promise<boolean>;
+  check(routeKey: string, clientIp: string): Promise<boolean>;
 };
 
 export type AppRateLimiter = {
@@ -20,8 +20,8 @@ export function createAuthRateLimiter(
     };
   }
   return {
-    async check(clientIp: string) {
-      const result = await binding.limit({ key: `auth:${clientIp}` });
+    async check(routeKey: string, clientIp: string) {
+      const result = await binding.limit({ key: `auth:${routeKey}:${clientIp}` });
       return result.success;
     },
   };

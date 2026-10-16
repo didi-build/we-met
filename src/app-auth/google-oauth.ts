@@ -17,6 +17,50 @@ export type GoogleIdTokenClaims = {
   exp: number;
 };
 
+type JwkKey = JsonWebKey & { kid?: string };
+
+export type GoogleJwksLoader = () => Promise<JwkKey[]>;
+
+let jwksCache: { keys: JwkKey[]; fetchedAt: number } | null = null;
+const JWKS_TTL_MS = 60 * 60 * 1000;
+
+export function resetGoogleJwksCacheForTests(): void {
+  jwksCache = null;
+}
+
+async function fetchGoogleJwksFromNetwork(): Promise<JwkKey[]> {
+  let response: Response;
+  try {
+    response = await fetch(GOOGLE_JWKS_URL);
+  } catch {
+    return [];
+  }
+  if (!response.ok) {
+    return [];
+  }
+  try {
+    const payload = (await response.json()) as { keys?: JwkKey[] };
+    return payload.keys ?? [];
+  } catch {
+    return [];
+  }
+}
+
+async function loadGoogleJwks(
+  loader?: GoogleJwksLoader,
+  forceRefresh = false,
+): Promise<JwkKey[]> {
+  const now = Date.now();
+  if (!forceRefresh && jwksCache && now - jwksCache.fetchedAt < JWKS_TTL_MS) {
+    return jwksCache.keys;
+  }
+  const keys = loader ? await loader() : await fetchGoogleJwksFromNetwork();
+  if (keys.length > 0) {
+    jwksCache = { keys, fetchedAt: now };
+  }
+  return keys;
+}
+
 export async function createPkcePair(): Promise<{
   verifier: string;
   challenge: string;
@@ -78,92 +122,108 @@ export async function exchangeGoogleCode(input: {
     return { error: "token_exchange_failed" };
   }
 
-  const json = (await response.json()) as { id_token?: string };
-  if (!json.id_token) {
+  try {
+    const json = (await response.json()) as { id_token?: string };
+    if (!json.id_token) {
+      return { error: "token_exchange_failed" };
+    }
+    return { idToken: json.id_token };
+  } catch {
     return { error: "token_exchange_failed" };
   }
-  return { idToken: json.id_token };
 }
 
-type JwkKey = JsonWebKey & { kid?: string };
-
-let jwksCache: { keys: JwkKey[]; fetchedAt: number } | null = null;
-const JWKS_TTL_MS = 60 * 60 * 1000;
-
-async function loadGoogleJwks(): Promise<JwkKey[]> {
-  const now = Date.now();
-  if (jwksCache && now - jwksCache.fetchedAt < JWKS_TTL_MS) {
-    return jwksCache.keys;
+function decodeJwtPart(part: string): Uint8Array | null {
+  try {
+    const padded = part.replace(/-/g, "+").replace(/_/g, "/");
+    const pad = padded.length % 4 === 0 ? "" : "=".repeat(4 - (padded.length % 4));
+    const binary = atob(padded + pad);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
+  } catch {
+    return null;
   }
-  const response = await fetch(GOOGLE_JWKS_URL);
-  if (!response.ok) {
-    throw new Error("google_jwks_fetch_failed");
-  }
-  const payload = (await response.json()) as { keys?: JwkKey[] };
-  const keys = payload.keys ?? [];
-  jwksCache = { keys, fetchedAt: now };
-  return keys;
 }
 
-function decodeJwtPart(part: string): Uint8Array {
-  const padded = part.replace(/-/g, "+").replace(/_/g, "/");
-  const pad = padded.length % 4 === 0 ? "" : "=".repeat(4 - (padded.length % 4));
-  const binary = atob(padded + pad);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
+function parseJsonUtf8(bytes: Uint8Array): unknown | null {
+  try {
+    return JSON.parse(new TextDecoder().decode(bytes));
+  } catch {
+    return null;
   }
-  return bytes;
-}
-
-function parseJsonUtf8(bytes: Uint8Array): unknown {
-  return JSON.parse(new TextDecoder().decode(bytes));
 }
 
 export async function verifyGoogleIdToken(
   idToken: string,
   expected: { clientId: string; nonce: string },
+  options?: { loadJwks?: GoogleJwksLoader },
 ): Promise<GoogleIdTokenClaims | null> {
   const parts = idToken.split(".");
   if (parts.length !== 3) {
     return null;
   }
   const [headerB64, payloadB64, signatureB64] = parts;
-  const header = parseJsonUtf8(decodeJwtPart(headerB64)) as {
-    alg?: string;
-    kid?: string;
-  };
-  if (header.alg !== "RS256" || !header.kid) {
+  const headerBytes = decodeJwtPart(headerB64);
+  if (!headerBytes) {
+    return null;
+  }
+  const header = parseJsonUtf8(headerBytes) as { alg?: string; kid?: string } | null;
+  if (!header || header.alg !== "RS256" || !header.kid) {
     return null;
   }
 
-  const keys = await loadGoogleJwks();
-  const jwk = keys.find((key) => key.kid === header.kid);
+  let keys = await loadGoogleJwks(options?.loadJwks);
+  let jwk = keys.find((key) => key.kid === header.kid);
+  if (!jwk) {
+    keys = await loadGoogleJwks(options?.loadJwks, true);
+    jwk = keys.find((key) => key.kid === header.kid);
+  }
   if (!jwk) {
     return null;
   }
 
-  const key = await crypto.subtle.importKey(
-    "jwk",
-    jwk,
-    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-    false,
-    ["verify"],
-  );
+  let key: CryptoKey;
+  try {
+    key = await crypto.subtle.importKey(
+      "jwk",
+      jwk,
+      { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+      false,
+      ["verify"],
+    );
+  } catch {
+    return null;
+  }
+
+  const payloadBytes = decodeJwtPart(payloadB64);
+  const signatureBytes = decodeJwtPart(signatureB64);
+  if (!payloadBytes || !signatureBytes) {
+    return null;
+  }
 
   const signedData = new TextEncoder().encode(`${headerB64}.${payloadB64}`);
-  const signatureBytes = new Uint8Array(decodeJwtPart(signatureB64));
-  const valid = await crypto.subtle.verify(
-    { name: "RSASSA-PKCS1-v1_5" },
-    key,
-    signatureBytes,
-    signedData,
-  );
+  let valid = false;
+  try {
+    valid = await crypto.subtle.verify(
+      { name: "RSASSA-PKCS1-v1_5" },
+      key,
+      new Uint8Array(signatureBytes),
+      signedData,
+    );
+  } catch {
+    return null;
+  }
   if (!valid) {
     return null;
   }
 
-  const claims = parseJsonUtf8(decodeJwtPart(payloadB64)) as GoogleIdTokenClaims;
+  const claims = parseJsonUtf8(payloadBytes) as GoogleIdTokenClaims | null;
+  if (!claims) {
+    return null;
+  }
   if (!GOOGLE_ISSUERS.has(claims.iss)) {
     return null;
   }

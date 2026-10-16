@@ -22,6 +22,7 @@ import {
   PRODUCTION_RESOURCE_MARKERS,
   RATE_LIMIT_BINDINGS,
 } from "./lib/wrangler-placeholders.mjs";
+import { previewLoginReachableForWorkerEnv } from "./lib/preview-login-guard.mjs";
 
 function usage() {
   console.error(
@@ -397,6 +398,19 @@ function checkProductionBlock(config) {
   }
   if (config.vars?.WE_MET_ENV !== "production") {
     fail('top-level WE_MET_ENV must be "production"');
+  }
+  if (previewLoginReachableForWorkerEnv(config.vars?.WE_MET_ENV, true)) {
+    fail(
+      "preview-login route must not be reachable with top-level WE_MET_ENV; only previews.vars.WE_MET_ENV=preview with a secret",
+    );
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(
+      config.vars ?? {},
+      "WE_MET_PREVIEW_LOGIN_SECRET",
+    )
+  ) {
+    fail("WE_MET_PREVIEW_LOGIN_SECRET must not appear in top-level wrangler vars");
   }
 
   const productionHostSuffix = config.vars?.WE_MET_PREVIEW_HOST_SUFFIX ?? "";

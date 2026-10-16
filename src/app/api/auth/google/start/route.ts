@@ -1,13 +1,15 @@
 import { oauthCookieValue } from "@/app-auth/cookies";
 import { randomToken } from "@/app-auth/crypto";
 import { buildGoogleAuthUrl, createPkcePair } from "@/app-auth/google-oauth";
-import { apiNotFound, clientIp } from "@/app-auth/guards";
+import { apiError, apiNotFound, clientIp } from "@/app-auth/guards";
+import { redirectResponse } from "@/app-auth/redirect-response";
 import { ensureAppApiHost, readAppAuthBindings } from "@/app-auth/route-context";
 import { createOAuthAttempt, type OAuthAttemptMode } from "@/app-auth/sessions";
 import { resolveAppOrigin } from "@/config/app-api-host";
 import { headers } from "next/headers";
 
 const OAUTH_COOKIE_MAX_AGE = 10 * 60;
+const AUTH_ROUTE_KEY = "google-start";
 
 function parseMode(value: string | null): OAuthAttemptMode {
   return value === "popup" ? "popup" : "redirect";
@@ -20,9 +22,9 @@ export async function GET(request: Request) {
   }
 
   const headerList = await headers();
-  const allowed = await ctx.authRateLimiter.check(clientIp(headerList));
+  const allowed = await ctx.authRateLimiter.check(AUTH_ROUTE_KEY, clientIp(headerList));
   if (!allowed) {
-    return new Response(null, { status: 429 });
+    return apiError("rate-limited", 429);
   }
 
   const clientId = ctx.env.GOOGLE_CLIENT_ID?.trim();
@@ -58,8 +60,7 @@ export async function GET(request: Request) {
     codeChallenge: challenge,
   });
 
-  const response = Response.redirect(authUrl, 302);
-  response.headers.set("cache-control", "no-store");
-  response.headers.append("set-cookie", oauthCookieValue(state, OAUTH_COOKIE_MAX_AGE));
-  return response;
+  return redirectResponse(authUrl, {
+    setCookies: [oauthCookieValue(state, OAUTH_COOKIE_MAX_AGE)],
+  });
 }

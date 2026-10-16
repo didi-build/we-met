@@ -28,3 +28,17 @@ export function oauthAttemptExpiresAt(now: string): string {
 export function shouldTouchSessionLastSeen(lastSeenAt: string, now: string): boolean {
   return Date.parse(now) - Date.parse(lastSeenAt) >= DAY_MS;
 }
+
+/** Cookie Max-Age: min(30d sliding window, time until absolute expiry). */
+export function sessionCookieMaxAgeSeconds(
+  absoluteExpiresAt: string,
+  slidingExpiresAt: string,
+  nowMs: number = Date.now(),
+): number {
+  const slidingCap = Math.floor(SLIDING_MS / 1000);
+  const toAbsolute = Math.floor((Date.parse(absoluteExpiresAt) - nowMs) / 1000);
+  const toSliding = Math.floor((Date.parse(slidingExpiresAt) - nowMs) / 1000);
+  return Math.max(0, Math.min(slidingCap, toAbsolute, toSliding));
+}
+
+export { SLIDING_MS, ABSOLUTE_MS, DAY_MS };

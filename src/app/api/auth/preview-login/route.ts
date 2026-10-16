@@ -26,7 +26,10 @@ export async function POST(request: Request) {
   }
 
   const headerList = await headers();
-  const allowed = await ctx.authRateLimiter.check(clientIp(headerList));
+  const allowed = await ctx.authRateLimiter.check(
+    "preview-login",
+    clientIp(headerList),
+  );
   if (!allowed) {
     return apiError("rate-limited", 429);
   }
