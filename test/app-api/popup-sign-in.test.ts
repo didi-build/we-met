@@ -39,6 +39,30 @@ describe("waitForPopupSignIn (unit)", () => {
     await expect(promise).resolves.toBe("ok");
   });
 
+  it("resolves failed when readSession rejects after postMessage ok", async () => {
+    const popup = { closed: false } as Window;
+    const readSession = vi.fn().mockRejectedValue(new Error("network"));
+    const promise = waitForPopupSignIn(popup, readSession, {
+      timeoutMs: 2000,
+      pollIntervalMs: 100,
+    });
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        data: { type: "we-met-auth", result: "ok" },
+        origin: window.location.origin,
+      }),
+    );
+    await expect(promise).resolves.toBe("failed");
+  });
+
+  it("resolves closed when readSession rejects after popup closes", async () => {
+    const popup = { closed: true } as Window;
+    const readSession = vi.fn().mockRejectedValue(new Error("network"));
+    await expect(
+      waitForPopupSignIn(popup, readSession, { timeoutMs: 2000, pollIntervalMs: 20 }),
+    ).resolves.toBe("closed");
+  });
+
   it("times out as closed when popup never completes", async () => {
     const popup = { closed: false } as Window;
     const readSession = vi.fn().mockResolvedValue(null);

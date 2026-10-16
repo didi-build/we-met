@@ -43,9 +43,13 @@ export async function waitForPopupSignIn(
         return;
       }
       if (data.result === "ok") {
-        void readSession().then((session) => {
-          finish(session ? "ok" : "failed");
-        });
+        void readSession()
+          .then((session) => {
+            finish(session ? "ok" : "failed");
+          })
+          .catch(() => {
+            finish("failed");
+          });
       }
     };
 
@@ -53,9 +57,13 @@ export async function waitForPopupSignIn(
 
     const pollTimer = window.setInterval(() => {
       if (popup.closed) {
-        void readSession().then((session) => {
-          finish(session ? "ok" : "closed");
-        });
+        void readSession()
+          .then((session) => {
+            finish(session ? "ok" : "closed");
+          })
+          .catch(() => {
+            finish("closed");
+          });
       }
     }, pollIntervalMs);
 

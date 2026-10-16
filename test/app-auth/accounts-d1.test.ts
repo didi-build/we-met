@@ -46,6 +46,24 @@ describe("upsertAccountFromGoogle (D1 integration)", () => {
     });
   });
 
+  it("handles concurrent first sign-ins for the same google_sub (D1 UNIQUE race)", async () => {
+    await withIsolatedLocalD1(async (db) => {
+      await setSignupsOpen(db, true);
+      const input = { sub: "g-race", email: "race@example.com", name: "Race" };
+      const [a, b] = await Promise.all([
+        upsertAccountFromGoogle(db, input),
+        upsertAccountFromGoogle(db, input),
+      ]);
+      expect(a.ok).toBe(true);
+      expect(b.ok).toBe(true);
+      const count = await db
+        .prepare("SELECT COUNT(*) AS c FROM accounts WHERE google_sub = ?")
+        .bind("g-race")
+        .first<{ c: number }>();
+      expect(count?.c).toBe(1);
+    });
+  });
+
   it("rejects suspended and deleted accounts", async () => {
     await withIsolatedLocalD1(async (db) => {
       await setSignupsOpen(db, true);

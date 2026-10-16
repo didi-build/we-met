@@ -36,27 +36,28 @@ export async function upsertAccountFromGoogle(
   if (!existing) {
     const id = crypto.randomUUID();
     const status = initialStatus(signupsOpen);
-    const insert = await db
-      .prepare(
-        `INSERT INTO accounts (id, google_sub, email, name, status, created_at, updated_at, last_login_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .bind(id, input.sub, email, name, status, now, now, now)
-      .run();
-    if (insert.success) {
+    try {
+      await db
+        .prepare(
+          `INSERT INTO accounts (id, google_sub, email, name, status, created_at, updated_at, last_login_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(id, input.sub, email, name, status, now, now, now)
+        .run();
       return {
         ok: true,
         account: { id, google_sub: input.sub, email, name, status },
       };
-    }
-    existing = await db
-      .prepare(
-        "SELECT id, google_sub, email, name, status FROM accounts WHERE google_sub = ?",
-      )
-      .bind(input.sub)
-      .first<AccountRow>();
-    if (!existing) {
-      return { ok: false, reason: "deleted" };
+    } catch {
+      existing = await db
+        .prepare(
+          "SELECT id, google_sub, email, name, status FROM accounts WHERE google_sub = ?",
+        )
+        .bind(input.sub)
+        .first<AccountRow>();
+      if (!existing) {
+        return { ok: false, reason: "deleted" };
+      }
     }
   }
 

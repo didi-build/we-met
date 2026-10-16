@@ -40,6 +40,14 @@ function oauthStatesMatch(cookieState: string | undefined, state: string): boole
   return constantTimeEqual(cookieState, state);
 }
 
+const AUTH_FAILED_FALLBACK_LOCATION = "https://we-met.link/app?auth_error=failed";
+
+function authFailedFallbackRedirect(): Response {
+  return redirectResponse(AUTH_FAILED_FALLBACK_LOCATION, {
+    setCookies: [clearOAuthCookieValue()],
+  });
+}
+
 export async function GET(request: Request) {
   try {
     const ctx = await readAppAuthBindings();
@@ -148,12 +156,16 @@ export async function GET(request: Request) {
       setCookies: [sessionCookieValue(session.token), clearOAuthCookieValue()],
     });
   } catch {
-    const ctx = await readAppAuthBindings().catch(() => null);
-    if (!ctx) {
-      return new Response(null, { status: 302, headers: { Location: "/" } });
+    try {
+      const ctx = await readAppAuthBindings();
+      if (ensureAppApiHost(ctx.hostname, ctx.hostConfig)) {
+        const appOrigin = resolveAppOrigin(ctx.hostConfig, request.url, ctx.env);
+        const spaPath = appSpaPath(ctx.hostConfig, ctx.hostname);
+        return redirectWithAuthError(appOrigin, spaPath, "failed");
+      }
+    } catch {
+      // resolveAppOrigin or bindings may throw; use static fallback.
     }
-    const appOrigin = resolveAppOrigin(ctx.hostConfig, request.url, ctx.env);
-    const spaPath = appSpaPath(ctx.hostConfig, ctx.hostname);
-    return redirectWithAuthError(appOrigin, spaPath, "failed");
+    return authFailedFallbackRedirect();
   }
 }

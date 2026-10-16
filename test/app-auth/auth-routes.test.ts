@@ -4,16 +4,35 @@ import { POST as logoutPost } from "@/app/api/auth/logout/route";
 import { POST as previewLoginPost } from "@/app/api/auth/preview-login/route";
 import { GET as googleCallbackGet } from "@/app/api/auth/google/callback/route";
 import { GET as googleStartGet } from "@/app/api/auth/google/start/route";
-import { SESSION_COOKIE_NAME } from "@/app-auth/cookies";
+import {
+  OAUTH_COOKIE_NAME,
+  SESSION_COOKIE_NAME,
+  clearOAuthCookieValue,
+} from "@/app-auth/cookies";
 import { isPreviewLoginRouteEnabled } from "@/app-auth/preview-login";
 import { upsertAccountFromGoogle } from "@/app-auth/accounts";
-import { createSession } from "@/app-auth/sessions";
+import { exchangeGoogleCode, verifyGoogleIdToken } from "@/app-auth/google-oauth";
+import { createOAuthAttempt, createSession } from "@/app-auth/sessions";
 import { withIsolatedLocalD1 } from "../helpers/d1";
 
 const routeMocks = vi.hoisted(() => ({
   env: {} as Record<string, unknown>,
   headerMap: new Map<string, string>(),
 }));
+
+const googleOAuthMocks = vi.hoisted(() => ({
+  exchangeGoogleCode: vi.fn(),
+  verifyGoogleIdToken: vi.fn(),
+}));
+
+vi.mock("@/app-auth/google-oauth", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/app-auth/google-oauth")>();
+  return {
+    ...actual,
+    exchangeGoogleCode: googleOAuthMocks.exchangeGoogleCode,
+    verifyGoogleIdToken: googleOAuthMocks.verifyGoogleIdToken,
+  };
+});
 
 vi.mock("@opennextjs/cloudflare", () => ({
   getCloudflareContext: vi.fn(async () => ({ env: routeMocks.env })),
@@ -38,6 +57,8 @@ function setRequestHeaders(init: Record<string, string>) {
 
 describe("auth API routes (integration)", () => {
   beforeEach(() => {
+    googleOAuthMocks.exchangeGoogleCode.mockReset();
+    googleOAuthMocks.verifyGoogleIdToken.mockReset();
     routeMocks.env = {
       WE_MET_BASE_URL: "https://we-met.link",
       WE_MET_ENV: "local",
@@ -104,29 +125,122 @@ describe("auth API routes (integration)", () => {
     });
   });
 
-  it("google callback redirects with auth_error=failed when OAuth state mismatches cookie (route handler)", async () => {
+  async function runGoogleCallbackOnAppHost(
+    db: import("@cloudflare/workers-types").D1Database,
+    requestInit: { url: string; cookie?: string },
+  ) {
+    routeMocks.env.WE_MET_DB = db;
+    routeMocks.env.WE_MET_ENV = "production";
+    routeMocks.env.WE_MET_AUTH_RATE_LIMITER = {
+      async limit() {
+        return { success: true };
+      },
+    };
+    const headers: Record<string, string> = { host: "app.we-met.link" };
+    if (requestInit.cookie) {
+      headers.cookie = requestInit.cookie;
+    }
+    setRequestHeaders(headers);
+    const response = await googleCallbackGet(new Request(requestInit.url));
+    routeMocks.env.WE_MET_ENV = "local";
+    setRequestHeaders({ host: "localhost:3000" });
+    return response;
+  }
+
+  function expectClearsOAuthCookie(response: Response) {
+    const cookies = response.headers.getSetCookie?.() ?? [];
+    const joined =
+      cookies.length > 0
+        ? cookies.join("\n")
+        : (response.headers.get("set-cookie") ?? "");
+    expect(joined).toContain(clearOAuthCookieValue().split(";")[0]);
+  }
+
+  it("google callback redirects with auth_error=failed when OAuth cookie is missing (route handler)", async () => {
     await withIsolatedLocalD1(async (db) => {
-      routeMocks.env.WE_MET_DB = db;
-      routeMocks.env.WE_MET_ENV = "production";
-      routeMocks.env.WE_MET_AUTH_RATE_LIMITER = {
-        async limit() {
-          return { success: true };
-        },
-      };
-      setRequestHeaders({
-        host: "app.we-met.link",
-        cookie: "__Host-wm_oauth=not-the-query-state",
+      const response = await runGoogleCallbackOnAppHost(db, {
+        url: "https://app.we-met.link/api/auth/google/callback?code=fake&state=query-state",
       });
-      const response = await googleCallbackGet(
-        new Request(
-          "https://app.we-met.link/api/auth/google/callback?code=fake&state=query-state",
-        ),
-      );
       expect(response.status).toBe(302);
       expect(response.headers.get("location")).toContain("auth_error=failed");
-      expect(response.headers.get("set-cookie")).toMatch(/__Host-wm_oauth=/);
-      routeMocks.env.WE_MET_ENV = "local";
-      setRequestHeaders({ host: "localhost:3000" });
+      expectClearsOAuthCookie(response);
+    });
+  });
+
+  it("google callback redirects with auth_error=failed when OAuth state mismatches cookie (route handler)", async () => {
+    await withIsolatedLocalD1(async (db) => {
+      const response = await runGoogleCallbackOnAppHost(db, {
+        url: "https://app.we-met.link/api/auth/google/callback?code=fake&state=query-state",
+        cookie: `${OAUTH_COOKIE_NAME}=not-the-query-state`,
+      });
+      expect(response.status).toBe(302);
+      expect(response.headers.get("location")).toContain("auth_error=failed");
+      expectClearsOAuthCookie(response);
+    });
+  });
+
+  it("google callback redirect mode sets session cookie and clears oauth cookie (route handler)", async () => {
+    await withIsolatedLocalD1(async (db) => {
+      const state = "oauth-state-redirect";
+      const nonce = "nonce-redirect";
+      const verifier = "pkce-verifier-redirect";
+      await createOAuthAttempt(db, {
+        state,
+        nonce,
+        pkceVerifier: verifier,
+        mode: "redirect",
+      });
+      googleOAuthMocks.exchangeGoogleCode.mockResolvedValue({ idToken: "id.jwt" });
+      googleOAuthMocks.verifyGoogleIdToken.mockResolvedValue({
+        sub: "google-sub-cb",
+        email: "cb@example.com",
+        name: "Callback",
+      });
+
+      const response = await runGoogleCallbackOnAppHost(db, {
+        url: `https://app.we-met.link/api/auth/google/callback?code=auth-code&state=${state}`,
+        cookie: `${OAUTH_COOKIE_NAME}=${state}`,
+      });
+
+      expect(response.status).toBe(302);
+      expect(response.headers.get("location")).not.toContain("auth_error");
+      const cookies = response.headers.getSetCookie?.() ?? [];
+      const joined = cookies.join("\n");
+      expect(joined).toContain(SESSION_COOKIE_NAME);
+      expectClearsOAuthCookie(response);
+      expect(exchangeGoogleCode).toHaveBeenCalled();
+      expect(verifyGoogleIdToken).toHaveBeenCalled();
+    });
+  });
+
+  it("google callback popup mode returns result HTML and session cookie (route handler)", async () => {
+    await withIsolatedLocalD1(async (db) => {
+      const state = "oauth-state-popup";
+      await createOAuthAttempt(db, {
+        state,
+        nonce: "nonce-popup",
+        pkceVerifier: "pkce-verifier-popup",
+        mode: "popup",
+      });
+      googleOAuthMocks.exchangeGoogleCode.mockResolvedValue({ idToken: "id.jwt" });
+      googleOAuthMocks.verifyGoogleIdToken.mockResolvedValue({
+        sub: "google-sub-popup",
+        email: "popup@example.com",
+        name: "Popup",
+      });
+
+      const response = await runGoogleCallbackOnAppHost(db, {
+        url: `https://app.we-met.link/api/auth/google/callback?code=auth-code&state=${state}`,
+        cookie: `${OAUTH_COOKIE_NAME}=${state}`,
+      });
+
+      expect(response.status).toBe(200);
+      const html = await response.text();
+      expect(html).toContain("we-met-auth");
+      const cookies = response.headers.getSetCookie?.() ?? [];
+      const joined = cookies.join("\n");
+      expect(joined).toContain(SESSION_COOKIE_NAME);
+      expectClearsOAuthCookie(response);
     });
   });
 
@@ -166,7 +280,8 @@ describe("auth API routes (integration)", () => {
       routeMocks.env.WE_MET_ENV = "preview";
       routeMocks.env.WE_MET_PREVIEW_LOGIN_SECRET = "preview-secret";
       routeMocks.env.WE_MET_PREVIEW_LOGIN_EMAIL = "preview@test.we-met.link";
-      routeMocks.env.WE_MET_PREVIEW_HOST_SUFFIX = "-we-met.diademshoukralla.workers.dev";
+      routeMocks.env.WE_MET_PREVIEW_HOST_SUFFIX =
+        "-we-met.diademshoukralla.workers.dev";
       routeMocks.env.WE_MET_AUTH_RATE_LIMITER = {
         async limit() {
           return { success: true };
