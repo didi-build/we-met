@@ -40,14 +40,25 @@ export type AppApiErrorCode =
   | "slug-taken"
   | "slug-reserved"
   | "slug-invalid"
-  | "name-missing";
+  | "slug-locked"
+  | "name-missing"
+  | "rate-limited"
+  | "invalid-fields"
+  | "invalid-photo"
+  | "unavailable";
 
 export class AppApiError extends Error {
   readonly code: AppApiErrorCode;
+  readonly fields?: Record<string, string>;
 
-  constructor(code: AppApiErrorCode, message?: string) {
+  constructor(
+    code: AppApiErrorCode,
+    message?: string,
+    fields?: Record<string, string>,
+  ) {
     super(message ?? code);
     this.code = code;
+    this.fields = fields;
     this.name = "AppApiError";
   }
 }

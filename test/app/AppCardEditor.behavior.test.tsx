@@ -98,6 +98,15 @@ describe("AppCardEditor behavior", () => {
     expect(preview.className).toContain("ap-card-preview-shell");
   });
 
+  it("puts chip popover boundary on the preview scroll container", () => {
+    renderEditor();
+    const preview = screen.getByTestId("app-card-preview");
+    const boundary = preview.closest("[data-chip-popover-boundary]");
+    expect(boundary).toBeTruthy();
+    expect(boundary).not.toBe(preview);
+    expect((boundary as HTMLElement).style.overflow).toBe("auto");
+  });
+
   it("debounces autosave and shows Saving then Saved", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     renderEditor();
@@ -128,20 +137,23 @@ describe("AppCardEditor behavior", () => {
       timeout: 10_000,
     });
     fireEvent.click(screen.getByRole("button", { name: /^Publish$/i }));
+    const confirmDialog = await waitFor(() => screen.getByRole("alertdialog"));
+    fireEvent.click(within(confirmDialog).getByRole("button", { name: /^Publish$/i }));
     await waitFor(
       () => {
         expect(document.getElementById("pub-title")?.textContent).toMatch(
           /Your card is live/,
         );
       },
-      { timeout: 15_000 },
+      { timeout: 10_000 },
     );
     const liveDialog = document
       .getElementById("pub-title")!
       .closest('[role="dialog"]')!;
     fireEvent.click(within(liveDialog as HTMLElement).getByLabelText(/^Close$/i));
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: /Share card/i })).toBeTruthy(),
+    await waitFor(
+      () => expect(screen.getByRole("button", { name: /Share card/i })).toBeTruthy(),
+      { timeout: 10_000 },
     );
     fireEvent.change(screen.getByLabelText(/^Name$/i), {
       target: { value: "Ada L." },
@@ -165,13 +177,15 @@ describe("AppCardEditor behavior", () => {
     const publishBtn = screen.getByRole("button", { name: /^Publish$/i });
     publishBtn.focus();
     fireEvent.click(publishBtn);
+    const confirmDialog = await waitFor(() => screen.getByRole("alertdialog"));
+    fireEvent.click(within(confirmDialog).getByRole("button", { name: /^Publish$/i }));
     await waitFor(
       () => {
         expect(document.getElementById("pub-title")?.textContent).toMatch(
           /Your card is live/,
         );
       },
-      { timeout: 15_000 },
+      { timeout: 10_000 },
     );
     const liveDialog = document
       .getElementById("pub-title")!

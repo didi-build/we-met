@@ -13,23 +13,32 @@ const CHIP_GAP = 10;
 const MAX_WIDTH = 280;
 const ARROW_EDGE_MARGIN = 20;
 
+export type ChipPopoverBounds = {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+};
+
 export function measureChipPopoverPosition(args: {
   chipRect: DOMRect;
   rootRect: DOMRect;
   popoverHeight: number;
-  viewportWidth: number;
-  viewportHeight: number;
+  bounds: ChipPopoverBounds;
 }): ChipPopoverPosition {
-  const { chipRect, rootRect, popoverHeight, viewportWidth, viewportHeight } = args;
-  const w = Math.min(MAX_WIDTH, viewportWidth - VIEWPORT_MARGIN * 2);
+  const { chipRect, rootRect, popoverHeight, bounds } = args;
+  const w = Math.min(MAX_WIDTH, bounds.width - VIEWPORT_MARGIN * 2);
+  const boundsRight = bounds.left + bounds.width;
+  const boundsBottom = bounds.top + bounds.height;
   const cx = chipRect.left + chipRect.width / 2;
   const left = Math.max(
-    VIEWPORT_MARGIN,
-    Math.min(cx - w / 2, viewportWidth - VIEWPORT_MARGIN - w),
+    bounds.left + VIEWPORT_MARGIN,
+    Math.min(cx - w / 2, boundsRight - VIEWPORT_MARGIN - w),
   );
   const fitsBelow =
-    chipRect.bottom + CHIP_GAP + popoverHeight <= viewportHeight - VIEWPORT_MARGIN;
-  const fitsAbove = chipRect.top - CHIP_GAP - popoverHeight >= VIEWPORT_MARGIN;
+    chipRect.bottom + CHIP_GAP + popoverHeight <= boundsBottom - VIEWPORT_MARGIN;
+  const fitsAbove =
+    chipRect.top - CHIP_GAP - popoverHeight >= bounds.top + VIEWPORT_MARGIN;
   const above = !fitsBelow && fitsAbove;
   const topViewport = above
     ? chipRect.top - CHIP_GAP - popoverHeight

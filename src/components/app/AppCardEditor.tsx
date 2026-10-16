@@ -1,7 +1,7 @@
 "use client";
 
 import { useAppApi } from "@/app-api/AppApiProvider";
-import type { AppSession, EditorCard } from "@/app-api/types";
+import { AppApiError, type AppSession, type EditorCard } from "@/app-api/types";
 import { CARD_FIELD_LIMITS } from "@/card-data/limits";
 import { AppEditorBottomBar } from "@/components/app/editor/AppEditorBottomBar";
 import { AppCardPreview } from "@/components/app/editor/AppCardPreview";
@@ -20,7 +20,6 @@ import {
   ArrowDownIcon,
   ArrowUpIcon,
   CameraIcon,
-  CheckIcon,
   ChevronDownIcon,
   GithubIcon,
   InstagramIcon,
@@ -39,7 +38,11 @@ import {
   renderCroppedPhotoJpeg,
 } from "@/lib/app-editor/photo-crop";
 import { useAutosave } from "@/lib/app-editor/hooks/useAutosave";
-import { publishBlockers, usePublish } from "@/lib/app-editor/hooks/usePublish";
+import {
+  publishBlockerSentence,
+  publishBlockers,
+  usePublish,
+} from "@/lib/app-editor/hooks/usePublish";
 import { useSlugCheck } from "@/lib/app-editor/hooks/useSlugCheck";
 import { allFieldKeys, fieldError } from "@/lib/app-editor/validation";
 import { cardInitials } from "@/lib/hi-card/card-content";
@@ -61,6 +64,9 @@ type AppCardEditorProps = {
   initialPublished: EditorCard | null;
   onSessionRestored: (session: AppSession) => void;
   onSignIn: () => Promise<void>;
+  onPreviewLogin?: () => Promise<void>;
+  previewSecret?: string;
+  isPreviewEnv?: boolean;
   signingIn: boolean;
 };
 
@@ -70,6 +76,9 @@ export function AppCardEditor({
   initialPublished,
   onSessionRestored,
   onSignIn,
+  onPreviewLogin,
+  previewSecret = "",
+  isPreviewEnv = false,
   signingIn,
 }: AppCardEditorProps) {
   const api = useAppApi();
@@ -79,8 +88,6 @@ export function AppCardEditor({
 
   const [card, setCard] = useState<EditorCard>(initialDraft);
   const [published, setPublished] = useState<EditorCard | null>(initialPublished);
-  const [slugEditing, setSlugEditing] = useState(false);
-  const [slugPrev, setSlugPrev] = useState("");
   const [triedPublish, setTriedPublish] = useState(false);
   const [tab, setTab] = useState<EditorTab>("edit");
   const [blockedOpen, setBlockedOpen] = useState(false);
@@ -89,7 +96,9 @@ export function AppCardEditor({
   const [photoUploading, setPhotoUploading] = useState(false);
   const [announce, setAnnounce] = useState("");
 
-  const [dialog, setDialog] = useState<"crop" | "published" | "session" | null>(null);
+  const [dialog, setDialog] = useState<
+    "crop" | "published" | "session" | "confirm-publish" | null
+  >(null);
   const [pubUrl, setPubUrl] = useState("");
   const [pubTitle, setPubTitle] = useState("Your card is live");
   const [copyLabel, setCopyLabel] = useState("Copy link");
@@ -112,7 +121,11 @@ export function AppCardEditor({
     dialogOpenerRef.current = document.activeElement as HTMLElement;
   }, []);
 
-  const { saveUi, scheduleSave, retrySave } = useAutosave(api, card, onSessionExpired);
+  const { saveUi, scheduleSave, retrySave, flushSave, cardRef } = useAutosave(
+    api,
+    card,
+    onSessionExpired,
+  );
   const { slugStatus, onSlugInput, markMine } = useSlugCheck(api, published, card.slug);
 
   const fieldKeys = useMemo(() => allFieldKeys(card), [card]);
@@ -153,27 +166,26 @@ export function AppCardEditor({
       const next = setPath(card, path, value);
       onCardChange(next);
     },
-    [card, onCardChange, onSlugInput, scheduleSave, slugEditing],
+    [card, onCardChange, onSlugInput, scheduleSave],
   );
 
   const blockers = useCallback(
     () =>
       publishBlockers({
-        slugEditing,
         name: card.name,
         slug: card.slug,
         slugStatus: slugStatus.status,
         fieldKeys,
         fieldError: errFor,
       }),
-    [card.name, card.slug, errFor, fieldKeys, slugEditing, slugStatus.status],
+    [card.name, card.slug, errFor, fieldKeys, slugStatus.status],
   );
 
   const {
     publishing,
     publishState,
     handlePublish: runPublish,
-  } = usePublish(api, card, published, blockers);
+  } = usePublish(api, card, published, blockers, flushSave);
 
   useEffect(() => {
     fitBar();
@@ -186,7 +198,10 @@ export function AppCardEditor({
   }, [fitBar]);
 
   const openDialog = useCallback(
-    (name: "crop" | "published" | "session", opener?: HTMLElement) => {
+    (
+      name: "crop" | "published" | "session" | "confirm-publish",
+      opener?: HTMLElement,
+    ) => {
       dialogOpenerRef.current = opener ?? (document.activeElement as HTMLElement);
       setDialog(name);
       document.body.style.overflow = "hidden";
@@ -280,17 +295,35 @@ export function AppCardEditor({
     try {
       const blob = await renderCroppedPhotoJpeg(img, crop);
       const { url } = await api.uploadPhoto(blob);
-      const next = { ...card, photo: url };
+      const next = { ...cardRef.current, photo: url };
       onCardChange(next);
       setAnnounce("Photo added.");
-    } catch {
-      setPhotoError("The upload didn't finish. Check your connection and try again.");
+    } catch (err) {
+      if (err instanceof AppApiError) {
+        if (err.code === "rate-limited") {
+          setPhotoError("You've reached the photo upload limit. Try again later.");
+        } else if (err.code === "invalid-photo") {
+          setPhotoError(
+            "That image could not be used. Use a square JPG, PNG, or WebP between 128×128 and 4096×4096 pixels.",
+          );
+        } else if (err.code === "unavailable") {
+          setPhotoError(
+            "The upload didn't finish. Check your connection and try again.",
+          );
+        } else {
+          setPhotoError(
+            "The upload didn't finish. Check your connection and try again.",
+          );
+        }
+      } else {
+        setPhotoError("The upload didn't finish. Check your connection and try again.");
+      }
     } finally {
       setPhotoUploading(false);
     }
-  }, [api, card, closeDialog, crop, onCardChange]);
+  }, [api, cardRef, closeDialog, crop, onCardChange]);
 
-  const handlePublish = useCallback(async () => {
+  const runPublishFlow = useCallback(async () => {
     setTriedPublish(true);
     const result = await runPublish(
       (url) => {
@@ -315,6 +348,23 @@ export function AppCardEditor({
     }
   }, [card, fitBar, markMine, openDialog, runPublish]);
 
+  const handlePublish = useCallback(() => {
+    setTriedPublish(true);
+    const b = blockers();
+    if (b.length) {
+      setBlockedOpen(true);
+      setBlockedText(publishBlockerSentence(b));
+      fitBar();
+      setTab("edit");
+      return;
+    }
+    if (!published) {
+      openDialog("confirm-publish");
+      return;
+    }
+    void runPublishFlow();
+  }, [blockers, fitBar, openDialog, published, runPublishFlow]);
+
   const openShare = useCallback(() => {
     if (!published) {
       return;
@@ -338,8 +388,7 @@ export function AppCardEditor({
     }
   }, [pubUrl]);
 
-  const slugLockable = Boolean(published);
-  const slugLocked = slugLockable && !slugEditing;
+  const slugLocked = Boolean(published);
 
   const slugStatusTone =
     slugStatus.status === "available" || slugStatus.status === "mine" ? "ok" : "";
@@ -348,9 +397,6 @@ export function AppCardEditor({
     slugStatus.status !== "invalid" &&
     slugStatus.status !== "reserved" &&
     slugStatus.status !== "taken";
-
-  const showSlugWarning =
-    Boolean(published && card.slug && card.slug !== published.slug) && !slugEditing;
 
   const initials = cardInitials(card.name);
 
@@ -483,67 +529,11 @@ export function AppCardEditor({
                         onChange={(e) => updateField("slug", e.target.value)}
                       />
                     </span>
-                    <button
-                      type="button"
-                      className="ap-iconbtn ap-box-btn"
-                      hidden={!slugLockable}
-                      data-tone={slugEditing ? "confirm" : undefined}
-                      aria-label={
-                        slugEditing ? "Use this link" : "Unlock to change your link"
-                      }
-                      disabled={
-                        slugEditing &&
-                        !(
-                          slugStatus.status === "available" ||
-                          slugStatus.status === "mine"
-                        )
-                      }
-                      onClick={() => {
-                        if (!slugEditing) {
-                          setSlugEditing(true);
-                          setSlugPrev(card.slug);
-                          setAnnounce("Link unlocked.");
-                          return;
-                        }
-                        if (!(
-                          slugStatus.status === "available" ||
-                          slugStatus.status === "mine"
-                        )) {
-                          return;
-                        }
-                        setSlugEditing(false);
-                        setAnnounce(
-                          card.slug === slugPrev
-                            ? "Link unchanged."
-                            : "New link set. Publish to make it live.",
-                        );
-                        onCardChange(card);
-                      }}
-                    >
-                      <span className="ap-icon" aria-hidden hidden={slugEditing}>
+                    {slugLocked ? (
+                      <span className="ap-icon ap-box-btn" aria-hidden>
                         <LockIcon size={18} />
                       </span>
-                      <span className="ap-icon" aria-hidden hidden={!slugEditing}>
-                        <CheckIcon size={18} />
-                      </span>
-                    </button>
-                  </div>
-                  <div className="ap-slug-edit" hidden={!slugEditing}>
-                    <span className="ap-help">
-                      Type the new address, then tap the check to use it.
-                    </span>
-                    <button
-                      type="button"
-                      className="ap-textbtn"
-                      onClick={() => {
-                        setSlugEditing(false);
-                        const next = { ...card, slug: slugPrev };
-                        setCard(next);
-                        onSlugInput(slugPrev);
-                      }}
-                    >
-                      Cancel
-                    </button>
+                    ) : null}
                   </div>
                   <p
                     className="ap-slug-status"
@@ -557,19 +547,6 @@ export function AppCardEditor({
                   </p>
                   <div className="ap-meta">
                     <FieldError message={errFor("slug")} id="f-slug-err" />
-                  </div>
-                  <div className="ap-alert ap-alert-info" hidden={!showSlugWarning}>
-                    <span className="ap-alert-mark" aria-hidden>
-                      !
-                    </span>
-                    <span className="ap-alert-body">
-                      <span>
-                        When you publish,{" "}
-                        <strong>we-met.link/hi/{published?.slug}</strong> will stop
-                        working. Anyone with the old link or QR code won&apos;t reach
-                        your card.
-                      </span>
-                    </span>
                   </div>
                 </>,
                 Boolean(errFor("slug")),
@@ -647,9 +624,16 @@ export function AppCardEditor({
                         hidden={!card.photo}
                         disabled={photoUploading}
                         onClick={() => {
-                          onCardChange({ ...card, photo: "" });
-                          setPhotoError("");
-                          setAnnounce("Photo removed.");
+                          void (async () => {
+                            try {
+                              await api.deletePhoto();
+                              onCardChange({ ...cardRef.current, photo: "" });
+                              setPhotoError("");
+                              setAnnounce("Photo removed.");
+                            } catch {
+                              setPhotoError("Couldn't remove the photo. Try again.");
+                            }
+                          })();
                         }}
                       >
                         Remove
@@ -1241,6 +1225,9 @@ export function AppCardEditor({
                   Leads go to <strong>{session.email}</strong>
                 </span>
               </p>
+              <p className="ap-help ap-leads-note">
+                Visitors who exchange contacts receive this address.
+              </p>
             </div>
           </section>
         </form>
@@ -1257,7 +1244,10 @@ export function AppCardEditor({
             <span className="ap-preview-note">Exchange is off in the preview.</span>
           </div>
           <div className="ap-frame" data-frame>
-            <div style={{ position: "absolute", inset: 0, overflow: "auto" }}>
+            <div
+              style={{ position: "absolute", inset: 0, overflow: "auto" }}
+              data-chip-popover-boundary
+            >
               <AppCardPreview theme={appTheme} draft={card} />
             </div>
           </div>
@@ -1298,6 +1288,14 @@ export function AppCardEditor({
         api={api}
         onSessionRestored={onSessionRestored}
         scheduleSave={scheduleSave}
+        publishSlug={card.slug}
+        onConfirmPublish={() => {
+          closeDialog();
+          void runPublishFlow();
+        }}
+        isPreviewEnv={isPreviewEnv}
+        previewSecret={previewSecret}
+        onPreviewLogin={onPreviewLogin ?? onSignIn}
       />
 
       <p className="ap-sr" role="status" aria-live="polite" id={announceId}>

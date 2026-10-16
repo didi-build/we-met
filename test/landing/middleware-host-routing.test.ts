@@ -35,9 +35,9 @@ describe("landing middleware host routing (unit)", () => {
     }
   });
 
-  it("rewrites app host / to the coming-soon page", () => {
+  it("rewrites app host / to the app SPA", () => {
     const response = middleware(request("/", "app.we-met.link"));
-    expect(response?.headers.get("x-middleware-rewrite")).toMatch(/app-coming-soon/);
+    expect(response?.headers.get("x-middleware-rewrite")).toMatch(/\/app/);
   });
 
   it("serves landing on we-met.link / without rewrite", () => {
@@ -61,6 +61,17 @@ describe("landing middleware host routing (unit)", () => {
   it("returns 404 for /app-coming-soon on the card host", () => {
     const response = middleware(request("/app-coming-soon", "we-met.link"));
     expect(response?.status).toBe(404);
+  });
+
+  it("returns 404 for /app on the production card host", () => {
+    const response = middleware(request("/app", "we-met.link"));
+    expect(response?.status).toBe(404);
+  });
+
+  it("allows /app on preview hosts", () => {
+    process.env.WE_MET_ENV = "preview";
+    const response = middleware(request("/app", "pr-42-we-met.example.workers.dev"));
+    expect(response?.status).not.toBe(404);
   });
 
   it("does not rewrite www or api hosts on /", () => {

@@ -1,11 +1,10 @@
 "use client";
 
 import type { AppApi } from "@/app-api/app-api";
-import type { EditorCard } from "@/app-api/types";
+import { AppApiError, type EditorCard } from "@/app-api/types";
 import { useCallback, useMemo, useState } from "react";
 
 export function publishBlockers(input: {
-  slugEditing: boolean;
   name: string;
   slug: string;
   slugStatus: string;
@@ -13,9 +12,6 @@ export function publishBlockers(input: {
   fieldError: (key: string) => string;
 }): string[] {
   const out: string[] = [];
-  if (input.slugEditing) {
-    out.push("tap the check to confirm your new link, or cancel");
-  }
   if (!input.name.trim()) {
     out.push("add your name");
   }
@@ -51,6 +47,7 @@ export function usePublish(
   card: EditorCard,
   published: EditorCard | null,
   blockersFn: () => string[],
+  flushSave?: () => Promise<boolean>,
 ) {
   const [publishing, setPublishing] = useState(false);
 
@@ -76,10 +73,38 @@ export function usePublish(
       }
       setPublishing(true);
       try {
+        if (flushSave) {
+          const saved = await flushSave();
+          if (!saved) {
+            return { blocked: false as const, published: false as const };
+          }
+        }
         const result = await api.publish(card);
         onSuccess(result.url);
         return { blocked: false as const, published: true as const };
-      } catch {
+      } catch (err) {
+        if (err instanceof AppApiError) {
+          if (err.code === "slug-locked") {
+            onBlocked("This link can't be changed after you publish.");
+            return { blocked: false as const, published: false as const };
+          }
+          if (err.code === "slug-taken") {
+            onBlocked("That link was just taken. Choose another and try again.");
+            return { blocked: false as const, published: false as const };
+          }
+          if (err.code === "forbidden") {
+            onBlocked("Your account can't publish right now.");
+            return { blocked: false as const, published: false as const };
+          }
+          if (err.code === "rate-limited") {
+            onBlocked("You're doing that too often. Wait a minute and try again.");
+            return { blocked: false as const, published: false as const };
+          }
+          if (err.code === "invalid-fields") {
+            onBlocked("Fix the fields marked in red, then publish again.");
+            return { blocked: false as const, published: false as const };
+          }
+        }
         onBlocked(
           "Something went wrong on our end and your card wasn't published. Your changes are saved. Try again?",
         );
@@ -88,7 +113,7 @@ export function usePublish(
         setPublishing(false);
       }
     },
-    [api, blockersFn, card],
+    [api, blockersFn, card, flushSave],
   );
 
   return { publishing, dirty, publishState, handlePublish };

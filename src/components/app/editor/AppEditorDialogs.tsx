@@ -13,7 +13,7 @@ import {
 import type { CropState } from "@/lib/app-editor/photo-crop";
 import type { PointerEvent as ReactPointerEvent } from "react";
 
-export type EditorDialog = "crop" | "published" | "session" | null;
+export type EditorDialog = "crop" | "published" | "session" | "confirm-publish" | null;
 
 type AppEditorDialogsProps = {
   dialog: EditorDialog;
@@ -41,6 +41,11 @@ type AppEditorDialogsProps = {
   api: AppApi;
   onSessionRestored: (session: AppSession) => void;
   scheduleSave: (ms: number) => void;
+  publishSlug: string;
+  onConfirmPublish: () => void;
+  isPreviewEnv: boolean;
+  previewSecret: string;
+  onPreviewLogin: () => Promise<void>;
 };
 
 export function AppEditorDialogs({
@@ -64,6 +69,11 @@ export function AppEditorDialogs({
   api,
   onSessionRestored,
   scheduleSave,
+  publishSlug,
+  onConfirmPublish,
+  isPreviewEnv,
+  previewSecret,
+  onPreviewLogin,
 }: AppEditorDialogsProps) {
   return (
     <>
@@ -242,6 +252,43 @@ export function AppEditorDialogs({
         </div>
       </div>
 
+      <div className="ap-dialog" hidden={dialog !== "confirm-publish"}>
+        <div className="ap-scrim" onClick={closeDialog} />
+        <div
+          className="ap-panel"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="confirm-pub-title"
+          aria-describedby="confirm-pub-text"
+        >
+          <div className="ap-panel-head">
+            <h2 className="ap-panel-title" id="confirm-pub-title">
+              Publish your card?
+            </h2>
+          </div>
+          <p className="ap-panel-text" id="confirm-pub-text">
+            This link can&apos;t be changed later:{" "}
+            <strong>we-met.link/hi/{publishSlug || "your-name"}</strong>
+          </p>
+          <div className="ap-panel-actions">
+            <button
+              type="button"
+              className="ap-btn ap-btn-lg"
+              onClick={onConfirmPublish}
+            >
+              Publish
+            </button>
+            <button
+              type="button"
+              className="ap-btn ap-btn-outline ap-btn-lg"
+              onClick={closeDialog}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div className="ap-dialog" hidden={dialog !== "session"}>
         <div className="ap-scrim" />
         <div
@@ -261,30 +308,50 @@ export function AppEditorDialogs({
             you&apos;re back.
           </p>
           <div className="ap-panel-actions">
-            <button
-              type="button"
-              className="ap-google"
-              aria-busy={signingIn}
-              disabled={signingIn}
-              onClick={async () => {
-                await onSignIn();
-                const s = await api.getSession();
-                if (s) {
-                  onSessionRestored(s);
-                  closeDialog();
-                  scheduleSave(0);
-                }
-              }}
-            >
-              {signingIn ? (
-                <span className="ap-spin" aria-hidden />
-              ) : (
-                <span className="ap-icon" aria-hidden>
-                  <GoogleGIcon size={20} />
-                </span>
-              )}
-              <span>{signingIn ? "Waiting for Google…" : "Sign in with Google"}</span>
-            </button>
+            {isPreviewEnv ? (
+              <button
+                type="button"
+                className="ap-btn ap-btn-lg"
+                aria-busy={signingIn}
+                disabled={signingIn || previewSecret.length === 0}
+                onClick={async () => {
+                  await onPreviewLogin();
+                  const s = await api.getSession();
+                  if (s) {
+                    onSessionRestored(s);
+                    closeDialog();
+                    scheduleSave(0);
+                  }
+                }}
+              >
+                {signingIn ? "Signing in…" : "Preview sign-in"}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="ap-google"
+                aria-busy={signingIn}
+                disabled={signingIn}
+                onClick={async () => {
+                  await onSignIn();
+                  const s = await api.getSession();
+                  if (s) {
+                    onSessionRestored(s);
+                    closeDialog();
+                    scheduleSave(0);
+                  }
+                }}
+              >
+                {signingIn ? (
+                  <span className="ap-spin" aria-hidden />
+                ) : (
+                  <span className="ap-icon" aria-hidden>
+                    <GoogleGIcon size={20} />
+                  </span>
+                )}
+                <span>{signingIn ? "Waiting for Google…" : "Sign in with Google"}</span>
+              </button>
+            )}
           </div>
         </div>
       </div>

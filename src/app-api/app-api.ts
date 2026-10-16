@@ -44,6 +44,9 @@ export interface AppApi {
    */
   uploadPhoto(blob: Blob): Promise<{ url: string }>;
 
+  /** Clears the draft photo key (does not delete R2 objects). Idempotent. */
+  deletePhoto(): Promise<void>;
+
   /**
    * Publishes the draft as the live card.
    * @throws {AppApiError} publish validation codes or `unauthorized` | `network`

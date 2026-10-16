@@ -136,6 +136,12 @@ Routes (all JSON; served only on the app host, preview hosts and localhost, and 
 - A paid slug change, and multiple cards per account under `/hi/<handle>/<card>`. Holding the old handle when someone renames is part of that pricing decision (DIDI-579).
 - Per-field vCard selection, real Google on every PR preview through an OAuth relay, a draft sync and merge flow, periodic email re-verification, a sign-out-everywhere button, self-serve deletion, a photo orphan cleanup job, an admin UI, a per-recipient cooldown, and a request-access flow. All tracked in DIDI-609.
 
+## Phase 3 implementation notes (DIDI-617)
+
+- **Variant:** every published MVP card uses `mono` only (no variant in the draft or editor).
+- **Photo cap:** five uploads per hour per account, counted in D1 `photo_upload_log` when an upload reaches the Images binding (migration `0006`).
+- **Image ingestion:** implemented in phase 3 (`src/images/ingest-card-photo.ts`); the only writer to `WE_MET_ASSETS`.
+
 ## Assumptions and UNVERIFIED items
 
 - **A1 (needs the maintainer's review):** when the kill switch is off or a daily cap is reached, the exchange still returns 200 so visitors are not blocked. The lead's ledger row is marked `failed` with error code `lead_email_paused` or `daily_cap_reached`, no lead or visitor email is sent, and the consumer drops (does not hold) messages that were already queued. Visitors may therefore get no follow-up, and the owner sees a failed ledger row.

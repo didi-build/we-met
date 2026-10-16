@@ -208,6 +208,16 @@ export function createStubApi(search = ""): AppApi {
       return { url: URL.createObjectURL(blob) };
     },
 
+    async deletePhoto() {
+      await wait(300);
+      if (flags.has("session-expired")) {
+        throw new AppApiError("unauthorized");
+      }
+      if (draft) {
+        draft = { ...draft, photo: "" };
+      }
+    },
+
     async publish(card) {
       await wait(900);
       if (!session) {

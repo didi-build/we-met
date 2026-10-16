@@ -104,17 +104,10 @@ function stubChipLayout() {
   });
 }
 
-function clickLinkExpectBlocked(shell: HTMLElement, link: HTMLAnchorElement) {
-  let prevented = false;
-  shell.addEventListener(
-    "click",
-    (e) => {
-      prevented = e.defaultPrevented;
-    },
-    { capture: true },
-  );
-  fireEvent.click(link);
-  expect(prevented).toBe(true);
+function clickLinkExpectBlocked(link: HTMLAnchorElement) {
+  const ev = new MouseEvent("click", { bubbles: true, cancelable: true });
+  link.dispatchEvent(ev);
+  expect(ev.defaultPrevented).toBe(true);
 }
 
 beforeAll(() => {
@@ -182,7 +175,7 @@ describe("AppCardPreview interaction (integration)", () => {
     expect(anchors.length).toBeGreaterThan(0);
     for (const anchor of anchors) {
       expect((anchor as HTMLAnchorElement).tabIndex).toBe(-1);
-      clickLinkExpectBlocked(shell, anchor as HTMLAnchorElement);
+      clickLinkExpectBlocked(anchor as HTMLAnchorElement);
     }
   });
 
@@ -205,7 +198,7 @@ describe("blockPreviewLinkNavigation (unit)", () => {
     root.appendChild(a);
     const ev = new MouseEvent("click", { bubbles: true, cancelable: true });
     Object.defineProperty(ev, "target", { value: a });
-    blockPreviewLinkNavigation(ev as unknown as React.MouseEvent, root);
+    blockPreviewLinkNavigation(ev, root);
     expect(ev.defaultPrevented).toBe(true);
   });
 });
