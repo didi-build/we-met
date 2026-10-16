@@ -47,6 +47,7 @@ export function usePublish(
   card: EditorCard,
   published: EditorCard | null,
   blockersFn: () => string[],
+  flushSave?: () => Promise<void>,
 ) {
   const [publishing, setPublishing] = useState(false);
 
@@ -72,6 +73,9 @@ export function usePublish(
       }
       setPublishing(true);
       try {
+        if (flushSave) {
+          await flushSave();
+        }
         const result = await api.publish(card);
         onSuccess(result.url);
         return { blocked: false as const, published: true as const };
@@ -106,7 +110,7 @@ export function usePublish(
         setPublishing(false);
       }
     },
-    [api, blockersFn, card],
+    [api, blockersFn, card, flushSave],
   );
 
   return { publishing, dirty, publishState, handlePublish };

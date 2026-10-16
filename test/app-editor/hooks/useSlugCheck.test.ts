@@ -15,6 +15,7 @@ function mockApi(checkSlug: AppApi["checkSlug"]): AppApi {
     saveDraft: vi.fn(),
     checkSlug,
     uploadPhoto: vi.fn(),
+    deletePhoto: vi.fn(),
     publish: vi.fn(),
   };
 }

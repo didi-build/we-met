@@ -44,7 +44,8 @@ export type AppApiErrorCode =
   | "name-missing"
   | "rate-limited"
   | "invalid-fields"
-  | "invalid-photo";
+  | "invalid-photo"
+  | "unavailable";
 
 export class AppApiError extends Error {
   readonly code: AppApiErrorCode;

@@ -121,7 +121,11 @@ export function AppCardEditor({
     dialogOpenerRef.current = document.activeElement as HTMLElement;
   }, []);
 
-  const { saveUi, scheduleSave, retrySave } = useAutosave(api, card, onSessionExpired);
+  const { saveUi, scheduleSave, retrySave, flushSave, cardRef } = useAutosave(
+    api,
+    card,
+    onSessionExpired,
+  );
   const { slugStatus, onSlugInput, markMine } = useSlugCheck(api, published, card.slug);
 
   const fieldKeys = useMemo(() => allFieldKeys(card), [card]);
@@ -181,7 +185,7 @@ export function AppCardEditor({
     publishing,
     publishState,
     handlePublish: runPublish,
-  } = usePublish(api, card, published, blockers);
+  } = usePublish(api, card, published, blockers, flushSave);
 
   useEffect(() => {
     fitBar();
@@ -291,7 +295,7 @@ export function AppCardEditor({
     try {
       const blob = await renderCroppedPhotoJpeg(img, crop);
       const { url } = await api.uploadPhoto(blob);
-      const next = { ...card, photo: url };
+      const next = { ...cardRef.current, photo: url };
       onCardChange(next);
       setAnnounce("Photo added.");
     } catch (err) {
@@ -301,6 +305,10 @@ export function AppCardEditor({
         } else if (err.code === "invalid-photo") {
           setPhotoError(
             "That image could not be used. Use a square JPG, PNG, or WebP between 128×128 and 4096×4096 pixels.",
+          );
+        } else if (err.code === "unavailable") {
+          setPhotoError(
+            "The upload didn't finish. Check your connection and try again.",
           );
         } else {
           setPhotoError(
@@ -313,7 +321,7 @@ export function AppCardEditor({
     } finally {
       setPhotoUploading(false);
     }
-  }, [api, card, closeDialog, crop, onCardChange]);
+  }, [api, cardRef, closeDialog, crop, onCardChange]);
 
   const runPublishFlow = useCallback(async () => {
     setTriedPublish(true);
@@ -616,9 +624,18 @@ export function AppCardEditor({
                         hidden={!card.photo}
                         disabled={photoUploading}
                         onClick={() => {
-                          onCardChange({ ...card, photo: "" });
-                          setPhotoError("");
-                          setAnnounce("Photo removed.");
+                          void (async () => {
+                            try {
+                              await api.deletePhoto();
+                              onCardChange({ ...cardRef.current, photo: "" });
+                              setPhotoError("");
+                              setAnnounce("Photo removed.");
+                            } catch {
+                              setPhotoError(
+                                "The upload didn't finish. Check your connection and try again.",
+                              );
+                            }
+                          })();
                         }}
                       >
                         Remove

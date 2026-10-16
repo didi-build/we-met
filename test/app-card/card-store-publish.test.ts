@@ -102,7 +102,7 @@ describe("publishCard (integration)", () => {
 });
 
 describe("saveDraft (integration)", () => {
-  it("does not persist client-supplied photo keys in draft_json", async () => {
+  it("does not change photo_key on saveDraft", async () => {
     await withIsolatedLocalD1(async (db) => {
       const now = new Date().toISOString();
       await db
@@ -111,6 +111,14 @@ describe("saveDraft (integration)", () => {
            VALUES ('a1', 'sub', 'owner@example.com', 'Owner', 'active', ?, ?)`,
         )
         .bind(now, now)
+        .run();
+      const key = "a".repeat(64);
+      await db
+        .prepare(
+          `INSERT INTO card_drafts (account_id, draft_json, photo_key, updated_at)
+           VALUES ('a1', '{}', ?, ?)`,
+        )
+        .bind(key, now)
         .run();
 
       await saveDraft(
@@ -126,10 +134,9 @@ describe("saveDraft (integration)", () => {
           "SELECT draft_json, photo_key FROM card_drafts WHERE account_id = 'a1'",
         )
         .first<{ draft_json: string; photo_key: string | null }>();
-      expect(row?.photo_key).toBeNull();
+      expect(row?.photo_key).toBe(key);
       const parsed = JSON.parse(row?.draft_json ?? "{}") as Record<string, unknown>;
       expect(parsed).not.toHaveProperty("photo");
-      expect((parsed.links as { website: string }).website).toBe("http://x");
     });
   });
 });

@@ -6,14 +6,14 @@ import { useAutosave } from "@/lib/app-editor/hooks/useAutosave";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-const CARD: EditorCard = {
+const BASE: EditorCard = {
   slug: "ada",
   name: "Ada",
   role: "",
   photo: "",
   about: [],
   services: [],
-  links: {},
+  links: { website: "", linkedin: "", github: "", instagram: "" },
   alternate: { url: "", label: "" },
 };
 
@@ -26,6 +26,7 @@ function mockApi(saveDraft: AppApi["saveDraft"]): AppApi {
     saveDraft,
     checkSlug: vi.fn(),
     uploadPhoto: vi.fn(),
+    deletePhoto: vi.fn(),
     publish: vi.fn(),
   };
 }
@@ -35,7 +36,7 @@ describe("useAutosave (unit)", () => {
     const saveDraft = vi.fn(async () => ({ updatedAt: new Date().toISOString() }));
     const onExpired = vi.fn();
     const { result } = renderHook(() =>
-      useAutosave(mockApi(saveDraft), CARD, onExpired),
+      useAutosave(mockApi(saveDraft), BASE, onExpired),
     );
 
     await act(async () => {
@@ -52,7 +53,7 @@ describe("useAutosave (unit)", () => {
     });
     const onExpired = vi.fn();
     const { result } = renderHook(() =>
-      useAutosave(mockApi(saveDraft), CARD, onExpired),
+      useAutosave(mockApi(saveDraft), BASE, onExpired),
     );
 
     await act(async () => {
@@ -61,5 +62,59 @@ describe("useAutosave (unit)", () => {
 
     await waitFor(() => expect(onExpired).toHaveBeenCalled());
     expect(result.current.saveUi).toBe("error");
+  });
+
+  it("saves the latest card after rapid changes", async () => {
+    const saveDraft = vi.fn(async () => ({ updatedAt: new Date().toISOString() }));
+    const onExpired = vi.fn();
+    let card = BASE;
+    const { result, rerender } = renderHook(
+      ({ c }) => useAutosave(mockApi(saveDraft), c, onExpired),
+      { initialProps: { c: card } },
+    );
+
+    card = { ...card, name: "Ada Lovelace" };
+    rerender({ c: card });
+    card = { ...card, role: "Mathematician" };
+    rerender({ c: card });
+
+    await act(async () => {
+      result.current.scheduleSave(0);
+    });
+
+    await waitFor(() =>
+      expect(saveDraft).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "Ada Lovelace", role: "Mathematician" }),
+      ),
+    );
+  });
+
+  it("persists an edit made immediately after a photo upload save", async () => {
+    const saveDraft = vi.fn(async () => ({ updatedAt: new Date().toISOString() }));
+    const onExpired = vi.fn();
+    let card: EditorCard = {
+      ...BASE,
+      photo: "/api/app/photo?v=" + "a".repeat(64),
+    };
+    const { result, rerender } = renderHook(
+      ({ c }) => useAutosave(mockApi(saveDraft), c, onExpired),
+      { initialProps: { c: card } },
+    );
+
+    card = { ...card, name: "After upload" };
+    rerender({ c: card });
+
+    await act(async () => {
+      result.current.scheduleSave(0);
+    });
+
+    await waitFor(() =>
+      expect(saveDraft).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "After upload",
+          photo: expect.stringContaining("/api/app/photo"),
+        }),
+      ),
+    );
   });
 });

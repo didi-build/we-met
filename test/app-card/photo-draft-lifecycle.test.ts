@@ -1,8 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GET as cardGet } from "@/app/api/app/card/route";
-import { PUT as draftPut } from "@/app/api/app/card/draft/route";
 import { POST as publishPost } from "@/app/api/app/card/publish/route";
-import { POST as photoPost } from "@/app/api/app/photo/route";
+import { DELETE as photoDelete, POST as photoPost } from "@/app/api/app/photo/route";
 import { SESSION_COOKIE_NAME } from "@/app-auth/cookies";
 import { createSession } from "@/app-auth/sessions";
 import { draftPhotoUrl } from "@/app-card/editor-persist";
@@ -33,7 +32,7 @@ vi.mock("@/images/ingest-card-photo", () => ({
   ingestCardPhotoFromRequest: vi.fn(async () => ({
     ok: true,
     key: "d".repeat(64),
-    size: 4,
+    size: 10,
   })),
 }));
 
@@ -129,7 +128,7 @@ describe("photo draft lifecycle (integration)", () => {
     });
   });
 
-  it("clears draft photo_key when save sends photo empty after upload", async () => {
+  it("publish after DELETE stores NULL photo_key on the live card", async () => {
     await withIsolatedLocalD1(async (db) => {
       routeMocks.env.WE_MET_DB = db;
       await activeSession(db);
@@ -145,43 +144,10 @@ describe("photo draft lifecycle (integration)", () => {
         }),
       );
 
-      const save = await draftPut(
-        new Request("http://localhost:3000/api/app/card/draft", {
-          method: "PUT",
-          headers: mutationHeaders(),
-          body: JSON.stringify({ card: baseCard({ photo: "" }) }),
-        }),
-      );
-      expect(save.status).toBe(200);
-
-      const row = await db
-        .prepare("SELECT photo_key FROM card_drafts WHERE account_id = 'a1'")
-        .first<{ photo_key: string | null }>();
-      expect(row?.photo_key).toBeNull();
-    });
-  });
-
-  it("publish after photo removal stores NULL photo_key on the live card", async () => {
-    await withIsolatedLocalD1(async (db) => {
-      routeMocks.env.WE_MET_DB = db;
-      await activeSession(db);
-
-      await photoPost(
+      await photoDelete(
         new Request("http://localhost:3000/api/app/photo", {
-          method: "POST",
-          headers: {
-            ...mutationHeaders(),
-            "content-type": "image/jpeg",
-          },
-          body: new Uint8Array([0xff, 0xd8]),
-        }),
-      );
-
-      await draftPut(
-        new Request("http://localhost:3000/api/app/card/draft", {
-          method: "PUT",
+          method: "DELETE",
           headers: mutationHeaders(),
-          body: JSON.stringify({ card: baseCard({ photo: "" }) }),
         }),
       );
 

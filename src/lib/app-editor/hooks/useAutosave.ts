@@ -15,6 +15,8 @@ export function useAutosave(
   const [pendingSave, setPendingSave] = useState(false);
   const saveTickRef = useRef(0);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cardRef = useRef(card);
+  cardRef.current = card;
 
   useEffect(() => {
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -30,9 +32,10 @@ export function useAutosave(
 
   const runSave = useCallback(async () => {
     const mine = ++saveTickRef.current;
+    const cardToSave = cardRef.current;
     setSaveUi("saving");
     try {
-      await api.saveDraft(card);
+      await api.saveDraft(cardToSave);
       if (mine !== saveTickRef.current) {
         return;
       }
@@ -50,7 +53,7 @@ export function useAutosave(
       setSaveUi("error");
       setPendingSave(true);
     }
-  }, [api, card, onSessionExpired]);
+  }, [api, onSessionExpired]);
 
   const scheduleSave = useCallback(
     (ms: number) => {
@@ -65,9 +68,18 @@ export function useAutosave(
     [runSave],
   );
 
+  const flushSave = useCallback(async () => {
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    setPendingSave(true);
+    await runSave();
+  }, [runSave]);
+
   const retrySave = useCallback(() => {
     scheduleSave(0);
   }, [scheduleSave]);
 
-  return { saveUi, pendingSave, scheduleSave, retrySave };
+  return { saveUi, pendingSave, scheduleSave, retrySave, flushSave, cardRef };
 }

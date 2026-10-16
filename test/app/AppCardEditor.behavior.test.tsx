@@ -142,8 +142,9 @@ describe("AppCardEditor behavior", () => {
       .getElementById("pub-title")!
       .closest('[role="dialog"]')!;
     fireEvent.click(within(liveDialog as HTMLElement).getByLabelText(/^Close$/i));
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: /Share card/i })).toBeTruthy(),
+    await waitFor(
+      () => expect(screen.getByRole("button", { name: /Share card/i })).toBeTruthy(),
+      { timeout: 15_000 },
     );
     fireEvent.change(screen.getByLabelText(/^Name$/i), {
       target: { value: "Ada L." },

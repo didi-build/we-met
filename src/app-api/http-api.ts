@@ -43,6 +43,9 @@ async function readApiError(response: Response): Promise<AppApiError> {
     if (code === "invalid-photo") {
       return new AppApiError("invalid-photo");
     }
+    if (code === "unavailable") {
+      return new AppApiError("unavailable");
+    }
   } catch {
     // fall through
   }
@@ -135,7 +138,8 @@ export function createHttpApi(): AppApi {
       if (
         response.status === 413 ||
         response.status === 415 ||
-        response.status === 422
+        response.status === 422 ||
+        response.status === 503
       ) {
         throw await readApiError(response);
       }
@@ -143,6 +147,26 @@ export function createHttpApi(): AppApi {
         throw new AppApiError("network");
       }
       return (await response.json()) as { url: string };
+    },
+
+    async deletePhoto(): Promise<void> {
+      const response = await fetch("/api/app/photo", {
+        method: "DELETE",
+        credentials: "same-origin",
+        headers: mutationHeaders("application/json"),
+      });
+      if (response.status === 401) {
+        throw new AppApiError("unauthorized");
+      }
+      if (response.status === 403) {
+        throw new AppApiError("forbidden");
+      }
+      if (response.status === 429) {
+        throw new AppApiError("rate-limited");
+      }
+      if (!response.ok) {
+        throw await readApiError(response);
+      }
     },
 
     async publish(card: EditorCard): Promise<{ url: string }> {

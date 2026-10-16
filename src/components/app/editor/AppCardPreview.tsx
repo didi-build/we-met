@@ -78,6 +78,7 @@ export function AppCardPreview({ theme, draft }: AppCardPreviewProps) {
         className="ap-card-preview-shell"
         aria-label="Card preview"
         data-testid="app-card-preview"
+        data-chip-popover-boundary
       >
         <HiCardPresentation
           card={previewRecord}

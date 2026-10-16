@@ -100,15 +100,29 @@ export function HiWhatIDoChips({ chips, interactive = true }: HiWhatIDoChipsProp
     const root = rootRef.current;
     if (!chip || !pop || !root) return;
 
-    const w = Math.min(280, document.documentElement.clientWidth - 32);
+    const boundary = root.closest("[data-chip-popover-boundary]");
+    const boundaryRect = boundary?.getBoundingClientRect();
+    const bounds = boundaryRect
+      ? {
+          left: boundaryRect.left,
+          top: boundaryRect.top,
+          width: boundaryRect.width,
+          height: boundaryRect.height,
+        }
+      : {
+          left: 0,
+          top: 0,
+          width: document.documentElement.clientWidth,
+          height: window.innerHeight,
+        };
+    const w = Math.min(280, bounds.width - 32);
     pop.style.width = `${w}px`;
     const popoverHeight = pop.offsetHeight;
     const pos = measureChipPopoverPosition({
       chipRect: chip.getBoundingClientRect(),
       rootRect: root.getBoundingClientRect(),
       popoverHeight,
-      viewportWidth: document.documentElement.clientWidth,
-      viewportHeight: window.innerHeight,
+      bounds,
     });
     const key = JSON.stringify(pos);
     if (key !== posKeyRef.current || !popoverPos) {
