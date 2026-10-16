@@ -1,8 +1,4 @@
-type PrivacyPolicyContentProps = {
-  cardHiHref: string;
-};
-
-export function PrivacyPolicyContent({ cardHiHref }: PrivacyPolicyContentProps) {
+export function PrivacyPolicyContent() {
   return (
     <main className="lp-wrap lp-legal">
       <h1 className="lp-legal-h1">Privacy</h1>
@@ -27,8 +23,7 @@ export function PrivacyPolicyContent({ cardHiHref }: PrivacyPolicyContentProps) 
       <p className="lp-body">
         <em>Your card.</em> We keep what you put on your card: your name, role, photo,
         about text, services and links, plus any drafts you save. Once you publish, your
-        card is public at <a href={cardHiHref}>we-met.link/hi/</a> followed by your
-        link.
+        card is public at we-met.link/hi/ followed by your link.
       </p>
       <p className="lp-body">
         <em>People who exchange details with you.</em> When someone taps &quot;Exchange

@@ -78,7 +78,7 @@ afterEach(() => {
 
 describe("privacy and terms pages (unit)", () => {
   it("renders privacy h1, sections, contact link, and last updated", () => {
-    render(<PrivacyPolicyContent cardHiHref={`${previewConfig.baseUrl}/hi/`} />);
+    render(<PrivacyPolicyContent />);
 
     expect(screen.getByRole("heading", { level: 1, name: "Privacy" })).toBeTruthy();
     for (const heading of PRIVACY_H2) {

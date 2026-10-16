@@ -2,7 +2,6 @@ import { LandingFooter } from "@/components/landing/LandingFooter";
 import { LandingHeader } from "@/components/landing/LandingHeader";
 import { LandingShell } from "@/components/landing/LandingShell";
 import { PrivacyPolicyContent } from "@/components/landing/PrivacyPolicyContent";
-import { absoluteUrl } from "@/config/we-met";
 import { resolvePrivacyMetadata } from "@/lib/landing/metadata";
 import {
   readLandingBrowseOrigin,
@@ -22,12 +21,11 @@ export default async function PrivacyPage() {
   const config = await readLandingHostConfig();
   const browseOrigin = await readLandingBrowseOrigin(config);
   const urls = resolveLandingUrls(config, browseOrigin);
-  const cardHiHref = absoluteUrl(browseOrigin, "/hi/");
 
   return (
     <LandingShell>
       <LandingHeader urls={urls} getStartedLabel="Get started" />
-      <PrivacyPolicyContent cardHiHref={cardHiHref} />
+      <PrivacyPolicyContent />
       <LandingFooter urls={urls} />
     </LandingShell>
   );
