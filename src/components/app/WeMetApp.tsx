@@ -117,6 +117,9 @@ export function WeMetApp() {
 
   const handleSignIn = useCallback(
     async (mode: "redirect" | "popup" = "redirect") => {
+      if (isPreviewEnv) {
+        return;
+      }
       setLoginError(false);
       setSigningIn(true);
       try {
@@ -132,7 +135,7 @@ export function WeMetApp() {
         }
       }
     },
-    [api, routeSession],
+    [api, isPreviewEnv, routeSession],
   );
 
   const handlePreviewLogin = useCallback(async () => {
@@ -268,6 +271,9 @@ export function WeMetApp() {
             </div>
             {isPreviewEnv ? (
               <>
+                <p className="ap-login-note ap-login-preview-google-off">
+                  Google sign-in is turned off on previews. Use Preview sign-in below.
+                </p>
                 <label className="ap-field">
                   <span className="ap-field-label">Preview sign-in</span>
                   <input

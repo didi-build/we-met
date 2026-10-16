@@ -51,6 +51,7 @@ jobs:
       - name: Build OpenNext (non-prod Turnstile site key)
         env:
           NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.WE_MET_TURNSTILE_SITE_KEY_NONPROD }}
+          WE_MET_ENV: preview
         run: npm run build
       - name: Create or update Cloudflare Preview
         id: preview

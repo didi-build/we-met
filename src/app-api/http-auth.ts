@@ -3,6 +3,10 @@ import { AppApiError, type AppSession } from "@/app-api/types";
 
 export type SignInMode = "redirect" | "popup";
 
+function isPreviewSignInClient(): boolean {
+  return process.env.NEXT_PUBLIC_WE_MET_ENV === "preview";
+}
+
 async function readSession(): Promise<AppSession | null> {
   const response = await fetch("/api/app/session", {
     method: "GET",
@@ -23,6 +27,9 @@ export function createHttpAuthApi() {
     },
 
     async signIn(mode: SignInMode = "redirect"): Promise<AppSession> {
+      if (isPreviewSignInClient()) {
+        throw new AppApiError("failed");
+      }
       if (mode === "redirect") {
         window.location.assign(`/api/auth/google/start?mode=redirect`);
         return new Promise(() => {
