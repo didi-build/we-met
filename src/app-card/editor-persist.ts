@@ -1,5 +1,6 @@
 import type { EditorCard } from "@/app-api/types";
 import { DEFAULT_MVP_CARD_COPY } from "@/app-card/default-card-copy";
+import { emptyEditorCard } from "@/app-card/route-auth";
 import { cardLoadInputToPersisted } from "@/card-data/card-persist";
 import type {
   CardAbout,
@@ -174,9 +175,32 @@ export function draftJsonToEditorCard(
   draftJson: string,
   photoKey: string | null,
 ): EditorCard {
-  const parsed = JSON.parse(draftJson) as EditorCard;
-  return {
+  const defaults = emptyEditorCard();
+  let parsed: Partial<EditorCard> = {};
+  try {
+    const raw = JSON.parse(draftJson) as unknown;
+    if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+      parsed = raw as Partial<EditorCard>;
+    }
+  } catch {
+    parsed = {};
+  }
+  const merged: EditorCard = {
+    ...defaults,
     ...parsed,
-    photo: photoKey ? draftPhotoUrl(photoKey) : (parsed.photo ?? ""),
+    about: Array.isArray(parsed.about) ? parsed.about : defaults.about,
+    services: Array.isArray(parsed.services) ? parsed.services : defaults.services,
+    links: {
+      ...defaults.links,
+      ...(parsed.links && typeof parsed.links === "object" ? parsed.links : {}),
+    },
+    alternate: {
+      ...defaults.alternate,
+      ...(parsed.alternate && typeof parsed.alternate === "object"
+        ? parsed.alternate
+        : {}),
+    },
+    photo: photoKey ? draftPhotoUrl(photoKey) : "",
   };
+  return merged;
 }

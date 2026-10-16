@@ -70,17 +70,32 @@ export async function saveDraft(
 ): Promise<string> {
   const updatedAt = nowIso();
   const draftJson = draftJsonFromEditorCard(card);
+  const clearPhoto = card.photo.trim() === "";
 
-  await db
-    .prepare(
-      `INSERT INTO card_drafts (account_id, draft_json, photo_key, updated_at)
-       VALUES (?, ?, NULL, ?)
-       ON CONFLICT(account_id) DO UPDATE SET
-         draft_json = excluded.draft_json,
-         updated_at = excluded.updated_at`,
-    )
-    .bind(accountId, draftJson, updatedAt)
-    .run();
+  if (clearPhoto) {
+    await db
+      .prepare(
+        `INSERT INTO card_drafts (account_id, draft_json, photo_key, updated_at)
+         VALUES (?, ?, NULL, ?)
+         ON CONFLICT(account_id) DO UPDATE SET
+           draft_json = excluded.draft_json,
+           photo_key = NULL,
+           updated_at = excluded.updated_at`,
+      )
+      .bind(accountId, draftJson, updatedAt)
+      .run();
+  } else {
+    await db
+      .prepare(
+        `INSERT INTO card_drafts (account_id, draft_json, photo_key, updated_at)
+         VALUES (?, ?, NULL, ?)
+         ON CONFLICT(account_id) DO UPDATE SET
+           draft_json = excluded.draft_json,
+           updated_at = excluded.updated_at`,
+      )
+      .bind(accountId, draftJson, updatedAt)
+      .run();
+  }
 
   return updatedAt;
 }
@@ -91,15 +106,16 @@ export async function setDraftPhotoKey(
   photoKey: string,
 ): Promise<void> {
   const updatedAt = nowIso();
+  const draftJson = draftJsonFromEditorCard(emptyEditorCard());
   await db
     .prepare(
       `INSERT INTO card_drafts (account_id, draft_json, photo_key, updated_at)
-       VALUES (?, '{}', ?, ?)
+       VALUES (?, ?, ?, ?)
        ON CONFLICT(account_id) DO UPDATE SET
          photo_key = excluded.photo_key,
          updated_at = excluded.updated_at`,
     )
-    .bind(accountId, photoKey, updatedAt)
+    .bind(accountId, draftJson, photoKey, updatedAt)
     .run();
 }
 

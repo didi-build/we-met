@@ -17,16 +17,16 @@ export async function authorizeActiveAppCardRoute(routeKey: string) {
     return base;
   }
   const { ctx } = base;
-  const headerList = await headers();
-  const ipAllowed = await ctx.authRateLimiter.check(
-    `app-card:${routeKey}`,
-    clientIp(headerList),
-  );
-  if (!ipAllowed) {
-    return { ok: false as const, response: apiError("rate-limited", 429) };
-  }
   const auth = await requireCardRouteAuth(ctx.env.WE_MET_DB, ctx.sessionToken);
   if (!auth.ok) {
+    const headerList = await headers();
+    const ipAllowed = await ctx.authRateLimiter.check(
+      `app-card:${routeKey}`,
+      clientIp(headerList),
+    );
+    if (!ipAllowed) {
+      return { ok: false as const, response: apiError("rate-limited", 429) };
+    }
     return { ok: false as const, response: auth.response };
   }
   const allowed = await ctx.appRateLimiter.check(auth.account.id, routeKey);

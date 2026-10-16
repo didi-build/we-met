@@ -1,5 +1,6 @@
 import {
   PHOTO_UPLOAD_CAP_PER_HOUR,
+  PHOTO_UPLOAD_WINDOW_MS,
   countPhotoUploadsInWindow,
   releasePhotoUploadReservation,
   reservePhotoUploadSlot,
@@ -28,6 +29,25 @@ describe("photo upload cap (integration)", () => {
       expect(await countPhotoUploadsInWindow(db, accountId)).toBe(
         PHOTO_UPLOAD_CAP_PER_HOUR - 1,
       );
+      expect(await reservePhotoUploadSlot(db, accountId)).toBeTruthy();
+    });
+  });
+
+  it("slides the window so uploads older than one hour no longer count", async () => {
+    await withIsolatedLocalD1(async (db) => {
+      const accountId = "acct-slide";
+      const stale = new Date(
+        Date.now() - PHOTO_UPLOAD_WINDOW_MS - 60_000,
+      ).toISOString();
+      for (let i = 0; i < PHOTO_UPLOAD_CAP_PER_HOUR; i++) {
+        await db
+          .prepare(
+            "INSERT INTO photo_upload_log (account_id, uploaded_at) VALUES (?, ?)",
+          )
+          .bind(accountId, stale)
+          .run();
+      }
+      expect(await countPhotoUploadsInWindow(db, accountId)).toBe(0);
       expect(await reservePhotoUploadSlot(db, accountId)).toBeTruthy();
     });
   });
