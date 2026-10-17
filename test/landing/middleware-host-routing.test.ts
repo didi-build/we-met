@@ -90,11 +90,8 @@ describe("landing middleware host routing (unit)", () => {
     }
   });
 
-  it("does not set card HTML cache-control on /hi photo or vcard assets", () => {
+  it("does not set card HTML cache-control on /hi photo assets", () => {
     const photo = middleware(request("/hi/didi/photo.jpg", "we-met.link"));
     expect(photo?.headers.get("cache-control")).toBeNull();
-
-    const vcard = middleware(request("/hi/didi/contact.vcf", "we-met.link"));
-    expect(vcard?.headers.get("cache-control")).toBeNull();
   });
 });

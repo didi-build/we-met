@@ -34,19 +34,18 @@ Agents should extend behavior only through these interfaces, not ad hoc fetches 
 
 ## Routes
 
-| Route                    | Host            | Role                                                                                                                   |
-| ------------------------ | --------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `/`                      | Card + app      | Landing (card host); editor SPA root on `app.we-met.link`.                                                             |
-| `/app`                   | Local + preview | Editor SPA mount (production uses `/` on app host).                                                                    |
-| `/hi/<slug>`             | Card            | Public card page (live cards only).                                                                                    |
-| `/hi/<slug>/contact.vcf` | Card            | vCard download (inline).                                                                                               |
-| `/hi/<slug>/photo.jpg`   | Card            | Published headshot from R2 (`cards.photo_key`).                                                                        |
-| `POST /api/exchange`     | Card            | Exchange submit (Turnstile, caps, dispatch sinks + mail).                                                              |
-| `POST /api/details`      | Card            | Optional details (signed token).                                                                                       |
-| `/api/auth/*`            | App (+ local)   | Google sign-in, preview test login, logout ([0025](../decisions/0025-we-met-mvp-accounts-sign-in-and-app-backend.md)). |
-| `/api/app/*`             | App (+ local)   | Session, draft, publish, slug check, photo ([app-api-contract](./app-api-contract.md)).                                |
+| Route                  | Host            | Role                                                                                                                   |
+| ---------------------- | --------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `/`                    | Card + app      | Landing (card host); editor SPA root on `app.we-met.link`.                                                             |
+| `/app`                 | Local + preview | Editor SPA mount (production uses `/` on app host).                                                                    |
+| `/hi/<slug>`           | Card            | Public card page (live cards only).                                                                                    |
+| `/hi/<slug>/photo.jpg` | Card            | Published headshot from R2 (`cards.photo_key`).                                                                        |
+| `POST /api/exchange`   | Card            | Exchange submit (Turnstile, caps, dispatch sinks + mail).                                                              |
+| `POST /api/details`    | Card            | Optional details (signed token).                                                                                       |
+| `/api/auth/*`          | App (+ local)   | Google sign-in, preview test login, logout ([0025](../decisions/0025-we-met-mvp-accounts-sign-in-and-app-backend.md)). |
+| `/api/app/*`           | App (+ local)   | Session, draft, publish, slug check, photo ([app-api-contract](./app-api-contract.md)).                                |
 
-**Legacy mapping:** `didi.build/hi` → `/hi/didi`; vCard equivalent. **`didi.build` is not redirected.** Slug rules: [0003](../decisions/0003-urls-and-lookup.md). Exchange API: [0008](../decisions/0008-api-routes-exchange-and-details.md).
+**Legacy mapping:** `didi.build/hi` → `/hi/didi`. **`didi.build` is not redirected.** Owner vCard is attached in the follow-up email after exchange only (no public `/hi/<slug>/contact.vcf`; [DIDI-641](https://linear.app/didi-build/issue/DIDI-641)). Slug rules: [0003](../decisions/0003-urls-and-lookup.md). Exchange API: [0008](../decisions/0008-api-routes-exchange-and-details.md).
 
 ## Theming
 
@@ -108,6 +107,6 @@ See [environments.md](./environments.md) for queues, secrets names, previews, an
 - **Multi-user (remaining):** admin UI, self-serve deletion, pricing, per-recipient cooldown ([DIDI-581](https://linear.app/didi-build/issue/DIDI-581), [DIDI-609](https://linear.app/didi-build/issue/DIDI-609)).
 - **Custom domains:** `card.theirdomain.com` flow and DNS ([DIDI-580](https://linear.app/didi-build/issue/DIDI-580)).
 - **Pricing and packaging** ([DIDI-579](https://linear.app/didi-build/issue/DIDI-579)).
-- **`didi.build/hi` and `/hi/contact.vcf` at cutover:** whether those URLs redirect (decide before [DIDI-566](https://linear.app/didi-build/issue/DIDI-566)).
+- **`didi.build/hi` at cutover:** whether that URL redirects (decide before [DIDI-566](https://linear.app/didi-build/issue/DIDI-566)). Public `/hi/<slug>/contact.vcf` is closed (404); vCard is email-only ([DIDI-641](https://linear.app/didi-build/issue/DIDI-641)).
 - **Photo orphan cleanup** and advanced abuse tooling ([DIDI-609](https://linear.app/didi-build/issue/DIDI-609)); ingestion is centralized ([0012](../decisions/0012-r2-images-single-ingestion.md)).
 - **Details-step token:** must carry **per-sink** record references (e.g. Linear issue id) so append-details can target each sink; encoding is undecided.
