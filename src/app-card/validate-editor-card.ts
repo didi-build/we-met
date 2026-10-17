@@ -12,6 +12,28 @@ export type EditorValidationResult =
   | { ok: false; code: "slug-reserved" }
   | { ok: false; code: "invalid-fields"; fields: Record<string, string> };
 
+/** Returns a user-facing error message, or null when the value is valid (empty is allowed). */
+export function phoneValidationMessage(phone: string): string | null {
+  if (!phone.trim()) {
+    return null;
+  }
+  if (/[\u0000-\u001f\u007f]/.test(phone)) {
+    return "Use a valid phone number.";
+  }
+  const value = phone.trim();
+  if (value.length > CARD_FIELD_LIMITS.phone) {
+    return `Keep your phone to ${CARD_FIELD_LIMITS.phone} characters or fewer.`;
+  }
+  if (!/^[\d\s+\-().]+$/.test(value)) {
+    return "Use only digits, spaces, and + - ( ) .";
+  }
+  const digits = value.replace(/\D/g, "").length;
+  if (digits < 7) {
+    return "Add at least 7 digits.";
+  }
+  return null;
+}
+
 function fieldLimitMessage(key: string, max: number): string {
   if (key === "name") {
     return `Keep your name to ${max} characters or fewer.`;
@@ -34,6 +56,10 @@ function collectDraftLimitViolations(card: EditorCard): Record<string, string> {
   }
   if (card.role.length > CARD_FIELD_LIMITS.role) {
     fields.role = fieldLimitMessage("role", CARD_FIELD_LIMITS.role);
+  }
+  const phoneErr = phoneValidationMessage(card.phone ?? "");
+  if (phoneErr) {
+    fields.phone = phoneErr;
   }
   if (card.about.length > CARD_FIELD_LIMITS.aboutParagraphs) {
     fields.about = `Use at most ${CARD_FIELD_LIMITS.aboutParagraphs} paragraphs.`;

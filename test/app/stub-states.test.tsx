@@ -78,7 +78,7 @@ describe("WeMetApp stub failure flags", () => {
 
   it("?stub=save-error shows Retry after failed autosave", async () => {
     await bootAndSignIn("?stub=save-error");
-    const nameInput = screen.getByLabelText(/^Name$/i);
+    const nameInput = screen.getByLabelText(/Display name/i);
     fireEvent.change(nameInput, { target: { value: "Ada Lovelace" } });
     await waitFor(
       () => {
@@ -91,7 +91,7 @@ describe("WeMetApp stub failure flags", () => {
 
   it("?stub=session-expired opens session dialog", async () => {
     await bootAndSignIn("?stub=session-expired");
-    const nameInput = screen.getByLabelText(/^Name$/i);
+    const nameInput = screen.getByLabelText(/Display name/i);
     fireEvent.change(nameInput, { target: { value: "Ada" } });
     await waitFor(
       () => {

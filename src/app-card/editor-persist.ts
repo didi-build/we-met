@@ -172,9 +172,11 @@ export function publishedRowToEditorCard(
     photo_key: string | null;
     page_copy_json: string;
     links_json: string;
+    contact_json: string;
   },
   parseJson: <T>(raw: string) => T,
 ): EditorCard {
+  const contact = parseJson<{ phone?: string }>(row.contact_json);
   const page = parseJson<{
     name?: string;
     role?: string;
@@ -196,6 +198,7 @@ export function publishedRowToEditorCard(
     slug: row.slug,
     name: page.name ?? "",
     role: page.role ?? "",
+    phone: contact.phone ?? "",
     photo: draftPhotoUrl(row.photo_key),
     about: [...about],
     services,

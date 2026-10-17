@@ -172,13 +172,12 @@ export function AppCardEditor({
   const blockers = useCallback(
     () =>
       publishBlockers({
-        name: card.name,
         slug: card.slug,
         slugStatus: slugStatus.status,
         fieldKeys,
         fieldError: errFor,
       }),
-    [card.name, card.slug, errFor, fieldKeys, slugStatus.status],
+    [card.slug, errFor, fieldKeys, slugStatus.status],
   );
 
   const {
@@ -398,7 +397,9 @@ export function AppCardEditor({
     slugStatus.status !== "reserved" &&
     slugStatus.status !== "taken";
 
-  const initials = cardInitials(card.name);
+  const googleDisplayName = session.name.trim();
+  const previewDisplayName = card.name.trim() || googleDisplayName;
+  const initials = cardInitials(previewDisplayName);
 
   const renderField = (key: string, children: ReactNode, invalid?: boolean) => (
     <div
@@ -668,18 +669,24 @@ export function AppCardEditor({
                 "name",
                 <>
                   <label className="ap-box" htmlFor="f-name">
-                    <span className="ap-label">Name</span>
+                    <span className="ap-label">
+                      Display name <span className="ap-label-opt">(optional)</span>
+                    </span>
                     <input
                       className="ap-input"
                       id="f-name"
                       value={card.name}
                       autoComplete="name"
-                      aria-describedby="f-name-err f-name-count"
+                      placeholder={googleDisplayName || undefined}
+                      aria-describedby="f-name-help f-name-err f-name-count"
                       aria-invalid={Boolean(errFor("name"))}
                       onChange={(e) => updateField("name", e.target.value)}
                     />
                   </label>
                   <div className="ap-meta">
+                    <p className="ap-help" id="f-name-help">
+                      Optional. Shown on your card. Defaults to your Google name.
+                    </p>
                     <FieldError message={errFor("name")} id="f-name-err" />
                     <CharCount
                       fieldKey="name"
@@ -719,6 +726,40 @@ export function AppCardEditor({
                   </div>
                 </>,
                 Boolean(errFor("role")),
+              )}
+
+              {renderField(
+                "phone",
+                <>
+                  <label className="ap-box" htmlFor="f-phone">
+                    <span className="ap-label">
+                      Phone <span className="ap-label-opt">(optional)</span>
+                    </span>
+                    <input
+                      className="ap-input"
+                      id="f-phone"
+                      type="tel"
+                      value={card.phone ?? ""}
+                      autoComplete="tel"
+                      inputMode="tel"
+                      aria-describedby="f-phone-help f-phone-err f-phone-count"
+                      aria-invalid={Boolean(errFor("phone"))}
+                      onChange={(e) => updateField("phone", e.target.value)}
+                    />
+                  </label>
+                  <div className="ap-meta">
+                    <p className="ap-help" id="f-phone-help">
+                      Shared with people after you exchange details with them.
+                    </p>
+                    <FieldError message={errFor("phone")} id="f-phone-err" />
+                    <CharCount
+                      fieldKey="phone"
+                      length={(card.phone ?? "").length}
+                      id="f-phone-count"
+                    />
+                  </div>
+                </>,
+                Boolean(errFor("phone")),
               )}
             </div>
           </section>
@@ -924,7 +965,7 @@ export function AppCardEditor({
                             <input
                               className="ap-input"
                               id={`f-${idFor(titleKey)}`}
-                              placeholder="System audit"
+                              placeholder="Initial consultation"
                               value={svc.title}
                               aria-describedby={`e-${idFor(titleKey)} c-${idFor(titleKey)}`}
                               aria-invalid={Boolean(errFor(titleKey))}
@@ -954,7 +995,7 @@ export function AppCardEditor({
                               className="ap-input"
                               id={`f-${idFor(descKey)}`}
                               rows={2}
-                              placeholder="One or two sentences about it"
+                              placeholder="A short call to understand what you need and how I can help."
                               value={svc.description}
                               aria-describedby={`e-${idFor(descKey)} c-${idFor(descKey)}`}
                               aria-invalid={Boolean(errFor(descKey))}
@@ -1248,7 +1289,11 @@ export function AppCardEditor({
               style={{ position: "absolute", inset: 0, overflow: "auto" }}
               data-chip-popover-boundary
             >
-              <AppCardPreview theme={appTheme} draft={card} />
+              <AppCardPreview
+                theme={appTheme}
+                draft={card}
+                googleName={googleDisplayName}
+              />
             </div>
           </div>
         </aside>

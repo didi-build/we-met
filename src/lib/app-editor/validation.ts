@@ -1,5 +1,6 @@
 import { CARD_FIELD_LIMITS } from "@/card-data/limits";
 import type { EditorCard } from "@/app-api/types";
+import { phoneValidationMessage } from "@/app-card/validate-editor-card";
 import type { SlugUiStatus } from "@/lib/app-editor/slug";
 
 export function isHttpsUrl(value: string): boolean {
@@ -17,6 +18,9 @@ export function maxForField(key: string): number {
   }
   if (key === "role") {
     return CARD_FIELD_LIMITS.role;
+  }
+  if (key === "phone") {
+    return CARD_FIELD_LIMITS.phone;
   }
   if (key === "alternate.label") {
     return CARD_FIELD_LIMITS.alternateLabel;
@@ -71,8 +75,8 @@ export function fieldError(
     return "";
   }
 
-  if (key === "name" && triedPublish && !t) {
-    return "Add your name to publish.";
+  if (key === "phone") {
+    return phoneValidationMessage(v) ?? "";
   }
 
   if (max && v.length > max) {
@@ -111,6 +115,7 @@ export function allFieldKeys(card: EditorCard): string[] {
     "slug",
     "name",
     "role",
+    "phone",
     "links.website",
     "links.linkedin",
     "links.github",

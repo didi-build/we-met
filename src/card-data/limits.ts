@@ -2,6 +2,7 @@
 export const CARD_FIELD_LIMITS = {
   name: 60,
   role: 100,
+  phone: 20,
   sectionTitle: 40,
   aboutParagraphs: 4,
   aboutParagraph: 500,
