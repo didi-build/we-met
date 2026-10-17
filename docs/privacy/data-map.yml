@@ -947,7 +947,9 @@
   storage: D1 we-met-db-nonprod; R2 we-met-assets-nonprod; Queue we-met-followup-email-nonprod
   processors:
     - Cloudflare
-  retention: unknown (whether real card-owner or visitor PII can exist in non-prod stores)
+  retention:
+    unknown (whether real card-owner or visitor PII can exist in non-prod stores); we-met-followup-email-nonprod queue
+    message retention 86,400 s (24 hours), same dashboard setting as production (2026-10-17)
   who_can_see: operator; PR preview access per Cloudflare preview policy
   source: docs/architecture/environments.md
   verified: false
@@ -959,14 +961,16 @@
   processors:
     - Cloudflare
   retention:
-    Cloudflare Queue message retention 4 days by default on Workers Paid (configurable 60s–14 days; per-queue setting
-    not in wrangler.jsonc); see https://developers.cloudflare.com/queues/platform/pricing/. Consumer retries use
-    exponential backoff (worst-case ~43,290 s / ~12 h before final attempt per docs/architecture/environments.md),
-    then message deleted; FOLLOWUP_RETRY_RETENTION_BUDGET_SECONDS (72_000 s) in scripts/lib/queue-retry-policy.mjs is
-    deploy-guard margin only, not the retry window
+    86,400 s (24 hours) per queue setting, read from the Cloudflare dashboard on 2026-10-17; messages are deleted when
+    retention expires (https://developers.cloudflare.com/queues/platform/limits/). Per-queue retention is not pinned in
+    the repo; a recreated queue on Workers Paid would default to 4 days
+    (https://developers.cloudflare.com/queues/platform/pricing/). Consumer retries use exponential backoff
+    (worst-case ~43,290 s / ~12 h before final attempt per docs/architecture/environments.md), then message deleted;
+    FOLLOWUP_RETRY_RETENTION_BUDGET_SECONDS (72_000 s) in scripts/lib/queue-retry-policy.mjs is deploy-guard margin
+    only, not the retry window
   who_can_see: operator via consumer logs if logged
-  source: https://developers.cloudflare.com/queues/platform/pricing/
-  verified: false
+  source: https://developers.cloudflare.com/queues/platform/limits/
+  verified: true
 - id: queue.lead_sink_record
   whose: visitor
   data: Visitor lead (name, email, phone) in lead_sink_record message plus sink config and card metadata
@@ -977,7 +981,7 @@
   retention: same as queue.visitor_followup
   who_can_see: operator via consumer
   source: src/exchange/queue/types.ts
-  verified: false
+  verified: true
 - id: queue.lead_sink_append_details
   whose: visitor
   data: Visitor lead identifiers plus job title, company, note in lead_sink_append_details message
@@ -988,7 +992,7 @@
   retention: same as queue.visitor_followup
   who_can_see: operator via consumer
   source: src/exchange/queue/types.ts
-  verified: false
+  verified: true
 - id: email.owner_lead_record
   whose: visitor
   data: Email to card owner with visitor name, email, phone from exchange
