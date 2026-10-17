@@ -10,6 +10,8 @@ type AppCardPreviewProps = {
   /** App editor theme (mirrored into the card subtree only). */
   theme: "light" | "dark";
   draft: EditorCard;
+  /** Google account name when display name is empty (editor preview only). */
+  googleName?: string;
 };
 
 const PREVIEW_GREETING_PLACEHOLDER = "Your name here";
@@ -40,13 +42,15 @@ export function blockPreviewLinkNavigation(
 }
 
 /** Live card preview: Exchange disabled via `preview`; chips/About interactive; links do not navigate. */
-export function AppCardPreview({ theme, draft }: AppCardPreviewProps) {
+export function AppCardPreview({ theme, draft, googleName = "" }: AppCardPreviewProps) {
   const shellRef = useRef<HTMLDivElement>(null);
-  const previewRecord = useMemo(() => editorCardToPreviewRecord(draft), [draft]);
+  const previewRecord = useMemo(
+    () => editorCardToPreviewRecord(draft, "preview", googleName),
+    [draft, googleName],
+  );
   const photoUrl = draft.photo || null;
-  const greetingOverride = !draft.name.trim()
-    ? PREVIEW_GREETING_PLACEHOLDER
-    : undefined;
+  const greetingOverride =
+    !draft.name.trim() && !googleName.trim() ? PREVIEW_GREETING_PLACEHOLDER : undefined;
 
   useLayoutEffect(() => {
     const root = shellRef.current;

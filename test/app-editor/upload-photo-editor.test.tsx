@@ -109,14 +109,14 @@ describe("AppCardEditor photo upload merge (integration)", () => {
 
     await waitFor(() => expect(uploadPhoto).toHaveBeenCalled());
 
-    fireEvent.change(screen.getByLabelText(/^Name$/i), {
+    fireEvent.change(screen.getByLabelText(/Display name/i), {
       target: { value: "Edited during upload" },
     });
 
     finishUpload?.({ url: PHOTO_URL });
 
     await waitFor(() => {
-      expect((screen.getByLabelText(/^Name$/i) as HTMLInputElement).value).toBe(
+      expect((screen.getByLabelText(/Display name/i) as HTMLInputElement).value).toBe(
         "Edited during upload",
       );
       const previewImg = document.querySelector(

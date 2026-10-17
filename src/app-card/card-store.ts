@@ -32,7 +32,7 @@ export async function loadCardBundle(
 
   const publishedRow = await db
     .prepare(
-      `SELECT slug, photo_key, page_copy_json, links_json, updated_at
+      `SELECT slug, photo_key, page_copy_json, links_json, contact_json, updated_at
        FROM cards WHERE account_id = ?`,
     )
     .bind(accountId)
@@ -41,6 +41,7 @@ export async function loadCardBundle(
       photo_key: string | null;
       page_copy_json: string;
       links_json: string;
+      contact_json: string;
       updated_at: string;
     }>();
 

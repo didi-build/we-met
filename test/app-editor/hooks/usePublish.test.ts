@@ -5,15 +5,14 @@ import {
 import { describe, expect, it } from "vitest";
 
 describe("publishBlockers (unit)", () => {
-  it("lists missing name and slug", () => {
+  it("lists missing slug without requiring display name on the client", () => {
     const blockers = publishBlockers({
-      name: "",
       slug: "",
       slugStatus: "empty",
       fieldKeys: ["name", "slug"],
       fieldError: () => "",
     });
-    expect(blockers).toContain("add your name");
+    expect(blockers).not.toContain("add your name");
     expect(blockers).toContain("choose your link");
   });
 });
@@ -21,7 +20,6 @@ describe("publishBlockers (unit)", () => {
 describe("usePublish publishState (unit)", () => {
   it("is wired through publishBlockers for waiting slug check", () => {
     const blockers = publishBlockers({
-      name: "Ada",
       slug: "ada",
       slugStatus: "checking",
       fieldKeys: [],

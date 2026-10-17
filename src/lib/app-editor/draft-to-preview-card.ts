@@ -6,9 +6,10 @@ import { previewCardShell } from "@/lib/app-editor/preview-card-shell";
 export function editorCardToPreviewRecord(
   draft: EditorCard,
   slugFallback = "preview",
+  displayNameFallback = "",
 ): CardRecord {
   const slug = draft.slug.trim() || slugFallback;
-  const name = draft.name.trim();
+  const name = draft.name.trim() || displayNameFallback.trim();
   const paragraphs = draft.about.map((p) => p.trim()).filter(Boolean);
   const items = draft.services
     .filter((s) => s.title.trim())

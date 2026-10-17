@@ -63,6 +63,7 @@ export function emptyEditorCard(): EditorCard {
     slug: "",
     name: "",
     role: "",
+    phone: "",
     photo: "",
     about: [],
     services: [],

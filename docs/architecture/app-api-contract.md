@@ -43,7 +43,10 @@ Mutating routes require same-origin `Origin`, matching content type, and `Sec-Fe
 | `checkSlug(slug)`   | `SlugCheckResult`                 | `network`                                                                                          |
 | `uploadPhoto(blob)` | `{ url }`                         | `unauthorized`, `forbidden`, `rate-limited`, `invalid-photo`, `unavailable`, `network`             |
 
-`EditorCard` matches `design/app/app.js` (slug, name, role, photo URL, about[], services[], links, alternate).
+`EditorCard` matches `design/app/app.js` (slug, name, role, optional phone, photo URL, about[], services[], links, alternate).
+
+- **Display name** (`name`): optional in the editor UI; shown on the public card. When empty at publish, the server resolves it to the signed-in Google name (publish pipeline; see DIDI-640).
+- **Phone** (`phone`): optional; stored in draft JSON and, after publish, in `contact_json.phone` (empty string means none). Shared with people only after an exchange (follow-up email vCard), not on the public card page or in owner lead emails. Allowed characters: digits, spaces, and `+ - ( ) .`; trimmed length at most 20; at least 7 digits when non-empty. Control characters (including newlines) are rejected.
 
 `published` is `null` until the first successful publish. The owner’s current published slug is always treated as available by `checkSlug`.
 
