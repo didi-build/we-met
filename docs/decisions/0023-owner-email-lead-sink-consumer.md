@@ -2,7 +2,7 @@
 
 - **Status:** accepted
 - **Date:** 2026-10-15
-- **Updates:** [0018](./0018-lead-sink.md), [0021](./0021-followup-email-consumer-worker.md), [0022](./0022-lead-delivery-ledger.md), [0024](./0024-sink-agnostic-record-append-correlation.md) (2026-10-15). **Extended by [0025](./0025-we-met-mvp-accounts-sign-in-and-app-backend.md) phase 4:** consumer reads `lead_email_enabled` and drops queued sink mail with `lead_email_paused`; visitor follow-up is acked without send when paused.
+- **Updates:** [0018](./0018-lead-sink.md), [0021](./0021-followup-email-consumer-worker.md), [0022](./0022-lead-delivery-ledger.md), [0024](./0024-sink-agnostic-record-append-correlation.md) (2026-10-15). **Extended by [0025](./0025-we-met-mvp-accounts-sign-in-and-app-backend.md) phase 4:** consumer reads `lead_email_enabled` and drops queued sink mail with `lead_email_paused`; visitor follow-up is acked without send when paused. **Amended 2026-10-17 ([DIDI-642](https://linear.app/didi-build/issue/DIDI-642)):** visitor follow-up **From** display name is `{Google first name} via We Met` when the first name passes validation, otherwise the platform name from `WE_MET_FROM_DISPLAY_NAME`; owner sink mail keeps the platform name only.
 
 ## Context
 
@@ -11,7 +11,7 @@
 ## Decision
 
 1. **Delivery pipe, not CRM.** No visitor PII in D1; the ledger stays metadata only ([0022](./0022-lead-delivery-ledger.md)).
-2. **From:** all consumer outbound mail uses secret **`WE_MET_OWNER_FROM_EMAIL`** as the SMTP From address and secret **`WE_MET_FROM_DISPLAY_NAME`** as the visible display name on **both** visitor follow-up and owner sink mail. The card snapshot **`emailFromName`** is **not** used for the From display name (platform sender identity; card owners must not control mail sent from this domain). **`Reply-To`** = the card owner email from the snapshot (never hardcoded). JWT `sub` stays **`GMAIL_SENDER`** (delegated Gmail user); OAuth scope stays `gmail.send` only.
+2. **From:** all consumer outbound mail uses secret **`WE_MET_OWNER_FROM_EMAIL`** as the SMTP From address. **Owner** sink mail uses secret **`WE_MET_FROM_DISPLAY_NAME`** as the visible display name. **Visitor** follow-up uses `{Google first name} via We Met` when the Google given name passes validation (`resolveVisitorFromDisplayName`); otherwise it uses **`WE_MET_FROM_DISPLAY_NAME`** unchanged (same fail-closed rules if that secret is missing or invalid). The card snapshot **`emailFromName`** is **not** used for the From display name; owners cannot type the visitor From name on the card. **`Reply-To`** = the card owner email from the snapshot (never hardcoded). JWT `sub` stays **`GMAIL_SENDER`** (delegated Gmail user); OAuth scope stays `gmail.send` only.
 3. **No fallback:** missing or invalid `WE_MET_FROM_DISPLAY_NAME` fails closed with `from_display_name_missing` through the normal retry/final-failure path.
 4. **No fallback:** missing or non-plain `WE_MET_OWNER_FROM_EMAIL` fails closed with `owner_from_email_missing` through the normal retry/final-failure path.
 5. **Destination:** `to` from queue `sinkConfig` snapshot only; consumer D1 reads **`lead_delivery_ledger`** and **`app_settings`** (`lead_email_enabled` only); never log `to`. When `lead_email_enabled` is off, drop queued sink work: mark the ledger row `failed` with `lead_email_paused`, send nothing, ack without retry. Visitor follow-up messages are acked without send. Daily caps are enforced at submission only ([0025](./0025-we-met-mvp-accounts-sign-in-and-app-backend.md) phase 4).

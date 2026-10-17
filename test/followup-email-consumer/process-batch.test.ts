@@ -166,7 +166,7 @@ describe("processFollowupQueueBatch (unit)", () => {
     const sent = vi.mocked(deps.emailSender.send).mock.calls[0][0];
     expect(sent.to).toBe("test-inbox@example.com");
     expect(sent.from).toBe("hello@we-met.link");
-    expect(sent.fromDisplayName).toBe(PLATFORM_FROM_DISPLAY_NAME);
+    expect(sent.fromDisplayName).toBe("Demo via We Met");
     expect(sent.replyTo).toBe("owner@example.com");
     expect(message.ack).toHaveBeenCalledOnce();
     expect(message.retry).not.toHaveBeenCalled();
@@ -248,6 +248,24 @@ describe("processFollowupQueueBatch (unit)", () => {
     });
     expect(message.ack).toHaveBeenCalledOnce();
     expect(message.retry).not.toHaveBeenCalled();
+  });
+
+  it("uses platform From display name when the owner given name is unsafe", async () => {
+    const unsafeCard: CardEmailSnapshot = {
+      ...card,
+      contact: {
+        ...card.contact,
+        name: { full: "R2D2 Bot", family: "Bot", given: "R2D2", nickname: "" },
+      },
+    };
+    const message = createMessage(visitorBody({ card: unsafeCard }));
+    const deps = createDeps();
+
+    await processFollowupQueueBatch({ messages: [message] }, deps);
+
+    const sent = vi.mocked(deps.emailSender.send).mock.calls[0][0];
+    expect(sent.fromDisplayName).toBe(PLATFORM_FROM_DISPLAY_NAME);
+    expect(sent.replyTo).toBe("owner@example.com");
   });
 
   it("never calls send when WE_MET_FROM_DISPLAY_NAME is unset; retries then permanent failure", async () => {

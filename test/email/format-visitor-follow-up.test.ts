@@ -65,6 +65,30 @@ describe("format visitor follow-up email (unit)", () => {
     expect(content.textHtml).not.toContain("example.com/book");
   });
 
+  it("uses owner email display name in signature and preview text", () => {
+    const diademCard: CardEmailSnapshot = {
+      ...card,
+      contact: {
+        ...card.contact,
+        name: {
+          full: "Diadem Shoukralla",
+          given: "Diadem",
+          family: "Shoukralla",
+          nickname: "Didi",
+        },
+      },
+    };
+    const content = buildVisitorFollowUpEmail({
+      card: diademCard,
+      visitorName: "Alex",
+      baseUrl,
+    });
+    const signatureName = "Diadem (Didi) Shoukralla";
+    expect(content.textPlain).toContain(signatureName);
+    expect(content.textHtml).toContain(signatureName);
+    expect(content.textHtml).toContain(`${signatureName} sent you their contact card`);
+  });
+
   it("includes owner role and omits photo block when photoKey is null", () => {
     const content = buildVisitorFollowUpEmail({
       card,
@@ -122,7 +146,12 @@ describe("format visitor follow-up email (unit)", () => {
       ...card,
       contact: {
         ...card.contact,
-        name: { ...card.contact.name, full: `<Ada> "Lovelace"` },
+        name: {
+          full: `<Ada> "Lovelace"`,
+          given: `<Ada>`,
+          family: `"Lovelace"`,
+          nickname: "",
+        },
         title: `CTO & Co-founder`,
       },
     };
