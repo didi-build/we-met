@@ -6,6 +6,10 @@ import { HiStickyExchangeBar } from "@/components/hi/HiStickyExchangeBar";
 import type { CardPlan, CardRecord } from "@/card-data/types";
 import { cardInitials } from "@/lib/hi-card/card-content";
 import { substituteFirstName } from "@/lib/copy/substitute-first-name";
+import {
+  readDetailsSentFlag,
+  writeDetailsSentFlag,
+} from "@/lib/hi-card/details-sent-storage";
 import { captureSheetOpener, restoreSheetFocus } from "@/lib/hi-card/sheet-focus";
 import type { MouseEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -30,6 +34,16 @@ export function HiPageClient({ card, photoUrl, plan = "free" }: HiPageClientProp
   const [firstName, setFirstName] = useState("");
   const [leadToken, setLeadToken] = useState("");
   const [stickyVisible, setStickyVisible] = useState(false);
+  const [contactSent, setContactSent] = useState(false);
+
+  useEffect(() => {
+    setContactSent(readDetailsSentFlag(card.slug));
+  }, [card.slug]);
+
+  const markContactSent = useCallback(() => {
+    writeDetailsSentFlag(card.slug);
+    setContactSent(true);
+  }, [card.slug]);
 
   const updateStickyFromScroll = useCallback(() => {
     const el = ctaRef.current;
@@ -39,11 +53,17 @@ export function HiPageClient({ card, photoUrl, plan = "free" }: HiPageClientProp
     setStickyVisible(el.getBoundingClientRect().top < 0);
   }, []);
 
-  const openSheet = useCallback((event: MouseEvent<HTMLButtonElement>) => {
-    sheetOpenerRef.current = captureSheetOpener(event.currentTarget);
-    pendingSheetFocusRestoreRef.current = true;
-    setSheetOpen(true);
-  }, []);
+  const openSheet = useCallback(
+    (event: MouseEvent<HTMLButtonElement>) => {
+      if (contactSent) {
+        return;
+      }
+      sheetOpenerRef.current = captureSheetOpener(event.currentTarget);
+      pendingSheetFocusRestoreRef.current = true;
+      setSheetOpen(true);
+    },
+    [contactSent],
+  );
 
   const closeSheet = useCallback(() => {
     updateStickyFromScroll();
@@ -98,6 +118,7 @@ export function HiPageClient({ card, photoUrl, plan = "free" }: HiPageClientProp
         photoAlt={card.pageCopy.headshotAlt}
         exchangeButtonRef={stickyExchangeButtonRef}
         onExchange={openSheet}
+        contactSent={contactSent}
       />
 
       <HiCardPresentation
@@ -108,6 +129,7 @@ export function HiPageClient({ card, photoUrl, plan = "free" }: HiPageClientProp
         ctaRef={ctaRef}
         onOpenExchange={openSheet}
         thanksLine={thanksLine}
+        contactSent={contactSent}
       />
 
       <HiExchangeSheet
@@ -123,6 +145,7 @@ export function HiPageClient({ card, photoUrl, plan = "free" }: HiPageClientProp
           setFirstName(nextFirstName);
           setLeadToken(token);
         }}
+        onDetailsSuccess={markContactSent}
       />
     </>
   );

@@ -65,6 +65,30 @@ describe("HiExchangeSheet details submit", () => {
     cleanup();
   });
 
+  it("calls onDetailsSuccess after a successful details submit", async () => {
+    const onDetailsSuccess = vi.fn();
+    vi.mocked(postHiDetails).mockResolvedValue({ ok: true });
+
+    render(
+      <HiExchangeSheet
+        slug="demo"
+        copy={sheetCopy}
+        open
+        initialStep="details"
+        firstName="Ada"
+        leadToken="lead-token"
+        onClose={() => {}}
+        onExchangeSuccess={() => {}}
+        onDetailsSuccess={onDetailsSuccess}
+      />,
+    );
+    submitDetails();
+
+    await waitFor(() => {
+      expect(onDetailsSuccess).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it("shows not-saved copy on a details server failure", async () => {
     vi.mocked(postHiDetails).mockResolvedValue({ ok: false, kind: "server" });
 

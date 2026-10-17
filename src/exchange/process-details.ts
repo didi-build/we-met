@@ -31,7 +31,8 @@ export type ProcessDetailsResult =
   | { status: "success" }
   | { status: "invalid_token" }
   | { status: "card_not_found" }
-  | { status: "lead_email_unavailable" };
+  | { status: "lead_email_unavailable" }
+  | { status: "details_already_sent" };
 
 function leadFromToken(payload: {
   leadId: string;
@@ -68,6 +69,12 @@ export async function processDetails(
     return { status: "card_not_found" };
   }
 
+  const lead = leadFromToken(verified.payload);
+
+  if (await deps.deliveryLedger.hasAppendPhaseForLead(lead.leadId)) {
+    return { status: "details_already_sent" };
+  }
+
   if (!(await deps.assertLeadEmailCapacity(card.id, 1))) {
     return { status: "lead_email_unavailable" };
   }
@@ -78,9 +85,11 @@ export async function processDetails(
     note: input.note,
   };
 
-  const lead = leadFromToken(verified.payload);
   const sourceUrl = absoluteUrl(deps.baseUrl, `/hi/${card.slug}`);
   const detailsSubmittedAt = deps.now().toISOString();
+  const enabledSinks = resolveLeadSinksForDispatch(sinks, card.email).filter(
+    (s) => s.enabled,
+  );
 
   const day = utcDayFromDate(deps.now());
   const sinkDispatchDeps: LeadSinkDispatchDeps = {
@@ -93,7 +102,7 @@ export async function processDetails(
     dailySendOnFirstLedger: { day, cardId: card.id, kinds: ["owner"] },
   };
 
-  await dispatchDetailsAppend(
+  const appended = await dispatchDetailsAppend(
     resolveLeadSinksForDispatch(sinks, card.email),
     lead,
     details,
@@ -103,6 +112,10 @@ export async function processDetails(
     detailsSubmittedAt,
     sinkDispatchDeps,
   );
+
+  if (enabledSinks.length > 0 && !appended) {
+    return { status: "details_already_sent" };
+  }
 
   return { status: "success" };
 }

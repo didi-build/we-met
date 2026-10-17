@@ -150,4 +150,18 @@ describe("postHiDetails", () => {
     const result = await postHiDetails({ token: "lead-token" });
     expect(result).toEqual({ ok: true });
   });
+
+  it("treats details-already-sent as success", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ error: "details-already-sent" }), {
+            status: 409,
+          }),
+      ),
+    );
+    const result = await postHiDetails({ token: "lead-token" });
+    expect(result).toEqual({ ok: true });
+  });
 });

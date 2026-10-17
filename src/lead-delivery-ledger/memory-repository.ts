@@ -60,6 +60,10 @@ export class MemoryLeadDeliveryLedger implements LeadDeliveryLedger {
       row.errorCode = errorCode;
     }
   }
+
+  async hasAppendPhaseForLead(leadId: string): Promise<boolean> {
+    return this.rows.some((r) => r.leadId === leadId && r.phase === "append");
+  }
 }
 
 function rowKey(leadId: string, sinkId: string, phase: LeadDeliveryPhase): string {

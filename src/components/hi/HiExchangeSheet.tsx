@@ -30,6 +30,7 @@ type HiExchangeSheetProps = {
   leadToken: string;
   onClose: () => void;
   onExchangeSuccess: (firstName: string, token: string) => void;
+  onDetailsSuccess?: () => void;
 };
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -153,6 +154,7 @@ export function HiExchangeSheet({
   leadToken,
   onClose,
   onExchangeSuccess,
+  onDetailsSuccess,
 }: HiExchangeSheetProps) {
   const formId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -400,6 +402,7 @@ export function HiExchangeSheet({
       setExchangeFailureAlert(result.kind === "server" ? "server" : "network");
       return;
     }
+    onDetailsSuccess?.();
     setDetailsSaved(true);
     window.setTimeout(() => animateClose(), 900);
   };

@@ -66,6 +66,72 @@ describe("processDetails (unit)", () => {
     expect((sinkMessages[0] as { type: string }).type).toBe("lead_sink_append_details");
   });
 
+  it("rejects a second details submit for the same lead", async () => {
+    const repo = new MemoryCardRepository();
+    const card = await repo.upsertCard(exampleCardInput());
+    const sinkMessages: unknown[] = [];
+    const ledger = new MemoryLeadDeliveryLedger();
+    const nowSeconds = Math.floor(
+      new Date("2026-10-12T12:00:00.000Z").getTime() / 1000,
+    );
+    const token = createDetailsToken(
+      "secret",
+      {
+        leadId: "lead-1",
+        cardId: card.id,
+        cardSlug: card.slug,
+        visitorEmail: "visitor@example.com",
+        visitorName: "Visitor",
+      },
+      nowSeconds,
+    );
+    const sinks = [
+      {
+        id: "sink-1",
+        cardId: card.id,
+        kind: "test_sink",
+        config: {},
+        enabled: true,
+        createdAt: "",
+        updatedAt: "",
+      },
+    ];
+    const deps = {
+      tokenSecret: "secret",
+      environment: "local",
+      leadSinkQueue: {
+        enqueueLeadSink: async (message: unknown) => {
+          sinkMessages.push(message);
+        },
+      },
+      leadSinkLogger: { logSinkEnqueueFailure: vi.fn() },
+      deliveryLedger: ledger,
+      deliveryLogger: {
+        logLedgerWriteFailed: vi.fn(),
+        logLedgerEnqueueFailed: vi.fn(),
+      },
+      createLedgerId: () => "ledger-1",
+      now: () => new Date("2026-10-12T12:00:00.000Z"),
+      baseUrl: "https://we-met.link",
+      ...leadEmailCapacityAlwaysAllowed,
+    };
+    const input = { token, jobTitle: "CTO", company: "Co", note: "Hi" };
+
+    const first = await processDetails(input, card, sinks, deps);
+    expect(first.status).toBe("success");
+    expect(sinkMessages).toHaveLength(1);
+
+    const second = await processDetails(
+      { ...input, jobTitle: "CEO", company: "Other", note: "Changed" },
+      card,
+      sinks,
+      { ...deps, createLedgerId: () => "ledger-2" },
+    );
+    expect(second.status).toBe("details_already_sent");
+    expect(sinkMessages).toHaveLength(1);
+    expect(ledger.rows.filter((r) => r.phase === "append")).toHaveLength(1);
+  });
+
   it("rejects invalid tokens", async () => {
     const repo = new MemoryCardRepository();
     const card = await repo.upsertCard(exampleCardInput());

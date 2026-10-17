@@ -16,6 +16,7 @@ import {
   servicesForChips,
   WE_MET_CARD_HOME_URL,
 } from "@/lib/hi-card/card-content";
+import { HI_CONTACT_SENT_BUTTON_LABEL } from "@/lib/hi-card/contact-sent-label";
 import Image from "next/image";
 import type { MouseEvent, Ref } from "react";
 import { useEffect, useState } from "react";
@@ -36,6 +37,8 @@ export type HiCardPresentationProps = {
   ctaRef?: Ref<HTMLDivElement>;
   onOpenExchange?: (event: MouseEvent<HTMLButtonElement>) => void;
   thanksLine?: string | null;
+  /** After details were sent on this device; exchange sheet cannot open. */
+  contactSent?: boolean;
 };
 
 function ExchangeRing({ small }: { small?: boolean }) {
@@ -62,6 +65,7 @@ export function HiCardPresentation({
   onOpenExchange,
   thanksLine,
   greetingOverride,
+  contactSent = false,
 }: HiCardPresentationProps) {
   const { copy, pageCopy } = card;
   const flags = cardContentFlags(card);
@@ -148,7 +152,7 @@ export function HiCardPresentation({
                 className="-mt-1 flex flex-col gap-1"
               >
                 <div className="relative isolate flex">
-                  <ExchangeRing />
+                  {!contactSent && <ExchangeRing />}
                   {preview ? (
                     <Button
                       type="button"
@@ -162,9 +166,11 @@ export function HiCardPresentation({
                       ref={exchangeButtonRef}
                       type="button"
                       onClick={onOpenExchange}
+                      disabled={contactSent}
+                      aria-disabled={contactSent}
                       className="min-h-14 w-full text-[17px] font-semibold"
                     >
-                      Exchange contact
+                      {contactSent ? HI_CONTACT_SENT_BUTTON_LABEL : "Exchange contact"}
                     </Button>
                   )}
                 </div>

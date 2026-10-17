@@ -121,15 +121,16 @@ export async function dispatchDetailsAppend(
   sourceUrl: string,
   detailsSubmittedAt: string,
   deps: LeadSinkDispatchDeps,
-): Promise<void> {
+): Promise<boolean> {
   const enabled = sinks.filter((s) => s.enabled);
   if (enabled.length === 0) {
-    return;
+    return false;
   }
 
   const now = deps.now();
   const createdAt = now.toISOString();
   const retryUntil = computeLeadDeliveryRetryUntilIso(now);
+  let anyInserted = false;
 
   for (const sink of enabled) {
     let inserted = false;
@@ -164,6 +165,7 @@ export async function dispatchDetailsAppend(
     if (!inserted) {
       continue;
     }
+    anyInserted = true;
 
     try {
       await deps.producer.enqueueLeadSink({
@@ -198,4 +200,6 @@ export async function dispatchDetailsAppend(
       }
     }
   }
+
+  return anyInserted;
 }
