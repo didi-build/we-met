@@ -7,6 +7,7 @@ import {
   ownerRoleFromContact,
 } from "@/email/email-template-vars";
 import { visitorFirstName } from "@/email/first-name";
+import { ownerEmailDisplayName } from "@/email/owner-email-display-name";
 import { sanitizeEmailHeaderValue } from "@/email/mime-headers";
 import { renderEmailTemplate } from "@/email/template-renderer";
 import { visitorFollowupTemplates } from "@/email/templates";
@@ -53,7 +54,7 @@ function visitorTemplateData(
 
   return {
     visitor_first_name: visitorFirstName(input.visitorName),
-    owner_name: input.card.contact.name.full,
+    owner_name: ownerEmailDisplayName(input.card.contact.name),
     owner_role: ownerRole,
     owner_photo_url: photo,
     logo_url: emailLogoUrl(input.baseUrl),

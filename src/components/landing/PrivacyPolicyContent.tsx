@@ -54,10 +54,13 @@ export function PrivacyPolicyContent() {
 
       <h2 className="lp-legal-h2">What the people you meet can see</h2>
       <p className="lp-body">
-        When someone exchanges details with you, they get a follow-up email from We Met
-        with your display name (or your Google name if you left display name blank),
-        role and photo, and your contact card attached. If you added a phone number, it
-        is included in that contact card after an exchange.{" "}
+        When someone exchanges details with you, they get a follow-up email from your
+        first name via We Met (for example, &quot;Diadem via We Met&quot;). The
+        signature shows your Google first name, your display name in brackets when you
+        use one, and your Google last name. The email also includes your display name on
+        the card (or your Google name if you left display name blank), your role and
+        photo, and your contact card attached. If you added a phone number, it is
+        included in that contact card after an exchange.{" "}
         <strong>
           Your Google account email address is shared with everyone who exchanges
           details with you:

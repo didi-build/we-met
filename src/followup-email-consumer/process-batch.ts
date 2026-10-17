@@ -6,7 +6,10 @@ import {
 } from "@/email/followup-email-error";
 import { createGmailEmailSender } from "@/email/gmail-sender";
 import { sanitizeEmailHeaderValue } from "@/email/mime-headers";
-import { resolveFromDisplayName } from "@/email/from-display-name";
+import {
+  resolveFromDisplayName,
+  resolveVisitorFromDisplayName,
+} from "@/email/from-display-name";
 import { resolveOwnerFromEmail } from "@/email/owner-from";
 import { resolveEmailRecipient } from "@/email/recipient";
 import type { EmailSender } from "@/email/types";
@@ -234,7 +237,11 @@ async function sendVisitorFollowup(
   deps: FollowupConsumerDeps,
 ): Promise<void> {
   const ownerFrom = resolveOwnerFromEmail(deps.ownerFromEmail);
-  const fromDisplayName = resolveFromDisplayName(deps.fromDisplayName);
+  const platformFromDisplayName = resolveFromDisplayName(deps.fromDisplayName);
+  const fromDisplayName = resolveVisitorFromDisplayName(
+    message.card.contact.name.given,
+    platformFromDisplayName,
+  );
   const recipient = resolveEmailRecipient({
     weMetEnv: deps.weMetEnv,
     visitorEmail: message.lead.email,
