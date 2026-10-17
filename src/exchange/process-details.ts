@@ -32,7 +32,8 @@ export type ProcessDetailsResult =
   | { status: "invalid_token" }
   | { status: "card_not_found" }
   | { status: "lead_email_unavailable" }
-  | { status: "details_already_sent" };
+  | { status: "details_already_sent" }
+  | { status: "server_error" };
 
 function leadFromToken(payload: {
   leadId: string;
@@ -87,9 +88,8 @@ export async function processDetails(
 
   const sourceUrl = absoluteUrl(deps.baseUrl, `/hi/${card.slug}`);
   const detailsSubmittedAt = deps.now().toISOString();
-  const enabledSinks = resolveLeadSinksForDispatch(sinks, card.email).filter(
-    (s) => s.enabled,
-  );
+  const sinksForDispatch = resolveLeadSinksForDispatch(sinks, card.email);
+  const enabledSinks = sinksForDispatch.filter((s) => s.enabled);
 
   const day = utcDayFromDate(deps.now());
   const sinkDispatchDeps: LeadSinkDispatchDeps = {
@@ -102,8 +102,8 @@ export async function processDetails(
     dailySendOnFirstLedger: { day, cardId: card.id, kinds: ["owner"] },
   };
 
-  const appended = await dispatchDetailsAppend(
-    resolveLeadSinksForDispatch(sinks, card.email),
+  const appendOutcome = await dispatchDetailsAppend(
+    sinksForDispatch,
     lead,
     details,
     card.id,
@@ -113,7 +113,10 @@ export async function processDetails(
     sinkDispatchDeps,
   );
 
-  if (enabledSinks.length > 0 && !appended) {
+  if (appendOutcome === "failed") {
+    return { status: "server_error" };
+  }
+  if (enabledSinks.length > 0 && appendOutcome === "already_exists") {
     return { status: "details_already_sent" };
   }
 

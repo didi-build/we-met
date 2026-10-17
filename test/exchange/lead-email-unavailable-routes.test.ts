@@ -240,4 +240,70 @@ describe("exchange and details routes lead_email_unavailable (integration)", () 
       expect(sinkMessages).toHaveLength(0);
     });
   });
+
+  it("POST /api/details returns 409 when append ledger already exists for the lead", async () => {
+    await withIsolatedLocalD1(async (db) => {
+      const repo = new MemoryCardRepository();
+      const card = await repo.upsertCard(exampleCardInput());
+      routeMocks.repo = repo;
+      routeMocks.card = card;
+      const sinkMessages: unknown[] = [];
+      const followup: unknown[] = [];
+      const exchangeDeps = buildExchangeDeps(db, sinkMessages, followup);
+      routeMocks.detailsDeps = {
+        tokenSecret: "secret",
+        environment: "preview",
+        leadSinkQueue: exchangeDeps.leadSinkQueue,
+        deliveryLedger: exchangeDeps.deliveryLedger,
+        deliveryLogger: exchangeDeps.deliveryLogger,
+        leadSinkLogger: exchangeDeps.leadSinkLogger,
+        createLedgerId: () => "ledger-details-dup",
+        now: exchangeDeps.now,
+        baseUrl: "https://we-met.link",
+        assertLeadEmailCapacity: exchangeDeps.assertLeadEmailCapacity,
+      };
+
+      await seedSettings(db, {
+        [APP_SETTING_LEAD_EMAIL_ENABLED]: "1",
+        [APP_SETTING_DAILY_CAP_GLOBAL]: "500",
+        [APP_SETTING_DAILY_CAP_PER_CARD]: "100",
+      });
+
+      const leadId = "lead-details-dup";
+      await exchangeDeps.deliveryLedger.insertAppendIfAbsent({
+        id: "ledger-existing-append",
+        leadId,
+        cardId: card.id,
+        sinkId: "sink-existing",
+        sinkKind: "email",
+        phase: "append",
+        retryUntil: "2026-10-17T12:00:00.000Z",
+        createdAt: "2026-10-16T12:00:00.000Z",
+      });
+
+      const tokenNowSeconds = Math.floor(Date.now() / 1000);
+      const token = createDetailsToken(
+        "secret",
+        {
+          leadId,
+          cardId: card.id,
+          cardSlug: card.slug,
+          visitorEmail: "visitor@example.com",
+          visitorName: "Visitor",
+        },
+        tokenNowSeconds,
+      );
+
+      const response = await detailsPost(
+        new Request("https://we-met.link/api/details", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ token, jobTitle: "CTO" }),
+        }),
+      );
+      expect(response.status).toBe(409);
+      expect(await response.json()).toEqual({ error: "details-already-sent" });
+      expect(sinkMessages).toHaveLength(0);
+    });
+  });
 });

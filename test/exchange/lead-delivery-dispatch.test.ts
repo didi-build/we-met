@@ -158,6 +158,59 @@ describe("lead delivery dispatch (unit)", () => {
     expect(deps.ledger.rows[0]?.errorCode).toBe("enqueue_failed");
   });
 
+  it("dispatchDetailsAppend reports inserted, already_exists, and failed outcomes", async () => {
+    const deps = createDispatchDeps();
+    const sinks = [sink("sink-a", "a@example.com")];
+    const details = { jobTitle: null, company: null, note: null };
+    const appendLead = { leadId: lead.leadId, name: lead.name, email: lead.email };
+    const submittedAt = NOW.toISOString();
+
+    const first = await dispatchDetailsAppend(
+      sinks,
+      appendLead,
+      details,
+      "card-1",
+      "demo",
+      SOURCE_URL,
+      submittedAt,
+      deps,
+    );
+    expect(first).toBe("inserted");
+
+    const second = await dispatchDetailsAppend(
+      sinks,
+      appendLead,
+      details,
+      "card-1",
+      "demo",
+      SOURCE_URL,
+      submittedAt,
+      deps,
+    );
+    expect(second).toBe("already_exists");
+
+    const throwingLedger = {
+      ...deps.ledger,
+      insertAppendIfAbsent: async () => {
+        throw new Error("d1");
+      },
+      insertAppendIfAbsentWithDailySendIncrements: async () => {
+        throw new Error("d1");
+      },
+    };
+    const failed = await dispatchDetailsAppend(
+      sinks,
+      appendLead,
+      details,
+      "card-1",
+      "demo",
+      SOURCE_URL,
+      submittedAt,
+      { ...deps, ledger: throwingLedger },
+    );
+    expect(failed).toBe("failed");
+  });
+
   it("details double submit enqueues append once per sink", async () => {
     const deps = createDispatchDeps();
     const sinks = [sink("sink-a", "a@example.com")];
