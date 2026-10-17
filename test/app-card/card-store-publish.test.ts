@@ -99,6 +99,56 @@ describe("publishCard (integration)", () => {
       expect(row?.display_name).toBe("After race");
     });
   });
+
+  it("resolves empty display name to the Google account name on publish", async () => {
+    await withIsolatedLocalD1(async (db) => {
+      const now = new Date().toISOString();
+      await db
+        .prepare(
+          `INSERT INTO accounts (id, google_sub, email, name, status, created_at, updated_at)
+           VALUES ('a1', 'sub', 'owner@example.com', 'Google Full Name', 'active', ?, ?)`,
+        )
+        .bind(now, now)
+        .run();
+
+      await publishCard(db, "a1", validCard({ name: "" }), null);
+
+      const row = await db
+        .prepare("SELECT display_name, contact_json FROM cards WHERE account_id = 'a1'")
+        .first<{ display_name: string; contact_json: string }>();
+      expect(row?.display_name).toBe("Google Full Name");
+      const contact = JSON.parse(row!.contact_json) as {
+        name: { full: string; nickname: string };
+      };
+      expect(contact.name.full).toBe("Google Full Name");
+      expect(contact.name.nickname).toBe("");
+    });
+  });
+
+  it("keeps a typed display name on publish", async () => {
+    await withIsolatedLocalD1(async (db) => {
+      const now = new Date().toISOString();
+      await db
+        .prepare(
+          `INSERT INTO accounts (id, google_sub, email, name, status, created_at, updated_at)
+           VALUES ('a1', 'sub', 'owner@example.com', 'Google Full Name', 'active', ?, ?)`,
+        )
+        .bind(now, now)
+        .run();
+
+      await publishCard(db, "a1", validCard({ name: "Card Nickname" }), null);
+
+      const row = await db
+        .prepare("SELECT display_name, contact_json FROM cards WHERE account_id = 'a1'")
+        .first<{ display_name: string; contact_json: string }>();
+      expect(row?.display_name).toBe("Card Nickname");
+      const contact = JSON.parse(row!.contact_json) as {
+        name: { full: string; nickname: string };
+      };
+      expect(contact.name.full).toBe("Google Full Name");
+      expect(contact.name.nickname).toBe("Card Nickname");
+    });
+  });
 });
 
 describe("saveDraft (integration)", () => {
