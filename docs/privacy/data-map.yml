@@ -921,6 +921,30 @@
   who_can_see: public visitors with card URL; operator with bucket access
   source: src/images/ingest-card-photo.ts
   verified: true
+- id: storage.d1_restore_points
+  whose: operational
+  data: D1 Time Travel and other restore points for production and non-prod databases
+  purpose: database backup and point-in-time recovery (Cloudflare platform)
+  storage: D1 restore history
+  processors:
+    - Cloudflare
+  retention: unknown
+  who_can_see: operator with Cloudflare account access
+  source: docs/runbooks/account-deletion.md
+  verified: false
+- id: storage.nonprod_environment
+  whose: operational
+  data:
+    Personal data in preview, local-remote, and shared non-prod D1, R2, and queue bindings (separate resource names from
+    production per wrangler previews block)
+  purpose: PR preview smoke and developer testing
+  storage: D1 we-met-db-nonprod; R2 we-met-assets-nonprod; Queue we-met-followup-email-nonprod
+  processors:
+    - Cloudflare
+  retention: unknown (whether real card-owner or visitor PII can exist in non-prod stores)
+  who_can_see: operator; PR preview access per Cloudflare preview policy
+  source: docs/architecture/environments.md
+  verified: false
 - id: queue.visitor_followup
   whose: visitor
   data: Visitor lead (name, email, phone) and card email snapshot in visitor_followup message
@@ -933,7 +957,7 @@
     retention; vendor retention unknown)
   who_can_see: operator via consumer logs if logged
   source: src/exchange/queue/types.ts
-  verified: true
+  verified: false
 - id: queue.lead_sink_record
   whose: visitor
   data: Visitor lead (name, email, phone) in lead_sink_record message plus sink config and card metadata
@@ -944,7 +968,7 @@
   retention: same as queue.visitor_followup
   who_can_see: operator via consumer
   source: src/exchange/queue/types.ts
-  verified: true
+  verified: false
 - id: queue.lead_sink_append_details
   whose: visitor
   data: Visitor lead identifiers plus job title, company, note in lead_sink_append_details message
@@ -955,7 +979,7 @@
   retention: same as queue.visitor_followup
   who_can_see: operator via consumer
   source: src/exchange/queue/types.ts
-  verified: true
+  verified: false
 - id: email.owner_lead_record
   whose: visitor
   data: Email to card owner with visitor name, email, phone from exchange
@@ -967,7 +991,7 @@
   retention: unknown (mailbox retention; not stored in D1)
   who_can_see: card owner; operator can read mailbox
   source: src/followup-email-consumer/lead-sink/email-handler.ts
-  verified: true
+  verified: false
 - id: email.owner_lead_append
   whose: visitor
   data: Email append to owner thread with visitor job title, company, note
@@ -979,7 +1003,7 @@
   retention: unknown
   who_can_see: card owner; operator
   source: src/followup-email-consumer/lead-sink/email-handler.ts
-  verified: true
+  verified: false
 - id: email.visitor_followup
   whose: visitor
   data:
@@ -993,7 +1017,7 @@
   retention: unknown (recipient and operator mailbox copies)
   who_can_see: visitor; operator mailbox
   source: src/email/format-visitor-follow-up.ts
-  verified: true
+  verified: false
 - id: email.operator_mailbox_visibility
   whose: operational
   data: Full MIME of sent lead and follow-up messages in operator-controlled Gmail
@@ -1004,7 +1028,7 @@
   retention: unknown
   who_can_see: operator
   source: src/components/landing/PrivacyPolicyContent.tsx
-  verified: true
+  verified: false
 - id: email.provider.placeholder
   whose: operational
   data: PLACEHOLDER — outbound email provider (DIDI-628 deciding Cloudflare Email Service vs Gmail)
@@ -1072,7 +1096,7 @@
   retention: unknown (limiter window 60s per wrangler.jsonc; vendor retention unknown)
   who_can_see: Cloudflare
   source: src/exchange/client-ip.ts
-  verified: true
+  verified: false
 - id: cookie.session
   whose: card_owner
   data: Opaque session token in __Host-wm_session HttpOnly cookie
