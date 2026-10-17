@@ -41,13 +41,15 @@
   table: accounts
   column: name
   whose: card_owner
-  data: Google account display name
-  purpose: app UI and default card naming
+  data: Google account display name (full name at sign-in; seeds card contact.name parts used in visitor email)
+  purpose: app UI, default card naming, visitor follow-up From and signature when contact fields match Google profile
   storage: D1
   processors:
     - Cloudflare
   retention: until account tombstone (blanked on delete)
-  who_can_see: operator; public card visitors when used as display fallback
+  who_can_see:
+    operator; public card visitors when used as display fallback; visitors who exchange (Google first name in email
+    From "{given} via We Met", signature given/nickname/family per privacy page)
   source: src/app-auth/accounts.ts
   verified: true
 - id: accounts.status
@@ -460,12 +462,12 @@
   column: display_name
   whose: card_owner
   data: Public display name on card
-  purpose: public card and emails
+  purpose: public card and visitor follow-up email body
   storage: D1
   processors:
     - Cloudflare
   retention: until card retired
-  who_can_see: public visitors
+  who_can_see: public visitors; visitors who exchange (email body when set, else Google name fallback)
   source: migrations/0005_cards_rebuild_mvp.sql
   verified: true
 - id: cards.account_id
@@ -524,7 +526,7 @@
   table: cards
   column: page_copy_json
   whose: card_owner
-  data: Page metadata copy JSON (titles, alt text, email from-name)
+  data: Page metadata copy JSON (titles, alt text)
   purpose: public card and email templates
   storage: D1
   processors:
@@ -537,13 +539,15 @@
   table: cards
   column: contact_json
   whose: card_owner
-  data: Structured contact JSON (name parts, org, title, phone, vcard note, URLs)
-  purpose: vCard and owner contact; phone not shown on public page
+  data:
+    Structured contact JSON (given and family from Google sign-in by default, optional nickname, org, title, phone,
+    vcard note, URLs)
+  purpose: visitor follow-up From display (given), signature (ownerEmailDisplayName), vCard; phone not on public page
   storage: D1
   processors:
     - Cloudflare
   retention: until card retired
-  who_can_see: operator; visitors after exchange via email vCard
+  who_can_see: operator; visitors after exchange via follow-up email From, signature, body, and vCard attachment
   source: migrations/0005_cards_rebuild_mvp.sql
   verified: true
 - id: cards.copy_json
@@ -928,9 +932,11 @@
   storage: D1 restore history
   processors:
     - Cloudflare
-  retention: unknown
+  retention:
+    restore to any point within 30 days on Workers Paid (7 days on Free); maintainer must confirm plan applies to
+    we-met D1 databases
   who_can_see: operator with Cloudflare account access
-  source: docs/runbooks/account-deletion.md
+  source: https://developers.cloudflare.com/d1/reference/time-travel/
   verified: false
 - id: storage.nonprod_environment
   whose: operational
@@ -953,10 +959,13 @@
   processors:
     - Cloudflare
   retention:
-    transit until consumer processes; retries up to ~20h per scripts/lib/queue-retry-policy.mjs (under Workers queue
-    retention; vendor retention unknown)
+    Cloudflare Queue message retention 4 days by default on Workers Paid (configurable 60s–14 days; per-queue setting
+    not in wrangler.jsonc); see https://developers.cloudflare.com/queues/platform/pricing/. Consumer retries use
+    exponential backoff (worst-case ~43,290 s / ~12 h before final attempt per docs/architecture/environments.md),
+    then message deleted; FOLLOWUP_RETRY_RETENTION_BUDGET_SECONDS (72_000 s) in scripts/lib/queue-retry-policy.mjs is
+    deploy-guard margin only, not the retry window
   who_can_see: operator via consumer logs if logged
-  source: src/exchange/queue/types.ts
+  source: https://developers.cloudflare.com/queues/platform/pricing/
   verified: false
 - id: queue.lead_sink_record
   whose: visitor
@@ -1007,15 +1016,16 @@
 - id: email.visitor_followup
   whose: visitor
   data:
-    Follow-up email to visitor with owner display name, role, photo, vCard attachment (may include owner phone and Google
-    email)
+    Follow-up email to visitor; From display "{owner contact given} via We Met" (platform fallback if unsafe); signature
+    shows given, optional nickname in brackets, and family; body includes card display name (or Google name), role,
+    photo, vCard with Google email and full Google name in FN
   purpose: reciprocate contact after exchange
   storage: Visitor inbox via Gmail API send
   processors:
     - Cloudflare
     - Google
   retention: unknown (recipient and operator mailbox copies)
-  who_can_see: visitor; operator mailbox
+  who_can_see: visitor (From, signature, body, vCard); operator mailbox
   source: src/email/format-visitor-follow-up.ts
   verified: false
 - id: email.operator_mailbox_visibility
@@ -1048,9 +1058,11 @@
   storage: Cloudflare Workers Observability
   processors:
     - Cloudflare
-  retention: unknown (head_sampling_rate 1.0 and persist true in wrangler.jsonc; vendor retention not in repo)
+  retention:
+    Workers Logs 7 days on Workers Paid (3 days on Free); traces retention not documented on pricing page (unknown);
+    head_sampling_rate 1.0 and persist true in wrangler.jsonc
   who_can_see: operator with Cloudflare account access
-  source: wrangler.jsonc
+  source: https://developers.cloudflare.com/workers/about/pricing
   verified: false
 - id: logs.worker_consumer
   whose: operational
@@ -1059,9 +1071,9 @@
   storage: Cloudflare Workers Observability
   processors:
     - Cloudflare
-  retention: unknown
+  retention: Workers Logs 7 days on Workers Paid (3 days on Free); traces retention unknown; sampling matches app Worker
   who_can_see: operator
-  source: workers/we-met-followup-email-consumer/wrangler.production.jsonc
+  source: https://developers.cloudflare.com/workers/about/pricing
   verified: false
 - id: auth.google_sign_in
   whose: card_owner
