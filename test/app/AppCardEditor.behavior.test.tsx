@@ -86,9 +86,9 @@ function renderEditor(search = "", draft = emptyEditorCard(), authed = false) {
 }
 
 describe("AppCardEditor behavior", () => {
-  it("shows placeholder greeting in preview when name is empty", () => {
+  it("shows Google name in preview when display name is empty", () => {
     renderEditor();
-    expect(screen.getByText("Your name here")).toBeTruthy();
+    expect(screen.getByText("I'm Ada")).toBeTruthy();
   });
 
   it("preview shell is not inert (chips and About can receive clicks)", () => {
@@ -110,7 +110,9 @@ describe("AppCardEditor behavior", () => {
   it("debounces autosave and shows Saving then Saved", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     renderEditor();
-    fireEvent.change(screen.getByLabelText(/^Name$/i), { target: { value: "Ada" } });
+    fireEvent.change(screen.getByLabelText(/Display name/i), {
+      target: { value: "Ada" },
+    });
     await vi.advanceTimersByTimeAsync(900);
     await waitFor(() => expect(screen.getByText(/Saving/i)).toBeTruthy());
     await vi.advanceTimersByTimeAsync(700);
@@ -121,9 +123,7 @@ describe("AppCardEditor behavior", () => {
     renderEditor();
     fireEvent.click(screen.getByRole("button", { name: /^Publish$/i }));
     await waitFor(() => {
-      expect(
-        screen.getByText(/To publish, add your name and choose your link/),
-      ).toBeTruthy();
+      expect(screen.getByText(/To publish, choose your link/)).toBeTruthy();
     });
   });
 
@@ -155,7 +155,7 @@ describe("AppCardEditor behavior", () => {
       () => expect(screen.getByRole("button", { name: /Share card/i })).toBeTruthy(),
       { timeout: 10_000 },
     );
-    fireEvent.change(screen.getByLabelText(/^Name$/i), {
+    fireEvent.change(screen.getByLabelText(/Display name/i), {
       target: { value: "Ada L." },
     });
     await waitFor(

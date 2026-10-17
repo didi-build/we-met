@@ -21,9 +21,10 @@ export function PrivacyPolicyContent() {
         and we don&apos;t keep Google access tokens.
       </p>
       <p className="lp-body">
-        <em>Your card.</em> We keep what you put on your card: your name, role, photo,
-        about text, services and links, plus any drafts you save. Once you publish, your
-        card is public at we-met.link/hi/ followed by your link.
+        <em>Your card.</em> We keep what you put on your card: an optional display name,
+        role, photo, about text, services and links, plus an optional phone number and
+        any drafts you save. Once you publish, your card is public at we-met.link/hi/
+        followed by your link. The phone number is not shown on your public card page.
       </p>
       <p className="lp-body">
         <em>People who exchange details with you.</em> When someone taps &quot;Exchange
@@ -54,15 +55,19 @@ export function PrivacyPolicyContent() {
       <h2 className="lp-legal-h2">What the people you meet can see</h2>
       <p className="lp-body">
         When someone exchanges details with you, they get a follow-up email from your
-        first name via We Met (for example, &quot;Diadem via We Met&quot;) with your
-        Google first name, last name and display name in brackets when you use one, plus
-        your role and photo, and your contact card attached.{" "}
+        first name via We Met (for example, &quot;Diadem via We Met&quot;). The
+        signature shows your Google first name, your display name in brackets when you
+        use one, and your Google last name. The email also includes your display name on
+        the card (or your Google name if you left display name blank), your role and
+        photo, and your contact card attached. If you added a phone number, it is
+        included in that contact card after an exchange.{" "}
         <strong>
           Your Google account email address is shared with everyone who exchanges
           details with you:
         </strong>{" "}
-        replies go to it, and it is in your contact card. Don&apos;t create a card if
-        you are not comfortable sharing that address.
+        replies go to it, and it is in your contact card. The contact card uses your
+        full Google name. Don&apos;t create a card if you are not comfortable sharing
+        that address.
       </p>
 
       <h2 className="lp-legal-h2">Who we share data with</h2>

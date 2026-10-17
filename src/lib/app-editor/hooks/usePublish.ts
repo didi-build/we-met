@@ -5,16 +5,12 @@ import { AppApiError, type EditorCard } from "@/app-api/types";
 import { useCallback, useMemo, useState } from "react";
 
 export function publishBlockers(input: {
-  name: string;
   slug: string;
   slugStatus: string;
   fieldKeys: string[];
   fieldError: (key: string) => string;
 }): string[] {
   const out: string[] = [];
-  if (!input.name.trim()) {
-    out.push("add your name");
-  }
   if (!input.slug) {
     out.push("choose your link");
   } else if (["invalid", "reserved", "taken"].includes(input.slugStatus)) {
@@ -22,10 +18,8 @@ export function publishBlockers(input: {
   } else if (input.slugStatus === "checking" || input.slugStatus === "typing") {
     out.push("wait for your link to be checked");
   }
-  const others = input.fieldKeys.filter(
-    (k) => k !== "slug" && k !== "name" && input.fieldError(k),
-  );
-  if (others.length || (input.name.trim() && input.fieldError("name"))) {
+  const others = input.fieldKeys.filter((k) => k !== "slug" && input.fieldError(k));
+  if (others.length) {
     out.push("fix the fields marked in red");
   }
   return out;

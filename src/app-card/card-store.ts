@@ -32,7 +32,7 @@ export async function loadCardBundle(
 
   const publishedRow = await db
     .prepare(
-      `SELECT slug, photo_key, page_copy_json, links_json, updated_at
+      `SELECT slug, photo_key, page_copy_json, links_json, contact_json, updated_at
        FROM cards WHERE account_id = ?`,
     )
     .bind(accountId)
@@ -41,6 +41,7 @@ export async function loadCardBundle(
       photo_key: string | null;
       page_copy_json: string;
       links_json: string;
+      contact_json: string;
       updated_at: string;
     }>();
 
@@ -143,6 +144,14 @@ export async function loadPublishedSlug(
   return row?.slug ?? null;
 }
 
+async function loadAccountName(db: D1Database, accountId: string): Promise<string> {
+  const row = await db
+    .prepare("SELECT name FROM accounts WHERE id = ?")
+    .bind(accountId)
+    .first<{ name: string }>();
+  return row?.name?.trim() ?? "";
+}
+
 async function loadExistingCard(
   db: D1Database,
   accountId: string,
@@ -168,14 +177,15 @@ async function updatePublishedCard(
     throw new PublishCardError("slug-locked");
   }
 
-  const persisted = editorCardToPersistedJson(card, photoKey);
+  const accountName = await loadAccountName(db, accountId);
+  const persisted = editorCardToPersistedJson(card, photoKey, accountName);
   const linksJson = JSON.stringify(persisted.links);
   const pageCopyJson = JSON.stringify(persisted.pageCopy);
   const contactJson = JSON.stringify(persisted.contact);
   const copyJson = JSON.stringify(persisted.copy);
   const updatedAt = nowIso();
   const slug = card.slug.trim();
-  const displayName = card.name.trim();
+  const displayName = persisted.displayName;
   const draftJson = draftJsonFromEditorCard(card);
 
   await db.batch([
@@ -223,14 +233,15 @@ async function insertPublishedCard(
   card: EditorCard,
   photoKey: string | null,
 ): Promise<{ path: string; slug: string }> {
-  const persisted = editorCardToPersistedJson(card, photoKey);
+  const accountName = await loadAccountName(db, accountId);
+  const persisted = editorCardToPersistedJson(card, photoKey, accountName);
   const linksJson = JSON.stringify(persisted.links);
   const pageCopyJson = JSON.stringify(persisted.pageCopy);
   const contactJson = JSON.stringify(persisted.contact);
   const copyJson = JSON.stringify(persisted.copy);
   const updatedAt = nowIso();
   const slug = card.slug.trim();
-  const displayName = card.name.trim();
+  const displayName = persisted.displayName;
   const draftJson = draftJsonFromEditorCard(card);
   const cardId = crypto.randomUUID();
   const sinkId = `${slug}-owner-inbox`;

@@ -1,4 +1,5 @@
 import type { EditorCard } from "@/app-api/types";
+import { phoneValidationMessage } from "@/app-card/validate-editor-card";
 import type { CardPublicLinksMap } from "@/card-data/types";
 
 const LINK_KEYS = ["website", "linkedin", "github", "instagram"] as const;
@@ -135,6 +136,7 @@ export function parseEditorCardWire(
     "slug",
     "name",
     "role",
+    "phone",
     "photo",
     "about",
     "services",
@@ -155,6 +157,20 @@ export function parseEditorCardWire(
     const e = parseString(cardRaw[key], key);
     if (e) {
       push(key, e);
+    }
+  }
+
+  let phone = "";
+  if (cardRaw.phone !== undefined) {
+    const phoneTypeErr = parseString(cardRaw.phone, "phone");
+    if (phoneTypeErr) {
+      push("phone", phoneTypeErr);
+    } else {
+      phone = cardRaw.phone as string;
+      const phoneFmt = phoneValidationMessage(phone);
+      if (phoneFmt) {
+        push("phone", phoneFmt);
+      }
     }
   }
 
@@ -183,6 +199,7 @@ export function parseEditorCardWire(
     slug: cardRaw.slug as string,
     name: cardRaw.name as string,
     role: cardRaw.role as string,
+    phone,
     photo: cardRaw.photo as string,
     about: (aboutResult as { about: string[] }).about,
     services: (servicesResult as { services: EditorCard["services"] }).services,
@@ -198,6 +215,7 @@ export function draftJsonFromEditorCard(card: EditorCard): string {
     slug: card.slug,
     name: card.name,
     role: card.role,
+    phone: card.phone ?? "",
     about: card.about,
     services: card.services,
     links: card.links,

@@ -2,6 +2,7 @@ import type { EditorCard } from "@/app-api/types";
 import { DEFAULT_MVP_CARD_COPY } from "@/app-card/default-card-copy";
 import { emptyEditorCard } from "@/app-card/route-auth";
 import { cardLoadInputToPersisted } from "@/card-data/card-persist";
+import { containsVCardControlChars } from "@/lib/hi/vcard";
 import type {
   CardAbout,
   CardContact,
@@ -51,43 +52,76 @@ function buildLinks(draft: EditorCard): CardPublicLinksMap {
   return links;
 }
 
-function buildContact(draft: EditorCard): CardContact {
-  const full = draft.name.trim();
-  const { given, family } = splitName(full);
-  const urls: CardContact["urls"] = [];
-  const website = draft.links.website?.trim();
-  if (website) {
-    urls.push({ url: website, type: "Website" });
+function resolveDisplayName(draft: EditorCard, accountName: string): string {
+  const typed = draft.name.trim();
+  const google = accountName.trim();
+  return typed || google;
+}
+
+function contactNickname(displayName: string, googleFullName: string): string {
+  const display = displayName.trim();
+  const google = googleFullName.trim();
+  if (!display || display.toLowerCase() === google.toLowerCase()) {
+    return "";
   }
+  return display;
+}
+
+function pushContactUrl(
+  urls: CardContact["urls"],
+  raw: string | undefined,
+  type: string,
+): void {
+  const url = raw?.trim();
+  if (!url || containsVCardControlChars(url)) {
+    return;
+  }
+  urls.push({ url, type });
+}
+
+function buildContact(draft: EditorCard, accountName: string): CardContact {
+  const googleFull = accountName.trim();
+  const { given, family } = splitName(googleFull);
+  const displayName = resolveDisplayName(draft, accountName);
+  const urls: CardContact["urls"] = [];
+  pushContactUrl(urls, draft.links.website, "Website");
+  pushContactUrl(urls, draft.links.linkedin, "LinkedIn");
+  pushContactUrl(urls, draft.links.github, "GitHub");
+  pushContactUrl(urls, draft.links.instagram, "Instagram");
+
+  const phoneRaw = draft.phone?.trim() ?? "";
+  const phone = phoneRaw && !containsVCardControlChars(phoneRaw) ? phoneRaw : "";
+
   return {
     name: {
-      full,
-      given: given || full,
+      full: googleFull,
+      given: given || googleFull,
       family,
-      nickname: given || full,
+      nickname: contactNickname(displayName, googleFull),
     },
     org: "",
     title: draft.role.trim(),
-    phone: "",
+    phone,
     vcardNote: "Met via We Met",
     urls,
   };
 }
 
-function buildPageCopy(draft: EditorCard): CardPageCopy {
-  const name = draft.name.trim();
+function buildPageCopy(draft: EditorCard, accountName: string): CardPageCopy {
+  const name = resolveDisplayName(draft, accountName);
   return {
-    pageTitle: name ? `${name} · We Met` : "We Met",
-    emailFromName: name || "We Met",
-    headshotAlt: name || "Your photo",
+    pageTitle: `${name} · We Met`,
+    emailFromName: name,
+    headshotAlt: name,
   };
 }
 
 export function editorCardToLoadInput(
   draft: EditorCard,
   photoKey: string | null,
+  accountName: string,
 ): CardLoadInput {
-  const name = draft.name.trim();
+  const name = resolveDisplayName(draft, accountName);
   const alternate =
     draft.alternate.url.trim() && draft.alternate.label.trim()
       ? { url: draft.alternate.url.trim(), label: draft.alternate.label.trim() }
@@ -106,16 +140,23 @@ export function editorCardToLoadInput(
     links: buildLinks(draft),
     alternate,
     bookingLinks: { bookingUrl: alternate?.url ?? "" },
-    pageCopy: buildPageCopy(draft),
-    contact: buildContact(draft),
+    pageCopy: buildPageCopy(draft, accountName),
+    contact: buildContact(draft, accountName),
     copy: DEFAULT_MVP_CARD_COPY,
     status: "live",
   };
 }
 
-export function editorCardToPersistedJson(draft: EditorCard, photoKey: string | null) {
-  const input = editorCardToLoadInput(draft, photoKey);
-  return cardLoadInputToPersisted(input);
+export function editorCardToPersistedJson(
+  draft: EditorCard,
+  photoKey: string | null,
+  accountName: string,
+) {
+  const input = editorCardToLoadInput(draft, photoKey, accountName);
+  return {
+    ...cardLoadInputToPersisted(input),
+    displayName: input.displayName,
+  };
 }
 
 export function draftPhotoUrl(key: string | null): string {
@@ -131,9 +172,11 @@ export function publishedRowToEditorCard(
     photo_key: string | null;
     page_copy_json: string;
     links_json: string;
+    contact_json: string;
   },
   parseJson: <T>(raw: string) => T,
 ): EditorCard {
+  const contact = parseJson<{ phone?: string }>(row.contact_json);
   const page = parseJson<{
     name?: string;
     role?: string;
@@ -155,6 +198,7 @@ export function publishedRowToEditorCard(
     slug: row.slug,
     name: page.name ?? "",
     role: page.role ?? "",
+    phone: contact.phone ?? "",
     photo: draftPhotoUrl(row.photo_key),
     about: [...about],
     services,

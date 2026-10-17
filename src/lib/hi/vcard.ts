@@ -3,6 +3,17 @@ import type { CardContact } from "@/card-data/types";
 const CRLF = "\r\n";
 const VCARD_LINE_MAX = 75;
 
+/** Reject values that would inject extra vCard lines or other control characters. */
+export function containsVCardControlChars(value: string): boolean {
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i);
+    if (code < 32 || code === 127) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /** Escape text values per vCard 3.0 (RFC 2426). */
 export function escapeVCardValue(value: string): string {
   return value
@@ -45,20 +56,35 @@ export function buildVCard(
     "VERSION:3.0",
     `N:${escapeVCardValue(contact.name.family)};${escapeVCardValue(contact.name.given)};;;`,
     `FN:${escapeVCardValue(contact.name.full)}`,
-    `NICKNAME:${escapeVCardValue(contact.name.nickname)}`,
+  ];
+
+  const nickname = contact.name.nickname.trim();
+  if (nickname) {
+    lines.push(`NICKNAME:${escapeVCardValue(nickname)}`);
+  }
+
+  lines.push(
     `ORG:${escapeVCardValue(contact.org)}`,
     `TITLE:${escapeVCardValue(contact.title)}`,
     `EMAIL;TYPE=INTERNET,WORK:${escapeVCardValue(options.ownerEmail)}`,
-    `TEL;TYPE=CELL:${contact.phone}`,
-  ];
+  );
+
+  const phone = contact.phone.trim();
+  if (phone && !containsVCardControlChars(phone)) {
+    lines.push(`TEL;TYPE=CELL:${escapeVCardValue(phone)}`);
+  }
 
   if (options.photo?.base64) {
     lines.push(`PHOTO;ENCODING=b;TYPE=JPEG:${options.photo.base64}`);
   }
 
   for (const entry of contact.urls) {
+    const url = entry.url.trim();
+    if (!url || containsVCardControlChars(url)) {
+      continue;
+    }
     const typeSuffix = entry.type ? `;TYPE=${escapeVCardValue(entry.type)}` : "";
-    lines.push(`URL${typeSuffix}:${entry.url}`);
+    lines.push(`URL${typeSuffix}:${url}`);
   }
 
   lines.push(`NOTE:${escapeVCardValue(contact.vcardNote)}`, "END:VCARD");

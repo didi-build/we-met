@@ -47,7 +47,7 @@ export function middleware(request: NextRequest) {
 
   if (pathname.startsWith("/hi/")) {
     const response = NextResponse.next();
-    if (!pathname.endsWith("/photo.jpg") && !pathname.endsWith("/contact.vcf")) {
+    if (!pathname.endsWith("/photo.jpg")) {
       response.headers.set("Cache-Control", CARD_HTML_CACHE_CONTROL);
     }
     return response;

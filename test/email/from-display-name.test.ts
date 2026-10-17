@@ -58,7 +58,8 @@ describe("resolveVisitorFromDisplayName (unit)", () => {
     const displayName = resolveVisitorFromDisplayName("Zoë", PLATFORM);
     expect(displayName).toBe("Zoë via We Met");
     const header = formatEmailFromHeader("hello@we-met.link", displayName);
-    expect(header).toMatch(/^"=\?UTF-8\?B\?/);
+    expect(header).toMatch(/^=\?UTF-8\?B\?/);
+    expect(header).not.toMatch(/^"=\?UTF-8\?B\?/);
     expect(header).toContain("<hello@we-met.link>");
   });
 

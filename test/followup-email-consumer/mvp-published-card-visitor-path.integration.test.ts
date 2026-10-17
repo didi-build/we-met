@@ -31,10 +31,11 @@ function validEditorCard(overrides: Partial<EditorCard> = {}): EditorCard {
     })),
     links: {
       website: "https://example.com",
-      linkedin: "",
-      github: "",
-      instagram: "",
+      linkedin: "https://linkedin.com/in/mvp",
+      github: "https://github.com/mvp",
+      instagram: "https://instagram.com/mvp",
     },
+    phone: "+1 555 0199",
     alternate: { url: "", label: "" },
     ...overrides,
   };
@@ -47,7 +48,7 @@ describe("published MVP card visitor follow-up path (integration)", () => {
       await db
         .prepare(
           `INSERT INTO accounts (id, google_sub, email, name, status, created_at, updated_at)
-           VALUES (?, 'sub-mvp-visitor', ?, 'Mvp Owner', 'active', ?, ?)`,
+           VALUES (?, 'sub-mvp-visitor', ?, 'Mvp Google Name', 'active', ?, ?)`,
         )
         .bind(ACCOUNT_ID, OWNER_EMAIL, now, now)
         .run();
@@ -76,7 +77,14 @@ describe("published MVP card visitor follow-up path (integration)", () => {
       expect(card).not.toBeNull();
       expect(card!.email).toBe(OWNER_EMAIL);
       expect(card!.contact).not.toHaveProperty("email");
-      expect(card!.contact.name.full).toBe("Mvp Owner");
+      expect(card!.contact.name.full).toBe("Mvp Google Name");
+      expect(card!.contact.phone).toBe("+1 555 0199");
+      expect(card!.contact.urls.map((u) => u.type)).toEqual([
+        "Website",
+        "LinkedIn",
+        "GitHub",
+        "Instagram",
+      ]);
 
       const snapshot = buildCardEmailSnapshot(card!);
       expect(snapshot.email).toBe(OWNER_EMAIL);
@@ -108,7 +116,11 @@ describe("published MVP card visitor follow-up path (integration)", () => {
       );
 
       expect(vcardBody).toContain(`EMAIL;TYPE=INTERNET,WORK:${OWNER_EMAIL}`);
-      expect(vcardBody).toContain("FN:Mvp Owner");
+      expect(vcardBody).toContain("FN:Mvp Google Name");
+      expect(vcardBody).toContain("TEL;TYPE=CELL:+1 555 0199");
+      expect(vcardBody).toContain("URL;TYPE=LinkedIn:https://linkedin.com/in/mvp");
+      expect(vcardBody).toContain("URL;TYPE=GitHub:https://github.com/mvp");
+      expect(vcardBody).toContain("URL;TYPE=Instagram:https://instagram.com/mvp");
       expect(vcardBody).not.toMatch(/EMAIL;TYPE=INTERNET,WORK:\s*$/m);
     });
   });

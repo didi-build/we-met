@@ -6,6 +6,7 @@ import {
   type AppSession,
   type EditorCard,
 } from "@/app-api/types";
+import { phoneValidationMessage } from "@/app-card/validate-editor-card";
 import { CARD_FIELD_LIMITS } from "@/card-data/limits";
 
 const RESERVED = [
@@ -39,6 +40,7 @@ const SAMPLE_CARD: EditorCard = {
   slug: "didi",
   name: "Didi Shoukralla",
   role: "Software Engineer and Technical Advisor",
+  phone: "",
   photo: "",
   about: [
     "I'm a software engineer in Toronto. I help founders who built their app with AI get it ready for real users, paying customers, or investors.",
@@ -86,6 +88,7 @@ export function emptyEditorCard(): EditorCard {
     slug: "",
     name: "",
     role: "",
+    phone: "",
     photo: "",
     about: [],
     services: [],
@@ -173,6 +176,10 @@ export function createStubApi(search = ""): AppApi {
       if (flags.has("session-expired")) {
         throw new AppApiError("unauthorized");
       }
+      const phoneErr = phoneValidationMessage(card.phone ?? "");
+      if (phoneErr) {
+        throw new AppApiError("invalid-fields", undefined, { phone: phoneErr });
+      }
       if (flags.has("save-error") && !saveFailedOnce) {
         saveFailedOnce = true;
         throw new AppApiError("network");
@@ -225,6 +232,10 @@ export function createStubApi(search = ""): AppApi {
       }
       if (!card.name.trim()) {
         throw new AppApiError("name-missing");
+      }
+      const phoneErr = phoneValidationMessage(card.phone ?? "");
+      if (phoneErr) {
+        throw new AppApiError("invalid-fields", undefined, { phone: phoneErr });
       }
       const fmt = slugFormatMessage(card.slug);
       if (fmt) {

@@ -1,6 +1,5 @@
 import type { CardRecord } from "@/card-data/types";
 import { absoluteUrl, type WeMetHostConfig } from "@/config/we-met";
-import { hiVcardPath } from "@/lib/hi-card/paths";
 import type { Metadata } from "next";
 
 export function resolveHiCardMetadata(
@@ -27,9 +26,6 @@ export function resolveHiCardMetadata(
     twitter: {
       card: "summary",
       title: card.pageCopy.pageTitle,
-    },
-    other: {
-      "contact:vcard": absoluteUrl(hostConfig.baseUrl, hiVcardPath(card.slug)),
     },
   };
 }

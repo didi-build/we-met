@@ -30,6 +30,53 @@ function escapeQuotedDisplayName(value: string): string {
   return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 
+const RFC2047_ENCODED_WORD_MAX = 75;
+const RFC2047_UTF8_B64_PREFIX = "=?UTF-8?B?";
+const RFC2047_UTF8_B64_SUFFIX = "?=";
+const RFC2047_UTF8_B64_MAX =
+  RFC2047_ENCODED_WORD_MAX -
+  RFC2047_UTF8_B64_PREFIX.length -
+  RFC2047_UTF8_B64_SUFFIX.length;
+
+function iterateUnicodeScalars(value: string): string[] {
+  const scalars: string[] = [];
+  for (let i = 0; i < value.length;) {
+    const codePoint = value.codePointAt(i)!;
+    scalars.push(String.fromCodePoint(codePoint));
+    i += codePoint > 0xffff ? 2 : 1;
+  }
+  return scalars;
+}
+
+/** RFC 2047 encoded-words for a UTF-8 display name (no surrounding quotes). */
+function encodeRfc2047Utf8DisplayName(value: string): string {
+  const words: string[] = [];
+  let current = "";
+  for (const scalar of iterateUnicodeScalars(value)) {
+    const trial = current + scalar;
+    const trialB64 = base64EncodeUtf8(trial);
+    if (trialB64.length > RFC2047_UTF8_B64_MAX) {
+      if (current.length === 0) {
+        words.push(`${RFC2047_UTF8_B64_PREFIX}${trialB64}${RFC2047_UTF8_B64_SUFFIX}`);
+        current = "";
+        continue;
+      }
+      words.push(
+        `${RFC2047_UTF8_B64_PREFIX}${base64EncodeUtf8(current)}${RFC2047_UTF8_B64_SUFFIX}`,
+      );
+      current = scalar;
+      continue;
+    }
+    current = trial;
+  }
+  if (current.length > 0) {
+    words.push(
+      `${RFC2047_UTF8_B64_PREFIX}${base64EncodeUtf8(current)}${RFC2047_UTF8_B64_SUFFIX}`,
+    );
+  }
+  return words.join(" ");
+}
+
 /** Build a RFC 5322 From header with optional display name (RFC 2047 when needed). */
 export function formatEmailFromHeader(email: string, displayName?: string): string {
   const sanitizedEmail = sanitizeEmailHeaderValue(email);
@@ -40,7 +87,7 @@ export function formatEmailFromHeader(email: string, displayName?: string): stri
   const sanitizedName = sanitizeEmailHeaderValue(trimmedName);
   const encodedName = isAsciiOnly(sanitizedName)
     ? `"${escapeQuotedDisplayName(sanitizedName)}"`
-    : `"=?UTF-8?B?${base64EncodeUtf8(sanitizedName)}?="`;
+    : encodeRfc2047Utf8DisplayName(sanitizedName);
   return `${encodedName} <${sanitizedEmail}>`;
 }
 
