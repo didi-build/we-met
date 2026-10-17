@@ -52,7 +52,7 @@
 - **Steps:** `npm ci` → prepare `wrangler.nonprod.ci.jsonc` → `npm run deploy:guards` → consumer deploy-time guards on the generated config → `npm run worker:consumer-dry-run:nonprod` → `wrangler secret list` (names only; fails if `GMAIL_SERVICE_ACCOUNT_JSON`, `GMAIL_SENDER`, `WE_MET_OWNER_FROM_EMAIL`, `WE_MET_FROM_DISPLAY_NAME`, or `WE_MET_TEST_MAIL_TO` is missing) → `wrangler deploy` with commit SHA in **`--message`** and **`--tag`**. Does **not** run `wrangler secret put`.
 - **Touches:** Worker **`we-met-followup-email-consumer-nonprod`**; queue **`we-met-followup-email-nonprod`**; shared non-prod D1 and R2 bindings per `workers/we-met-followup-email-consumer/wrangler.nonprod.jsonc`.
 - **Concurrency:** Run-level group `deploy-consumer-nonprod` with `cancel-in-progress: false` (at most one deploy at a time; does not cancel an in-progress run).
-- **Failure mode:** The job fails loudly; fix the error and re-run the workflow (or use the [manual fallback](./deploy-setup.md#non-prod-follow-up-email-consumer-ci-default-manual-fallback)).
+- **Failure mode:** The job fails loudly; fix the error and use **Run workflow** (`workflow_dispatch`) on **`main`** to deploy the current `main` commit — do **not** use **Re-run** on an old Actions run, because a re-run redeploys that run’s original commit, not the latest `main`. Or use the [manual fallback](./deploy-setup.md#non-prod-follow-up-email-consumer-ci-default-manual-fallback).
 - **Manual fallback:** Operator `wrangler login` steps in [deploy-setup.md](./deploy-setup.md#non-prod-follow-up-email-consumer-ci-default-manual-fallback) (for example deploying a PR branch consumer to non-prod).
 
 ## Local / operator commands
