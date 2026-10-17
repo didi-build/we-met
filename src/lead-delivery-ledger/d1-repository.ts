@@ -122,5 +122,17 @@ export function createLeadDeliveryLedgerFromD1(db: D1Database): LeadDeliveryLedg
         .bind(errorCode, updatedAt, leadId, sinkId, phase)
         .run();
     },
+
+    async hasAppendPhaseForLead(leadId: string): Promise<boolean> {
+      const row = await db
+        .prepare(
+          `SELECT 1 AS present FROM lead_delivery_ledger
+           WHERE lead_id = ? AND phase = 'append'
+           LIMIT 1`,
+        )
+        .bind(leadId)
+        .first<{ present: number }>();
+      return row != null;
+    },
   };
 }

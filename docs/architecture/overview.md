@@ -73,8 +73,8 @@ sequenceDiagram
   M-->>V: 200 + signed token (2h TTL)
 
   V->>M: POST /api/details (token + fields)
-  M->>D: Dispatch append per enabled sink
-  M-->>V: 200
+  M->>D: Dispatch append per enabled sink (once per lead)
+  M-->>V: 200, or 409 details-already-sent on repeat submit
 
   Q->>C: Deliver jobs (per-message retries)
   C->>C: Visitor follow-up + email sink delivery via Gmail

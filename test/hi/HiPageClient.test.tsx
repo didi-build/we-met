@@ -4,7 +4,9 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { HiPageClient } from "@/components/hi/HiPageClient";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
+import { HI_CONTACT_SENT_BUTTON_LABEL } from "@/lib/hi-card/contact-sent-label";
 import { WE_MET_CARD_HOME_URL } from "@/lib/hi-card/card-content";
+import { detailsSentStorageKey } from "@/lib/hi-card/details-sent-storage";
 import { exampleCardInput } from "../helpers/example-card";
 import type { CardRecord } from "@/card-data/types";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -65,6 +67,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  window.localStorage.clear();
   cleanup();
 });
 
@@ -182,6 +185,29 @@ describe("HiPageClient (component)", () => {
     expect(document.activeElement).toBe(stickyExchange);
 
     rectSpy.mockRestore();
+  });
+
+  it("disables exchange buttons when the details-sent flag is set", () => {
+    window.localStorage.setItem(detailsSentStorageKey("didi"), "1");
+    renderCard();
+    const mainExchange = screen.getByRole("button", {
+      name: HI_CONTACT_SENT_BUTTON_LABEL,
+    });
+    expect(mainExchange.hasAttribute("disabled")).toBe(true);
+    fireEvent.scroll(window);
+    const stickyExchange = screen.getAllByRole("button", {
+      name: HI_CONTACT_SENT_BUTTON_LABEL,
+    });
+    expect(stickyExchange.length).toBeGreaterThanOrEqual(1);
+    for (const button of stickyExchange) {
+      expect(button.hasAttribute("disabled")).toBe(true);
+    }
+  });
+
+  it("keeps exchange enabled when the details-sent flag is not set", () => {
+    renderCard();
+    const mainExchange = screen.getByRole("button", { name: /Exchange contact/i });
+    expect(mainExchange.hasAttribute("disabled")).toBe(false);
   });
 
   it.each([["light"], ["dark"]] as const)("renders in %s theme", (theme) => {

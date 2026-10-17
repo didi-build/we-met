@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/Button";
+import { HI_CONTACT_SENT_BUTTON_LABEL } from "@/lib/hi-card/contact-sent-label";
 import Image from "next/image";
 import type { Ref } from "react";
 
@@ -13,6 +14,7 @@ type HiStickyExchangeBarProps = {
   photoAlt: string;
   exchangeButtonRef?: Ref<HTMLButtonElement>;
   onExchange: (event: React.MouseEvent<HTMLButtonElement>) => void;
+  contactSent?: boolean;
 };
 
 export function HiStickyExchangeBar({
@@ -24,6 +26,7 @@ export function HiStickyExchangeBar({
   photoAlt,
   exchangeButtonRef,
   onExchange,
+  contactSent = false,
 }: HiStickyExchangeBarProps) {
   return (
     <div
@@ -61,22 +64,26 @@ export function HiStickyExchangeBar({
           )}
         </div>
         <div className="relative isolate shrink-0">
-          <span
-            aria-hidden
-            className="pointer-events-none absolute inset-0 -z-10 rounded-pill"
-            style={{
-              animation: visible
-                ? "hi-ring-pulse-sm 2.6s 0.4s linear infinite"
-                : undefined,
-            }}
-          />
+          {!contactSent && (
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-0 -z-10 rounded-pill"
+              style={{
+                animation: visible
+                  ? "hi-ring-pulse-sm 2.6s 0.4s linear infinite"
+                  : undefined,
+              }}
+            />
+          )}
           <Button
             ref={exchangeButtonRef}
             type="button"
             onClick={onExchange}
+            disabled={contactSent}
+            aria-disabled={contactSent}
             className="min-h-10 px-6 text-sm"
           >
-            Exchange
+            {contactSent ? HI_CONTACT_SENT_BUTTON_LABEL : "Exchange"}
           </Button>
         </div>
       </div>

@@ -112,6 +112,8 @@ export async function dispatchLeadOnExchange(
   }
 }
 
+export type DetailsAppendDispatchOutcome = "inserted" | "already_exists" | "failed";
+
 export async function dispatchDetailsAppend(
   sinks: LeadSinkRecord[],
   lead: LeadSinkAppendLead,
@@ -121,15 +123,17 @@ export async function dispatchDetailsAppend(
   sourceUrl: string,
   detailsSubmittedAt: string,
   deps: LeadSinkDispatchDeps,
-): Promise<void> {
+): Promise<DetailsAppendDispatchOutcome> {
   const enabled = sinks.filter((s) => s.enabled);
   if (enabled.length === 0) {
-    return;
+    return "inserted";
   }
 
   const now = deps.now();
   const createdAt = now.toISOString();
   const retryUntil = computeLeadDeliveryRetryUntilIso(now);
+  let anyInserted = false;
+  let anyWriteFailed = false;
 
   for (const sink of enabled) {
     let inserted = false;
@@ -158,12 +162,14 @@ export async function dispatchDetailsAppend(
         sink.id,
         "ledger_write_failed",
       );
+      anyWriteFailed = true;
       continue;
     }
 
     if (!inserted) {
       continue;
     }
+    anyInserted = true;
 
     try {
       await deps.producer.enqueueLeadSink({
@@ -198,4 +204,12 @@ export async function dispatchDetailsAppend(
       }
     }
   }
+
+  if (anyWriteFailed) {
+    return "failed";
+  }
+  if (anyInserted) {
+    return "inserted";
+  }
+  return "already_exists";
 }

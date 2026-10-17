@@ -25,6 +25,25 @@ describe("lead delivery ledger D1 (integration)", () => {
     });
   });
 
+  it("reports append phase rows per lead", async () => {
+    await withIsolatedLocalD1(async (db) => {
+      const ledger = createLeadDeliveryLedgerFromD1(db);
+      expect(await ledger.hasAppendPhaseForLead("lead-1")).toBe(false);
+      await ledger.insertAppendIfAbsent({
+        id: "row-1",
+        leadId: "lead-1",
+        cardId: "card-1",
+        sinkId: "sink-1",
+        sinkKind: "email",
+        phase: "append",
+        retryUntil: "2026-10-13T12:00:00.000Z",
+        createdAt: "2026-10-12T12:00:00.000Z",
+      });
+      expect(await ledger.hasAppendPhaseForLead("lead-1")).toBe(true);
+      expect(await ledger.hasAppendPhaseForLead("lead-2")).toBe(false);
+    });
+  });
+
   it("does not increment daily_send_counts when append ledger insert conflicts", async () => {
     await withIsolatedLocalD1(async (db) => {
       const ledger = createLeadDeliveryLedgerFromD1(db);

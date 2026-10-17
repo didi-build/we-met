@@ -495,7 +495,7 @@ describe("exchange and details abuse controls (D1 integration)", () => {
         detailsDeps,
       );
       expect(first.status).toBe("success");
-      expect(second.status).toBe("success");
+      expect(second.status).toBe("details_already_sent");
       const owner = await db
         .prepare(
           `SELECT count FROM daily_send_counts WHERE day = '2026-10-16' AND card_id = ? AND kind = 'owner'`,

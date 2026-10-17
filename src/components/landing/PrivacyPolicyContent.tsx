@@ -34,6 +34,12 @@ export function PrivacyPolicyContent() {
         queued, sent or failed, when, and an error code if it failed.
       </p>
       <p className="lp-body">
+        <em>Visitor card pages.</em> After someone submits the optional details step on
+        a card, their browser may store a small flag in local storage so the exchange
+        button shows &quot;Contact sent&quot; on that device. It contains no personal
+        data.
+      </p>
+      <p className="lp-body">
         <em>Counts and technical data.</em> We keep daily counts of how many emails we
         send, per card and overall, so we stay within sending limits. Our hosting and
         security providers process technical data such as IP addresses to run the

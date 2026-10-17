@@ -41,4 +41,6 @@ export type LeadDeliveryLedger = {
     errorCode: string,
     updatedAt: string,
   ): Promise<void>;
+  /** True when any sink already has a phase=append ledger row for this lead. */
+  hasAppendPhaseForLead(leadId: string): Promise<boolean>;
 };

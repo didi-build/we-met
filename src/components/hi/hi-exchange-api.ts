@@ -72,7 +72,10 @@ export async function postHiDetails(
       body: JSON.stringify(payload),
       signal: controller.signal,
     });
-    await readJsonResponse(response);
+    const data = (await readJsonResponse(response)) as { error?: string } | null;
+    if (response.status === 409 && data?.error === "details-already-sent") {
+      return { ok: true };
+    }
     if (!response.ok) {
       return { ok: false, kind: "server" };
     }
