@@ -1,0 +1,114 @@
+name: Deploy consumer non-prod
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-consumer-nonprod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: consumer-nonprod
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Prepare follow-up email consumer Wrangler config (non-prod D1 ID)
+        env:
+          WE_MET_D1_DATABASE_ID_NONPROD: ${{ vars.WE_MET_D1_DATABASE_ID_NONPROD }}
+        run: |
+          set -euo pipefail
+          node scripts/prepare-wrangler-config.mjs \
+            --target consumer-nonprod \
+            --output workers/we-met-followup-email-consumer/wrangler.nonprod.ci.jsonc
+      - name: Deploy-time guards (repo)
+        run: npm run deploy:guards
+      - name: Deploy-time guards (non-prod consumer config)
+        run: |
+          node scripts/check-deploy-guards.mjs \
+            --target consumer-nonprod \
+            --config workers/we-met-followup-email-consumer/wrangler.nonprod.ci.jsonc
+      - name: Dry-run non-prod consumer bundle
+        run: npm run worker:consumer-dry-run:nonprod
+      - name: Require consumer Worker secrets (names only)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_CONSUMER_NONPROD }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          if ! LIST_JSON=$(npx wrangler secret list --name we-met-followup-email-consumer-nonprod 2>&1); then
+            echo "::error::wrangler secret list failed for we-met-followup-email-consumer-nonprod. If the token lacks permission to list secret names, add the minimum Cloudflare permission named in the error (Workers Editor alone is UNVERIFIED for this API)."
+            exit 1
+          fi
+          export LIST_JSON
+          node --input-type=module -e "
+            const required = [
+              'GMAIL_SERVICE_ACCOUNT_JSON',
+              'GMAIL_SENDER',
+              'WE_MET_OWNER_FROM_EMAIL',
+              'WE_MET_FROM_DISPLAY_NAME',
+              'WE_MET_TEST_MAIL_TO',
+            ];
+            let parsed;
+            try {
+              parsed = JSON.parse(process.env.LIST_JSON);
+            } catch {
+              console.error('::error::wrangler secret list did not return JSON; cannot verify required secret names without printing values.');
+              process.exit(1);
+            }
+            if (!Array.isArray(parsed)) {
+              console.error('::error::Unexpected wrangler secret list shape; cannot verify required secret names.');
+              process.exit(1);
+            }
+            const names = new Set(parsed.map((entry) => entry?.name).filter(Boolean));
+            const missing = required.filter((name) => !names.has(name));
+            if (missing.length > 0) {
+              for (const name of missing) {
+                console.error('::error::Missing required Worker secret on we-met-followup-email-consumer-nonprod: ' + name);
+              }
+              process.exit(1);
+            }
+            console.log('All required consumer secret names are present (' + required.length + ').');
+          "
+      - name: Deploy follow-up email consumer to non-prod
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_CONSUMER_NONPROD }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          WRANGLER_CONFIG="workers/we-met-followup-email-consumer/wrangler.nonprod.ci.jsonc"
+          DEPLOY_LOG=$(mktemp)
+          if ! npx wrangler deploy \
+            --config "$WRANGLER_CONFIG" \
+            --message "main ${GITHUB_SHA}" \
+            --tag "${GITHUB_SHA}" \
+            2>&1 | tee "$DEPLOY_LOG"; then
+            echo "::error::wrangler deploy failed for we-met-followup-email-consumer-nonprod"
+            exit 1
+          fi
+          VERSION_ID=$(grep -E 'Current Version ID:' "$DEPLOY_LOG" | sed -n 's/.*Current Version ID: //p' | tail -1 || true)
+          if [ -z "$VERSION_ID" ]; then
+            echo "::warning::Could not parse Current Version ID from wrangler deploy output; check the deploy step log."
+            VERSION_ID="unknown"
+          fi
+          {
+            echo "## Non-prod follow-up email consumer deploy"
+            echo ""
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Commit | \`${GITHUB_SHA}\` |"
+            echo "| Wrangler tag | \`${GITHUB_SHA}\` |"
+            echo "| Version ID | \`${VERSION_ID}\` |"
+            echo "| Worker | \`we-met-followup-email-consumer-nonprod\` |"
+          } >> "$GITHUB_STEP_SUMMARY"

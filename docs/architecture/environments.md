@@ -56,7 +56,7 @@ Production deploys use the GitHub **`production`** environment (required reviewe
 
 Documented for operators; see [kill-switch-and-caps](../runbooks/kill-switch-and-caps.md) and Linear [DIDI-627](https://linear.app/didi-build/issue/DIDI-627).
 
-- **Non-prod follow-up consumer deploy:** only [Deploy production](../runbooks/deploy.md) ships `we-met-followup-email-consumer`. There is **no** GitHub workflow that deploys `we-met-followup-email-consumer-nonprod` on merge; the non-prod consumer was **stale relative to `main`** as of **2026-10-16** (UNVERIFIED until a maintainer re-deploys and records the run).
+- **Non-prod follow-up consumer deploy:** [Deploy consumer non-prod](../runbooks/deploy.md#non-prod-follow-up-email-consumer-merge-to-main-no-approval) ships `we-met-followup-email-consumer-nonprod` on every push to `main` ([DIDI-652](https://linear.app/didi-build/issue/DIDI-652)). **UNVERIFIED** until the first successful run after merge (maintainer: `workflow_dispatch` and record date on the ticket).
 - **Visitor follow-up vs ledger:** visitor follow-up queue handling does **not** write `lead_delivery_ledger` rows (sink deliveries only).
 - **`daily_send_counts`:** counters increment when exchange/details **enqueue** owner and visitor mail, not when Gmail reports delivery.
 
