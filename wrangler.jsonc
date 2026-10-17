@@ -82,6 +82,17 @@
     "WE_MET_ENV": "production",
     "WE_MET_PREVIEW_HOST_SUFFIX": "",
   },
+  "observability": {
+    "redact_query_string": true,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "invocation_logs": true,
+      "persist": true,
+    },
+    "traces": { "enabled": true, "head_sampling_rate": 1, "persist": true },
+    "issue_detection": { "enabled": true },
+  },
   "previews": {
     "images": {
       "binding": "IMAGES",
@@ -139,5 +150,16 @@
         },
       },
     ],
+    "observability": {
+      "redact_query_string": true,
+      "logs": {
+        "enabled": true,
+        "head_sampling_rate": 1,
+        "invocation_logs": true,
+        "persist": true,
+      },
+      "traces": { "enabled": true, "head_sampling_rate": 1, "persist": true },
+      "issue_detection": { "enabled": true },
+    },
   },
 }
