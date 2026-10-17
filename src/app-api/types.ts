@@ -5,6 +5,7 @@ export type EditorCard = {
   slug: string;
   name: string;
   role: string;
+  phone?: string;
   photo: string;
   about: string[];
   services: { title: string; description: string }[];

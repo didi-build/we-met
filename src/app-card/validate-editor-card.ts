@@ -127,11 +127,6 @@ export function validateEditorCardForDraft(card: EditorCard): EditorValidationRe
 }
 
 export function validateEditorCardForPublish(card: EditorCard): EditorValidationResult {
-  const name = card.name.trim();
-  if (!name) {
-    return { ok: false, code: "name-missing" };
-  }
-
   const slug = card.slug.trim();
   const slugFmt = slugFormatCheck(slug);
   if (!slug || slugFmt || !isValidSlug(slug)) {
