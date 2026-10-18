@@ -49,6 +49,8 @@ function mapAttachment(attachment: EmailAttachment): CloudflareAttachment {
   };
 }
 
+const CLOUDFLARE_BINDING_ERROR_CODE = /^E_[A-Z0-9_]+$/;
+
 function cloudflareErrorFromThrown(error: unknown): FollowupEmailError {
   if (error instanceof FollowupEmailError) {
     return error;
@@ -60,7 +62,9 @@ function cloudflareErrorFromThrown(error: unknown): FollowupEmailError {
     typeof (error as { code?: unknown }).code === "string"
   ) {
     const code = (error as { code: string }).code;
-    return new FollowupEmailError(`cloudflare_${code}`);
+    if (CLOUDFLARE_BINDING_ERROR_CODE.test(code)) {
+      return new FollowupEmailError(`cloudflare_${code}`);
+    }
   }
   return new FollowupEmailError("unknown");
 }

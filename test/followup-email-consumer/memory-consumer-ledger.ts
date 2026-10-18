@@ -29,6 +29,21 @@ export class MemoryConsumerLeadDeliveryLedger implements ConsumerLeadDeliveryLed
     });
   }
 
+  seedFailed(
+    leadId: string,
+    sinkId: string,
+    phase: LeadDeliveryPhase,
+    errorCode: string,
+  ): void {
+    this.rows.set(key(leadId, sinkId, phase), {
+      status: "failed",
+      externalRef: null,
+      attemptCount: 0,
+      nextAttemptAt: null,
+      errorCode,
+    });
+  }
+
   seedSent(
     leadId: string,
     sinkId: string,

@@ -142,6 +142,15 @@ function createDeps(
   };
 }
 
+function cloudflareLeadEmailControls() {
+  return {
+    leadEmailEnabled: true,
+    emailProvider: "cloudflare" as const,
+    dailyCapGlobal: 150,
+    dailyCapPerCard: 50,
+  };
+}
+
 function sinkRecordBody(overrides: Record<string, unknown> = {}) {
   return {
     type: "lead_sink_record",
@@ -919,6 +928,217 @@ describe("processFollowupQueueBatch (unit)", () => {
     expect(message.ack).toHaveBeenCalledOnce();
     expect(ledger.getRowState("lead-1", "sink-1", "record")?.errorCode).toBe(
       "malformed_sink_email_config",
+    );
+  });
+
+  it("stores Cloudflare external_ref on owner record send with Cloudflare From and no Gmail threading fields", async () => {
+    const ledger = new MemoryConsumerLeadDeliveryLedger();
+    ledger.seedQueued("lead-1", "sink-1", "record");
+    const message = createMessage(sinkRecordBody());
+    const deps = createDeps(
+      {
+        readLeadEmailControls: vi.fn(async () => cloudflareLeadEmailControls()),
+        sendEmail: vi.fn(async () => ({
+          messageId: "<record@mail.we-met.link>",
+          threadId: null,
+        })),
+      },
+      ledger,
+    );
+
+    await processFollowupQueueBatch({ messages: [message] }, deps);
+
+    expect(deps.sendEmail).toHaveBeenCalledOnce();
+    const [provider, sent] = vi.mocked(deps.sendEmail).mock.calls[0]!;
+    expect(provider).toBe("cloudflare");
+    expect(sent.from).toBe("hello@mail.we-met.link");
+    expect(sent.messageId).toBeUndefined();
+    expect(sent.threadId).toBeUndefined();
+    expect(
+      JSON.parse(ledger.getRowState("lead-1", "sink-1", "record")!.externalRef!),
+    ).toEqual({
+      provider: "cloudflare",
+      messageId: "<record@mail.we-met.link>",
+    });
+    expect(message.ack).toHaveBeenCalledOnce();
+  });
+
+  it("sends Cloudflare append unthreaded when record ref is Gmail-era", async () => {
+    const ledger = new MemoryConsumerLeadDeliveryLedger();
+    ledger.seedSent(
+      "lead-1",
+      "sink-1",
+      "record",
+      JSON.stringify({ gmailThreadId: "gmail-thread", gmailMessageId: "g1" }),
+    );
+    ledger.seedQueued("lead-1", "sink-1", "append");
+    const message = createMessage({
+      type: "lead_sink_append_details",
+      sinkId: "sink-1",
+      sinkKind: "email",
+      sinkConfig: { to: "owner@example.com" },
+      lead: {
+        leadId: "lead-1",
+        name: "Alex Visitor",
+        email: "visitor@example.com",
+      },
+      details: { jobTitle: "CEO", company: null, note: null },
+      detailsSubmittedAt: "2026-10-12T01:00:00.000Z",
+      cardId: "card-1",
+      cardSlug: "demo",
+      sourceUrl: "https://we-met.link/hi/demo",
+    });
+    const deps = createDeps(
+      {
+        readLeadEmailControls: vi.fn(async () => cloudflareLeadEmailControls()),
+      },
+      ledger,
+    );
+
+    await processFollowupQueueBatch({ messages: [message] }, deps);
+
+    const [, sent] = vi.mocked(deps.sendEmail).mock.calls[0]!;
+    expect(sent.inReplyTo).toBeUndefined();
+    expect(sent.references).toBeUndefined();
+    expect(sent.messageId).toBeUndefined();
+    expect(sent.threadId).toBeUndefined();
+    expect(message.ack).toHaveBeenCalledOnce();
+  });
+
+  it("sends Cloudflare append unthreaded when record ref is null", async () => {
+    const ledger = new MemoryConsumerLeadDeliveryLedger();
+    ledger.seedFailed("lead-1", "sink-1", "record", "gmail_network_error");
+    ledger.seedQueued("lead-1", "sink-1", "append");
+    const message = createMessage({
+      type: "lead_sink_append_details",
+      sinkId: "sink-1",
+      sinkKind: "email",
+      sinkConfig: { to: "owner@example.com" },
+      lead: {
+        leadId: "lead-1",
+        name: "Alex Visitor",
+        email: "visitor@example.com",
+      },
+      details: { jobTitle: "CEO", company: null, note: null },
+      detailsSubmittedAt: "2026-10-12T01:00:00.000Z",
+      cardId: "card-1",
+      cardSlug: "demo",
+      sourceUrl: "https://we-met.link/hi/demo",
+    });
+    const deps = createDeps(
+      {
+        readLeadEmailControls: vi.fn(async () => cloudflareLeadEmailControls()),
+      },
+      ledger,
+    );
+
+    await processFollowupQueueBatch({ messages: [message] }, deps);
+
+    const [, sent] = vi.mocked(deps.sendEmail).mock.calls[0]!;
+    expect(sent.inReplyTo).toBeUndefined();
+    expect(sent.references).toBeUndefined();
+    expect(message.ack).toHaveBeenCalledOnce();
+  });
+
+  it("never calls send when Cloudflare From is unset; visitor retries then permanent failure", async () => {
+    const send = vi.fn();
+    const depsUnset = createDeps({
+      readLeadEmailControls: vi.fn(async () => cloudflareLeadEmailControls()),
+      outboundFrom: {
+        ownerFromEmail: "hello@we-met.link",
+        cloudflareFromEmail: undefined,
+      },
+      sendEmail: send,
+    });
+    const msgRetry = createMessage(visitorBody(), { attempts: 3 });
+    await processFollowupQueueBatch({ messages: [msgRetry] }, depsUnset);
+    expect(send).not.toHaveBeenCalled();
+    expect(msgRetry.retry).toHaveBeenCalledOnce();
+    expect(depsUnset.logVisitorFollowupAttemptFailure).toHaveBeenCalledWith(
+      "lead-1",
+      3,
+      {
+        code: "cloudflare_from_email_missing",
+        secretName: "WE_MET_EMAIL_FROM_CLOUDFLARE",
+      },
+      true,
+    );
+
+    const msgFinal = createMessage(visitorBody(), {
+      attempts: MAX_VISITOR_FOLLOWUP_ATTEMPTS,
+    });
+    const depsFinal = createDeps({
+      readLeadEmailControls: vi.fn(async () => cloudflareLeadEmailControls()),
+      outboundFrom: { ownerFromEmail: "hello@we-met.link", cloudflareFromEmail: "" },
+      sendEmail: send,
+    });
+    await processFollowupQueueBatch({ messages: [msgFinal] }, depsFinal);
+    expect(send).not.toHaveBeenCalled();
+    expect(msgFinal.ack).toHaveBeenCalledOnce();
+    expect(depsFinal.logVisitorFollowupPermanentFailure).toHaveBeenCalledWith(
+      "lead-1",
+      {
+        code: "cloudflare_from_email_missing",
+        secretName: "WE_MET_EMAIL_FROM_CLOUDFLARE",
+      },
+    );
+  });
+
+  it("never calls send when Cloudflare From is unset; sink retries then marks ledger failed", async () => {
+    const ledger = new MemoryConsumerLeadDeliveryLedger();
+    ledger.seedQueued("lead-1", "sink-1", "record");
+    const send = vi.fn();
+    const message = createMessage(sinkRecordBody(), { attempts: 3 });
+    const deps = createDeps(
+      {
+        readLeadEmailControls: vi.fn(async () => cloudflareLeadEmailControls()),
+        outboundFrom: {
+          ownerFromEmail: "hello@we-met.link",
+          cloudflareFromEmail: undefined,
+        },
+        sendEmail: send,
+      },
+      ledger,
+    );
+
+    await processFollowupQueueBatch({ messages: [message] }, deps);
+
+    expect(send).not.toHaveBeenCalled();
+    expect(message.retry).toHaveBeenCalledOnce();
+
+    const finalMessage = createMessage(sinkRecordBody(), {
+      attempts: MAX_VISITOR_FOLLOWUP_ATTEMPTS,
+    });
+    await processFollowupQueueBatch({ messages: [finalMessage] }, deps);
+    expect(send).not.toHaveBeenCalled();
+    expect(finalMessage.ack).toHaveBeenCalledOnce();
+    expect(ledger.getRowState("lead-1", "sink-1", "record")?.status).toBe("failed");
+    expect(ledger.getRowState("lead-1", "sink-1", "record")?.errorCode).toBe(
+      "cloudflare_from_email_missing",
+    );
+  });
+
+  it("marks sink failed without retry on permanent Cloudflare binding error", async () => {
+    const ledger = new MemoryConsumerLeadDeliveryLedger();
+    ledger.seedQueued("lead-1", "sink-1", "record");
+    const message = createMessage(sinkRecordBody());
+    const deps = createDeps(
+      {
+        readLeadEmailControls: vi.fn(async () => cloudflareLeadEmailControls()),
+        sendEmail: vi.fn(async () => {
+          throw new FollowupEmailError("cloudflare_E_CONTENT_TOO_LARGE");
+        }),
+      },
+      ledger,
+    );
+
+    await processFollowupQueueBatch({ messages: [message] }, deps);
+
+    expect(message.ack).toHaveBeenCalledOnce();
+    expect(message.retry).not.toHaveBeenCalled();
+    expect(ledger.getRowState("lead-1", "sink-1", "record")?.status).toBe("failed");
+    expect(ledger.getRowState("lead-1", "sink-1", "record")?.errorCode).toBe(
+      "cloudflare_E_CONTENT_TOO_LARGE",
     );
   });
 

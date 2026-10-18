@@ -4,6 +4,19 @@ import {
   type CloudflareOutboundMessage,
   type CloudflareSendEmailBinding,
 } from "@/email/cloudflare-sender";
+import { FollowupEmailError } from "@/email/followup-email-error";
+
+function decodeBase64Utf8(base64: string): string {
+  const binary = atob(base64);
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
+function bindingError(code: string): Error & { code: string } {
+  const error = new Error(code) as Error & { code: string };
+  error.code = code;
+  return error;
+}
 
 describe("createCloudflareEmailSender (unit)", () => {
   it("maps outbound mail to the binding and returns messageId with null threadId", async () => {
@@ -14,6 +27,7 @@ describe("createCloudflareEmailSender (unit)", () => {
       send: send as CloudflareSendEmailBinding["send"],
     });
 
+    const vcardBody = "BEGIN:VCARD\nFN:José\nEND:VCARD";
     const result = await sender.send({
       from: "hello@mail.we-met.link",
       fromDisplayName: "We Met",
@@ -28,7 +42,7 @@ describe("createCloudflareEmailSender (unit)", () => {
         {
           filename: "card.vcf",
           mimeType: "text/vcard",
-          body: "BEGIN:VCARD\nEND:VCARD",
+          body: vcardBody,
         },
       ],
     });
@@ -44,7 +58,7 @@ describe("createCloudflareEmailSender (unit)", () => {
       name: "We Met",
     });
     expect(payload.headers).toBeUndefined();
-    expect(payload.attachments?.[0]?.content).toBeTruthy();
+    expect(decodeBase64Utf8(payload.attachments![0]!.content)).toBe(vcardBody);
     expect(payload.attachments?.[0]?.disposition).toBe("attachment");
   });
 
@@ -72,11 +86,35 @@ describe("createCloudflareEmailSender (unit)", () => {
     });
   });
 
-  it("wraps binding errors as cloudflare_* FollowupEmailError codes", async () => {
+  it("omits threading headers when only one of inReplyTo or references is set", async () => {
+    const send = vi.fn(async (_message: CloudflareOutboundMessage) => ({
+      messageId: "<r@mail.we-met.link>",
+    }));
+    const sender = createCloudflareEmailSender({
+      send: send as CloudflareSendEmailBinding["send"],
+    });
+
+    await sender.send({
+      from: "hello@mail.we-met.link",
+      to: "owner@example.com",
+      subject: "Re: lead",
+      textPlain: "a",
+      textHtml: "b",
+      inReplyTo: "<record@mail.we-met.link>",
+    });
+
+    expect(send.mock.calls[0]![0]!.headers).toBeUndefined();
+  });
+
+  it.each([
+    ["E_RATE_LIMIT_EXCEEDED", "cloudflare_E_RATE_LIMIT_EXCEEDED"],
+    ["E_DAILY_LIMIT_EXCEEDED", "cloudflare_E_DAILY_LIMIT_EXCEEDED"],
+    ["E_DELIVERY_FAILED", "cloudflare_E_DELIVERY_FAILED"],
+    ["E_RECIPIENT_SUPPRESSED", "cloudflare_E_RECIPIENT_SUPPRESSED"],
+    ["E_CONTENT_TOO_LARGE", "cloudflare_E_CONTENT_TOO_LARGE"],
+  ])("maps binding error %s to %s", async (bindingCode, expectedCode) => {
     const send = vi.fn(async () => {
-      const error = new Error("rate limited") as Error & { code: string };
-      error.code = "E_RATE_LIMIT_EXCEEDED";
-      throw error;
+      throw bindingError(bindingCode);
     });
     const sender = createCloudflareEmailSender({ send });
 
@@ -88,22 +126,74 @@ describe("createCloudflareEmailSender (unit)", () => {
         textPlain: "plain",
         textHtml: "<p>html</p>",
       }),
-    ).rejects.toMatchObject({
-      code: "cloudflare_E_RATE_LIMIT_EXCEEDED",
+    ).rejects.toMatchObject({ code: expectedCode });
+  });
+
+  it("maps non-E_* binding codes and missing codes to unknown", async () => {
+    const sendInvalid = vi.fn(async () => {
+      throw bindingError("not_an_e_code");
     });
+    await expect(
+      createCloudflareEmailSender({ send: sendInvalid }).send({
+        from: "hello@mail.we-met.link",
+        to: "visitor@example.com",
+        subject: "Hi",
+        textPlain: "plain",
+        textHtml: "<p>html</p>",
+      }),
+    ).rejects.toMatchObject({ code: "unknown" });
+
+    const sendNoCode = vi.fn(async () => {
+      throw new Error("network");
+    });
+    await expect(
+      createCloudflareEmailSender({ send: sendNoCode }).send({
+        from: "hello@mail.we-met.link",
+        to: "visitor@example.com",
+        subject: "Hi",
+        textPlain: "plain",
+        textHtml: "<p>html</p>",
+      }),
+    ).rejects.toMatchObject({ code: "unknown" });
+  });
+
+  it("re-throws FollowupEmailError from the binding unchanged", async () => {
+    const send = vi.fn(async () => {
+      throw new FollowupEmailError("cloudflare_binding_missing");
+    });
+    const sender = createCloudflareEmailSender({ send });
+
+    await expect(
+      sender.send({
+        from: "hello@mail.we-met.link",
+        to: "visitor@example.com",
+        subject: "Hi",
+        textPlain: "plain",
+        textHtml: "<p>html</p>",
+      }),
+    ).rejects.toMatchObject({ code: "cloudflare_binding_missing" });
   });
 });
 
 describe("isRetryableFollowupEmailError (unit)", () => {
-  it("treats Cloudflare header errors as permanent", async () => {
+  it("classifies Cloudflare binding error codes for retry policy", async () => {
     const { isRetryableFollowupEmailError } =
       await import("@/email/retryable-followup-error");
     expect(isRetryableFollowupEmailError("cloudflare_E_HEADER_NOT_ALLOWED")).toBe(
       false,
     );
+    expect(isRetryableFollowupEmailError("cloudflare_E_RECIPIENT_SUPPRESSED")).toBe(
+      false,
+    );
+    expect(isRetryableFollowupEmailError("cloudflare_E_CONTENT_TOO_LARGE")).toBe(false);
     expect(isRetryableFollowupEmailError("cloudflare_E_RATE_LIMIT_EXCEEDED")).toBe(
       true,
     );
+    expect(isRetryableFollowupEmailError("cloudflare_E_DAILY_LIMIT_EXCEEDED")).toBe(
+      true,
+    );
+    expect(isRetryableFollowupEmailError("cloudflare_E_DELIVERY_FAILED")).toBe(true);
+    expect(isRetryableFollowupEmailError("unknown")).toBe(true);
     expect(isRetryableFollowupEmailError("malformed_sink_email_config")).toBe(false);
   });
 });
