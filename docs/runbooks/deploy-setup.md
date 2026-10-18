@@ -213,6 +213,7 @@ npx wrangler deploy --config workers/we-met-followup-email-consumer/wrangler.non
 npx wrangler secret put GMAIL_SERVICE_ACCOUNT_JSON --name we-met-followup-email-consumer-nonprod < /path/to/key.json
 npx wrangler secret put GMAIL_SENDER --name we-met-followup-email-consumer-nonprod
 npx wrangler secret put WE_MET_OWNER_FROM_EMAIL --name we-met-followup-email-consumer-nonprod
+npx wrangler secret put WE_MET_EMAIL_FROM_CLOUDFLARE --name we-met-followup-email-consumer-nonprod
 npx wrangler secret put WE_MET_FROM_DISPLAY_NAME --name we-met-followup-email-consumer-nonprod
 npx wrangler secret put WE_MET_TEST_MAIL_TO --name we-met-followup-email-consumer-nonprod
 ```

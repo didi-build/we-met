@@ -79,7 +79,8 @@ Values live in GitHub Environments, the Cloudflare dashboard, or local `.env`. *
 | `TURNSTILE_SECRET_KEY`           | App Worker                  | Server-side Turnstile verify                                                                                                                                                                                                                                                                                             |
 | `GMAIL_SERVICE_ACCOUNT_JSON`     | Consumer                    | Gmail API credentials (follow-up email)                                                                                                                                                                                                                                                                                  |
 | `GMAIL_SENDER`                   | Consumer                    | Gmail API delegated sender (JWT `sub`); not the visible **From** on outbound mail ([0023](../decisions/0023-owner-email-lead-sink-consumer.md))                                                                                                                                                                          |
-| `WE_MET_OWNER_FROM_EMAIL`        | Consumer                    | Visible **From** address on visitor follow-up and owner sink mail ([0023](../decisions/0023-owner-email-lead-sink-consumer.md))                                                                                                                                                                                          |
+| `WE_MET_OWNER_FROM_EMAIL`        | Consumer                    | Visible **From** when `email_provider` is Gmail (default) ([0023](../decisions/0023-owner-email-lead-sink-consumer.md))                                                                                                                                                                                                  |
+| `WE_MET_EMAIL_FROM_CLOUDFLARE`   | Consumer                    | Visible **From** when `email_provider` is `cloudflare` (`hello@mail.we-met.link`; [DIDI-653](https://linear.app/didi-build/issue/DIDI-653))                                                                                                                                                                              |
 | `WE_MET_FROM_DISPLAY_NAME`       | Consumer                    | Platform **From** display name on owner sink mail and visitor follow-up **fallback**; visitor mail otherwise uses `{Google first name} via We Met` ([0023](../decisions/0023-owner-email-lead-sink-consumer.md), [DIDI-642](https://linear.app/didi-build/issue/DIDI-642))                                               |
 | `WE_MET_TEST_MAIL_TO`            | Consumer                    | **Non-prod only:** all outbound mail redirected here                                                                                                                                                                                                                                                                     |
 | `BOOKING_URL`                    | App Worker                  | Public booking link in the card flow                                                                                                                                                                                                                                                                                     |
@@ -98,7 +99,7 @@ Lead sink destinations (Linear project IDs, owner email addresses, etc.) live in
 | `WE_MET_APP_RATE_LIMITER`      | Namespace id **2006**     | Namespace id **2005**              |
 | `IMAGES`                       | Cloudflare Images binding | Same (image ingestion)             |
 
-The follow-up email consumer is a **separate Worker** (not the OpenNext `we-met` bundle) with configs under `workers/we-met-followup-email-consumer/` ([0021](../decisions/0021-followup-email-consumer-worker.md)):
+The follow-up email consumer is a **separate Worker** (not the OpenNext `we-met` bundle) with configs under `workers/we-met-followup-email-consumer/` ([0021](../decisions/0021-followup-email-consumer-worker.md)). Each consumer binds **`send_email`** as **`EMAIL`** (`allowed_sender_addresses`: `hello@mail.we-met.link`) for the Cloudflare provider path ([DIDI-653](https://linear.app/didi-build/issue/DIDI-653)).
 
 | Worker name                              | Queue consumed                  | D1 (`WE_MET_DB`)    | R2 bucket (`WE_MET_ASSETS`) |
 | ---------------------------------------- | ------------------------------- | ------------------- | --------------------------- |
@@ -130,9 +131,25 @@ The consumer registers on the queue in **its own** Wrangler config; it is not an
 | `lead_sink_ledger_record_failed`     | `leadId`, `sinkId`, `errorCode`                                                                                                                                    |
 | `lead_sink_ledger_mark_failed`       | `leadId`, `sinkId`, `errorCode`                                                                                                                                    |
 
-**Consumer secrets (follow-up Workers):** `GMAIL_SERVICE_ACCOUNT_JSON`, `GMAIL_SENDER`, `WE_MET_OWNER_FROM_EMAIL`, `WE_MET_FROM_DISPLAY_NAME` on **both** consumers; **`WE_MET_TEST_MAIL_TO`** on **non-prod only** (five secret names on non-prod, four on production).
+**Consumer secrets (follow-up Workers):** `GMAIL_SERVICE_ACCOUNT_JSON`, `GMAIL_SENDER`, `WE_MET_OWNER_FROM_EMAIL`, `WE_MET_EMAIL_FROM_CLOUDFLARE`, `WE_MET_FROM_DISPLAY_NAME` on **both** consumers; **`WE_MET_TEST_MAIL_TO`** on **non-prod only** (six secret names on non-prod, five on production). Gmail secrets stay required while Gmail remains the fallback provider.
 
-**Consumer `errorCode` values (no raw exception text):** `gmail_secret_missing`, `gmail_invalid_service_account_json`, `gmail_token_http_<status>`, `gmail_token_missing_access_token`, `gmail_send_http_<status>`, `gmail_network_error`, `nonprod_mail_redirect_unset`, `owner_from_email_missing`, `from_display_name_missing`, `malformed_sink_email_config`, `record_unavailable`, `invalid_rfc5322_message_id`, `unknown`. Ledger update failures may log `ledger_update_failed` with `external_ref_invalid`. For `gmail_secret_missing`, `owner_from_email_missing`, and `from_display_name_missing`, logs include `secretName` — never a secret value.
+**Email provider switch (`app_settings`):** row `email_provider` = `gmail` (default when missing or unknown) or `cloudflare`. Flip non-prod and production separately:
+
+```sql
+INSERT INTO app_settings (key, value) VALUES ('email_provider', 'cloudflare')
+  ON CONFLICT(key) DO UPDATE SET value = excluded.value;
+```
+
+Rollback to Gmail:
+
+```sql
+INSERT INTO app_settings (key, value) VALUES ('email_provider', 'gmail')
+  ON CONFLICT(key) DO UPDATE SET value = excluded.value;
+```
+
+**Cloudflare Email Service quota:** account limit **200 messages per day** (dashboard window; UNVERIFIED alignment with UTC). App enqueue caps remain **`daily_cap_global` 150** and **`daily_cap_per_card` 50** (counted at submission, not per provider).
+
+**Consumer `errorCode` values (no raw exception text):** `gmail_secret_missing`, `gmail_invalid_service_account_json`, `gmail_token_http_<status>`, `gmail_token_missing_access_token`, `gmail_send_http_<status>`, `gmail_network_error`, `nonprod_mail_redirect_unset`, `owner_from_email_missing`, `cloudflare_from_email_missing`, `cloudflare_binding_missing`, `cloudflare_<Cloudflare code>` (for example `cloudflare_E_RATE_LIMIT_EXCEEDED`), `from_display_name_missing`, `malformed_sink_email_config`, `record_unavailable`, `invalid_rfc5322_message_id`, `unknown`. Ledger update failures may log `ledger_update_failed` with `external_ref_invalid`. For `gmail_secret_missing`, `owner_from_email_missing`, `cloudflare_from_email_missing`, and `from_display_name_missing`, logs include `secretName` — never a secret value.
 
 **Consumer Wrangler `vars` allowlist:** `WE_MET_ENV` only. `WE_MET_TEST_MAIL_TO` must be a **secret**, not a var.
 

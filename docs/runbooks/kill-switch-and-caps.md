@@ -11,8 +11,9 @@
 | Key                  | Role                                                                                                                                                                                                                                                                                             |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `lead_email_enabled` | Kill switch. **On** only when the value is **`1`** or **`true`** (case-insensitive). **Missing or empty** defaults to **enabled**. Any other **non-empty** value (for example `0`, `false`, `off`) is treated as **off** (`leadEmailEnabledFromSettingValue` in `src/app-settings/defaults.ts`). |
-| `daily_cap_global`   | Max **enqueue** slots per UTC day across all cards (owner + visitor kinds summed).                                                                                                                                                                                                               |
-| `daily_cap_per_card` | Max **enqueue** slots per UTC day for one `card_id` (owner + visitor kinds summed).                                                                                                                                                                                                              |
+| `daily_cap_global`   | Max **enqueue** slots per UTC day across all cards (owner + visitor kinds summed). Product default **150**.                                                                                                                                                                                      |
+| `daily_cap_per_card` | Max **enqueue** slots per UTC day for one `card_id` (owner + visitor kinds summed). Product default **50**.                                                                                                                                                                                      |
+| `email_provider`     | `gmail` (default) or `cloudflare` for the follow-up consumer ([DIDI-653](https://linear.app/didi-build/issue/DIDI-653)).                                                                                                                                                                         |
 
 Missing, non-numeric, or non-positive cap values **fail closed** (same as kill switch off) — new submissions get **503** `lead_email_unavailable`.
 
@@ -21,9 +22,9 @@ Missing, non-numeric, or non-positive cap values **fail closed** (same as kill s
 Set at cutover (from [DIDI-631](https://linear.app/didi-build/issue/DIDI-631) / ADR 0025):
 
 ```sql
-INSERT INTO app_settings (key, value) VALUES ('daily_cap_global', '500')
+INSERT INTO app_settings (key, value) VALUES ('daily_cap_global', '150')
   ON CONFLICT(key) DO UPDATE SET value = excluded.value;
-INSERT INTO app_settings (key, value) VALUES ('daily_cap_per_card', '100')
+INSERT INTO app_settings (key, value) VALUES ('daily_cap_per_card', '50')
   ON CONFLICT(key) DO UPDATE SET value = excluded.value;
 INSERT INTO app_settings (key, value) VALUES ('lead_email_enabled', '1')
   ON CONFLICT(key) DO UPDATE SET value = excluded.value;

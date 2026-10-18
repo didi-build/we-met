@@ -2,6 +2,8 @@ import {
   followupEmailErrorLogFields,
   type FollowupEmailErrorLogFields,
 } from "@/email/followup-email-error";
+import { isRetryableFollowupEmailError } from "@/email/retryable-followup-error";
+import type { LeadEmailControls } from "@/app-settings/caps";
 import {
   parseExternalRef,
   validateExternalRefForStorage,
@@ -23,7 +25,7 @@ import { UnsupportedQueueMessageError } from "@/followup-email-consumer/unsuppor
 import { LEAD_EMAIL_PAUSED_ERROR } from "@/lead-email/paused";
 
 export type LeadSinkConsumerDeps = {
-  isLeadEmailEnabled: () => Promise<boolean>;
+  readLeadEmailControls: () => Promise<LeadEmailControls>;
   sinkHandlers: Map<string, LeadSinkHandler>;
   ledger: ConsumerLeadDeliveryLedger;
   logUnsupportedType(typeLabel: string): void;
@@ -51,8 +53,6 @@ export type LeadSinkConsumerDeps = {
   logLeadSinkAppendDeferred(leadId: string, sinkId: string, attempt: number): void;
   now: () => Date;
 };
-
-const NON_RETRYABLE_ERROR_CODES = new Set(["malformed_sink_email_config"]);
 
 function leadSinkPhase(message: ParsedLeadSinkMessage): "record" | "append" {
   return message.type === "lead_sink_record" ? "record" : "append";
@@ -252,16 +252,20 @@ async function processQueuedLeadSink(
     return;
   }
 
-  if (!(await deps.isLeadEmailEnabled())) {
+  const leadEmailControls = await deps.readLeadEmailControls();
+  if (!leadEmailControls.leadEmailEnabled) {
     await markNonRetryableFailure(message, parsed, LEAD_EMAIL_PAUSED_ERROR, deps);
     return;
   }
 
+  const handlerContext = {
+    messageAttempts: message.attempts,
+    emailProvider: leadEmailControls.emailProvider,
+  };
+
   try {
     if (parsed.type === "lead_sink_record") {
-      const result = await handler.deliverRecord(parsed, {
-        messageAttempts: message.attempts,
-      });
+      const result = await handler.deliverRecord(parsed, handlerContext);
       await afterSuccessfulDelivery(message, parsed, result.externalRef, deps);
       return;
     }
@@ -282,13 +286,13 @@ async function processQueuedLeadSink(
     }
 
     const result = await handler.deliverAppend(parsed, {
-      messageAttempts: message.attempts,
+      ...handlerContext,
       recordRef: appendPlan.recordRef,
     });
     await afterSuccessfulDelivery(message, parsed, result.externalRef, deps);
   } catch (error) {
     const errorFields = followupEmailErrorLogFields(error);
-    if (NON_RETRYABLE_ERROR_CODES.has(errorFields.code)) {
+    if (!isRetryableFollowupEmailError(errorFields.code)) {
       await markNonRetryableFailure(message, parsed, errorFields.code, deps);
       return;
     }

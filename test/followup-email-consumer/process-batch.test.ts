@@ -71,15 +71,16 @@ function createDeps(
 ): FollowupConsumerDeps {
   const ledger =
     overrides.ledger ?? ledgerArg ?? new MemoryConsumerLeadDeliveryLedger();
-  const emailSender = overrides.emailSender ?? {
-    send: vi.fn(async () => ({ messageId: "g1", threadId: "t1" })),
+  const sendEmail =
+    overrides.sendEmail ?? vi.fn(async () => ({ messageId: "g1", threadId: "t1" }));
+  const outboundFrom = overrides.outboundFrom ?? {
+    ownerFromEmail: "hello@we-met.link",
+    cloudflareFromEmail: "hello@mail.we-met.link",
   };
   const now = overrides.now ?? (() => new Date("2026-10-12T12:00:00.000Z"));
   const weMetEnv = overrides.weMetEnv ?? "preview";
   const testMailTo =
     "testMailTo" in overrides ? overrides.testMailTo : "test-inbox@example.com";
-  const ownerFromEmail =
-    "ownerFromEmail" in overrides ? overrides.ownerFromEmail : "hello@we-met.link";
   const fromDisplayName =
     "fromDisplayName" in overrides
       ? overrides.fromDisplayName
@@ -93,9 +94,9 @@ function createDeps(
       email: createEmailLeadSinkHandler({
         weMetEnv,
         testMailTo,
-        ownerFromEmail,
+        outboundFrom,
         fromDisplayName,
-        emailSender,
+        sendEmail,
         logMalformedLeadSink: logMalformedLeadSinkForHandler,
       }),
     });
@@ -105,9 +106,9 @@ function createDeps(
     weMetEnv,
     baseUrl: overrides.baseUrl ?? "https://we-met.link",
     testMailTo,
-    ownerFromEmail,
+    outboundFrom,
     fromDisplayName,
-    emailSender,
+    sendEmail,
     ledger,
     sinkHandlers,
     logLedgerRowMissing,
@@ -141,6 +142,15 @@ function createDeps(
   };
 }
 
+function cloudflareLeadEmailControls() {
+  return {
+    leadEmailEnabled: true,
+    emailProvider: "cloudflare" as const,
+    dailyCapGlobal: 150,
+    dailyCapPerCard: 50,
+  };
+}
+
 function sinkRecordBody(overrides: Record<string, unknown> = {}) {
   return {
     type: "lead_sink_record",
@@ -162,8 +172,8 @@ describe("processFollowupQueueBatch (unit)", () => {
 
     await processFollowupQueueBatch({ messages: [message] }, deps);
 
-    expect(deps.emailSender.send).toHaveBeenCalledOnce();
-    const sent = vi.mocked(deps.emailSender.send).mock.calls[0][0];
+    expect(deps.sendEmail).toHaveBeenCalledOnce();
+    const sent = vi.mocked(deps.sendEmail).mock.calls[0][1];
     expect(sent.to).toBe("test-inbox@example.com");
     expect(sent.from).toBe("hello@we-met.link");
     expect(sent.fromDisplayName).toBe("Demo via We Met");
@@ -175,11 +185,9 @@ describe("processFollowupQueueBatch (unit)", () => {
   it("retries on temporary visitor follow-up failure and logs attempt", async () => {
     const message = createMessage(visitorBody(), { attempts: 2 });
     const deps = createDeps({
-      emailSender: {
-        send: vi.fn(async () => {
-          throw new FollowupEmailError("gmail_network_error");
-        }),
-      },
+      sendEmail: vi.fn(async () => {
+        throw new FollowupEmailError("gmail_network_error");
+      }),
     });
 
     await processFollowupQueueBatch({ messages: [message] }, deps);
@@ -202,11 +210,9 @@ describe("processFollowupQueueBatch (unit)", () => {
     for (let attempt = 1; attempt <= 29; attempt++) {
       const message = createMessage(visitorBody(), { attempts: attempt });
       const deps = createDeps({
-        emailSender: {
-          send: vi.fn(async () => {
-            throw new FollowupEmailError("gmail_network_error");
-          }),
-        },
+        sendEmail: vi.fn(async () => {
+          throw new FollowupEmailError("gmail_network_error");
+        }),
       });
       await processFollowupQueueBatch({ messages: [message] }, deps);
       if (attempt < MAX_VISITOR_FOLLOWUP_ATTEMPTS) {
@@ -228,11 +234,9 @@ describe("processFollowupQueueBatch (unit)", () => {
       attempts: MAX_VISITOR_FOLLOWUP_ATTEMPTS,
     });
     const deps = createDeps({
-      emailSender: {
-        send: vi.fn(async () => {
-          throw new FollowupEmailError("gmail_network_error");
-        }),
-      },
+      sendEmail: vi.fn(async () => {
+        throw new FollowupEmailError("gmail_network_error");
+      }),
     });
 
     await processFollowupQueueBatch({ messages: [message] }, deps);
@@ -263,14 +267,14 @@ describe("processFollowupQueueBatch (unit)", () => {
 
     await processFollowupQueueBatch({ messages: [message] }, deps);
 
-    const sent = vi.mocked(deps.emailSender.send).mock.calls[0][0];
+    const sent = vi.mocked(deps.sendEmail).mock.calls[0][1];
     expect(sent.fromDisplayName).toBe(PLATFORM_FROM_DISPLAY_NAME);
     expect(sent.replyTo).toBe("owner@example.com");
   });
 
   it("never calls send when WE_MET_FROM_DISPLAY_NAME is unset; retries then permanent failure", async () => {
     const send = vi.fn(async () => ({ messageId: null, threadId: null }));
-    const depsUnset = createDeps({ fromDisplayName: undefined, emailSender: { send } });
+    const depsUnset = createDeps({ fromDisplayName: undefined, sendEmail: send });
     const msgRetry = createMessage(visitorBody(), { attempts: 3 });
     await processFollowupQueueBatch({ messages: [msgRetry] }, depsUnset);
     expect(send).not.toHaveBeenCalled();
@@ -285,7 +289,7 @@ describe("processFollowupQueueBatch (unit)", () => {
     const msgFinal = createMessage(visitorBody(), {
       attempts: MAX_VISITOR_FOLLOWUP_ATTEMPTS,
     });
-    const depsFinal = createDeps({ fromDisplayName: "", emailSender: { send } });
+    const depsFinal = createDeps({ fromDisplayName: "", sendEmail: send });
     await processFollowupQueueBatch({ messages: [msgFinal] }, depsFinal);
     expect(send).not.toHaveBeenCalled();
     expect(msgFinal.ack).toHaveBeenCalledOnce();
@@ -297,7 +301,13 @@ describe("processFollowupQueueBatch (unit)", () => {
 
   it("never calls send when WE_MET_OWNER_FROM_EMAIL is unset; retries then permanent failure", async () => {
     const send = vi.fn(async () => ({ messageId: null, threadId: null }));
-    const depsUnset = createDeps({ ownerFromEmail: undefined, emailSender: { send } });
+    const depsUnset = createDeps({
+      outboundFrom: {
+        ownerFromEmail: undefined,
+        cloudflareFromEmail: "hello@mail.we-met.link",
+      },
+      sendEmail: send,
+    });
     const msgRetry = createMessage(visitorBody(), { attempts: 3 });
     await processFollowupQueueBatch({ messages: [msgRetry] }, depsUnset);
     expect(send).not.toHaveBeenCalled();
@@ -312,7 +322,13 @@ describe("processFollowupQueueBatch (unit)", () => {
     const msgFinal = createMessage(visitorBody(), {
       attempts: MAX_VISITOR_FOLLOWUP_ATTEMPTS,
     });
-    const depsFinal = createDeps({ ownerFromEmail: "", emailSender: { send } });
+    const depsFinal = createDeps({
+      outboundFrom: {
+        ownerFromEmail: "",
+        cloudflareFromEmail: "hello@mail.we-met.link",
+      },
+      sendEmail: send,
+    });
     await processFollowupQueueBatch({ messages: [msgFinal] }, depsFinal);
     expect(send).not.toHaveBeenCalled();
     expect(msgFinal.ack).toHaveBeenCalledOnce();
@@ -324,7 +340,7 @@ describe("processFollowupQueueBatch (unit)", () => {
 
   it("never calls send when non-prod redirect is unset; retries then permanent failure", async () => {
     const send = vi.fn(async () => ({ messageId: null, threadId: null }));
-    const depsUnset = createDeps({ testMailTo: undefined, emailSender: { send } });
+    const depsUnset = createDeps({ testMailTo: undefined, sendEmail: send });
     const msgRetry = createMessage(visitorBody(), { attempts: 3 });
     await processFollowupQueueBatch({ messages: [msgRetry] }, depsUnset);
     expect(send).not.toHaveBeenCalled();
@@ -339,7 +355,7 @@ describe("processFollowupQueueBatch (unit)", () => {
     const msgFinal = createMessage(visitorBody(), {
       attempts: MAX_VISITOR_FOLLOWUP_ATTEMPTS,
     });
-    const depsFinal = createDeps({ testMailTo: "", emailSender: { send } });
+    const depsFinal = createDeps({ testMailTo: "", sendEmail: send });
     await processFollowupQueueBatch({ messages: [msgFinal] }, depsFinal);
     expect(send).not.toHaveBeenCalled();
     expect(msgFinal.ack).toHaveBeenCalledOnce();
@@ -362,7 +378,7 @@ describe("processFollowupQueueBatch (unit)", () => {
     const deps = createDeps({
       weMetEnv: "production",
       testMailTo: undefined,
-      emailSender: { send },
+      sendEmail: send,
     });
 
     await processFollowupQueueBatch({ messages: [message] }, deps);
@@ -385,7 +401,7 @@ describe("processFollowupQueueBatch (unit)", () => {
     );
     const deps = createDeps({ weMetEnv: "preview" });
     await processFollowupQueueBatch({ messages: [message] }, deps);
-    const sent = vi.mocked(deps.emailSender.send).mock.calls[0][0];
+    const sent = vi.mocked(deps.sendEmail).mock.calls[0][1];
     expect(sent.to).toBe("test-inbox@example.com");
     expect(sent.subject).toContain("visitor@example.com");
   });
@@ -394,7 +410,7 @@ describe("processFollowupQueueBatch (unit)", () => {
     const message = createMessage(visitorBody());
     const deps = createDeps({ weMetEnv: "production", testMailTo: undefined });
     await processFollowupQueueBatch({ messages: [message] }, deps);
-    const sent = vi.mocked(deps.emailSender.send).mock.calls[0][0];
+    const sent = vi.mocked(deps.sendEmail).mock.calls[0][1];
     expect(sent.to).toBe("visitor@example.com");
     expect(sent.subject).not.toContain("[we-met test");
     expect(sent.textPlain).not.toContain("Test delivery (visitor typed)");
@@ -418,7 +434,7 @@ describe("processFollowupQueueBatch (unit)", () => {
     ledger.seedSent("lead-1", "sink-1", "record");
     const message = createMessage(sinkRecordBody());
     const send = vi.fn(async () => ({ messageId: "g1", threadId: "t1" }));
-    const deps = createDeps({ emailSender: { send } }, ledger);
+    const deps = createDeps({ sendEmail: send }, ledger);
 
     await processFollowupQueueBatch({ messages: [message] }, deps);
 
@@ -455,8 +471,8 @@ describe("processFollowupQueueBatch (unit)", () => {
 
     await processFollowupQueueBatch({ messages: [message] }, deps);
 
-    expect(deps.emailSender.send).toHaveBeenCalledOnce();
-    const sent = vi.mocked(deps.emailSender.send).mock.calls[0][0];
+    expect(deps.sendEmail).toHaveBeenCalledOnce();
+    const sent = vi.mocked(deps.sendEmail).mock.calls[0][1];
     expect(sent.subject).toBe(
       "Re: [we-met test → owner@example.com] New lead added: Alex Visitor",
     );
@@ -474,8 +490,8 @@ describe("processFollowupQueueBatch (unit)", () => {
 
     await processFollowupQueueBatch({ messages: [message] }, deps);
 
-    expect(deps.emailSender.send).toHaveBeenCalledOnce();
-    const sent = vi.mocked(deps.emailSender.send).mock.calls[0][0];
+    expect(deps.sendEmail).toHaveBeenCalledOnce();
+    const sent = vi.mocked(deps.sendEmail).mock.calls[0][1];
     expect(sent.to).toBe("test-inbox@example.com");
     expect(sent.from).toBe("hello@we-met.link");
     expect(sent.fromDisplayName).toBe(PLATFORM_FROM_DISPLAY_NAME);
@@ -551,7 +567,7 @@ describe("processFollowupQueueBatch (unit)", () => {
 
     await processFollowupQueueBatch({ messages: [message] }, deps);
 
-    expect(deps.emailSender.send).not.toHaveBeenCalled();
+    expect(deps.sendEmail).not.toHaveBeenCalled();
     expect(deps.logLeadSinkAppendDeferred).toHaveBeenCalledWith("lead-1", "sink-1", 2);
     expect(message.retry).toHaveBeenCalledOnce();
     expect(message.ack).not.toHaveBeenCalled();
@@ -588,7 +604,7 @@ describe("processFollowupQueueBatch (unit)", () => {
 
     await processFollowupQueueBatch({ messages: [message] }, deps);
 
-    const sent = vi.mocked(deps.emailSender.send).mock.calls[0][0];
+    const sent = vi.mocked(deps.sendEmail).mock.calls[0][1];
     expect(sent.inReplyTo).toBeUndefined();
     expect(sent.threadId).toBeUndefined();
     expect(message.ack).toHaveBeenCalledOnce();
@@ -600,11 +616,9 @@ describe("processFollowupQueueBatch (unit)", () => {
     const message = createMessage(sinkRecordBody(), { attempts: 2 });
     const deps = createDeps(
       {
-        emailSender: {
-          send: vi.fn(async () => {
-            throw new FollowupEmailError("gmail_network_error");
-          }),
-        },
+        sendEmail: vi.fn(async () => {
+          throw new FollowupEmailError("gmail_network_error");
+        }),
       },
       ledger,
     );
@@ -627,11 +641,9 @@ describe("processFollowupQueueBatch (unit)", () => {
     });
     const deps = createDeps(
       {
-        emailSender: {
-          send: vi.fn(async () => {
-            throw new FollowupEmailError("gmail_network_error");
-          }),
-        },
+        sendEmail: vi.fn(async () => {
+          throw new FollowupEmailError("gmail_network_error");
+        }),
       },
       ledger,
     );
@@ -652,7 +664,13 @@ describe("processFollowupQueueBatch (unit)", () => {
     const send = vi.fn(async () => ({ messageId: "g1", threadId: "t1" }));
     const message = createMessage(sinkRecordBody(), { attempts: 3 });
     const deps = createDeps(
-      { ownerFromEmail: undefined, emailSender: { send } },
+      {
+        outboundFrom: {
+          ownerFromEmail: undefined,
+          cloudflareFromEmail: "hello@mail.we-met.link",
+        },
+        sendEmail: send,
+      },
       ledger,
     );
 
@@ -667,10 +685,7 @@ describe("processFollowupQueueBatch (unit)", () => {
     ledger.seedQueued("lead-1", "sink-1", "record");
     const send = vi.fn(async () => ({ messageId: "g1", threadId: "t1" }));
     const message = createMessage(sinkRecordBody(), { attempts: 3 });
-    const deps = createDeps(
-      { fromDisplayName: undefined, emailSender: { send } },
-      ledger,
-    );
+    const deps = createDeps({ fromDisplayName: undefined, sendEmail: send }, ledger);
 
     await processFollowupQueueBatch({ messages: [message] }, deps);
 
@@ -690,7 +705,7 @@ describe("processFollowupQueueBatch (unit)", () => {
     ledger.seedQueued("lead-1", "sink-1", "record");
     const send = vi.fn(async () => ({ messageId: "g1", threadId: "t1" }));
     const message = createMessage(sinkRecordBody(), { attempts: 3 });
-    const deps = createDeps({ testMailTo: undefined, emailSender: { send } }, ledger);
+    const deps = createDeps({ testMailTo: undefined, sendEmail: send }, ledger);
 
     await processFollowupQueueBatch({ messages: [message] }, deps);
 
@@ -717,7 +732,7 @@ describe("processFollowupQueueBatch (unit)", () => {
     const ledger = new MemoryConsumerLeadDeliveryLedger();
     const send = vi.fn(async () => ({ messageId: "g1", threadId: "t1" }));
     const message = createMessage(sinkRecordBody());
-    const deps = createDeps({ emailSender: { send } }, ledger);
+    const deps = createDeps({ sendEmail: send }, ledger);
 
     await processFollowupQueueBatch({ messages: [message] }, deps);
 
@@ -744,7 +759,7 @@ describe("processFollowupQueueBatch (unit)", () => {
 
     await processFollowupQueueBatch({ messages: [message] }, deps);
 
-    expect(deps.emailSender.send).toHaveBeenCalledOnce();
+    expect(deps.sendEmail).toHaveBeenCalledOnce();
     expect(deps.logLedgerUpdateFailed).toHaveBeenCalledWith(
       "lead-1",
       "sink-1",
@@ -763,16 +778,16 @@ describe("processFollowupQueueBatch (unit)", () => {
       const index = sendCount++;
       return { messageId: `msg-${index}`, threadId: `thread-${index}` };
     });
-    const deps = createDeps({ emailSender: { send } }, ledger);
+    const deps = createDeps({ sendEmail: send }, ledger);
     const msgA = createMessage(sinkRecordBody({ sinkId: "sink-a" }), { id: "a" });
     const msgB = createMessage(sinkRecordBody({ sinkId: "sink-b" }), { id: "b" });
 
     await processFollowupQueueBatch({ messages: [msgA, msgB] }, deps);
 
     expect(send).toHaveBeenCalledTimes(2);
-    const calls = vi.mocked(deps.emailSender.send).mock.calls;
-    expect(calls[0]![0].messageId).toBe("<lead-1.sink-a.record@we-met.link>");
-    expect(calls[1]![0].messageId).toBe("<lead-1.sink-b.record@we-met.link>");
+    const calls = vi.mocked(deps.sendEmail).mock.calls;
+    expect(calls[0]![1].messageId).toBe("<lead-1.sink-a.record@we-met.link>");
+    expect(calls[1]![1].messageId).toBe("<lead-1.sink-b.record@we-met.link>");
     expect(
       JSON.parse(ledger.getRowState("lead-1", "sink-a", "record")!.externalRef!),
     ).toMatchObject({ gmailThreadId: "thread-0" });
@@ -786,13 +801,13 @@ describe("processFollowupQueueBatch (unit)", () => {
     ledger.seedQueued("lead-1", "sink-1", "record");
     const sink = createMessage(sinkRecordBody(), { id: "sink" });
     const visitor = createMessage(visitorBody(), { id: "visitor" });
-    const send = vi.fn(async (email: { messageId?: string }) => {
+    const send = vi.fn(async (_provider, email: { messageId?: string }) => {
       if (email.messageId?.includes("sink-1")) {
         throw new FollowupEmailError("gmail_network_error");
       }
       return { messageId: "v1", threadId: "vt1" };
     });
-    const deps = createDeps({ emailSender: { send } }, ledger);
+    const deps = createDeps({ sendEmail: send }, ledger);
 
     await processFollowupQueueBatch({ messages: [sink, visitor] }, deps);
 
@@ -808,13 +823,13 @@ describe("processFollowupQueueBatch (unit)", () => {
     ledger.seedQueued("lead-1", "sink-b", "record");
     const sinkA = createMessage(sinkRecordBody({ sinkId: "sink-a" }), { id: "sink-a" });
     const sinkB = createMessage(sinkRecordBody({ sinkId: "sink-b" }), { id: "sink-b" });
-    const send = vi.fn(async (email: { messageId?: string }) => {
+    const send = vi.fn(async (_provider, email: { messageId?: string }) => {
       if (email.messageId?.includes("sink-a")) {
         throw new FollowupEmailError("gmail_network_error");
       }
       return { messageId: "g-b", threadId: "t-b" };
     });
-    const deps = createDeps({ emailSender: { send } }, ledger);
+    const deps = createDeps({ sendEmail: send }, ledger);
 
     await processFollowupQueueBatch({ messages: [sinkA, sinkB] }, deps);
 
@@ -841,11 +856,9 @@ describe("processFollowupQueueBatch (unit)", () => {
     const deps = createDeps(
       {
         ledger: ledgerBroken,
-        emailSender: {
-          send: vi.fn(async () => {
-            throw new FollowupEmailError("gmail_network_error");
-          }),
-        },
+        sendEmail: vi.fn(async () => {
+          throw new FollowupEmailError("gmail_network_error");
+        }),
       },
       ledger,
     );
@@ -882,11 +895,9 @@ describe("processFollowupQueueBatch (unit)", () => {
     const deps = createDeps(
       {
         ledger: ledgerBroken,
-        emailSender: {
-          send: vi.fn(async () => {
-            throw new FollowupEmailError("gmail_network_error");
-          }),
-        },
+        sendEmail: vi.fn(async () => {
+          throw new FollowupEmailError("gmail_network_error");
+        }),
       },
       ledger,
     );
@@ -909,7 +920,7 @@ describe("processFollowupQueueBatch (unit)", () => {
     const message = createMessage(
       sinkRecordBody({ sinkConfig: { to: "not-an-email" } }),
     );
-    const deps = createDeps({ emailSender: { send } }, ledger);
+    const deps = createDeps({ sendEmail: send }, ledger);
 
     await processFollowupQueueBatch({ messages: [message] }, deps);
 
@@ -918,5 +929,286 @@ describe("processFollowupQueueBatch (unit)", () => {
     expect(ledger.getRowState("lead-1", "sink-1", "record")?.errorCode).toBe(
       "malformed_sink_email_config",
     );
+  });
+
+  it("stores Cloudflare external_ref on owner record send with Cloudflare From and no Gmail threading fields", async () => {
+    const ledger = new MemoryConsumerLeadDeliveryLedger();
+    ledger.seedQueued("lead-1", "sink-1", "record");
+    const message = createMessage(sinkRecordBody());
+    const deps = createDeps(
+      {
+        readLeadEmailControls: vi.fn(async () => cloudflareLeadEmailControls()),
+        sendEmail: vi.fn(async () => ({
+          messageId: "<record@mail.we-met.link>",
+          threadId: null,
+        })),
+      },
+      ledger,
+    );
+
+    await processFollowupQueueBatch({ messages: [message] }, deps);
+
+    expect(deps.sendEmail).toHaveBeenCalledOnce();
+    const [provider, sent] = vi.mocked(deps.sendEmail).mock.calls[0]!;
+    expect(provider).toBe("cloudflare");
+    expect(sent.from).toBe("hello@mail.we-met.link");
+    expect(sent.messageId).toBeUndefined();
+    expect(sent.threadId).toBeUndefined();
+    expect(
+      JSON.parse(ledger.getRowState("lead-1", "sink-1", "record")!.externalRef!),
+    ).toEqual({
+      provider: "cloudflare",
+      messageId: "<record@mail.we-met.link>",
+    });
+    expect(message.ack).toHaveBeenCalledOnce();
+  });
+
+  it("sends Cloudflare append unthreaded when record ref is Gmail-era", async () => {
+    const ledger = new MemoryConsumerLeadDeliveryLedger();
+    ledger.seedSent(
+      "lead-1",
+      "sink-1",
+      "record",
+      JSON.stringify({ gmailThreadId: "gmail-thread", gmailMessageId: "g1" }),
+    );
+    ledger.seedQueued("lead-1", "sink-1", "append");
+    const message = createMessage({
+      type: "lead_sink_append_details",
+      sinkId: "sink-1",
+      sinkKind: "email",
+      sinkConfig: { to: "owner@example.com" },
+      lead: {
+        leadId: "lead-1",
+        name: "Alex Visitor",
+        email: "visitor@example.com",
+      },
+      details: { jobTitle: "CEO", company: null, note: null },
+      detailsSubmittedAt: "2026-10-12T01:00:00.000Z",
+      cardId: "card-1",
+      cardSlug: "demo",
+      sourceUrl: "https://we-met.link/hi/demo",
+    });
+    const deps = createDeps(
+      {
+        readLeadEmailControls: vi.fn(async () => cloudflareLeadEmailControls()),
+      },
+      ledger,
+    );
+
+    await processFollowupQueueBatch({ messages: [message] }, deps);
+
+    const [, sent] = vi.mocked(deps.sendEmail).mock.calls[0]!;
+    expect(sent.inReplyTo).toBeUndefined();
+    expect(sent.references).toBeUndefined();
+    expect(sent.messageId).toBeUndefined();
+    expect(sent.threadId).toBeUndefined();
+    expect(message.ack).toHaveBeenCalledOnce();
+  });
+
+  it("sends Cloudflare append unthreaded when record ref is null", async () => {
+    const ledger = new MemoryConsumerLeadDeliveryLedger();
+    ledger.seedFailed("lead-1", "sink-1", "record", "gmail_network_error");
+    ledger.seedQueued("lead-1", "sink-1", "append");
+    const message = createMessage({
+      type: "lead_sink_append_details",
+      sinkId: "sink-1",
+      sinkKind: "email",
+      sinkConfig: { to: "owner@example.com" },
+      lead: {
+        leadId: "lead-1",
+        name: "Alex Visitor",
+        email: "visitor@example.com",
+      },
+      details: { jobTitle: "CEO", company: null, note: null },
+      detailsSubmittedAt: "2026-10-12T01:00:00.000Z",
+      cardId: "card-1",
+      cardSlug: "demo",
+      sourceUrl: "https://we-met.link/hi/demo",
+    });
+    const deps = createDeps(
+      {
+        readLeadEmailControls: vi.fn(async () => cloudflareLeadEmailControls()),
+      },
+      ledger,
+    );
+
+    await processFollowupQueueBatch({ messages: [message] }, deps);
+
+    const [, sent] = vi.mocked(deps.sendEmail).mock.calls[0]!;
+    expect(sent.inReplyTo).toBeUndefined();
+    expect(sent.references).toBeUndefined();
+    expect(message.ack).toHaveBeenCalledOnce();
+  });
+
+  it("never calls send when Cloudflare From is unset; visitor retries then permanent failure", async () => {
+    const send = vi.fn();
+    const depsUnset = createDeps({
+      readLeadEmailControls: vi.fn(async () => cloudflareLeadEmailControls()),
+      outboundFrom: {
+        ownerFromEmail: "hello@we-met.link",
+        cloudflareFromEmail: undefined,
+      },
+      sendEmail: send,
+    });
+    const msgRetry = createMessage(visitorBody(), { attempts: 3 });
+    await processFollowupQueueBatch({ messages: [msgRetry] }, depsUnset);
+    expect(send).not.toHaveBeenCalled();
+    expect(msgRetry.retry).toHaveBeenCalledOnce();
+    expect(depsUnset.logVisitorFollowupAttemptFailure).toHaveBeenCalledWith(
+      "lead-1",
+      3,
+      {
+        code: "cloudflare_from_email_missing",
+        secretName: "WE_MET_EMAIL_FROM_CLOUDFLARE",
+      },
+      true,
+    );
+
+    const msgFinal = createMessage(visitorBody(), {
+      attempts: MAX_VISITOR_FOLLOWUP_ATTEMPTS,
+    });
+    const depsFinal = createDeps({
+      readLeadEmailControls: vi.fn(async () => cloudflareLeadEmailControls()),
+      outboundFrom: { ownerFromEmail: "hello@we-met.link", cloudflareFromEmail: "" },
+      sendEmail: send,
+    });
+    await processFollowupQueueBatch({ messages: [msgFinal] }, depsFinal);
+    expect(send).not.toHaveBeenCalled();
+    expect(msgFinal.ack).toHaveBeenCalledOnce();
+    expect(depsFinal.logVisitorFollowupPermanentFailure).toHaveBeenCalledWith(
+      "lead-1",
+      {
+        code: "cloudflare_from_email_missing",
+        secretName: "WE_MET_EMAIL_FROM_CLOUDFLARE",
+      },
+    );
+  });
+
+  it("never calls send when Cloudflare From is unset; sink retries then marks ledger failed", async () => {
+    const ledger = new MemoryConsumerLeadDeliveryLedger();
+    ledger.seedQueued("lead-1", "sink-1", "record");
+    const send = vi.fn();
+    const message = createMessage(sinkRecordBody(), { attempts: 3 });
+    const deps = createDeps(
+      {
+        readLeadEmailControls: vi.fn(async () => cloudflareLeadEmailControls()),
+        outboundFrom: {
+          ownerFromEmail: "hello@we-met.link",
+          cloudflareFromEmail: undefined,
+        },
+        sendEmail: send,
+      },
+      ledger,
+    );
+
+    await processFollowupQueueBatch({ messages: [message] }, deps);
+
+    expect(send).not.toHaveBeenCalled();
+    expect(message.retry).toHaveBeenCalledOnce();
+
+    const finalMessage = createMessage(sinkRecordBody(), {
+      attempts: MAX_VISITOR_FOLLOWUP_ATTEMPTS,
+    });
+    await processFollowupQueueBatch({ messages: [finalMessage] }, deps);
+    expect(send).not.toHaveBeenCalled();
+    expect(finalMessage.ack).toHaveBeenCalledOnce();
+    expect(ledger.getRowState("lead-1", "sink-1", "record")?.status).toBe("failed");
+    expect(ledger.getRowState("lead-1", "sink-1", "record")?.errorCode).toBe(
+      "cloudflare_from_email_missing",
+    );
+  });
+
+  it("marks sink failed without retry on permanent Cloudflare binding error", async () => {
+    const ledger = new MemoryConsumerLeadDeliveryLedger();
+    ledger.seedQueued("lead-1", "sink-1", "record");
+    const message = createMessage(sinkRecordBody());
+    const deps = createDeps(
+      {
+        readLeadEmailControls: vi.fn(async () => cloudflareLeadEmailControls()),
+        sendEmail: vi.fn(async () => {
+          throw new FollowupEmailError("cloudflare_E_CONTENT_TOO_LARGE");
+        }),
+      },
+      ledger,
+    );
+
+    await processFollowupQueueBatch({ messages: [message] }, deps);
+
+    expect(message.ack).toHaveBeenCalledOnce();
+    expect(message.retry).not.toHaveBeenCalled();
+    expect(ledger.getRowState("lead-1", "sink-1", "record")?.status).toBe("failed");
+    expect(ledger.getRowState("lead-1", "sink-1", "record")?.errorCode).toBe(
+      "cloudflare_E_CONTENT_TOO_LARGE",
+    );
+  });
+
+  it("threads lead_sink_append_details with Cloudflare record messageId", async () => {
+    const ledger = new MemoryConsumerLeadDeliveryLedger();
+    ledger.seedSent(
+      "lead-1",
+      "sink-1",
+      "record",
+      JSON.stringify({
+        provider: "cloudflare",
+        messageId: "<record@mail.we-met.link>",
+      }),
+    );
+    ledger.seedQueued("lead-1", "sink-1", "append");
+    const message = createMessage({
+      type: "lead_sink_append_details",
+      sinkId: "sink-1",
+      sinkKind: "email",
+      sinkConfig: { to: "owner@example.com" },
+      lead: {
+        leadId: "lead-1",
+        name: "Alex Visitor",
+        email: "visitor@example.com",
+      },
+      details: { jobTitle: "CEO", company: null, note: null },
+      detailsSubmittedAt: "2026-10-12T01:00:00.000Z",
+      cardId: "card-1",
+      cardSlug: "demo",
+      sourceUrl: "https://we-met.link/hi/demo",
+    });
+    const deps = createDeps(
+      {
+        readLeadEmailControls: vi.fn(async () => ({
+          leadEmailEnabled: true,
+          emailProvider: "cloudflare" as const,
+          dailyCapGlobal: 150,
+          dailyCapPerCard: 50,
+        })),
+      },
+      ledger,
+    );
+
+    await processFollowupQueueBatch({ messages: [message] }, deps);
+
+    expect(deps.sendEmail).toHaveBeenCalledOnce();
+    const [provider, sent] = vi.mocked(deps.sendEmail).mock.calls[0];
+    expect(provider).toBe("cloudflare");
+    expect(sent.from).toBe("hello@mail.we-met.link");
+    expect(sent.inReplyTo).toBe("<record@mail.we-met.link>");
+    expect(sent.references).toBe("<record@mail.we-met.link>");
+    expect(sent.threadId).toBeUndefined();
+    expect(sent.messageId).toBeUndefined();
+    expect(message.ack).toHaveBeenCalledOnce();
+  });
+
+  it("acks visitor follow-up on permanent Cloudflare recipient suppression", async () => {
+    const message = createMessage(visitorBody(), { attempts: 2 });
+    const deps = createDeps({
+      sendEmail: vi.fn(async () => {
+        throw new FollowupEmailError("cloudflare_E_RECIPIENT_SUPPRESSED");
+      }),
+    });
+
+    await processFollowupQueueBatch({ messages: [message] }, deps);
+
+    expect(deps.logVisitorFollowupPermanentFailure).toHaveBeenCalledWith("lead-1", {
+      code: "cloudflare_E_RECIPIENT_SUPPRESSED",
+    });
+    expect(message.ack).toHaveBeenCalledOnce();
+    expect(message.retry).not.toHaveBeenCalled();
   });
 });

@@ -23,6 +23,12 @@
       "bucket_name": "we-met-assets-nonprod",
     },
   ],
+  "send_email": [
+    {
+      "name": "EMAIL",
+      "allowed_sender_addresses": ["hello@mail.we-met.link"],
+    },
+  ],
   "queues": {
     "consumers": [
       {

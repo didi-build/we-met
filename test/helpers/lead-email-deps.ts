@@ -5,6 +5,13 @@ export const leadEmailCapacityAlwaysAllowed = {
   incrementDailySendCounts: vi.fn(async () => {}),
 };
 
+export const defaultLeadEmailControls = {
+  leadEmailEnabled: true,
+  emailProvider: "gmail" as const,
+  dailyCapGlobal: 150,
+  dailyCapPerCard: 50,
+};
+
 export const leadEmailConsumerEnabled = {
-  isLeadEmailEnabled: vi.fn(async () => true),
+  readLeadEmailControls: vi.fn(async () => defaultLeadEmailControls),
 };

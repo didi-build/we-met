@@ -28,6 +28,7 @@ describe("lead email caps (unit)", () => {
   it("fails closed when caps are missing or invalid", () => {
     const controls = {
       leadEmailEnabled: true,
+      emailProvider: "gmail" as const,
       dailyCapGlobal: null,
       dailyCapPerCard: 100,
     };
@@ -39,6 +40,7 @@ describe("lead email caps (unit)", () => {
   it("rejects when switch is off without revealing which limit", () => {
     const controls = {
       leadEmailEnabled: false,
+      emailProvider: "gmail" as const,
       dailyCapGlobal: 500,
       dailyCapPerCard: 100,
     };
@@ -50,6 +52,7 @@ describe("lead email caps (unit)", () => {
   it("exchange needs two slots; details needs one", () => {
     const controls = {
       leadEmailEnabled: true,
+      emailProvider: "gmail" as const,
       dailyCapGlobal: 500,
       dailyCapPerCard: 10,
     };

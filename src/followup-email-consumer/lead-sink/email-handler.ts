@@ -5,12 +5,16 @@ import {
   buildOwnerLeadRecordMessageId,
 } from "@/email/format-owner-lead-email";
 import { resolveFromDisplayName } from "@/email/from-display-name";
+import type { EmailProvider } from "@/email/email-provider";
 import { FollowupEmailError } from "@/email/followup-email-error";
-import { resolveOwnerFromEmail } from "@/email/owner-from";
 import { parseEmailSinkConfig } from "@/email/parse-email-sink-config";
+import {
+  resolveOutboundFromEmail,
+  type OutboundFromSecrets,
+} from "@/email/resolve-outbound-from";
 import { resolveSinkEmailRecipient } from "@/email/recipient";
 import { sanitizeEmailHeaderValue } from "@/email/mime-headers";
-import type { EmailSender } from "@/email/types";
+import type { EmailSendResult, OutboundEmail } from "@/email/types";
 import type {
   LeadSinkHandler,
   ParsedLeadSinkAppendMessage,
@@ -20,13 +24,16 @@ import type {
 export type EmailLeadSinkHandlerDeps = {
   weMetEnv: string;
   testMailTo?: string;
-  ownerFromEmail?: string;
+  outboundFrom: OutboundFromSecrets;
   fromDisplayName?: string;
-  emailSender: EmailSender;
+  sendEmail: (
+    provider: EmailProvider,
+    message: OutboundEmail,
+  ) => Promise<EmailSendResult>;
   logMalformedLeadSink(leadId: string): void;
 };
 
-function emailExternalRef(
+function gmailExternalRef(
   gmailMessageId: string | null,
   gmailThreadId: string | null,
 ): string {
@@ -36,20 +43,38 @@ function emailExternalRef(
   });
 }
 
+function cloudflareExternalRef(messageId: string | null): string {
+  return JSON.stringify({
+    provider: "cloudflare",
+    messageId,
+  });
+}
+
+function externalRefForProvider(
+  provider: EmailProvider,
+  sendResult: EmailSendResult,
+): string {
+  if (provider === "cloudflare") {
+    return cloudflareExternalRef(sendResult.messageId);
+  }
+  return gmailExternalRef(sendResult.messageId, sendResult.threadId);
+}
+
 export function createEmailLeadSinkHandler(
   deps: EmailLeadSinkHandlerDeps,
 ): LeadSinkHandler {
   return {
     appendRequiresRecord: false,
 
-    async deliverRecord(message: ParsedLeadSinkRecordMessage) {
+    async deliverRecord(message: ParsedLeadSinkRecordMessage, ctx) {
       const sinkConfig = parseEmailSinkConfig(message.sinkConfig);
       if (!sinkConfig) {
         deps.logMalformedLeadSink(message.lead.leadId);
         throw new FollowupEmailError("malformed_sink_email_config");
       }
 
-      const ownerFrom = resolveOwnerFromEmail(deps.ownerFromEmail);
+      const provider = ctx.emailProvider;
+      const ownerFrom = resolveOutboundFromEmail(provider, deps.outboundFrom);
       const recipient = resolveSinkEmailRecipient({
         weMetEnv: deps.weMetEnv,
         sinkDestinationEmail: sinkConfig.to,
@@ -67,14 +92,8 @@ export function createEmailLeadSinkHandler(
         nonProdSinkDestinationLabel: nonProdLabel,
       });
 
-      const messageId = buildOwnerLeadRecordMessageId(
-        message.lead.leadId,
-        message.sinkId,
-        ownerFrom,
-      );
-
       const fromDisplayName = resolveFromDisplayName(deps.fromDisplayName);
-      const sendResult = await deps.emailSender.send({
+      const outbound: OutboundEmail = {
         from: ownerFrom,
         fromDisplayName,
         to: recipient.to,
@@ -82,11 +101,20 @@ export function createEmailLeadSinkHandler(
         subject: content.subject,
         textPlain: content.textPlain,
         textHtml: content.textHtml,
-        messageId,
-      });
+      };
+
+      if (provider === "gmail") {
+        outbound.messageId = buildOwnerLeadRecordMessageId(
+          message.lead.leadId,
+          message.sinkId,
+          ownerFrom,
+        );
+      }
+
+      const sendResult = await deps.sendEmail(provider, outbound);
 
       return {
-        externalRef: emailExternalRef(sendResult.messageId, sendResult.threadId),
+        externalRef: externalRefForProvider(provider, sendResult),
       };
     },
 
@@ -97,7 +125,8 @@ export function createEmailLeadSinkHandler(
         throw new FollowupEmailError("malformed_sink_email_config");
       }
 
-      const ownerFrom = resolveOwnerFromEmail(deps.ownerFromEmail);
+      const provider = ctx.emailProvider;
+      const ownerFrom = resolveOutboundFromEmail(provider, deps.outboundFrom);
       const recipient = resolveSinkEmailRecipient({
         weMetEnv: deps.weMetEnv,
         sinkDestinationEmail: sinkConfig.to,
@@ -115,27 +144,8 @@ export function createEmailLeadSinkHandler(
         nonProdSinkDestinationLabel: nonProdLabel,
       });
 
-      const recordMessageId =
-        ctx.recordRef !== null
-          ? buildOwnerLeadRecordMessageId(
-              message.lead.leadId,
-              message.sinkId,
-              ownerFrom,
-            )
-          : undefined;
-      const threadId =
-        ctx.recordRef !== null && typeof ctx.recordRef.gmailThreadId === "string"
-          ? ctx.recordRef.gmailThreadId
-          : undefined;
-
-      const appendMessageId = buildOwnerLeadAppendMessageId(
-        message.lead.leadId,
-        message.sinkId,
-        ownerFrom,
-      );
-
       const fromDisplayName = resolveFromDisplayName(deps.fromDisplayName);
-      const sendResult = await deps.emailSender.send({
+      const outbound: OutboundEmail = {
         from: ownerFrom,
         fromDisplayName,
         to: recipient.to,
@@ -143,15 +153,47 @@ export function createEmailLeadSinkHandler(
         subject: content.subject,
         textPlain: content.textPlain,
         textHtml: content.textHtml,
-        messageId: appendMessageId,
-        ...(recordMessageId
-          ? { inReplyTo: recordMessageId, references: recordMessageId }
-          : {}),
-        ...(threadId ? { threadId } : {}),
-      });
+      };
+
+      if (provider === "gmail") {
+        const recordMessageId =
+          ctx.recordRef !== null
+            ? buildOwnerLeadRecordMessageId(
+                message.lead.leadId,
+                message.sinkId,
+                ownerFrom,
+              )
+            : undefined;
+        const threadId =
+          ctx.recordRef !== null && typeof ctx.recordRef.gmailThreadId === "string"
+            ? ctx.recordRef.gmailThreadId
+            : undefined;
+
+        outbound.messageId = buildOwnerLeadAppendMessageId(
+          message.lead.leadId,
+          message.sinkId,
+          ownerFrom,
+        );
+        if (recordMessageId) {
+          outbound.inReplyTo = recordMessageId;
+          outbound.references = recordMessageId;
+        }
+        if (threadId) {
+          outbound.threadId = threadId;
+        }
+      } else if (ctx.recordRef !== null) {
+        const recordMessageId =
+          typeof ctx.recordRef.messageId === "string" ? ctx.recordRef.messageId : null;
+        if (recordMessageId) {
+          outbound.inReplyTo = recordMessageId;
+          outbound.references = recordMessageId;
+        }
+      }
+
+      const sendResult = await deps.sendEmail(provider, outbound);
 
       return {
-        externalRef: emailExternalRef(sendResult.messageId, sendResult.threadId),
+        externalRef: externalRefForProvider(provider, sendResult),
       };
     },
   };

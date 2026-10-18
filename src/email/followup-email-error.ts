@@ -7,9 +7,12 @@ export type FollowupEmailErrorCode =
   | "gmail_network_error"
   | "nonprod_mail_redirect_unset"
   | "owner_from_email_missing"
+  | "cloudflare_from_email_missing"
+  | "cloudflare_binding_missing"
   | "from_display_name_missing"
   | "malformed_sink_email_config"
   | "invalid_rfc5322_message_id"
+  | `cloudflare_${string}`
   | "unknown";
 
 export class FollowupEmailError extends Error {
@@ -43,6 +46,7 @@ export function followupEmailErrorLogFields(
     if (
       (error.code === "gmail_secret_missing" ||
         error.code === "owner_from_email_missing" ||
+        error.code === "cloudflare_from_email_missing" ||
         error.code === "from_display_name_missing") &&
       error.secretName
     ) {
