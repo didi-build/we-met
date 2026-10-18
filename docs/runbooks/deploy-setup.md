@@ -135,6 +135,7 @@ Cloudflare supports **resource-scoped Workers roles** ([Workers granular authori
 | `we-met-ci-nonprod`             | `CLOUDFLARE_API_TOKEN_NONPROD`             | **Workers Editor**, scoped to Worker **`we-met`** only. No zone policy (previews do not touch `we-met.link`). No R2 or Queues permissions initially.                                                                                                                                                                                                                                                                                                                                                                                |
 | `we-met-ci-production`          | `CLOUDFLARE_API_TOKEN_PRODUCTION`          | **Workers Editor** on **`we-met`**, plus account-level **D1 Edit** (dashboard **D1 Write**) for `wrangler d1 migrations apply`, plus a **third policy**: **Specified Domains** → `we-met.link` with **Workers Routes Write** and **Zone Read**. No R2 or Queues initially.                                                                                                                                                                                                                                                          |
 | `we-met-ci-consumer-production` | `CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION` | **Workers Editor** on **`we-met-followup-email-consumer`** only, plus account-level **Queues Edit** (dashboard **Queues** → **Edit**). Wrangler lists queues during deploy (verified **2026-10-14** — first CI consumer deploy failed with `Authentication error [code: 10000]` on queue list until **Queues Edit** was added; D1 was not required despite a D1 binding). Stored only on the GitHub **`production`** environment. Do not widen `we-met-ci-production`. **Not tested:** minimal queue permission vs **Queues Edit**. |
+| `we-met-ci-consumer-nonprod`    | `CLOUDFLARE_API_TOKEN_CONSUMER_NONPROD`    | **Workers Editor** on **`we-met-followup-email-consumer-nonprod`** only, plus account-level **Queues Edit** (same pattern as the production consumer token). Stored only on the GitHub **`consumer-nonprod`** environment. **UNVERIFIED:** whether **Workers Editor** alone is enough for `wrangler secret list` (names only) before deploy; add the permission a 403 names if the first CI run fails.                                                                                                                              |
 | `we-met-ci-migrate-nonprod`     | `CLOUDFLARE_API_TOKEN_MIGRATE_NONPROD`     | **D1 Edit** only (account-level). Verified **2026-10-13:** the Cloudflare token builder only offered account-level D1 (**Entire account**, **D1 Write** and **D1 Read**); no per-database scope was available. One-year expiry; calendar reminder.                                                                                                                                                                                                                                                                                  |
 
 ### GitHub Actions policy (pull_request_target)
@@ -181,13 +182,15 @@ Cloudflare supports **resource-scoped Workers roles** ([Workers granular authori
 
 Add further Cloudflare token permissions **only** when a **403** names them (Cloudflare 403 responses link to the required permission). **Never use Admin as the fix.**
 
-The **non-prod follow-up email consumer** ([DIDI-577](https://linear.app/didi-build/issue/DIDI-577)) deploys **by hand**. The **production** consumer is **hand-deployed once** on `main`, then ongoing deploys run from **Deploy production** ([DIDI-599](https://linear.app/didi-build/issue/DIDI-599)) — see [first-deploy checklist](#production-follow-up-email-consumer-first-deploy-didi-599).
+The **non-prod follow-up email consumer** ([DIDI-577](https://linear.app/didi-build/issue/DIDI-577)) deploys from **`main`** via [**Deploy consumer non-prod**](../../.github/workflows/deploy-consumer-nonprod.yml) ([DIDI-652](https://linear.app/didi-build/issue/DIDI-652)); manual steps below are the **fallback** (for example deploying a PR branch’s consumer to non-prod). The **production** consumer is **hand-deployed once** on `main`, then ongoing deploys run from **Deploy production** ([DIDI-599](https://linear.app/didi-build/issue/DIDI-599)) — see [first-deploy checklist](#production-follow-up-email-consumer-first-deploy-didi-599).
 
 Details and caveats: [0017](../decisions/0017-cloudflare-api-credentials.md).
 
-### Non-prod follow-up email consumer (manual, after DIDI-577)
+### Non-prod follow-up email consumer (CI default; manual fallback)
 
-Use **`npx wrangler login`** (OAuth). From the repo root. **Never** export `WE_MET_D1_DATABASE_ID_PRODUCTION` in this shell.
+**Default:** every push to **`main`** runs **Deploy consumer non-prod** (no path filter; the consumer bundles shared email code). The job uses GitHub environment **`consumer-nonprod`**, checks required Worker **secret names** (never values), then `wrangler deploy` with commit SHA in **`--message`** and **`--tag`**. It does **not** run `wrangler secret put`.
+
+**Manual fallback** (PR branch or when CI is unavailable): use **`npx wrangler login`** (OAuth). From the repo root. **Never** export `WE_MET_D1_DATABASE_ID_PRODUCTION` in this shell.
 
 ```bash
 export WE_MET_D1_DATABASE_ID_NONPROD='<nonprod-db-uuid>'
@@ -270,6 +273,9 @@ After the production follow-up email consumer shipped (**2026-10-14**), the firs
 5. **`production` environment variables:** `WE_MET_D1_DATABASE_ID_PRODUCTION`, `WE_MET_TURNSTILE_SITE_KEY_PRODUCTION` (widget **we-met production**).
 6. Create the **`migrate-nonprod`** environment with yourself as required reviewer. **Deployment branches:** **`main` only**. Turn **Prevent self-review** **off** (you are the only reviewer; runs you push must still be approvable). Add:
    - **Secret:** `CLOUDFLARE_API_TOKEN_MIGRATE_NONPROD` (from `we-met-ci-migrate-nonprod`; **never** as a repository or organization secret)
+   - **Variable:** `WE_MET_D1_DATABASE_ID_NONPROD` (same value as `preview`)
+7. Create the **`consumer-nonprod`** environment: **no** required reviewers (non-prod, like `preview`). **Deployment branches:** **`main` only**. Add:
+   - **Secret:** `CLOUDFLARE_API_TOKEN_CONSUMER_NONPROD` (from `we-met-ci-consumer-nonprod`)
    - **Variable:** `WE_MET_D1_DATABASE_ID_NONPROD` (same value as `preview`)
 
 Remove or rename any legacy unsuffixed `CLOUDFLARE_API_TOKEN` secrets. Do **not** duplicate `CLOUDFLARE_ACCOUNT_ID` on the `preview` or `production` environments unless you intentionally use a different account (the repo uses one repo-level `CLOUDFLARE_ACCOUNT_ID` for both workflows).

@@ -43,6 +43,18 @@
 - **Failure mode:** If the app deploy succeeds but the **consumer** deploy fails, production **`we-met`** stays on the new version while the follow-up queue may still lack a healthy consumer. Recovery: fix the failure and **re-run the full Deploy production job** (still requires `production` approval); the job re-runs app migrations, app deploy, and consumer deploy together.
 - **Manual re-run:** Actions → **Deploy production** → Re-run failed jobs (still requires `production` approval when the environment is used).
 
+## Non-prod follow-up email consumer (merge to `main`, no approval)
+
+- **Workflow:** [Deploy consumer non-prod](../../.github/workflows/deploy-consumer-nonprod.yml) (`name: Deploy consumer non-prod`).
+- **Trigger:** Push to **`main`** (every push; no path filter, because the consumer bundles shared email code) or **`workflow_dispatch`** on **`main`** only (GitHub environment **Deployment branches** restrict secrets to `main`; the job also checks `github.ref == 'refs/heads/main'`).
+- **Ordering vs CI:** Uses a direct **`push`** to `main`, same pattern as **Deploy production** (not `workflow_run` after CI). PRs still gate changes with `npm run check`; this workflow ships the non-prod consumer without waiting for the CI workflow on the same push.
+- **Environment:** GitHub **`consumer-nonprod`** (no required reviewers). **`WE_MET_D1_DATABASE_ID_PRODUCTION` is never set** in this job.
+- **Steps:** `npm ci` → prepare `wrangler.nonprod.ci.jsonc` → `npm run deploy:guards` → consumer deploy-time guards on the generated config → `npm run worker:consumer-dry-run:nonprod` → `wrangler secret list` (names only; fails if `GMAIL_SERVICE_ACCOUNT_JSON`, `GMAIL_SENDER`, `WE_MET_OWNER_FROM_EMAIL`, `WE_MET_FROM_DISPLAY_NAME`, or `WE_MET_TEST_MAIL_TO` is missing) → `wrangler deploy` with commit SHA in **`--message`** and **`--tag`**. Does **not** run `wrangler secret put`.
+- **Touches:** Worker **`we-met-followup-email-consumer-nonprod`**; queue **`we-met-followup-email-nonprod`**; shared non-prod D1 and R2 bindings per `workers/we-met-followup-email-consumer/wrangler.nonprod.jsonc`.
+- **Concurrency:** Run-level group `deploy-consumer-nonprod` with `cancel-in-progress: false` (at most one deploy at a time; does not cancel an in-progress run).
+- **Failure mode:** The job fails loudly; fix the error and use **Run workflow** (`workflow_dispatch`) on **`main`** to deploy the current `main` commit — do **not** use **Re-run** on an old Actions run, because a re-run redeploys that run’s original commit, not the latest `main`. Or use the [manual fallback](./deploy-setup.md#non-prod-follow-up-email-consumer-ci-default-manual-fallback).
+- **Manual fallback:** Operator `wrangler login` steps in [deploy-setup.md](./deploy-setup.md#non-prod-follow-up-email-consumer-ci-default-manual-fallback) (for example deploying a PR branch consumer to non-prod).
+
 ## Local / operator commands
 
 ```bash
@@ -65,21 +77,22 @@ Proof deploys before first CI run: [deploy-setup.md](./deploy-setup.md) (maintai
 
 ## GitHub configuration
 
-CI Cloudflare tokens use **Workers Editor** on specific Workers ([0017](../decisions/0017-cloudflare-api-credentials.md)): `we-met-ci-nonprod` → `CLOUDFLARE_API_TOKEN_NONPROD` (**Editor** on **`we-met`** only; no zone policy). `we-met-ci-production` → `CLOUDFLARE_API_TOKEN_PRODUCTION` (**Editor** on **`we-met`**, account-level **D1 Edit** for production migrations, plus zone **`we-met.link`** policy — **Workers Routes Write** + **Zone Read**, verified **2026-10-11**). `we-met-ci-consumer-production` → `CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION` (**Editor** on **`we-met-followup-email-consumer`** only, plus account-level **Queues Edit** — verified **2026-10-14**; first CI consumer deploy failed with `Authentication error [code: 10000]` on queue list until **Queues Edit** was added; D1 was not required). Add further permissions only when a 403 names them (except **Queues Edit** on the consumer token, which is required up front).
+CI Cloudflare tokens use **Workers Editor** on specific Workers ([0017](../decisions/0017-cloudflare-api-credentials.md)): `we-met-ci-nonprod` → `CLOUDFLARE_API_TOKEN_NONPROD` (**Editor** on **`we-met`** only; no zone policy). `we-met-ci-production` → `CLOUDFLARE_API_TOKEN_PRODUCTION` (**Editor** on **`we-met`**, account-level **D1 Edit** for production migrations, plus zone **`we-met.link`** policy — **Workers Routes Write** + **Zone Read**, verified **2026-10-11**). `we-met-ci-consumer-production` → `CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION` (**Editor** on **`we-met-followup-email-consumer`** only, plus account-level **Queues Edit** — verified **2026-10-14**; first CI consumer deploy failed with `Authentication error [code: 10000]` on queue list until **Queues Edit** was added; D1 was not required). `we-met-ci-consumer-nonprod` → `CLOUDFLARE_API_TOKEN_CONSUMER_NONPROD` (**Editor** on **`we-met-followup-email-consumer-nonprod`** only, plus account-level **Queues Edit**). Add further permissions only when a 403 names them (except **Queues Edit** on the consumer tokens, which is required up front).
 
 **Troubleshooting:** `The zone "we-met.link" does not exist on your account [code: 10084]` during production deploy means the CI token lacks zone access on `we-met.link`; see [0017](../decisions/0017-cloudflare-api-credentials.md#token-scoping-cloudflare-2026).
 
-| Name                                       | Where                                                 | Used by                                                         |
-| ------------------------------------------ | ----------------------------------------------------- | --------------------------------------------------------------- |
-| `CLOUDFLARE_ACCOUNT_ID`                    | Repository secret                                     | Preview and production workflows                                |
-| `CLOUDFLARE_API_TOKEN_NONPROD`             | `preview` environment secret                          | Preview workflow                                                |
-| `CLOUDFLARE_API_TOKEN_MIGRATE_NONPROD`     | `migrate-nonprod` environment secret                  | Migrate non-prod D1 workflow (D1 only; names only here)         |
-| `WE_MET_D1_DATABASE_ID_NONPROD`            | `preview` and `migrate-nonprod` environment variables | Preview workflow, migrate workflow, `db:migrate:remote` (local) |
-| `WE_MET_TURNSTILE_SITE_KEY_NONPROD`        | `preview` environment variable                        | Preview build                                                   |
-| `CLOUDFLARE_API_TOKEN_PRODUCTION`          | `production` environment secret                       | Production app deploy and D1 migrations only                    |
-| `CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION` | `production` environment secret                       | Production follow-up email consumer deploy only                 |
-| `WE_MET_D1_DATABASE_ID_PRODUCTION`         | `production` environment variable                     | Production deploy (`prepare` needs only this D1)                |
-| `WE_MET_TURNSTILE_SITE_KEY_PRODUCTION`     | `production` environment variable                     | Production build                                                |
+| Name                                       | Where                                                                      | Used by                                                                        |
+| ------------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `CLOUDFLARE_ACCOUNT_ID`                    | Repository secret                                                          | Preview, consumer non-prod, and production workflows                           |
+| `CLOUDFLARE_API_TOKEN_NONPROD`             | `preview` environment secret                                               | Preview workflow                                                               |
+| `CLOUDFLARE_API_TOKEN_MIGRATE_NONPROD`     | `migrate-nonprod` environment secret                                       | Migrate non-prod D1 workflow (D1 only; names only here)                        |
+| `WE_MET_D1_DATABASE_ID_NONPROD`            | `preview`, `migrate-nonprod`, and `consumer-nonprod` environment variables | Preview, migrate, and non-prod consumer workflows; `db:migrate:remote` (local) |
+| `WE_MET_TURNSTILE_SITE_KEY_NONPROD`        | `preview` environment variable                                             | Preview build                                                                  |
+| `CLOUDFLARE_API_TOKEN_PRODUCTION`          | `production` environment secret                                            | Production app deploy and D1 migrations only                                   |
+| `CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION` | `production` environment secret                                            | Production follow-up email consumer deploy only                                |
+| `CLOUDFLARE_API_TOKEN_CONSUMER_NONPROD`    | `consumer-nonprod` environment secret                                      | Non-prod follow-up email consumer deploy only                                  |
+| `WE_MET_D1_DATABASE_ID_PRODUCTION`         | `production` environment variable                                          | Production deploy (`prepare` needs only this D1)                               |
+| `WE_MET_TURNSTILE_SITE_KEY_PRODUCTION`     | `production` environment variable                                          | Production build                                                               |
 
 Worker secrets (`WE_MET_TOKEN_SECRET`, `TURNSTILE_SECRET_KEY`): set during the maintainer proof deploy in [deploy-setup.md](./deploy-setup.md) (`wrangler login`, then `wrangler secret put` / `wrangler preview base-config secret put`).
 
@@ -93,4 +106,4 @@ Worker secrets (`WE_MET_TOKEN_SECRET`, `TURNSTILE_SECRET_KEY`): set during the m
 - **App Worker:** Cloudflare dashboard → Workers & Pages → **we-met** → Logs (production) or select Preview `pr-<n>`.
 - **Queues:** Workers & Pages → Queues → `we-met-followup-email` / `we-met-followup-email-nonprod`.
 - **Consumers:** Workers **we-met-followup-email-consumer** / **we-met-followup-email-consumer-nonprod** ([DIDI-577](https://linear.app/didi-build/issue/DIDI-577)).
-- **GitHub:** Actions runs for workflows **Preview** and **Deploy production**.
+- **GitHub:** Actions runs for workflows **Preview**, **Deploy consumer non-prod**, and **Deploy production**.
