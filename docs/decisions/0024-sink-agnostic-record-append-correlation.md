@@ -17,7 +17,7 @@ ADR 0018 requires every sink kind to implement record lead and append details. T
 5. **`appendRequiresRecord`:** per handler flag. When `true`, append fails with `record_unavailable` if the record row is missing, `failed`, or still `queued` on the final queue attempt. When `false` (email), append still runs with `recordRef: null` (unthreaded).
 6. **Append waits for record:** while the record row is `queued` and retries remain, append **defers** (`message.retry`, log `lead_sink_append_deferred`). Deferral is not a failure.
 7. **Invalid `externalRef` after send:** log `ledger_update_failed` with `external_ref_invalid`, store `null`, **ack** (no resend).
-8. **Email handler** stores `{ "gmailThreadId", "gmailMessageId" }` in `externalRef` and uses `recordRef.gmailThreadId` as Gmail `threadId` on append. Deterministic `Message-ID`, `In-Reply-To`, `References`, subjects, From, and templates stay unchanged ([0023](./0023-owner-email-lead-sink-consumer.md)).
+8. **Email handler** stores provider-tagged refs: Gmail `{ "gmailThreadId", "gmailMessageId" }` (deterministic `Message-ID` on send, `threadId` on append); Cloudflare `{ "provider": "cloudflare", "messageId": "<...>" }` using the binding-returned id (no custom `Message-ID`; append sets `In-Reply-To` / `References` from `recordRef.messageId` when present). Gmail-era rows are not translated for Cloudflare threading ([0023](./0023-owner-email-lead-sink-consumer.md), [DIDI-653](https://linear.app/didi-build/issue/DIDI-653)).
 
 ## Reasons
 

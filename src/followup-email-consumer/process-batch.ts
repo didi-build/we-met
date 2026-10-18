@@ -4,15 +4,22 @@ import {
   followupEmailErrorLogFields,
   type FollowupEmailErrorLogFields,
 } from "@/email/followup-email-error";
-import { createGmailEmailSender } from "@/email/gmail-sender";
+import type { EmailProvider } from "@/email/email-provider";
+import {
+  createConsumerOutboundEmailSend,
+  type ConsumerOutboundEmailSend,
+} from "@/email/email-provider";
+import { isRetryableFollowupEmailError } from "@/email/retryable-followup-error";
+import {
+  resolveOutboundFromEmail,
+  type OutboundFromSecrets,
+} from "@/email/resolve-outbound-from";
 import { sanitizeEmailHeaderValue } from "@/email/mime-headers";
 import {
   resolveFromDisplayName,
   resolveVisitorFromDisplayName,
 } from "@/email/from-display-name";
-import { resolveOwnerFromEmail } from "@/email/owner-from";
 import { resolveEmailRecipient } from "@/email/recipient";
-import type { EmailSender } from "@/email/types";
 import {
   buildOwnerVCardAttachment,
   type ReadOnlyR2Assets,
@@ -28,7 +35,7 @@ import { createEmailLeadSinkHandler } from "@/followup-email-consumer/lead-sink/
 import { createLeadSinkHandlerRegistry } from "@/followup-email-consumer/lead-sink/registry";
 import { processLeadSinkQueueMessage } from "@/followup-email-consumer/process-lead-sink";
 import { UnsupportedQueueMessageError } from "@/followup-email-consumer/unsupported-queue-message";
-import { readLeadEmailEnabled } from "@/app-settings/caps";
+import { readLeadEmailControls, type LeadEmailControls } from "@/app-settings/caps";
 import {
   isLeadSinkQueueMessageType,
   isUnsupportedQueueMessageType,
@@ -55,19 +62,22 @@ export type FollowupConsumerEnv = {
   WE_MET_BASE_URL: string;
   GMAIL_SENDER: string;
   GMAIL_SERVICE_ACCOUNT_JSON: string;
+  EMAIL?: import("@/email/cloudflare-sender").CloudflareSendEmailBinding;
   WE_MET_TEST_MAIL_TO?: string;
   WE_MET_OWNER_FROM_EMAIL?: string;
+  WE_MET_EMAIL_FROM_CLOUDFLARE?: string;
   WE_MET_FROM_DISPLAY_NAME?: string;
   WE_MET_ASSETS: R2Bucket;
   WE_MET_DB: D1Database;
 };
 
 export type FollowupConsumerDeps = {
-  isLeadEmailEnabled: () => Promise<boolean>;
+  readLeadEmailControls: () => Promise<LeadEmailControls>;
   weMetEnv: string;
   baseUrl: string;
   testMailTo?: string;
-  emailSender: EmailSender;
+  sendEmail: ConsumerOutboundEmailSend;
+  outboundFrom: OutboundFromSecrets;
   assets: ReadOnlyR2Assets;
   logVisitorFollowupAttemptFailure(
     leadId: string,
@@ -111,7 +121,6 @@ export type FollowupConsumerDeps = {
     import("@/followup-email-consumer/lead-sink/types").LeadSinkHandler
   >;
   ledger: import("@/followup-email-consumer/lead-delivery-ledger").ConsumerLeadDeliveryLedger;
-  ownerFromEmail?: string;
   fromDisplayName?: string;
   now: () => Date;
 };
@@ -120,10 +129,11 @@ export function createFollowupConsumerDepsFromEnv(
   env: FollowupConsumerEnv,
 ): FollowupConsumerDeps {
   const ledger = createConsumerLeadDeliveryLedger(env.WE_MET_DB);
-  const emailSender = createGmailEmailSender({
-    serviceAccountJson: env.GMAIL_SERVICE_ACCOUNT_JSON,
-    senderEmail: env.GMAIL_SENDER,
-  });
+  const sendEmail = createConsumerOutboundEmailSend(env);
+  const outboundFrom: OutboundFromSecrets = {
+    ownerFromEmail: env.WE_MET_OWNER_FROM_EMAIL,
+    cloudflareFromEmail: env.WE_MET_EMAIL_FROM_CLOUDFLARE,
+  };
   const logLedgerRowMissing = (leadId: string, sinkId: string) => {
     console.error("ledger_row_missing", { leadId, sinkId });
   };
@@ -148,11 +158,12 @@ export function createFollowupConsumerDepsFromEnv(
   const { baseUrl } = readWeMetHostConfig(env);
 
   return {
-    isLeadEmailEnabled: () => readLeadEmailEnabled(env.WE_MET_DB),
+    readLeadEmailControls: () => readLeadEmailControls(env.WE_MET_DB),
     weMetEnv: env.WE_MET_ENV,
     baseUrl,
     testMailTo: env.WE_MET_TEST_MAIL_TO,
-    emailSender,
+    sendEmail,
+    outboundFrom,
     assets: createReadOnlyConsumerAssets(env.WE_MET_ASSETS),
     logVisitorFollowupAttemptFailure(leadId, attempt, error, willRetry) {
       console.error("visitor_followup_attempt_failure", {
@@ -214,16 +225,15 @@ export function createFollowupConsumerDepsFromEnv(
       console.error("lead_sink_append_deferred", { leadId, sinkId, attempt });
     },
     ledger,
-    ownerFromEmail: env.WE_MET_OWNER_FROM_EMAIL,
     fromDisplayName: env.WE_MET_FROM_DISPLAY_NAME,
     now,
     sinkHandlers: createLeadSinkHandlerRegistry({
       email: createEmailLeadSinkHandler({
         weMetEnv: env.WE_MET_ENV,
         testMailTo: env.WE_MET_TEST_MAIL_TO,
-        ownerFromEmail: env.WE_MET_OWNER_FROM_EMAIL,
+        outboundFrom,
         fromDisplayName: env.WE_MET_FROM_DISPLAY_NAME,
-        emailSender,
+        sendEmail,
         logMalformedLeadSink(leadId) {
           console.error("lead_sink_malformed", { leadId });
         },
@@ -235,8 +245,9 @@ export function createFollowupConsumerDepsFromEnv(
 async function sendVisitorFollowup(
   message: NonNullable<ReturnType<typeof parseVisitorFollowupMessage>>,
   deps: FollowupConsumerDeps,
+  emailProvider: EmailProvider,
 ): Promise<void> {
-  const ownerFrom = resolveOwnerFromEmail(deps.ownerFromEmail);
+  const ownerFrom = resolveOutboundFromEmail(emailProvider, deps.outboundFrom);
   const platformFromDisplayName = resolveFromDisplayName(deps.fromDisplayName);
   const fromDisplayName = resolveVisitorFromDisplayName(
     message.card.contact.name.given,
@@ -266,7 +277,7 @@ async function sendVisitorFollowup(
     deps,
   );
 
-  await deps.emailSender.send({
+  await deps.sendEmail(emailProvider, {
     from: ownerFrom,
     fromDisplayName,
     to: recipient.to,
@@ -313,17 +324,23 @@ async function processQueueMessage(
     return;
   }
 
-  if (!(await deps.isLeadEmailEnabled())) {
+  const leadEmailControls = await deps.readLeadEmailControls();
+  if (!leadEmailControls.leadEmailEnabled) {
     deps.logVisitorFollowupDroppedPaused(parsed.lead.leadId);
     message.ack();
     return;
   }
 
   try {
-    await sendVisitorFollowup(parsed, deps);
+    await sendVisitorFollowup(parsed, deps, leadEmailControls.emailProvider);
     message.ack();
   } catch (error) {
     const errorFields = followupEmailErrorLogFields(error);
+    if (!isRetryableFollowupEmailError(errorFields.code)) {
+      deps.logVisitorFollowupPermanentFailure(parsed.lead.leadId, errorFields);
+      message.ack();
+      return;
+    }
     const willRetry = message.attempts < MAX_VISITOR_FOLLOWUP_ATTEMPTS;
     deps.logVisitorFollowupAttemptFailure(
       parsed.lead.leadId,

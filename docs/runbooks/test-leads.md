@@ -31,7 +31,8 @@ Use this after changing the mail or consumer path:
 3. Confirm exchange returns **200** and a non-empty signed token; optional details step returns **200**.
 4. Confirm jobs on **`we-met-followup-email-nonprod`**.
 5. Check **`WE_MET_TEST_MAIL_TO`** for redirected **visitor** follow-up mail and **email** sink owner notifications (subject/body label the sink destination in non-prod). **Visitor** follow-up uses `{Google first name} via We Met` when the owner’s Google first name passes validation (example: `Diadem via We Met`); otherwise it falls back to secret **`WE_MET_FROM_DISPLAY_NAME`**. **Owner** sink mail always uses **`WE_MET_FROM_DISPLAY_NAME`** (example: `Diadem at We Met`).
-6. No Linear verification until the Linear sink kind ships.
+6. **Cloudflare provider (optional):** after secrets include **`WE_MET_EMAIL_FROM_CLOUDFLARE`** and the consumer config binds **`EMAIL`**, flip non-prod only: `INSERT INTO app_settings (key, value) VALUES ('email_provider', 'cloudflare') ON CONFLICT(key) DO UPDATE SET value = excluded.value;` on **`we-met-db-nonprod`**. Repeat the exchange; mail should arrive **From** `hello@mail.we-met.link` with the same display-name rules. Owner **record** then **append** should thread in the mailbox using Cloudflare-generated `Message-ID` values (check ledger `external_ref` for `{ "provider": "cloudflare", "messageId": "..." }`). Roll back with `email_provider` = `gmail` before production cutover unless production is intentionally ready.
+7. No Linear verification until the Linear sink kind ships.
 
 ## Deliberate end-to-end test (with Linear sink, step 2+)
 

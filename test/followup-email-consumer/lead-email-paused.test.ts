@@ -55,11 +55,17 @@ describe("lead email kill switch in consumer (unit)", () => {
       { messages: [message] },
       {
         ...leadEmailConsumerEnabled,
-        isLeadEmailEnabled: async () => false,
+        readLeadEmailControls: async () => ({
+          leadEmailEnabled: false,
+          emailProvider: "gmail",
+          dailyCapGlobal: 150,
+          dailyCapPerCard: 50,
+        }),
         weMetEnv: "preview",
         baseUrl: "https://we-met.link",
         testMailTo: "inbox@example.com",
-        emailSender: { send },
+        sendEmail: send,
+        outboundFrom: { ownerFromEmail: "hello@we-met.link" },
         assets: { get: vi.fn() },
         ledger: new MemoryConsumerLeadDeliveryLedger(),
         sinkHandlers: new Map(),
@@ -113,14 +119,19 @@ describe("lead email kill switch in consumer (unit)", () => {
 
     await processLeadSinkQueueMessage(message, {
       ...leadEmailConsumerEnabled,
-      isLeadEmailEnabled: async () => false,
+      readLeadEmailControls: async () => ({
+        leadEmailEnabled: false,
+        emailProvider: "gmail",
+        dailyCapGlobal: 150,
+        dailyCapPerCard: 50,
+      }),
       sinkHandlers: createLeadSinkHandlerRegistry({
         email: createEmailLeadSinkHandler({
           weMetEnv: "preview",
           testMailTo: "inbox@example.com",
-          ownerFromEmail: "hello@we-met.link",
+          outboundFrom: { ownerFromEmail: "hello@we-met.link" },
           fromDisplayName: "We Met",
-          emailSender: { send },
+          sendEmail: send,
           logMalformedLeadSink: vi.fn(),
         }),
       }),
@@ -180,13 +191,14 @@ describe("lead email kill switch in consumer (unit)", () => {
         { messages: [message] },
         {
           ...leadEmailConsumerEnabled,
-          isLeadEmailEnabled: async () => {
+          readLeadEmailControls: async () => {
             throw new Error("d1 unavailable");
           },
           weMetEnv: "preview",
           baseUrl: "https://we-met.link",
           testMailTo: "inbox@example.com",
-          emailSender: { send },
+          sendEmail: send,
+          outboundFrom: { ownerFromEmail: "hello@we-met.link" },
           assets: { get: vi.fn() },
           ledger: new MemoryConsumerLeadDeliveryLedger(),
           sinkHandlers: new Map(),
