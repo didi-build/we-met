@@ -76,9 +76,17 @@ jobs:
                   raw.slice(0, 200),
               );
             };
+            const firstBracket = raw.indexOf('[');
+            const lastBracket = raw.lastIndexOf(']');
+            if (firstBracket === -1 || lastBracket === -1 || lastBracket < firstBracket) {
+              stdoutPreview();
+              console.error('::error::Could not locate a JSON array in wrangler secret list stdout.');
+              process.exit(1);
+            }
+            const jsonText = raw.slice(firstBracket, lastBracket + 1);
             let parsed;
             try {
-              parsed = JSON.parse(raw);
+              parsed = JSON.parse(jsonText);
             } catch {
               stdoutPreview();
               process.exit(1);
