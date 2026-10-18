@@ -32,6 +32,32 @@ INSERT INTO app_settings (key, value) VALUES ('lead_email_enabled', '1')
 
 (`0005` seeds `lead_email_enabled` and `signups_open` when empty; caps are operator-set.)
 
+## Email provider
+
+Flip the follow-up consumer to Cloudflare Email Service:
+
+```sql
+INSERT INTO app_settings (key, value) VALUES ('email_provider', 'cloudflare')
+  ON CONFLICT(key) DO UPDATE SET value = excluded.value;
+```
+
+Rollback to Gmail:
+
+```sql
+INSERT INTO app_settings (key, value) VALUES ('email_provider', 'gmail')
+  ON CONFLICT(key) DO UPDATE SET value = excluded.value;
+```
+
+Read back:
+
+```sql
+SELECT key, value FROM app_settings WHERE key = 'email_provider';
+```
+
+Set `WE_MET_EMAIL_FROM_CLOUDFLARE` on the consumer **before** flipping to `cloudflare`; with provider `cloudflare` and that secret missing, sends fail closed and retry. A missing or unknown `email_provider` value means Gmail, so rollback takes effect on the next message.
+
+`email_provider` is per environment (non-prod and production use separate D1 databases); run these statements against the database you intend to change.
+
 ## Turn kill switch off
 
 ```sql
