@@ -1040,6 +1040,53 @@ describe("processFollowupQueueBatch (unit)", () => {
     expect(message.ack).toHaveBeenCalledOnce();
   });
 
+  it("never calls send when Cloudflare From is malformed; visitor retries then permanent failure", async () => {
+    const send = vi.fn();
+    const depsRetry = createDeps({
+      readLeadEmailControls: vi.fn(async () => cloudflareLeadEmailControls()),
+      outboundFrom: {
+        ownerFromEmail: "hello@we-met.link",
+        cloudflareFromEmail: "not an email",
+      },
+      sendEmail: send,
+    });
+    const msgRetry = createMessage(visitorBody(), { attempts: 3 });
+    await processFollowupQueueBatch({ messages: [msgRetry] }, depsRetry);
+    expect(send).not.toHaveBeenCalled();
+    expect(msgRetry.retry).toHaveBeenCalledOnce();
+    expect(depsRetry.logVisitorFollowupAttemptFailure).toHaveBeenCalledWith(
+      "lead-1",
+      3,
+      {
+        code: "cloudflare_from_email_missing",
+        secretName: "WE_MET_EMAIL_FROM_CLOUDFLARE",
+      },
+      true,
+    );
+
+    const msgFinal = createMessage(visitorBody(), {
+      attempts: MAX_VISITOR_FOLLOWUP_ATTEMPTS,
+    });
+    const depsFinal = createDeps({
+      readLeadEmailControls: vi.fn(async () => cloudflareLeadEmailControls()),
+      outboundFrom: {
+        ownerFromEmail: "hello@we-met.link",
+        cloudflareFromEmail: "a@b.com, c@d.com",
+      },
+      sendEmail: send,
+    });
+    await processFollowupQueueBatch({ messages: [msgFinal] }, depsFinal);
+    expect(send).not.toHaveBeenCalled();
+    expect(msgFinal.ack).toHaveBeenCalledOnce();
+    expect(depsFinal.logVisitorFollowupPermanentFailure).toHaveBeenCalledWith(
+      "lead-1",
+      {
+        code: "cloudflare_from_email_missing",
+        secretName: "WE_MET_EMAIL_FROM_CLOUDFLARE",
+      },
+    );
+  });
+
   it("never calls send when Cloudflare From is unset; visitor retries then permanent failure", async () => {
     const send = vi.fn();
     const depsUnset = createDeps({

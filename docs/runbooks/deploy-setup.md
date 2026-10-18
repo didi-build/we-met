@@ -245,6 +245,19 @@ The first deploy **attaches the consumer to the production queue** and **starts 
 
 **Verified (2026-10-14):** production consumer Worker secrets (`GMAIL_SERVICE_ACCOUNT_JSON`, `GMAIL_SENDER`) **survive** a CI redeploy (both names still present after a successful consumer deploy step).
 
+### Cloudflare email provider secret ([DIDI-653](https://linear.app/didi-build/issue/DIDI-653/we-met-send-email-through-cloudflare-email-service-adapter-provider))
+
+When using the Cloudflare Email Service adapter (`email_provider` = `cloudflare` in D1), set the sending address on the onboarded subdomain (for example `hello@mail.we-met.link`):
+
+```bash
+npx wrangler secret put WE_MET_EMAIL_FROM_CLOUDFLARE --name we-met-followup-email-consumer-nonprod
+npx wrangler secret put WE_MET_EMAIL_FROM_CLOUDFLARE --name we-met-followup-email-consumer
+```
+
+After setup, `npx wrangler secret list --name we-met-followup-email-consumer` shows **five** secret names on production and `npx wrangler secret list --name we-met-followup-email-consumer-nonprod` shows **six** (non-prod includes `WE_MET_TEST_MAIL_TO`). The [first-deploy checklist](#production-follow-up-email-consumer-first-deploy-didi-599) above is a historical record of the original four Gmail secrets; Cloudflare From was added in [DIDI-653](https://linear.app/didi-build/issue/DIDI-653).
+
+To flip `email_provider` or roll back, use the SQL in [kill-switch-and-caps.md](./kill-switch-and-caps.md) instead of repeating it here.
+
 Smoke test: [test-leads.md](./test-leads.md) (exchange on a PR preview → mail at `WE_MET_TEST_MAIL_TO`).
 
 ### First CI run results
