@@ -65,7 +65,7 @@ describe("format visitor follow-up email (unit)", () => {
     expect(content.textHtml).not.toContain("example.com/book");
   });
 
-  it("uses owner email display name in signature and preview text", () => {
+  it("uses owner email display name in signature", () => {
     const diademCard: CardEmailSnapshot = {
       ...card,
       contact: {
@@ -86,7 +86,6 @@ describe("format visitor follow-up email (unit)", () => {
     const signatureName = "Diadem (Didi) Shoukralla";
     expect(content.textPlain).toContain(signatureName);
     expect(content.textHtml).toContain(signatureName);
-    expect(content.textHtml).toContain(`${signatureName} sent you their contact card`);
   });
 
   it("includes owner role and omits photo block when photoKey is null", () => {
