@@ -1,11 +1,6 @@
 {{#if test_sink}}Test delivery (sink destination): {{test_sink}}
 
-{{/if}}We Met: get your own card for free
-https://we-met.link
-
----
-
-Hi {{visitor_first_name}},
+{{/if}}Hi {{visitor_first_name}},
 
 Great meeting you, and thanks for sharing your details with me.
 
@@ -18,5 +13,8 @@ My contact card is attached to this email, so you can save it to your phone in o
 You're getting this because you exchanged contact info at {{card_url}}.
 
 This is the only email you'll get from this exchange unless you reply.
+
+We Met: get your own card for free
+https://we-met.link
 
 Sent with We Met.
