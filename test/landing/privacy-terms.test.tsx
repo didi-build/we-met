@@ -150,7 +150,7 @@ describe("landing privacy section and footer (unit)", () => {
     );
 
     const section = screen.getByRole("region", { name: /note on your emails/i });
-    expect(section.textContent).toContain("operator can technically see them");
+    expect(section.textContent).toContain("Cloudflare Email Service");
     expect(section.textContent).toContain("delivery information");
     expect(section.textContent).toContain("Google account email address");
 

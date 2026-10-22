@@ -53,9 +53,23 @@ export function PrivacyPolicyContent() {
 
       <h2 className="lp-legal-h2">Who can see the emails</h2>
       <p className="lp-body">
-        Emails from We Met are sent through our operator&apos;s mailbox, so the operator
-        can technically see them. We don&apos;t store their contents in our database. We
-        plan to move email sending to a separate service.
+        Emails we send when you use We Met (like contact-exchange notifications) go out
+        in one of two ways, depending on how we operate the service. Both paths are
+        built into We Met today.
+      </p>
+      <p className="lp-body">
+        <em>Gmail (Google).</em> Owner lead notifications and visitor follow-up emails
+        can be sent through a Google mailbox we control, using Google&apos;s Gmail API.
+        Google receives the full message: who it is to and from (including reply
+        addresses), the subject, the text and HTML body, and any attachments (such as
+        contact cards). Our operator can read these messages in that mailbox. We do not
+        keep the text of these emails in our database.
+      </p>
+      <p className="lp-body">
+        <em>Cloudflare Email Service.</em> The same kinds of email can instead be sent
+        through Cloudflare Email Service. Cloudflare receives the same information for
+        delivery: recipients, sender and reply-to addresses, subject, bodies, and
+        attachments. We do not keep the text of these emails in our database.
       </p>
 
       <h2 className="lp-legal-h2">What the people you meet can see</h2>
@@ -78,9 +92,11 @@ export function PrivacyPolicyContent() {
 
       <h2 className="lp-legal-h2">Who we share data with</h2>
       <p className="lp-body">
-        We use Cloudflare to host We Met, store data and pass messages between our
-        systems, and Google to sign you in and send email. We don&apos;t sell personal
-        information and we don&apos;t use it for advertising.
+        We use Cloudflare to host We Met, store data, and pass messages between our
+        systems (including Cloudflare Email Service when that sending path is active).
+        We use Google so you can sign in with Google, and to send email when the Gmail
+        path is active. We don&apos;t sell personal information and we don&apos;t use it
+        for advertising.
       </p>
       <p className="lp-body">
         Cloudflare and Google may process personal information in Canada, the United
