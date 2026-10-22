@@ -53,8 +53,9 @@ export function PrivacyPolicyContent() {
 
       <h2 className="lp-legal-h2">Who can see the emails</h2>
       <p className="lp-body">
-        We send transactional email in one of two ways, depending on how we operate the
-        service. Both paths are built into We Met today.
+        Emails we send when you use We Met (like contact-exchange notifications) go out
+        in one of two ways, depending on how we operate the service. Both paths are
+        built into We Met today.
       </p>
       <p className="lp-body">
         <em>Gmail (Google).</em> Owner lead notifications and visitor follow-up emails

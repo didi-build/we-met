@@ -53,12 +53,13 @@ export function LandingHome({ urls, getStartedLabel }: LandingHomeProps) {
             </h2>
           </div>
           <p className="lp-body">
-            Transactional email is sent through either our operator&apos;s Google
-            mailbox or Cloudflare Email Service; the active provider sees the full
-            message for delivery. We only store delivery information (like whether an
-            email was sent), not the contents of your leads. Anyone you exchange details
-            with also gets your Google account email address, so replies go to it and it
-            is in your contact card. Read our <a href={urls.privacy}>Privacy</a> and{" "}
+            Emails we send when you use We Met (like contact-exchange notifications) go
+            through either our operator&apos;s Google mailbox or Cloudflare Email
+            Service; the active provider sees the full message for delivery. We only
+            store delivery information (like whether an email was sent), not the
+            contents of your leads. Anyone you exchange details with also gets your
+            Google account email address, so replies go to it and it is in your contact
+            card. Read our <a href={urls.privacy}>Privacy</a> and{" "}
             <a href={urls.terms}>Terms</a> pages for more.
           </p>
         </section>
