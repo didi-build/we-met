@@ -1,0 +1,55 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "we-met-warmup-cron",
+  "workers_dev": false,
+  "preview_urls": false,
+  "main": "index.ts",
+  "compatibility_date": "2026-09-24",
+  "compatibility_flags": ["global_fetch_strictly_public"],
+  "triggers": {
+    "crons": ["0 * * * *"],
+  },
+  "send_email": [
+    {
+      "name": "EMAIL",
+      // Placeholder only — must match WARMUP_FROM when Diadem deploys (DIDI-711).
+      "allowed_sender_addresses": ["warmup-sender@example.com"],
+    },
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "WARMUP_STATE",
+      "id": "00000000-0000-0000-0000-000000000000",
+    },
+  ],
+  "queues": {
+    "producers": [
+      {
+        "queue": "we-met-warmup-send-retry",
+        "binding": "WARMUP_SEND_QUEUE",
+      },
+      {
+        "queue": "we-met-warmup-send-dlq",
+        "binding": "WARMUP_DLQ",
+      },
+    ],
+    "consumers": [
+      {
+        "queue": "we-met-warmup-send-retry",
+        "max_batch_size": 1,
+        "max_batch_timeout": 30,
+        "max_retries": 5,
+        "retry_delay": 120,
+        "dead_letter_queue": "we-met-warmup-send-dlq",
+      },
+    ],
+  },
+  "observability": {
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "invocation_logs": true,
+      "persist": true,
+    },
+  },
+}
