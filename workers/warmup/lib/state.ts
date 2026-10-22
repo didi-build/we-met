@@ -3,6 +3,10 @@ import type { WarmupEnv } from "./config";
 export const WARMUP_KV_ENABLED = "enabled";
 export const WARMUP_KV_PAUSED = "paused";
 export const WARMUP_KV_PAUSED_ALERT = "paused_alert";
+export const WARMUP_KV_PAUSED_ALERT_ATTEMPT = "paused_alert_attempt";
+
+/** Cooldown before retrying pause alert after a send or guard write (6 hours). */
+export const WARMUP_ALERT_RETRY_COOLDOWN_SECONDS = 21_600;
 
 export type WarmupPausedState = {
   reason: string;
@@ -25,6 +29,11 @@ export type WarmupPausedReadResult = {
 export type WarmupPausedAlertState = {
   episode: string;
   sentAt: string;
+};
+
+export type WarmupPausedAlertAttemptState = {
+  episode: string;
+  at: string;
 };
 
 function parseWarmupPausedValue(raw: string): WarmupPausedState {
@@ -125,6 +134,46 @@ export async function writeWarmupPausedAlert(
     await kv.put(
       WARMUP_KV_PAUSED_ALERT,
       JSON.stringify({ episode, sentAt } satisfies WarmupPausedAlertState),
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function readWarmupPausedAlertAttempt(
+  kv: KVNamespace,
+): Promise<WarmupPausedAlertAttemptState | null | "read_failed"> {
+  let raw: string | null;
+  try {
+    raw = await kv.get(WARMUP_KV_PAUSED_ALERT_ATTEMPT);
+  } catch {
+    return "read_failed";
+  }
+  if (!raw) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(raw) as WarmupPausedAlertAttemptState;
+    if (typeof parsed.episode === "string" && typeof parsed.at === "string") {
+      return parsed;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export async function writeWarmupPausedAlertAttempt(
+  kv: KVNamespace,
+  episode: string,
+  at: string,
+): Promise<boolean> {
+  try {
+    await kv.put(
+      WARMUP_KV_PAUSED_ALERT_ATTEMPT,
+      JSON.stringify({ episode, at } satisfies WarmupPausedAlertAttemptState),
+      { expirationTtl: WARMUP_ALERT_RETRY_COOLDOWN_SECONDS },
     );
     return true;
   } catch {

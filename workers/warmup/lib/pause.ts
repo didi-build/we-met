@@ -3,8 +3,10 @@ import {
   isWarmupInvalidPausedState,
   readWarmupPaused,
   readWarmupPausedAlert,
+  readWarmupPausedAlertAttempt,
   writeWarmupPaused,
   writeWarmupPausedAlert,
+  writeWarmupPausedAlertAttempt,
   warmupPausedEpisodeId,
   type WarmupPausedState,
 } from "./state";
@@ -53,10 +55,28 @@ export async function deliverPauseAlertIfPending(
   if (alertState?.episode === episode) {
     return false;
   }
+  const attemptState = await readWarmupPausedAlertAttempt(kv);
+  if (attemptState === "read_failed") {
+    console.warn("warmup_pause_alert_attempt_read_failed");
+    return false;
+  }
+  if (attemptState?.episode === episode) {
+    console.log("warmup_pause_alert_cooldown", { episode });
+    return false;
+  }
+  const attemptAt = new Date().toISOString();
+  const guardWritten = await writeWarmupPausedAlertAttempt(kv, episode, attemptAt);
+  if (!guardWritten) {
+    console.error("warmup_pause_alert_guard_write_failed", { episode });
+    return false;
+  }
   const malformed = isWarmupInvalidPausedState(paused.state);
   const sent = await sendWarmupPauseAlert(env, secrets, paused.state, malformed);
   if (sent) {
-    await writeWarmupPausedAlert(kv, episode, new Date().toISOString());
+    const marked = await writeWarmupPausedAlert(kv, episode, new Date().toISOString());
+    if (!marked) {
+      console.error("warmup_pause_alert_mark_failed", { episode });
+    }
   }
   return sent;
 }
