@@ -30,7 +30,7 @@ The machine-readable map is [`data-map.yml`](./data-map.yml).
 
 **Proposed baseline tag after merge (maintainer creates; do not tag in this PR):** `privacy-audit-2026-10-22` at merge commit on `main`.
 
-**Docs reconciliation (DIDI-687):** breach runbook [`docs/runbooks/privacy-breach.md`](../runbooks/privacy-breach.md); privacy page and [`account-deletion.md`](../runbooks/account-deletion.md) aligned to `data-map.yml` (email-path / Cloudflare Email Service copy deferred to DIDI-699).
+**Docs reconciliation (DIDI-687 / DIDI-699):** breach runbook [`docs/runbooks/privacy-breach.md`](../runbooks/privacy-breach.md); privacy page and [`account-deletion.md`](../runbooks/account-deletion.md) aligned to `data-map.yml`, including Gmail and Cloudflare Email Service paths ([`subprocessors.md`](./subprocessors.md)).
 
 ## Map scope note
 
