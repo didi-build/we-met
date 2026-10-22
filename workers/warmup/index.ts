@@ -3,7 +3,13 @@ import {
   type CronRandom,
   type CronTickResult,
 } from "./lib/cron-tick";
+import { processEmailEventsBatch } from "./lib/email-events";
 import { processWarmupQueueBatch } from "./lib/queue-batch";
+import {
+  WARMUP_EMAIL_EVENTS_QUEUE,
+  WARMUP_EMAIL_EVENTS_QUEUE_PLACEHOLDER,
+  WARMUP_SEND_RETRY_QUEUE,
+} from "./lib/queue-names";
 import type { WarmupEnv, WarmupQueueBody } from "./lib/config";
 
 export async function executeWarmupScheduled(
@@ -27,6 +33,25 @@ export async function handleWarmupScheduled(
   }
 }
 
+export async function handleWarmupQueue(
+  batch: MessageBatch<WarmupQueueBody | unknown>,
+  env: WarmupEnv,
+): Promise<void> {
+  const queueName = batch.queue;
+  if (queueName === WARMUP_SEND_RETRY_QUEUE) {
+    await processWarmupQueueBatch(batch as MessageBatch<WarmupQueueBody>, env);
+    return;
+  }
+  if (
+    queueName === WARMUP_EMAIL_EVENTS_QUEUE ||
+    queueName === WARMUP_EMAIL_EVENTS_QUEUE_PLACEHOLDER
+  ) {
+    await processEmailEventsBatch(batch as MessageBatch<unknown>, env);
+    return;
+  }
+  throw new Error(`warmup_unknown_queue:${queueName}`);
+}
+
 const warmupWorker = {
   async scheduled(
     _controller: ScheduledController,
@@ -36,8 +61,11 @@ const warmupWorker = {
     await handleWarmupScheduled(env);
   },
 
-  async queue(batch: MessageBatch<WarmupQueueBody>, env: WarmupEnv): Promise<void> {
-    await processWarmupQueueBatch(batch, env);
+  async queue(
+    batch: MessageBatch<WarmupQueueBody | unknown>,
+    env: WarmupEnv,
+  ): Promise<void> {
+    await handleWarmupQueue(batch, env);
   },
 };
 

@@ -30,6 +30,10 @@
         "queue": "we-met-warmup-send-dlq",
         "binding": "WARMUP_DLQ",
       },
+      {
+        "queue": "we-met-warmup-email-events-dlq",
+        "binding": "WARMUP_EMAIL_EVENTS_DLQ",
+      },
     ],
     "consumers": [
       {
@@ -40,14 +44,21 @@
         "retry_delay": 120,
         "dead_letter_queue": "we-met-warmup-send-dlq",
       },
+      {
+        "queue": "we-met-warmup-email-events",
+        "max_batch_size": 10,
+        "max_batch_timeout": 30,
+        "max_retries": 3,
+        "dead_letter_queue": "we-met-warmup-email-events-dlq",
+      },
     ],
   },
   "observability": {
     "logs": {
       "enabled": true,
       "head_sampling_rate": 1,
-      "invocation_logs": true,
       "persist": true,
+      "invocation_logs": true,
     },
   },
 }

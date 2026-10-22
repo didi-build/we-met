@@ -24,12 +24,19 @@ import {
   PRODUCTION_RESOURCE_MARKERS,
   RATE_LIMIT_BINDINGS,
   WARMUP_KV_PLACEHOLDER_ID,
+  WARMUP_EMAIL_EVENTS_DLQ,
+  WARMUP_EMAIL_EVENTS_DLQ_PLACEHOLDER,
+  WARMUP_EMAIL_EVENTS_QUEUE,
+  WARMUP_EMAIL_EVENTS_QUEUE_PLACEHOLDER,
 } from "./lib/wrangler-placeholders.mjs";
 
 const WARMUP_WORKER_NAME = "we-met-warmup-cron";
 const WARMUP_RETRY_QUEUE = "we-met-warmup-send-retry";
 const WARMUP_DLQ = "we-met-warmup-send-dlq";
 const WARMUP_STATE_BINDING = "WARMUP_STATE";
+const WARMUP_EMAIL_EVENTS_DLQ_BINDING = "WARMUP_EMAIL_EVENTS_DLQ";
+const WARMUP_EMAIL_EVENTS_MAX_RETRIES = 3;
+const WARMUP_EMAIL_EVENTS_MAX_BATCH_SIZE = 10;
 import { previewLoginReachableForWorkerEnv } from "./lib/preview-login-guard.mjs";
 
 function usage() {
@@ -405,14 +412,83 @@ function checkWarmupProduction(config) {
   if (!producerQueues.includes(WARMUP_DLQ)) {
     fail(`warmup must declare queue producer "${WARMUP_DLQ}"`);
   }
-  const consumers = config.queues?.consumers ?? [];
+  const emailEventsProducer = producers.find(
+    (row) => row.binding === WARMUP_EMAIL_EVENTS_DLQ_BINDING,
+  );
+  if (!emailEventsProducer) {
+    fail(
+      `warmup must declare queue producer binding "${WARMUP_EMAIL_EVENTS_DLQ_BINDING}"`,
+    );
+  }
+  const emailEventsDlqQueue =
+    typeof emailEventsProducer.queue === "string"
+      ? emailEventsProducer.queue.trim()
+      : "";
   if (
-    consumers.length !== 1 ||
-    consumers[0].queue !== WARMUP_RETRY_QUEUE ||
-    consumers[0].dead_letter_queue !== WARMUP_DLQ
+    !emailEventsDlqQueue ||
+    emailEventsDlqQueue === WARMUP_EMAIL_EVENTS_DLQ_PLACEHOLDER
   ) {
     fail(
+      `warmup ${WARMUP_EMAIL_EVENTS_DLQ_BINDING} queue must be set to "${WARMUP_EMAIL_EVENTS_DLQ}" (not the placeholder id)`,
+    );
+  }
+  if (emailEventsDlqQueue !== WARMUP_EMAIL_EVENTS_DLQ) {
+    fail(
+      `warmup ${WARMUP_EMAIL_EVENTS_DLQ_BINDING} queue must be "${WARMUP_EMAIL_EVENTS_DLQ}"`,
+    );
+  }
+  const consumers = config.queues?.consumers ?? [];
+  if (consumers.length !== 2) {
+    fail(
+      "warmup must declare exactly two queue consumers (send-retry and email-events)",
+    );
+  }
+  const retryConsumer = consumers.find((row) => row.queue === WARMUP_RETRY_QUEUE);
+  if (!retryConsumer || retryConsumer.dead_letter_queue !== WARMUP_DLQ) {
+    fail(
       `warmup queue consumer must consume "${WARMUP_RETRY_QUEUE}" with dead_letter_queue "${WARMUP_DLQ}"`,
+    );
+  }
+  const emailEventsConsumer = consumers.find(
+    (row) =>
+      row.queue === WARMUP_EMAIL_EVENTS_QUEUE ||
+      row.queue === WARMUP_EMAIL_EVENTS_QUEUE_PLACEHOLDER,
+  );
+  if (!emailEventsConsumer) {
+    fail(`warmup must declare a queue consumer for "${WARMUP_EMAIL_EVENTS_QUEUE}"`);
+  }
+  const emailEventsQueue =
+    typeof emailEventsConsumer.queue === "string"
+      ? emailEventsConsumer.queue.trim()
+      : "";
+  if (!emailEventsQueue || emailEventsQueue === WARMUP_EMAIL_EVENTS_QUEUE_PLACEHOLDER) {
+    fail(
+      `warmup email-events consumer queue must be set to "${WARMUP_EMAIL_EVENTS_QUEUE}" (not the placeholder id)`,
+    );
+  }
+  if (emailEventsQueue !== WARMUP_EMAIL_EVENTS_QUEUE) {
+    fail(`warmup email-events consumer queue must be "${WARMUP_EMAIL_EVENTS_QUEUE}"`);
+  }
+  const emailEventsDlq =
+    typeof emailEventsConsumer.dead_letter_queue === "string"
+      ? emailEventsConsumer.dead_letter_queue.trim()
+      : "";
+  if (!emailEventsDlq || emailEventsDlq === WARMUP_EMAIL_EVENTS_DLQ_PLACEHOLDER) {
+    fail(
+      `warmup email-events dead_letter_queue must be set to "${WARMUP_EMAIL_EVENTS_DLQ}" (not the placeholder id)`,
+    );
+  }
+  if (emailEventsDlq !== WARMUP_EMAIL_EVENTS_DLQ) {
+    fail(`warmup email-events dead_letter_queue must be "${WARMUP_EMAIL_EVENTS_DLQ}"`);
+  }
+  if (emailEventsConsumer.max_retries !== WARMUP_EMAIL_EVENTS_MAX_RETRIES) {
+    fail(
+      `warmup email-events consumer max_retries must be ${WARMUP_EMAIL_EVENTS_MAX_RETRIES}`,
+    );
+  }
+  if (emailEventsConsumer.max_batch_size !== WARMUP_EMAIL_EVENTS_MAX_BATCH_SIZE) {
+    fail(
+      `warmup email-events consumer max_batch_size must be ${WARMUP_EMAIL_EVENTS_MAX_BATCH_SIZE}`,
     );
   }
 }

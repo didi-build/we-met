@@ -22,6 +22,7 @@ export type WarmupEnv = {
   WARMUP_STATE?: KVNamespace;
   WARMUP_SEND_QUEUE?: Queue<WarmupQueueBody>;
   WARMUP_DLQ?: Queue<WarmupDlqBody>;
+  WARMUP_EMAIL_EVENTS_DLQ?: Queue<unknown>;
 };
 
 export type WarmupQueueBody = {

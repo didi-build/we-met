@@ -4,6 +4,9 @@
  */
 const PAUSE_ERROR_CODES = new Set(["E_RECIPIENT_SUPPRESSED", "E_ACCOUNT_SUSPENDED"]);
 
+export const WARMUP_PAUSE_REASON_ASYNC_COMPLAINT = "async_complaint";
+export const WARMUP_PAUSE_REASON_ASYNC_HARD_BOUNCE = "async_hard_bounce";
+
 export function extractEmailSendErrorCode(error: unknown): string | undefined {
   if (error && typeof error === "object") {
     const code = (error as { code?: unknown }).code;

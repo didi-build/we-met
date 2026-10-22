@@ -9,6 +9,14 @@ export const D1_PLACEHOLDER_NONPROD = "00000000-0000-0000-0000-000000000002";
 /** Placeholder KV namespace id in workers/warmup/wrangler.jsonc until production id is committed or injected. */
 export const WARMUP_KV_PLACEHOLDER_ID = "00000000-0000-0000-0000-000000000000";
 
+/** Placeholder queue names in workers/warmup/wrangler.jsonc until DIDI-721 provisions Email Sending subscriptions. */
+export const WARMUP_EMAIL_EVENTS_QUEUE = "we-met-warmup-email-events";
+export const WARMUP_EMAIL_EVENTS_DLQ = "we-met-warmup-email-events-dlq";
+export const WARMUP_EMAIL_EVENTS_QUEUE_PLACEHOLDER =
+  "00000000-0000-0000-0000-000000000003";
+export const WARMUP_EMAIL_EVENTS_DLQ_PLACEHOLDER =
+  "00000000-0000-0000-0000-000000000004";
+
 export const PRODUCTION_APP_HOST = "app.we-met.link";
 
 export const PRODUCTION_RESOURCE_MARKERS = {

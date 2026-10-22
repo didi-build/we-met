@@ -424,6 +424,22 @@ describe("check-deploy-guards (unit)", () => {
     expect(result.stderr).toContain("zero placeholder");
   });
 
+  it("fails warmup-production when email-events queue names are still placeholders", () => {
+    const path = writeTempWarmupConfig((config) => {
+      const consumers = config.queues as { consumers: { queue: string }[] };
+      const emailConsumer = consumers.consumers.find(
+        (row) => row.queue === "we-met-warmup-email-events",
+      );
+      if (emailConsumer) {
+        emailConsumer.queue = "00000000-0000-0000-0000-000000000003";
+      }
+    });
+    const result = runGuards("warmup-production", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("email-events");
+    expect(result.stderr).toContain("placeholder");
+  });
+
   it("fails consumer-nonprod when vars contain WE_MET_TEST_MAIL_TO key", () => {
     const dir = mkdtempSync(join(tmpdir(), "we-met-consumer-guards-"));
     tempDirs.push(dir);
