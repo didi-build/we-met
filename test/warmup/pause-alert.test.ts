@@ -12,7 +12,7 @@ const secretsEnv = {
 
 describe("warmup auto-pause and alert (unit)", () => {
   it("sets paused and sends exactly one alert on E_RECIPIENT_SUPPRESSED", async () => {
-    const send = vi.fn(async (message: { to: string }) => {
+    const send = vi.fn(async (message: { to: string; from: { email: string } }) => {
       if (message.to === "seed@example.com") {
         const err = new Error("suppressed");
         (err as Error & { code: string }).code = "E_RECIPIENT_SUPPRESSED";
@@ -44,6 +44,9 @@ describe("warmup auto-pause and alert (unit)", () => {
       (call) => call[0].to === "alerts@example.com",
     );
     expect(alertCalls).toHaveLength(1);
+    expect(alertCalls[0][0].from).toEqual({
+      email: "warmup@mail.we-met.link",
+    });
 
     send.mockClear();
     const second = await runWarmupCronTick(env, { unit: () => 0 });

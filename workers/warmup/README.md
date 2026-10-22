@@ -14,23 +14,28 @@ wrangler deploy --config workers/warmup/wrangler.jsonc
 
 Before the first production deploy:
 
-1. **KV**: Create a KV namespace for warmup state (`WARMUP_STATE`). Replace the placeholder `id` under `kv_namespaces` in `wrangler.jsonc` with the real namespace id.
+1. **KV**: Create a KV namespace for warmup state (`WARMUP_STATE`). Replace the placeholder `id` under `kv_namespaces` in `wrangler.jsonc` with the real namespace id (committing that id in git is fine).
 2. **Queues**: Create queues `we-met-warmup-send-retry` and `we-met-warmup-send-dlq` in the Cloudflare account (names must match `wrangler.jsonc`), or rename both in config and in the dashboard consistently.
 
-## Secrets (never commit values)
+## Secrets (names only; never commit values)
+
+`WARMUP_SEEDS`, `WARMUP_FROM`, and `WARMUP_ALERT_TO` are the only sources of mailbox addresses for this Worker. None of those values belong in the repo; CI fails on any non-`@example.com` address under `workers/warmup/` (`npm run warmup-no-emails`).
+
+| Secret            | Role                                                                                                                                                                      |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `WARMUP_SEEDS`    | Comma-separated seed recipients (warmup sends only).                                                                                                                      |
+| `WARMUP_FROM`     | `From` on every outbound message, including pause alerts. Must be on `mail.we-met.link` (see in-code check in `lib/from-address.ts`; not duplicated in `wrangler.jsonc`). |
+| `WARMUP_ALERT_TO` | Recipient for the one-shot email when auto-pause triggers.                                                                                                                |
 
 ```bash
 wrangler secret put WARMUP_SEEDS --config workers/warmup/wrangler.jsonc
-# Comma-separated list of exactly four seed mailbox addresses.
-
 wrangler secret put WARMUP_FROM --config workers/warmup/wrangler.jsonc
-# From address on mail.we-met.link (enforced in Worker code; not stored in the repo).
-
 wrangler secret put WARMUP_ALERT_TO --config workers/warmup/wrangler.jsonc
-# One mailbox that receives a single alert when auto-pause triggers (not stored in the repo).
 ```
 
-If either `WARMUP_SEEDS` or `WARMUP_FROM` is missing or empty, or `WARMUP_FROM` is not on `mail.we-met.link`, the Worker sends nothing. `WARMUP_ALERT_TO` is optional for day-to-day sending; without it, auto-pause still writes KV state but does not email anyone.
+The `send_email` binding in `wrangler.jsonc` is unrestricted (no `allowed_sender_addresses`). Sender domain enforcement stays in code so `WARMUP_FROM` remains a secret.
+
+If `WARMUP_SEEDS` or `WARMUP_FROM` is missing or empty, or `WARMUP_FROM` is not on `mail.we-met.link`, the Worker sends nothing. `WARMUP_ALERT_TO` is optional for day-to-day sending; without it, auto-pause still writes KV state but does not email anyone. When set, alerts are sent with `from` taken from `WARMUP_FROM`, same as seed mail.
 
 ## KV state (`WARMUP_STATE`)
 
