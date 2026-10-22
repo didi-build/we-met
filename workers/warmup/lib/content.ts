@@ -33,10 +33,13 @@ function pick<T>(items: readonly T[], randomUnit: number): T {
   return items[index];
 }
 
-export function buildWarmupContent(randomUnit: number): WarmupContent {
-  const subject = pick(SUBJECTS, randomUnit);
-  const lineA = pick(BODY_LINES, (randomUnit * 0.37) % 1);
-  const lineB = pick(BODY_LINES, (randomUnit * 0.91) % 1);
+export function buildWarmupContent(
+  subjectRandom: number,
+  bodyRandom: number,
+): WarmupContent {
+  const subject = pick(SUBJECTS, subjectRandom);
+  const lineA = pick(BODY_LINES, bodyRandom);
+  const lineB = pick(BODY_LINES, (bodyRandom * 0.91) % 1);
   const text = `${lineA} ${lineB}`;
   const html = `<p>${lineA}</p><p>${lineB}</p>`;
   return { subject, text, html };

@@ -28,7 +28,7 @@ export async function runWarmupCronTick(
   }
 
   const recipient = pickSeedRecipient(secrets.seeds, random.unit());
-  const content = buildWarmupContent(random.unit());
+  const content = buildWarmupContent(random.unit(), random.unit());
   const sendResult = await sendWarmupEmail(env, secrets, {
     to: recipient,
     ...content,

@@ -1,3 +1,5 @@
+import { isAllowedWarmupFromAddress, logInvalidWarmupFrom } from "./from-address";
+
 export type WarmupSecrets = {
   seeds: string[];
   from: string;
@@ -40,6 +42,10 @@ export function parseWarmupSecrets(
   const seedsRaw = env.WARMUP_SEEDS?.trim();
   const from = env.WARMUP_FROM?.trim();
   if (!seedsRaw || !from) {
+    return null;
+  }
+  if (!isAllowedWarmupFromAddress(from)) {
+    logInvalidWarmupFrom(from);
     return null;
   }
   const seeds = seedsRaw

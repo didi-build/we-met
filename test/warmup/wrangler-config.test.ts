@@ -26,6 +26,11 @@ describe("warmup wrangler config (unit)", () => {
     expect(consumer.dead_letter_queue).toBe("we-met-warmup-send-dlq");
   });
 
+  it("does not pin sender addresses in wrangler (WARMUP_FROM secret only)", () => {
+    const sendEmail = config.send_email as Record<string, unknown>[];
+    expect(sendEmail[0]).not.toHaveProperty("allowed_sender_addresses");
+  });
+
   it("binds WARMUP_STATE KV placeholder", () => {
     const kv = (config.kv_namespaces as { binding: string; id: string }[])[0];
     expect(kv.binding).toBe("WARMUP_STATE");

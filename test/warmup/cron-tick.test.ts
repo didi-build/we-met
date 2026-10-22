@@ -17,7 +17,7 @@ describe("warmup cron tick (unit)", () => {
     const send = vi.fn();
     const env: WarmupEnv = {
       WARMUP_SEEDS: "seed@example.com",
-      WARMUP_FROM: "from@example.com",
+      WARMUP_FROM: "warmup@mail.we-met.link",
       EMAIL: { send },
     };
     // Force send attempt with random=0 (send + first seed). Patch via direct send test file instead.
@@ -41,7 +41,7 @@ describe("warmup cron tick (unit)", () => {
     const send = vi.fn(async () => ({ messageId: "m1" }));
     const env: WarmupEnv = {
       WARMUP_SEEDS: "seed@example.com",
-      WARMUP_FROM: "from@example.com",
+      WARMUP_FROM: "warmup@mail.we-met.link",
       EMAIL: { send },
     };
     let n = 0;

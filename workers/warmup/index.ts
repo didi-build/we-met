@@ -1,18 +1,39 @@
-import { runWarmupCronTick } from "./lib/cron-tick";
+import {
+  runWarmupCronTick,
+  type CronRandom,
+  type CronTickResult,
+} from "./lib/cron-tick";
 import { processWarmupQueueBatch } from "./lib/queue-batch";
 import type { WarmupEnv, WarmupQueueBody } from "./lib/config";
+
+export async function executeWarmupScheduled(
+  env: WarmupEnv,
+  random: CronRandom,
+): Promise<CronTickResult> {
+  return runWarmupCronTick(env, random);
+}
+
+export async function handleWarmupScheduled(
+  env: WarmupEnv,
+  random: CronRandom = { unit: () => Math.random() },
+): Promise<void> {
+  try {
+    await executeWarmupScheduled(env, random);
+  } catch (error) {
+    console.error("warmup_scheduled_failed", {
+      error: error instanceof Error ? error.message : "unknown",
+    });
+    throw error;
+  }
+}
 
 const warmupWorker = {
   async scheduled(
     _controller: ScheduledController,
     env: WarmupEnv,
-    ctx: ExecutionContext,
+    _ctx: ExecutionContext,
   ): Promise<void> {
-    ctx.waitUntil(
-      runWarmupCronTick(env, {
-        unit: () => Math.random(),
-      }),
-    );
+    await handleWarmupScheduled(env);
   },
 
   async queue(batch: MessageBatch<WarmupQueueBody>, env: WarmupEnv): Promise<void> {

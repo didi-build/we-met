@@ -9,6 +9,7 @@ import { join } from "node:path";
 const ROOT = "workers/warmup";
 
 const EMAIL_RE = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+const MAILTO_RE = /mailto:([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+)/gi;
 
 function isAllowedEmail(email) {
   const domain = email.split("@")[1]?.toLowerCase() ?? "";
@@ -30,6 +31,9 @@ const offenders = [];
 for (const file of listFiles(ROOT)) {
   const text = readFileSync(file, "utf8");
   const matches = [...text.matchAll(EMAIL_RE)].map((m) => m[0]);
+  for (const mailto of text.matchAll(MAILTO_RE)) {
+    matches.push(mailto[1]);
+  }
   for (const email of matches) {
     if (!isAllowedEmail(email)) {
       offenders.push({ file, email });

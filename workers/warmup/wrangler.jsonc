@@ -12,8 +12,6 @@
   "send_email": [
     {
       "name": "EMAIL",
-      // Placeholder only — must match WARMUP_FROM when Diadem deploys (DIDI-711).
-      "allowed_sender_addresses": ["warmup-sender@example.com"],
     },
   ],
   "kv_namespaces": [
