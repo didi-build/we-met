@@ -2,9 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 import { runWarmupCronTick } from "../../workers/warmup/lib/cron-tick";
 import { parseWarmupSecrets, type WarmupEnv } from "../../workers/warmup/lib/config";
 import { deliverPauseAlertIfPending } from "../../workers/warmup/lib/pause";
+import { processWarmupQueueBatch } from "../../workers/warmup/lib/queue-batch";
 import {
+  WARMUP_ALERT_RETRY_COOLDOWN_SECONDS,
   WARMUP_KV_PAUSED,
   WARMUP_KV_PAUSED_ALERT,
+  WARMUP_KV_PAUSED_ALERT_ATTEMPT,
   warmupPausedEpisodeId,
 } from "../../workers/warmup/lib/state";
 import { warmupKvEnabled } from "./memory-kv";
@@ -65,7 +68,7 @@ describe("warmup auto-pause and alert (unit)", () => {
     expect(send).not.toHaveBeenCalled();
   });
 
-  it("retries the pause alert on later ticks until one succeeds", async () => {
+  it("retries the pause alert after the attempt cooldown when the first send fails", async () => {
     let alertAttempts = 0;
     const send = vi.fn(async (message: { to: string; from: { email: string } }) => {
       if (message.to === "seed@example.com") {
@@ -87,36 +90,47 @@ describe("warmup auto-pause and alert (unit)", () => {
       WARMUP_STATE: kv,
     };
 
-    let n = 0;
-    await runWarmupCronTick(env, {
-      unit: () => {
-        n += 1;
-        return n === 1 ? 0 : 0.1;
-      },
-    });
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-22T12:00:00.000Z"));
+    try {
+      let n = 0;
+      await runWarmupCronTick(env, {
+        unit: () => {
+          n += 1;
+          return n === 1 ? 0 : 0.1;
+        },
+      });
 
-    const afterFirst = JSON.parse((await kv.get(WARMUP_KV_PAUSED))!);
-    expect(afterFirst.alertSent).toBeUndefined();
-    expect(await kv.get(WARMUP_KV_PAUSED_ALERT)).toBeNull();
+      const afterFirst = JSON.parse((await kv.get(WARMUP_KV_PAUSED))!);
+      expect(afterFirst.alertSent).toBeUndefined();
+      expect(await kv.get(WARMUP_KV_PAUSED_ALERT)).toBeNull();
+      expect(await kv.get(WARMUP_KV_PAUSED_ALERT_ATTEMPT)).toBeTruthy();
 
-    const alertCallsAfterPause = send.mock.calls.filter(
-      (call) => call[0].to === "alerts@example.com",
-    );
-    expect(alertCallsAfterPause).toHaveLength(1);
+      const alertCallsAfterPause = send.mock.calls.filter(
+        (call) => call[0].to === "alerts@example.com",
+      );
+      expect(alertCallsAfterPause).toHaveLength(1);
 
-    send.mockClear();
-    const second = await runWarmupCronTick(env, { unit: () => 0 });
-    expect(second.action).toBe("skipped_paused");
-    const alertCallsAfterRetry = send.mock.calls.filter(
-      (call) => call[0].to === "alerts@example.com",
-    );
-    expect(alertCallsAfterRetry).toHaveLength(1);
+      send.mockClear();
+      const second = await runWarmupCronTick(env, { unit: () => 0 });
+      expect(second.action).toBe("skipped_paused");
+      expect(send).not.toHaveBeenCalled();
 
-    expect(await kv.get(WARMUP_KV_PAUSED_ALERT)).toBeTruthy();
+      vi.advanceTimersByTime(WARMUP_ALERT_RETRY_COOLDOWN_SECONDS * 1000 + 1);
+      send.mockClear();
+      await runWarmupCronTick(env, { unit: () => 0 });
+      const alertCallsAfterCooldown = send.mock.calls.filter(
+        (call) => call[0].to === "alerts@example.com",
+      );
+      expect(alertCallsAfterCooldown).toHaveLength(1);
+      expect(await kv.get(WARMUP_KV_PAUSED_ALERT)).toBeTruthy();
 
-    send.mockClear();
-    await runWarmupCronTick(env, { unit: () => 0 });
-    expect(send).not.toHaveBeenCalled();
+      send.mockClear();
+      await runWarmupCronTick(env, { unit: () => 0 });
+      expect(send).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("sends one malformed-pause alert without rewriting the paused key", async () => {
@@ -227,6 +241,133 @@ describe("warmup auto-pause and alert (unit)", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("does not repeat alerts when paused_alert write fails until cooldown expires", async () => {
+    const send = vi.fn(async (message: { to: string }) => {
+      if (message.to === "seed@example.com") {
+        return { messageId: "seed" };
+      }
+      return { messageId: "alert" };
+    });
+    const base = warmupKvEnabled();
+    const pausedJson = JSON.stringify({
+      reason: "manual",
+      at: "2026-10-22T12:00:00.000Z",
+    });
+    await base.put(WARMUP_KV_PAUSED, pausedJson);
+
+    let failPausedAlertWrite = true;
+    const kv = {
+      ...base,
+      put: async (key: string, value: string, options?: { expirationTtl?: number }) => {
+        if (key === WARMUP_KV_PAUSED_ALERT && failPausedAlertWrite) {
+          throw new Error("kv write failed");
+        }
+        return base.put(key, value, options);
+      },
+    } as KVNamespace;
+
+    const env: WarmupEnv = {
+      ...secretsEnv,
+      EMAIL: { send },
+      WARMUP_STATE: kv,
+    };
+    const secrets = parseWarmupSecrets(env);
+    expect(secrets).not.toBeNull();
+
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-22T12:00:00.000Z"));
+    try {
+      const first = await deliverPauseAlertIfPending(env, secrets!);
+      expect(first).toBe(true);
+      expect(await kv.get(WARMUP_KV_PAUSED_ALERT)).toBeNull();
+      expect(await kv.get(WARMUP_KV_PAUSED_ALERT_ATTEMPT)).toBeTruthy();
+      expect(errorLog).toHaveBeenCalledWith("warmup_pause_alert_mark_failed", {
+        episode: await warmupPausedEpisodeId(pausedJson),
+      });
+
+      send.mockClear();
+      for (let i = 0; i < 5; i += 1) {
+        await runWarmupCronTick(env, { unit: () => 0 });
+      }
+      const cronAlertCalls = send.mock.calls.filter(
+        (call) => call[0].to === "alerts@example.com",
+      );
+      expect(cronAlertCalls).toHaveLength(0);
+
+      send.mockClear();
+      const m1 = {
+        id: "q1",
+        attempts: 1,
+        body: {
+          to: "seed@example.com",
+          subject: "s",
+          text: "t",
+          html: "<p>t</p>",
+          attempt: 1,
+        },
+        ack: vi.fn(),
+        retry: vi.fn(),
+      };
+      await processWarmupQueueBatch({ messages: [m1] }, env);
+      expect(
+        send.mock.calls.filter((call) => call[0].to === "alerts@example.com"),
+      ).toHaveLength(0);
+
+      failPausedAlertWrite = false;
+      vi.advanceTimersByTime(WARMUP_ALERT_RETRY_COOLDOWN_SECONDS * 1000 + 1);
+      send.mockClear();
+      const afterCooldown = await deliverPauseAlertIfPending(env, secrets!);
+      expect(afterCooldown).toBe(true);
+      expect(await kv.get(WARMUP_KV_PAUSED_ALERT)).toBeTruthy();
+      const retryCalls = send.mock.calls.filter(
+        (call) => call[0].to === "alerts@example.com",
+      );
+      expect(retryCalls).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+      errorLog.mockRestore();
+    }
+  });
+
+  it("does not send when paused_alert_attempt guard write fails", async () => {
+    const send = vi.fn(async () => ({ messageId: "alert" }));
+    const base = warmupKvEnabled();
+    await base.put(
+      WARMUP_KV_PAUSED,
+      JSON.stringify({ reason: "manual", at: "2020-01-01T00:00:00.000Z" }),
+    );
+
+    const kv = {
+      ...base,
+      put: async (key: string, value: string, options?: { expirationTtl?: number }) => {
+        if (key === WARMUP_KV_PAUSED_ALERT_ATTEMPT) {
+          throw new Error("kv full");
+        }
+        return base.put(key, value, options);
+      },
+    } as KVNamespace;
+
+    const env: WarmupEnv = {
+      ...secretsEnv,
+      EMAIL: { send },
+      WARMUP_STATE: kv,
+    };
+    const secrets = parseWarmupSecrets(env);
+    expect(secrets).not.toBeNull();
+
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+    const sent = await deliverPauseAlertIfPending(env, secrets!);
+    expect(sent).toBe(false);
+    expect(send).not.toHaveBeenCalled();
+    expect(errorLog).toHaveBeenCalledWith(
+      "warmup_pause_alert_guard_write_failed",
+      expect.objectContaining({ episode: expect.any(String) }),
+    );
+    errorLog.mockRestore();
   });
 
   it("skips alert when paused_alert KV read fails", async () => {
