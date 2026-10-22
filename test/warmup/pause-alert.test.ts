@@ -187,33 +187,46 @@ describe("warmup auto-pause and alert (unit)", () => {
       WARMUP_STATE: kv,
     };
 
-    let n = 0;
-    await runWarmupCronTick(env, {
-      unit: () => {
-        n += 1;
-        return n === 1 ? 0 : 0.1;
-      },
-    });
-    const firstEpisode = await kv.get(WARMUP_KV_PAUSED_ALERT);
-    expect(firstEpisode).toBeTruthy();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-22T12:00:00.000Z"));
+    try {
+      let n = 0;
+      await runWarmupCronTick(env, {
+        unit: () => {
+          n += 1;
+          return n === 1 ? 0 : 0.1;
+        },
+      });
+      const firstPausedRaw = await kv.get(WARMUP_KV_PAUSED);
+      expect(firstPausedRaw).toBeTruthy();
+      const firstEpisode = await kv.get(WARMUP_KV_PAUSED_ALERT);
+      expect(firstEpisode).toBeTruthy();
 
-    await kv.delete(WARMUP_KV_PAUSED);
-    send.mockClear();
-    n = 0;
-    await runWarmupCronTick(env, {
-      unit: () => {
-        n += 1;
-        return n === 1 ? 0 : 0.1;
-      },
-    });
+      await kv.delete(WARMUP_KV_PAUSED);
+      send.mockClear();
+      vi.setSystemTime(new Date("2026-10-22T12:00:01.000Z"));
+      n = 0;
+      await runWarmupCronTick(env, {
+        unit: () => {
+          n += 1;
+          return n === 1 ? 0 : 0.1;
+        },
+      });
 
-    const secondEpisode = await kv.get(WARMUP_KV_PAUSED_ALERT);
-    expect(secondEpisode).toBeTruthy();
-    expect(secondEpisode).not.toBe(firstEpisode);
-    const alertCalls = send.mock.calls.filter(
-      (call) => call[0].to === "alerts@example.com",
-    );
-    expect(alertCalls).toHaveLength(1);
+      const secondPausedRaw = await kv.get(WARMUP_KV_PAUSED);
+      expect(secondPausedRaw).toBeTruthy();
+      expect(secondPausedRaw).not.toBe(firstPausedRaw);
+
+      const secondEpisode = await kv.get(WARMUP_KV_PAUSED_ALERT);
+      expect(secondEpisode).toBeTruthy();
+      expect(secondEpisode).not.toBe(firstEpisode);
+      const alertCalls = send.mock.calls.filter(
+        (call) => call[0].to === "alerts@example.com",
+      );
+      expect(alertCalls).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("skips alert when paused_alert KV read fails", async () => {
