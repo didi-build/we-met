@@ -82,11 +82,42 @@ export function PrivacyPolicyContent() {
         systems, and Google to sign you in and send email. We don&apos;t sell personal
         information and we don&apos;t use it for advertising.
       </p>
+      <p className="lp-body">
+        Cloudflare and Google may process personal information in Canada, the United
+        States, and other countries where they operate. Their privacy policies describe
+        how they handle data outside Canada.
+      </p>
 
       <h2 className="lp-legal-h2">How long we keep it</h2>
       <p className="lp-body">
-        We keep your account and card until you ask us to delete them. Delivery records
-        and daily counts contain no lead contents and are kept.
+        We keep your account and card until you ask us to delete them. When you sign in,
+        your session lasts up to 30 days of activity, with a hard limit of 90 days from
+        when the session started.
+      </p>
+      <p className="lp-body">
+        When someone exchanges details with you, their name, email and optional fields
+        may sit in our message queue for up to about 24 hours while we send email. We
+        read that retention from our hosting provider&apos;s queue settings (last
+        checked October 2026). We do not keep visitor lead contents in our database.
+      </p>
+      <p className="lp-body">
+        Our hosting provider may keep technical logs and traces of how the service runs
+        for a short period (for example, about seven days for Workers logs on a paid
+        plan, per their pricing page). We do not control trace retention separately in
+        our code.
+      </p>
+      <p className="lp-body">
+        Delivery records and daily email send counts do not contain visitor lead
+        contents. We keep them after account deletion for operations and limits.
+      </p>
+
+      <h2 className="lp-legal-h2">Access and correction</h2>
+      <p className="lp-body">
+        You can see and edit most of your card in the app while signed in. For a copy of
+        personal information we hold about you, or to correct something you cannot
+        change in the app, email{" "}
+        <a href="mailto:hello@we-met.link">hello@we-met.link</a> from the address you
+        signed in with. We respond as soon as we can.
       </p>
 
       <h2 className="lp-legal-h2">Deleting your data</h2>
@@ -95,7 +126,19 @@ export function PrivacyPolicyContent() {
         <a href="mailto:hello@we-met.link">hello@we-met.link</a> from the email address
         you signed in with. We remove your card, draft and photo and anonymise your
         account, as soon as we can. Your card link is retired and can&apos;t be used
-        again.
+        again. Delivery records and send counts stay as described above. Copies of
+        emails already delivered may remain in mailboxes we do not control. Replaced
+        card photos that are no longer linked from your card may remain in storage until
+        we add cleanup.
+      </p>
+
+      <h2 className="lp-legal-h2">Security breaches</h2>
+      <p className="lp-body">
+        If a breach of security safeguards creates a real risk of significant harm, we
+        will report it to the Office of the Privacy Commissioner of Canada and notify
+        affected people as soon as feasible, as required by Canadian privacy law. We
+        keep an internal record of breaches involving personal information for 24
+        months.
       </p>
 
       <h2 className="lp-legal-h2">Changes</h2>
