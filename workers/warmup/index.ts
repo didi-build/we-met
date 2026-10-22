@@ -3,7 +3,9 @@ import {
   type CronRandom,
   type CronTickResult,
 } from "./lib/cron-tick";
+import { processEmailEventsBatch } from "./lib/email-events";
 import { processWarmupQueueBatch } from "./lib/queue-batch";
+import { WARMUP_EMAIL_EVENTS_QUEUE, WARMUP_SEND_RETRY_QUEUE } from "./lib/queue-names";
 import type { WarmupEnv, WarmupQueueBody } from "./lib/config";
 
 export async function executeWarmupScheduled(
@@ -27,6 +29,35 @@ export async function handleWarmupScheduled(
   }
 }
 
+function ackUnknownQueueBatch(
+  batch: MessageBatch<WarmupQueueBody | unknown>,
+  queueName: string,
+): void {
+  console.warn("warmup_unknown_queue", {
+    queue: queueName,
+    messageCount: batch.messages.length,
+  });
+  for (const message of batch.messages) {
+    message.ack();
+  }
+}
+
+export async function handleWarmupQueue(
+  batch: MessageBatch<WarmupQueueBody | unknown>,
+  env: WarmupEnv,
+): Promise<void> {
+  const queueName = batch.queue;
+  if (queueName === WARMUP_SEND_RETRY_QUEUE) {
+    await processWarmupQueueBatch(batch as MessageBatch<WarmupQueueBody>, env);
+    return;
+  }
+  if (queueName === WARMUP_EMAIL_EVENTS_QUEUE) {
+    await processEmailEventsBatch(batch as MessageBatch<unknown>, env);
+    return;
+  }
+  ackUnknownQueueBatch(batch, queueName);
+}
+
 const warmupWorker = {
   async scheduled(
     _controller: ScheduledController,
@@ -36,8 +67,11 @@ const warmupWorker = {
     await handleWarmupScheduled(env);
   },
 
-  async queue(batch: MessageBatch<WarmupQueueBody>, env: WarmupEnv): Promise<void> {
-    await processWarmupQueueBatch(batch, env);
+  async queue(
+    batch: MessageBatch<WarmupQueueBody | unknown>,
+    env: WarmupEnv,
+  ): Promise<void> {
+    await handleWarmupQueue(batch, env);
   },
 };
 

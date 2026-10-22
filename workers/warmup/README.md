@@ -15,7 +15,7 @@ wrangler deploy --config workers/warmup/wrangler.jsonc
 Before the first production deploy:
 
 1. **KV**: Create a KV namespace for warmup state (`WARMUP_STATE`). Replace the placeholder `id` under `kv_namespaces` in `wrangler.jsonc` with the real namespace id (committing that id in git is fine).
-2. **Queues**: Create queues `we-met-warmup-send-retry` and `we-met-warmup-send-dlq` in the Cloudflare account (names must match `wrangler.jsonc`), or rename both in config and in the dashboard consistently.
+2. **Queues**: Create queues `we-met-warmup-send-retry`, `we-met-warmup-send-dlq`, `we-met-warmup-email-events`, and `we-met-warmup-email-events-dlq` in the Cloudflare account (names must match `wrangler.jsonc`), or rename consistently in config and in the dashboard. The committed `wrangler.jsonc` already uses the final email-events queue names; production deploy guards reject zero UUID placeholder queue names if they appear in consumer `queue` or `dead_letter_queue` fields (same idea as the zero KV id).
 
 ## Secrets (names only; never commit values)
 
@@ -61,14 +61,24 @@ wrangler kv key get --namespace-id="<WARMUP_STATE_ID>" enabled
 wrangler kv key get --namespace-id="<WARMUP_STATE_ID>" paused
 ```
 
-### Bounce and complaint signal (DIDI-710)
+### Bounce and complaint signal (DIDI-710, DIDI-720)
 
-We do **not** poll the suppressions REST API from this Worker (no API token in the Worker). Instead we rely on synchronous signals from the [Email Sending Workers binding](https://developers.cloudflare.com/email-service/api/send-emails/workers-api/):
+We do **not** poll the suppressions REST API from this Worker (no API token in the Worker). Pause triggers come from two paths:
+
+**Synchronous (send binding)** from the [Email Sending Workers binding](https://developers.cloudflare.com/email-service/api/send-emails/workers-api/):
 
 - `E_RECIPIENT_SUPPRESSED`: recipient is on Cloudflare's suppression list (hard bounce or complaint).
 - `E_ACCOUNT_SUSPENDED`: Cloudflare paused Email Sending for the account for reputation.
 
-Asynchronous `message.bounced` / `message.complained` event subscriptions are a possible follow-up if we need pause before the next send attempt to a seed.
+**Asynchronous (queue consumer, DIDI-720)** on `we-met-warmup-email-events`, fed by a Cloudflare Queues event subscription on sending domain `mail.we-met.link` for `cf.email.sending.message.bounced` and `cf.email.sending.message.complained` (provisioned in DIDI-721; names only here, no addresses in git).
+
+| Event                                  | Seed recipient (`WARMUP_SEEDS`, case-insensitive)                           | Non-seed recipient                                                                                                          |
+| -------------------------------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Complaint                              | Pause warm-up only; one urgent alert per pause episode to `WARMUP_ALERT_TO` | No pause; one urgent alert per Email Sending `messageId` (KV dedupe, separate from pause episode keys) to `WARMUP_ALERT_TO` |
+| Hard bounce (`bounce.type === "hard"`) | Same as complaint (`async_hard_bounce` reason)                              | Same as complaint                                                                                                           |
+| Soft bounce                            | Log with redacted recipient only; no pause or alert                         | Log only                                                                                                                    |
+
+Malformed bodies or `eventSchemaVersion !== 1` are logged and retried with bounded `max_retries` into `we-met-warmup-email-events-dlq` (never acked silently). Missing `WARMUP_STATE`, seeds, or `WARMUP_FROM` retries the batch so events are not dropped.
 
 ## Behavior
 
@@ -76,6 +86,7 @@ Asynchronous `message.bounced` / `message.complained` event subscriptions are a 
 - Each tick rolls against a fixed probability targeting ~200 sends per month, subject to the KV kill switch, pause latch, and hard caps.
 - Recipients are chosen at random from `WARMUP_SEEDS`; any other recipient is rejected and logged (addresses are never logged in full).
 - Sends use the `EMAIL` (`send_email`) binding with `from` taken only from `WARMUP_FROM`. Transient failures enqueue a retry on `WARMUP_SEND_QUEUE` with explicit `max_retries` / `retry_delay` and a dead-letter queue; explicit DLQ publishes are guarded in code.
+- The `queue()` handler routes `we-met-warmup-send-retry` to send retries and `we-met-warmup-email-events` to `processEmailEventsBatch`. Any other `batch.queue` is logged and its messages are acked without processing.
 
 ## Local dry-run
 
