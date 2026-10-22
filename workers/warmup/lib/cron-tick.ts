@@ -4,6 +4,7 @@ import { shouldSendThisTick } from "./rate";
 import { checkWarmupSendCap } from "./send-cap";
 import { handleWarmupSendResult } from "./send-outcome";
 import { sendWarmupEmail } from "./send-warmup-email";
+import { deliverPauseAlertIfPending } from "./pause";
 import { checkWarmupSendGate } from "./state";
 
 export type CronRandom = {
@@ -32,6 +33,7 @@ export async function runWarmupCronTick(
   const gate = await checkWarmupSendGate(env);
   if (!gate.ok) {
     if (gate.reason === "paused") {
+      await deliverPauseAlertIfPending(env, secrets);
       return { action: "skipped_paused" };
     }
     return { action: "skipped_disabled" };

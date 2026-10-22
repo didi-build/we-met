@@ -1,5 +1,6 @@
 import { sendToDlqIfAllowed } from "./dlq";
 import { parseWarmupSecrets, type WarmupEnv, type WarmupQueueBody } from "./config";
+import { deliverPauseAlertIfPending } from "./pause";
 import { handleWarmupSendResult } from "./send-outcome";
 import { checkWarmupSendCap } from "./send-cap";
 import { redactEmailForLog } from "./redact-email";
@@ -14,35 +15,40 @@ export type WarmupQueueMessage = {
   retry(options?: { delaySeconds?: number }): void;
 };
 
+function ackMessagesWithoutSend(
+  messages: readonly WarmupQueueMessage[],
+  reason: string,
+): void {
+  for (const message of messages) {
+    console.warn("warmup_queue_skip", {
+      messageId: message.id,
+      reason,
+    });
+    message.ack();
+  }
+}
+
 export async function processWarmupQueueBatch(
   batch: { messages: readonly WarmupQueueMessage[] },
   env: WarmupEnv,
 ): Promise<void> {
   const secrets = parseWarmupSecrets(env);
   if (!secrets) {
-    for (const message of batch.messages) {
-      console.warn("warmup_queue_skip", {
-        messageId: message.id,
-        reason: "missing_secrets",
-      });
-      message.ack();
-    }
+    ackMessagesWithoutSend(batch.messages, "missing_secrets");
     return;
   }
 
-  const gate = await checkWarmupSendGate(env);
-  if (!gate.ok) {
-    for (const message of batch.messages) {
-      console.warn("warmup_queue_skip", {
-        messageId: message.id,
-        reason: gate.reason,
-      });
-      message.ack();
+  for (let index = 0; index < batch.messages.length; index += 1) {
+    const gate = await checkWarmupSendGate(env);
+    if (!gate.ok) {
+      if (gate.reason === "paused") {
+        await deliverPauseAlertIfPending(env, secrets);
+      }
+      ackMessagesWithoutSend(batch.messages.slice(index), gate.reason);
+      return;
     }
-    return;
-  }
 
-  for (const message of batch.messages) {
+    const message = batch.messages[index];
     const body = message.body;
     const cap = await checkWarmupSendCap(env);
     if (!cap.ok) {
@@ -62,6 +68,13 @@ export async function processWarmupQueueBatch(
     });
 
     await handleWarmupSendResult(env, secrets, result);
+
+    const gateAfterSend = await checkWarmupSendGate(env);
+    if (!gateAfterSend.ok && gateAfterSend.reason === "paused") {
+      await deliverPauseAlertIfPending(env, secrets);
+      ackMessagesWithoutSend(batch.messages.slice(index), "paused");
+      return;
+    }
 
     if (result.ok) {
       message.ack();

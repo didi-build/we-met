@@ -25,6 +25,29 @@ export async function setWarmupPaused(
   return ok ? state : null;
 }
 
+/** Send the pause alert when `paused` exists and `alertSent` is not set. Safe to call on every tick. */
+export async function deliverPauseAlertIfPending(
+  env: WarmupEnv,
+  secrets: WarmupSecrets,
+): Promise<boolean> {
+  const kv = env.WARMUP_STATE;
+  if (!kv) {
+    return false;
+  }
+  const paused = await readWarmupPaused(kv);
+  if (!paused || paused === "read_failed") {
+    return false;
+  }
+  if (paused.alertSent) {
+    return false;
+  }
+  const sent = await sendWarmupPauseAlert(env, secrets, paused);
+  if (sent) {
+    await markWarmupPauseAlertSent(kv);
+  }
+  return sent;
+}
+
 export async function sendWarmupPauseAlert(
   env: WarmupEnv,
   secrets: WarmupSecrets,
@@ -92,13 +115,7 @@ export async function pauseWarmupAndAlertOnce(
     }
     paused = created;
   }
-  if (paused.alertSent) {
-    return;
-  }
-  const sent = await sendWarmupPauseAlert(env, secrets, paused);
-  if (sent) {
-    await markWarmupPauseAlertSent(kv);
-  }
+  await deliverPauseAlertIfPending(env, secrets);
 }
 
 export async function pauseWarmupForSendError(

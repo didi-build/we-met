@@ -10,6 +10,24 @@ export type WarmupPausedState = {
   alertSent?: boolean;
 };
 
+/** Non-empty `paused` KV that failed validation; keeps sending off until the key is deleted. */
+export const WARMUP_INVALID_PAUSED_STATE: WarmupPausedState = {
+  reason: "invalid_paused_kv_value",
+  at: "1970-01-01T00:00:00.000Z",
+};
+
+function parseWarmupPausedValue(raw: string): WarmupPausedState {
+  try {
+    const parsed = JSON.parse(raw) as WarmupPausedState;
+    if (typeof parsed.reason === "string" && typeof parsed.at === "string") {
+      return parsed;
+    }
+  } catch {
+    // fall through to invalid
+  }
+  return WARMUP_INVALID_PAUSED_STATE;
+}
+
 export type WarmupGateResult =
   | { ok: true }
   | {
@@ -43,11 +61,7 @@ export async function readWarmupPaused(
     if (!raw) {
       return null;
     }
-    const parsed = JSON.parse(raw) as WarmupPausedState;
-    if (typeof parsed.reason !== "string" || typeof parsed.at !== "string") {
-      return null;
-    }
-    return parsed;
+    return parseWarmupPausedValue(raw);
   } catch {
     return "read_failed";
   }
