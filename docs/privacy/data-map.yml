@@ -1006,8 +1006,18 @@
     - Cloudflare
     - Google
     - Cloudflare Email Service
-  retention: unknown (recipient mailbox; Gmail operator copy when Gmail path; Cloudflare-side retention unknown)
-  who_can_see: card owner; operator can read delegated Gmail mailbox when Gmail path is active
+  retention:
+    recipient mailbox (unknown); operator Gmail copy when Gmail path (unknown per Google mailbox policy); when
+    email_provider is cloudflare, Cloudflare Email Service retains per-event sending metadata (from, to, subject,
+    messageId, status, authentication and error fields) for 31 days in Activity log and emailSendingAdaptive datasets
+    (https://developers.cloudflare.com/email-service/observability/metrics-analytics/); optional full message preview
+    about seven days when domain Email preview is on
+    (https://developers.cloudflare.com/email-service/observability/logs/#message-preview); duration Cloudflare keeps
+    full message bodies after delivery is unknown in Email Service developer docs (DPA Customer Content uses
+    agreement-term criteria only, https://www.cloudflare.com/cloudflare-customer-dpa/)
+  who_can_see:
+    card owner; operator can read delegated Gmail mailbox when Gmail path is active; operator with Cloudflare account
+    access to Email Service Activity log when Cloudflare path is active
   source: src/followup-email-consumer/lead-sink/email-handler.ts
   verified: false
 - id: email.owner_lead_append
@@ -1019,8 +1029,8 @@
     - Cloudflare
     - Google
     - Cloudflare Email Service
-  retention: unknown
-  who_can_see: card owner; operator can read Gmail mailbox when Gmail path is active
+  retention: same as email.owner_lead_record
+  who_can_see: same as email.owner_lead_record
   source: src/followup-email-consumer/lead-sink/email-handler.ts
   verified: false
 - id: email.visitor_followup
@@ -1035,8 +1045,10 @@
     - Cloudflare
     - Google
     - Cloudflare Email Service
-  retention: unknown (recipient mailbox; operator Gmail copy when Gmail path is active)
-  who_can_see: visitor (From, signature, body, vCard); operator Gmail when Gmail path is active
+  retention: same as email.owner_lead_record
+  who_can_see:
+    visitor (From, signature, body, vCard); operator Gmail when Gmail path is active; operator with Cloudflare
+    account access to Email Service Activity log when Cloudflare path is active
   source: src/email/format-visitor-follow-up.ts
   verified: false
 - id: email.operator_mailbox_visibility
@@ -1067,13 +1079,55 @@
     Cloudflare Workers send_email binding EMAIL on follow-up consumer Workers; carries outbound MIME (visitor and card
     owner PII in message bodies) when email_provider is cloudflare
   purpose: Cloudflare Email Service delivery from hello@mail.we-met.link
-  storage: Cloudflare Email Service (transit; vendor retention unknown)
+  storage:
+    Cloudflare Email Service (in-transit send and delivery); post-delivery vendor logging in logs.cloudflare_email_sending_*
+    rows when email_provider is cloudflare
   processors:
     - Cloudflare
-  retention: unknown
-  who_can_see: Cloudflare as processor; card owner and visitor as recipients
-  source: workers/we-met-followup-email-consumer/wrangler.production.jsonc
+    - Cloudflare Email Service
+  retention:
+    unknown — Email Service developer docs do not state how long full message bodies remain in Cloudflare systems after
+    delivery; DPA Customer Content retention is until agreement expiry/termination or processing no longer necessary
+    (https://www.cloudflare.com/cloudflare-customer-dpa/)
+  who_can_see: Cloudflare as processor; card owner and visitor as recipients; operator via Email Service Activity log
+  source: workers/we-met-followup-email-consumer/wrangler.production.jsonc;
+    https://developers.cloudflare.com/email-service/observability/metrics-analytics/;
+    https://developers.cloudflare.com/email-service/observability/logs/
   verified: false
+- id: logs.cloudflare_email_sending_activity
+  whose: visitor
+  data:
+    When email_provider is cloudflare, per outbound send — Email Service Activity log and emailSendingAdaptive GraphQL
+    events with from, to, subject, messageId, sessionId, status, delivery and authentication fields, and errorDetail
+    (visitor and card-owner addresses and subject lines; not full bodies unless preview row applies)
+  purpose: Cloudflare Email Service delivery observability
+  storage: Cloudflare Email Service Activity log and GraphQL Analytics emailSendingAdaptive dataset
+  processors:
+    - Cloudflare Email Service
+  retention: per-event sending metrics and events retained 31 days
+    (https://developers.cloudflare.com/email-service/observability/metrics-analytics/); Activity log dashboard filter
+    range 30 minutes to 30 days on the same underlying datasets
+    (https://developers.cloudflare.com/email-service/observability/logs/)
+  who_can_see: operator with Cloudflare account access to Email Service Activity log and Analytics API
+  source: https://developers.cloudflare.com/email-service/observability/metrics-analytics/
+  verified: true
+- id: logs.cloudflare_email_sending_preview
+  whose: visitor
+  data:
+    When email_provider is cloudflare and domain Email preview is enabled, full sent message HTML, plain text, headers,
+    attachments, and raw RFC 5322 source in Activity log Preview (includes visitor lead and card-owner PII from bodies
+    and vCard attachments)
+  purpose: Cloudflare Email Service message inspection (vendor debugging feature)
+  storage: Cloudflare Email Service Activity log message preview
+  processors:
+    - Cloudflare Email Service
+  retention:
+    about seven days for messages sent while Email preview is on; new sending domains have Email preview on by default
+    (https://developers.cloudflare.com/email-service/observability/logs/#message-preview,
+    https://developers.cloudflare.com/email-service/configuration/domains/#email-preview)
+  who_can_see: operator with Cloudflare account access to Email Service Activity log
+  source: https://developers.cloudflare.com/email-service/observability/logs/#message-preview
+  verified: true
 - id: binding.worker_assets
   whose: operational
   data: OpenNext static asset bundle served from ASSETS binding (no app user PII in binding)
