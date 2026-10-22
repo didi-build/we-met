@@ -31,9 +31,9 @@ describe("warmup wrangler config (unit)", () => {
     expect(sendEmail[0]).not.toHaveProperty("allowed_sender_addresses");
   });
 
-  it("binds WARMUP_STATE KV placeholder", () => {
+  it("binds production WARMUP_STATE KV namespace id", () => {
     const kv = (config.kv_namespaces as { binding: string; id: string }[])[0];
     expect(kv.binding).toBe("WARMUP_STATE");
-    expect(kv.id).toMatch(/^0{8}-0{4}-0{4}-0{4}-0{12}$/);
+    expect(kv.id).toBe("eb24ad76e95b4120ab6cdb9c6ba2fb46");
   });
 });

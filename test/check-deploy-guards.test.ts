@@ -396,6 +396,34 @@ describe("check-deploy-guards (unit)", () => {
     expect(result.status).toBe(0);
   });
 
+  const WARMUP_CONFIG = "workers/warmup/wrangler.jsonc";
+
+  function writeTempWarmupConfig(mutator: (config: Record<string, unknown>) => void) {
+    const dir = mkdtempSync(join(tmpdir(), "we-met-warmup-guards-"));
+    tempDirs.push(dir);
+    const base = readFileSync(WARMUP_CONFIG, "utf8");
+    const config = parseJsonc(base) as Record<string, unknown>;
+    mutator(config);
+    const path = join(dir, "wrangler.jsonc");
+    writeFileSync(path, JSON.stringify(config, null, 2), "utf8");
+    return path;
+  }
+
+  it("passes warmup-production guards on committed config", () => {
+    const result = runGuards("warmup-production", WARMUP_CONFIG);
+    expect(result.status).toBe(0);
+  });
+
+  it("fails warmup-production when WARMUP_STATE namespace id is the zero placeholder", () => {
+    const path = writeTempWarmupConfig((config) => {
+      const kv = config.kv_namespaces as { binding: string; id: string }[];
+      kv[0].id = "00000000-0000-0000-0000-000000000000";
+    });
+    const result = runGuards("warmup-production", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("zero placeholder");
+  });
+
   it("fails consumer-nonprod when vars contain WE_MET_TEST_MAIL_TO key", () => {
     const dir = mkdtempSync(join(tmpdir(), "we-met-consumer-guards-"));
     tempDirs.push(dir);
