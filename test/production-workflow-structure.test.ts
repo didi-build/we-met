@@ -99,6 +99,7 @@ function deployStepByName(steps: DeployStepBlock[], name: string): DeployStepBlo
 }
 
 const CONSUMER_DEPLOY_STEP_NAME = "Deploy follow-up email consumer to production";
+const WARMUP_DEPLOY_STEP_NAME = "Deploy warmup cron Worker to production";
 const CONSUMER_PREPARE_STEP_NAME =
   "Prepare follow-up email consumer Wrangler config (production D1 ID)";
 const CONSUMER_GUARDS_STEP_NAME = "Deploy-time guards (production consumer)";
@@ -153,6 +154,40 @@ function assertDeployJobCloudflareTokenIsolation(deploySection: string): void {
   }
   if (appDeploy.block.includes("CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION")) {
     throw new Error(`${APP_DEPLOY_STEP_NAME} must not use the consumer token`);
+  }
+
+  const warmupDeploy = deployStepByName(steps, WARMUP_DEPLOY_STEP_NAME);
+  if (!warmupDeploy.block.includes("CLOUDFLARE_API_TOKEN_PRODUCTION")) {
+    throw new Error(
+      `${WARMUP_DEPLOY_STEP_NAME} must use CLOUDFLARE_API_TOKEN_PRODUCTION`,
+    );
+  }
+  if (warmupDeploy.block.includes("CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION")) {
+    throw new Error(`${WARMUP_DEPLOY_STEP_NAME} must not use the consumer token`);
+  }
+  if (!warmupDeploy.block.includes("workers/warmup/wrangler.jsonc")) {
+    throw new Error(
+      `${WARMUP_DEPLOY_STEP_NAME} must deploy workers/warmup/wrangler.jsonc`,
+    );
+  }
+  if (warmupDeploy.block.includes("continue-on-error")) {
+    throw new Error(`${WARMUP_DEPLOY_STEP_NAME} must not use continue-on-error`);
+  }
+  if (warmupDeploy.block.includes("|| true")) {
+    throw new Error(`${WARMUP_DEPLOY_STEP_NAME} must not mask failures with || true`);
+  }
+  if (warmupDeploy.block.match(/WARMUP_(FROM|SEEDS|ALERT_TO)/)) {
+    throw new Error(
+      `${WARMUP_DEPLOY_STEP_NAME} must not set warmup Worker secrets in CI`,
+    );
+  }
+  if (
+    warmupDeploy.block.match(/kv\s+key\s+put/i) ||
+    warmupDeploy.block.includes('"enabled"')
+  ) {
+    throw new Error(
+      `${WARMUP_DEPLOY_STEP_NAME} must not write WARMUP_STATE enabled in CI`,
+    );
   }
 
   const consumerPrepare = deployStepByName(steps, CONSUMER_PREPARE_STEP_NAME);
@@ -280,12 +315,14 @@ describe("Deploy production workflow structure (unit)", () => {
     const consumerDeployIdx = deploySection.indexOf(
       "Deploy follow-up email consumer to production",
     );
+    const warmupDeployIdx = deploySection.indexOf(WARMUP_DEPLOY_STEP_NAME);
     expect(productionGuardsIdx).toBeGreaterThan(-1);
     expect(consumerPrepareIdx).toBeGreaterThan(productionGuardsIdx);
     expect(consumerGuardsIdx).toBeGreaterThan(consumerPrepareIdx);
     expect(turnstileIdx).toBeGreaterThan(consumerGuardsIdx);
     expect(appDeployIdx).toBeGreaterThan(turnstileIdx);
     expect(consumerDeployIdx).toBeGreaterThan(appDeployIdx);
+    expect(warmupDeployIdx).toBeGreaterThan(consumerDeployIdx);
     expect(deploySection).not.toContain("WE_MET_TEST_MAIL_TO");
   });
 

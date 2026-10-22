@@ -5,9 +5,15 @@ import {
   WARMUP_KV_PAUSED,
 } from "../../workers/warmup/lib/state";
 import type { WarmupEnv } from "../../workers/warmup/lib/config";
-import { warmupKvEnabled } from "./memory-kv";
+import { createMemoryKv, warmupKvEnabled } from "./memory-kv";
+import { readWarmupEnabled } from "../../workers/warmup/lib/state";
 
 describe("warmup KV state (unit)", () => {
+  it("treats a missing enabled key as off", async () => {
+    const kv = createMemoryKv();
+    expect(await readWarmupEnabled(kv)).toBe(false);
+  });
+
   it("treats malformed paused JSON as paused (fail closed)", async () => {
     const kv = warmupKvEnabled();
     await kv.put(WARMUP_KV_PAUSED, '{"oops":true}');
