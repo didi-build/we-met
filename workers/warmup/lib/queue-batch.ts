@@ -1,7 +1,10 @@
 import { sendToDlqIfAllowed } from "./dlq";
 import { parseWarmupSecrets, type WarmupEnv, type WarmupQueueBody } from "./config";
+import { handleWarmupSendResult } from "./send-outcome";
+import { checkWarmupSendCap } from "./send-cap";
 import { redactEmailForLog } from "./redact-email";
 import { sendWarmupEmail } from "./send-warmup-email";
+import { checkWarmupSendGate } from "./state";
 
 export type WarmupQueueMessage = {
   id: string;
@@ -27,14 +30,38 @@ export async function processWarmupQueueBatch(
     return;
   }
 
+  const gate = await checkWarmupSendGate(env);
+  if (!gate.ok) {
+    for (const message of batch.messages) {
+      console.warn("warmup_queue_skip", {
+        messageId: message.id,
+        reason: gate.reason,
+      });
+      message.ack();
+    }
+    return;
+  }
+
   for (const message of batch.messages) {
     const body = message.body;
+    const cap = await checkWarmupSendCap(env);
+    if (!cap.ok) {
+      console.warn("warmup_queue_skip", {
+        messageId: message.id,
+        reason: "send_cap",
+      });
+      message.ack();
+      continue;
+    }
+
     const result = await sendWarmupEmail(env, secrets, {
       to: body.to,
       subject: body.subject,
       text: body.text,
       html: body.html,
     });
+
+    await handleWarmupSendResult(env, secrets, result);
 
     if (result.ok) {
       message.ack();

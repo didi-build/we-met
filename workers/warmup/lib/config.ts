@@ -8,6 +8,8 @@ export type WarmupSecrets = {
 export type WarmupEnv = {
   WARMUP_SEEDS?: string;
   WARMUP_FROM?: string;
+  /** Alert recipient when auto-pause triggers (Wrangler secret; never commit). */
+  WARMUP_ALERT_TO?: string;
   EMAIL?: {
     send(message: {
       from: { email: string };
