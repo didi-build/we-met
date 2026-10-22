@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { handleWarmupScheduled } from "../../workers/warmup/index";
 import type { WarmupEnv } from "../../workers/warmup/lib/config";
+import { warmupKvEnabled } from "./memory-kv";
 
 describe("warmup scheduled handler (unit)", () => {
   it("logs and rethrows when the cron tick throws", async () => {
@@ -17,6 +18,7 @@ describe("warmup scheduled handler (unit)", () => {
           throw new Error("queue down");
         }),
       } as never,
+      WARMUP_STATE: warmupKvEnabled(),
     };
 
     const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});

@@ -35,11 +35,12 @@ function pick<T>(items: readonly T[], randomUnit: number): T {
 
 export function buildWarmupContent(
   subjectRandom: number,
-  bodyRandom: number,
+  bodyRandomA: number,
+  bodyRandomB: number,
 ): WarmupContent {
   const subject = pick(SUBJECTS, subjectRandom);
-  const lineA = pick(BODY_LINES, bodyRandom);
-  const lineB = pick(BODY_LINES, (bodyRandom * 0.91) % 1);
+  const lineA = pick(BODY_LINES, bodyRandomA);
+  const lineB = pick(BODY_LINES, bodyRandomB);
   const text = `${lineA} ${lineB}`;
   const html = `<p>${lineA}</p><p>${lineB}</p>`;
   return { subject, text, html };

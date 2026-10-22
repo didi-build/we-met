@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { runWarmupCronTick } from "../../workers/warmup/lib/cron-tick";
 import type { WarmupEnv } from "../../workers/warmup/lib/config";
+import { warmupKvEnabled } from "./memory-kv";
 
 describe("warmup cron tick (unit)", () => {
   it("sends nothing when secrets are missing", async () => {
@@ -43,6 +44,7 @@ describe("warmup cron tick (unit)", () => {
       WARMUP_SEEDS: "seed@example.com",
       WARMUP_FROM: "warmup@mail.we-met.link",
       EMAIL: { send },
+      WARMUP_STATE: warmupKvEnabled(),
     };
     let n = 0;
     const result = await runWarmupCronTick(env, {

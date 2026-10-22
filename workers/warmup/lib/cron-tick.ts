@@ -1,7 +1,11 @@
 import { buildWarmupContent, pickSeedRecipient } from "./content";
 import { parseWarmupSecrets, type WarmupEnv, type WarmupQueueBody } from "./config";
 import { shouldSendThisTick } from "./rate";
+import { checkWarmupSendCap } from "./send-cap";
+import { handleWarmupSendResult } from "./send-outcome";
 import { sendWarmupEmail } from "./send-warmup-email";
+import { deliverPauseAlertIfPending } from "./pause";
+import { checkWarmupSendGate } from "./state";
 
 export type CronRandom = {
   /** Uniform [0, 1). */
@@ -10,6 +14,9 @@ export type CronRandom = {
 
 export type CronTickResult =
   | { action: "skipped_missing_secrets" }
+  | { action: "skipped_disabled" }
+  | { action: "skipped_paused" }
+  | { action: "skipped_send_cap" }
   | { action: "skipped_rate" }
   | { action: "sent"; messageId: string }
   | { action: "send_failed"; enqueuedRetry: boolean };
@@ -23,16 +30,32 @@ export async function runWarmupCronTick(
     return { action: "skipped_missing_secrets" };
   }
 
+  const gate = await checkWarmupSendGate(env);
+  if (!gate.ok) {
+    if (gate.reason === "paused") {
+      await deliverPauseAlertIfPending(env, secrets);
+      return { action: "skipped_paused" };
+    }
+    return { action: "skipped_disabled" };
+  }
+
+  const cap = await checkWarmupSendCap(env);
+  if (!cap.ok) {
+    return { action: "skipped_send_cap" };
+  }
+
   if (!shouldSendThisTick(random.unit())) {
     return { action: "skipped_rate" };
   }
 
   const recipient = pickSeedRecipient(secrets.seeds, random.unit());
-  const content = buildWarmupContent(random.unit(), random.unit());
+  const content = buildWarmupContent(random.unit(), random.unit(), random.unit());
   const sendResult = await sendWarmupEmail(env, secrets, {
     to: recipient,
     ...content,
   });
+
+  await handleWarmupSendResult(env, secrets, sendResult);
 
   if (sendResult.ok) {
     return { action: "sent", messageId: sendResult.messageId };

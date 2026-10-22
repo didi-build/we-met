@@ -1,5 +1,6 @@
 import { assertSeedRecipient } from "./allowlist";
 import type { WarmupEnv } from "./config";
+import { extractEmailSendErrorCode } from "./send-error";
 import { redactEmailForLog } from "./redact-email";
 
 export type WarmupSendPayload = {
@@ -14,6 +15,7 @@ export type WarmupSendResult =
   | {
       ok: false;
       code: "missing_secrets" | "not_in_seeds" | "missing_binding" | "send_failed";
+      errorCode?: string;
     };
 
 export async function sendWarmupEmail(
@@ -49,10 +51,12 @@ export async function sendWarmupEmail(
     });
     return { ok: true, messageId: result.messageId };
   } catch (error) {
+    const errorCode = extractEmailSendErrorCode(error);
     console.error("warmup_send_failed", {
       to: redactEmailForLog(payload.to),
       error: error instanceof Error ? error.message : "unknown",
+      errorCode,
     });
-    return { ok: false, code: "send_failed" };
+    return { ok: false, code: "send_failed", errorCode };
   }
 }
