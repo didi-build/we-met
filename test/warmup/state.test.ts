@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   checkWarmupSendGate,
+  readWarmupEnabled,
   WARMUP_INVALID_PAUSED_STATE,
   WARMUP_KV_PAUSED,
 } from "../../workers/warmup/lib/state";
 import type { WarmupEnv } from "../../workers/warmup/lib/config";
 import { createMemoryKv, warmupKvEnabled } from "./memory-kv";
-import { readWarmupEnabled } from "../../workers/warmup/lib/state";
 
 describe("warmup KV state (unit)", () => {
   it("treats a missing enabled key as off", async () => {

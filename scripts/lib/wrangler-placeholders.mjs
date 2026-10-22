@@ -6,6 +6,9 @@ export const WRANGLER_D1_NONPROD_CI_CONFIG = "wrangler.d1-nonprod.ci.jsonc";
 export const D1_PLACEHOLDER_PRODUCTION = "00000000-0000-0000-0000-000000000001";
 export const D1_PLACEHOLDER_NONPROD = "00000000-0000-0000-0000-000000000002";
 
+/** Placeholder KV namespace id in workers/warmup/wrangler.jsonc until production id is committed or injected. */
+export const WARMUP_KV_PLACEHOLDER_ID = "00000000-0000-0000-0000-000000000000";
+
 export const PRODUCTION_APP_HOST = "app.we-met.link";
 
 export const PRODUCTION_RESOURCE_MARKERS = {

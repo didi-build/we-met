@@ -103,6 +103,7 @@ const WARMUP_DEPLOY_STEP_NAME = "Deploy warmup cron Worker to production";
 const CONSUMER_PREPARE_STEP_NAME =
   "Prepare follow-up email consumer Wrangler config (production D1 ID)";
 const CONSUMER_GUARDS_STEP_NAME = "Deploy-time guards (production consumer)";
+const WARMUP_GUARDS_STEP_NAME = "Deploy-time guards (production warmup)";
 const MIGRATIONS_STEP_NAME = "Apply production D1 migrations";
 const APP_DEPLOY_STEP_NAME = "Deploy Worker to production";
 
@@ -190,6 +191,16 @@ function assertDeployJobCloudflareTokenIsolation(deploySection: string): void {
     );
   }
 
+  const warmupGuards = deployStepByName(steps, WARMUP_GUARDS_STEP_NAME);
+  if (!warmupGuards.block.includes("warmup-production")) {
+    throw new Error(`${WARMUP_GUARDS_STEP_NAME} must use --target warmup-production`);
+  }
+  if (!warmupGuards.block.includes("workers/warmup/wrangler.jsonc")) {
+    throw new Error(
+      `${WARMUP_GUARDS_STEP_NAME} must guard workers/warmup/wrangler.jsonc`,
+    );
+  }
+
   const consumerPrepare = deployStepByName(steps, CONSUMER_PREPARE_STEP_NAME);
   const consumerGuards = deployStepByName(steps, CONSUMER_GUARDS_STEP_NAME);
   if (consumerPrepare.block.includes("secrets.")) {
@@ -236,6 +247,11 @@ const EXPECTED_DEPLOY_STEPS_BLOCK = `    steps:
           node scripts/check-deploy-guards.mjs \\
             --target consumer-production \\
             --config workers/we-met-followup-email-consumer/wrangler.production.ci.jsonc
+      - name: Deploy-time guards (production warmup)
+        run: |
+          node scripts/check-deploy-guards.mjs \\
+            --target warmup-production \\
+            --config workers/warmup/wrangler.jsonc
       - name: Require production Turnstile site key
         env:
           NEXT_PUBLIC_TURNSTILE_SITE_KEY: \${{ vars.WE_MET_TURNSTILE_SITE_KEY_PRODUCTION }}
@@ -310,7 +326,9 @@ describe("Deploy production workflow structure (unit)", () => {
     const consumerGuardsIdx = deploySection.indexOf(
       "Deploy-time guards (production consumer)",
     );
+    const warmupGuardsIdx = deploySection.indexOf(WARMUP_GUARDS_STEP_NAME);
     const turnstileIdx = deploySection.indexOf("Require production Turnstile site key");
+    const migrationsIdx = deploySection.indexOf(MIGRATIONS_STEP_NAME);
     const appDeployIdx = deploySection.indexOf("opennextjs-cloudflare deploy");
     const consumerDeployIdx = deploySection.indexOf(
       "Deploy follow-up email consumer to production",
@@ -319,7 +337,9 @@ describe("Deploy production workflow structure (unit)", () => {
     expect(productionGuardsIdx).toBeGreaterThan(-1);
     expect(consumerPrepareIdx).toBeGreaterThan(productionGuardsIdx);
     expect(consumerGuardsIdx).toBeGreaterThan(consumerPrepareIdx);
-    expect(turnstileIdx).toBeGreaterThan(consumerGuardsIdx);
+    expect(warmupGuardsIdx).toBeGreaterThan(consumerGuardsIdx);
+    expect(turnstileIdx).toBeGreaterThan(warmupGuardsIdx);
+    expect(migrationsIdx).toBeGreaterThan(warmupGuardsIdx);
     expect(appDeployIdx).toBeGreaterThan(turnstileIdx);
     expect(consumerDeployIdx).toBeGreaterThan(appDeployIdx);
     expect(warmupDeployIdx).toBeGreaterThan(consumerDeployIdx);

@@ -7,6 +7,7 @@
  *   node scripts/check-deploy-guards.mjs --target production --config wrangler.jsonc
  *   node scripts/check-deploy-guards.mjs --target consumer-nonprod --config workers/we-met-followup-email-consumer/wrangler.nonprod.jsonc
  *   node scripts/check-deploy-guards.mjs --target consumer-production --config workers/we-met-followup-email-consumer/wrangler.production.jsonc
+ *   node scripts/check-deploy-guards.mjs --target warmup-production --config workers/warmup/wrangler.jsonc
  *   node scripts/check-deploy-guards.mjs --mail-safety-config config/nonprod-mail-safety.json
  */
 import { readFileSync } from "node:fs";
@@ -22,12 +23,18 @@ import {
   PRODUCTION_APP_HOST,
   PRODUCTION_RESOURCE_MARKERS,
   RATE_LIMIT_BINDINGS,
+  WARMUP_KV_PLACEHOLDER_ID,
 } from "./lib/wrangler-placeholders.mjs";
+
+const WARMUP_WORKER_NAME = "we-met-warmup-cron";
+const WARMUP_RETRY_QUEUE = "we-met-warmup-send-retry";
+const WARMUP_DLQ = "we-met-warmup-send-dlq";
+const WARMUP_STATE_BINDING = "WARMUP_STATE";
 import { previewLoginReachableForWorkerEnv } from "./lib/preview-login-guard.mjs";
 
 function usage() {
   console.error(
-    "Usage: check-deploy-guards.mjs --target <preview|production|consumer-nonprod|consumer-production> --config <path> [--mail-safety-config <path>]",
+    "Usage: check-deploy-guards.mjs --target <preview|production|consumer-nonprod|consumer-production|warmup-production> --config <path> [--mail-safety-config <path>]",
   );
   process.exit(1);
 }
@@ -374,6 +381,42 @@ function checkConsumerNonprod(config) {
   checkConsumerD1Binding(config, NONPROD_RESOURCE_MARKERS.d1Name);
 }
 
+function checkWarmupProduction(config) {
+  checkConsumerPublicUrlSettings(config);
+  if (config.name !== WARMUP_WORKER_NAME) {
+    fail(`warmup Worker name must be "${WARMUP_WORKER_NAME}"`);
+  }
+  const kvRows = config.kv_namespaces ?? [];
+  const warmupKv = kvRows.find((row) => row.binding === WARMUP_STATE_BINDING);
+  if (!warmupKv) {
+    fail(`warmup must bind KV namespace "${WARMUP_STATE_BINDING}"`);
+  }
+  const kvId = typeof warmupKv.id === "string" ? warmupKv.id.trim() : "";
+  if (!kvId || kvId === WARMUP_KV_PLACEHOLDER_ID) {
+    fail(
+      "warmup WARMUP_STATE namespace id must be set to the production KV namespace (not the zero placeholder)",
+    );
+  }
+  const producers = config.queues?.producers ?? [];
+  const producerQueues = producers.map((row) => row.queue).filter(Boolean);
+  if (!producerQueues.includes(WARMUP_RETRY_QUEUE)) {
+    fail(`warmup must declare queue producer "${WARMUP_RETRY_QUEUE}"`);
+  }
+  if (!producerQueues.includes(WARMUP_DLQ)) {
+    fail(`warmup must declare queue producer "${WARMUP_DLQ}"`);
+  }
+  const consumers = config.queues?.consumers ?? [];
+  if (
+    consumers.length !== 1 ||
+    consumers[0].queue !== WARMUP_RETRY_QUEUE ||
+    consumers[0].dead_letter_queue !== WARMUP_DLQ
+  ) {
+    fail(
+      `warmup queue consumer must consume "${WARMUP_RETRY_QUEUE}" with dead_letter_queue "${WARMUP_DLQ}"`,
+    );
+  }
+}
+
 function checkConsumerProduction(config) {
   checkConsumerPublicUrlSettings(config);
   checkConsumerVarsAllowlist(config);
@@ -479,7 +522,8 @@ function main() {
 
   const isConsumerTarget =
     target === "consumer-nonprod" || target === "consumer-production";
-  if (!isConsumerTarget) {
+  const isWarmupTarget = target === "warmup-production";
+  if (!isConsumerTarget && !isWarmupTarget) {
     checkWranglerDomainSettings(config);
     checkDistinctD1Ids(config);
   }
@@ -499,6 +543,12 @@ function main() {
   if (target === "consumer-production") {
     checkConsumerProduction(config);
     console.log("deploy-time guards passed (consumer-production)");
+    return;
+  }
+
+  if (target === "warmup-production") {
+    checkWarmupProduction(config);
+    console.log("deploy-time guards passed (warmup-production)");
     return;
   }
 
