@@ -8,6 +8,7 @@ import {
   findBootstrapTokenViolations,
   findConsumerProductionCredentialViolations,
   findMigrateNonprodCredentialViolations,
+  findWarmupProductionCredentialViolations,
 } from "../scripts/check-secret-usage.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
@@ -39,6 +40,19 @@ describe("check-secret-usage (unit)", () => {
 
     writeFileSync(join(dir, "evil.yml"), "secrets.BOOTSTRAP_TOKEN\n");
     expect(findBootstrapTokenViolations(dir)).toEqual(["evil.yml"]);
+  });
+
+  it("allows warmup production token only in deploy-production.yml", () => {
+    const dir = mkdtempSync(join(tmpdir(), "secret-usage-warmup-"));
+    writeFileSync(
+      join(dir, "deploy-production.yml"),
+      "secrets.CLOUDFLARE_API_TOKEN_WARMUP_PRODUCTION\n",
+    );
+    writeFileSync(join(dir, "ci.yml"), "name: CI\n");
+    expect(findWarmupProductionCredentialViolations(dir)).toEqual([]);
+
+    writeFileSync(join(dir, "leak.yml"), "CLOUDFLARE_API_TOKEN_WARMUP_PRODUCTION\n");
+    expect(findWarmupProductionCredentialViolations(dir)).toEqual(["leak.yml"]);
   });
 
   it("allows consumer production token only in deploy-production.yml", () => {

@@ -10,6 +10,7 @@ const SECRET_NAME = "BOOTSTRAP_TOKEN";
 const MIGRATE_NONPROD_SECRET = "CLOUDFLARE_API_TOKEN_MIGRATE_NONPROD";
 const MIGRATE_NONPROD_ENV = "migrate-nonprod";
 const CONSUMER_PRODUCTION_SECRET = "CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION";
+const WARMUP_PRODUCTION_SECRET = "CLOUDFLARE_API_TOKEN_WARMUP_PRODUCTION";
 
 /**
  * @param {string} workflowsDir
@@ -60,6 +61,24 @@ export function findMigrateNonprodCredentialViolations(workflowsDir) {
  * @param {string} workflowsDir
  * @returns {string[]}
  */
+export function findWarmupProductionCredentialViolations(workflowsDir) {
+  if (!existsSync(workflowsDir)) {
+    return [];
+  }
+  const violations = [];
+  for (const entry of readdirSync(workflowsDir, { withFileTypes: true })) {
+    if (!entry.isFile()) continue;
+    const name = entry.name;
+    if (!name.endsWith(".yml") && !name.endsWith(".yaml")) continue;
+    if (name === ALLOWED_DEPLOY_PRODUCTION_FILE) continue;
+    const text = readFileSync(join(workflowsDir, name), "utf8");
+    if (text.includes(WARMUP_PRODUCTION_SECRET)) {
+      violations.push(name);
+    }
+  }
+  return violations.sort();
+}
+
 export function findConsumerProductionCredentialViolations(workflowsDir) {
   if (!existsSync(workflowsDir)) {
     return [];
@@ -107,6 +126,17 @@ function runCli() {
       `${CONSUMER_PRODUCTION_SECRET} must only appear in .github/workflows/${ALLOWED_DEPLOY_PRODUCTION_FILE}. Offenders:\n`,
     );
     for (const file of consumerViolations) {
+      console.error(`  - ${file}`);
+    }
+    process.exit(1);
+  }
+
+  const warmupViolations = findWarmupProductionCredentialViolations(WORKFLOWS_DIR);
+  if (warmupViolations.length > 0) {
+    console.error(
+      `${WARMUP_PRODUCTION_SECRET} must only appear in .github/workflows/${ALLOWED_DEPLOY_PRODUCTION_FILE}. Offenders:\n`,
+    );
+    for (const file of warmupViolations) {
       console.error(`  - ${file}`);
     }
     process.exit(1);

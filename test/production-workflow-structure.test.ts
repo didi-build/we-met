@@ -135,9 +135,15 @@ function assertDeployJobCloudflareTokenIsolation(deploySection: string): void {
 
   for (const step of steps) {
     if (step.name === CONSUMER_DEPLOY_STEP_NAME) continue;
+    if (step.name === WARMUP_DEPLOY_STEP_NAME) continue;
     if (step.block.includes("CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION")) {
       throw new Error(
         `step "${step.name ?? "(unnamed)"}" must not reference CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION`,
+      );
+    }
+    if (step.block.includes("CLOUDFLARE_API_TOKEN_WARMUP_PRODUCTION")) {
+      throw new Error(
+        `step "${step.name ?? "(unnamed)"}" must not reference CLOUDFLARE_API_TOKEN_WARMUP_PRODUCTION`,
       );
     }
   }
@@ -158,9 +164,18 @@ function assertDeployJobCloudflareTokenIsolation(deploySection: string): void {
   }
 
   const warmupDeploy = deployStepByName(steps, WARMUP_DEPLOY_STEP_NAME);
-  if (!warmupDeploy.block.includes("CLOUDFLARE_API_TOKEN_PRODUCTION")) {
+  if (
+    !warmupDeploy.block.includes(
+      "CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_WARMUP_PRODUCTION }}",
+    )
+  ) {
     throw new Error(
-      `${WARMUP_DEPLOY_STEP_NAME} must use CLOUDFLARE_API_TOKEN_PRODUCTION`,
+      `${WARMUP_DEPLOY_STEP_NAME} must set CLOUDFLARE_API_TOKEN to CLOUDFLARE_API_TOKEN_WARMUP_PRODUCTION`,
+    );
+  }
+  if (warmupDeploy.block.includes("CLOUDFLARE_API_TOKEN_PRODUCTION")) {
+    throw new Error(
+      `${WARMUP_DEPLOY_STEP_NAME} must not use CLOUDFLARE_API_TOKEN_PRODUCTION`,
     );
   }
   if (warmupDeploy.block.includes("CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION")) {

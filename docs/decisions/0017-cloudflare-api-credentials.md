@@ -44,3 +44,8 @@ Previews use the **same** Worker name (`we-met`) as production. The non-prod tok
 2. Account-level **Queues Edit** (dashboard label **Queues**, permission **Edit**). Wrangler lists queues during deploy; the first production consumer deploy in CI (**2026-10-14**) failed at the consumer step with `Authentication error [code: 10000]` on the queues list call until **Queues Edit** was added.
 
 **Observed (2026-10-14):** a consumer deploy that includes a D1 binding did **not** require a D1 permission on this token. **Not tested:** whether **Queues Edit** is the minimal queue permission (vs a narrower scope if Cloudflare adds one).
+
+**Production warmup cron token (DIDI-717):** dashboard name **`we-met-ci-warmup-production`**, GitHub secret **`CLOUDFLARE_API_TOKEN_WARMUP_PRODUCTION`** on the **`production`** environment only. Use **two** token policies — do **not** widen **`we-met-ci-production`**:
+
+1. **Workers Editor** scoped to Worker **`we-met-warmup-cron`** only.
+2. Account-level **Queues Edit** (same pattern as the production consumer token). Wrangler lists queues and calls the Worker secrets API during deploy when bindings are present; the first production warmup deploy in CI (**2026-10-22**) failed with `No access to the specified resource` on `GET /workers/scripts/we-met-warmup-cron/secrets` while using **`CLOUDFLARE_API_TOKEN_PRODUCTION`** (scoped to **`we-met`** only).

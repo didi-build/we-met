@@ -159,7 +159,7 @@ jobs:
             --config workers/we-met-followup-email-consumer/wrangler.production.ci.jsonc
       - name: Deploy warmup cron Worker to production
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_PRODUCTION }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_WARMUP_PRODUCTION }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
