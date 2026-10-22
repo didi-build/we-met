@@ -1005,6 +1005,7 @@
   processors:
     - Cloudflare
     - Google
+    - Cloudflare Email Service
   retention: unknown (recipient mailbox; Gmail operator copy when Gmail path; Cloudflare-side retention unknown)
   who_can_see: card owner; operator can read delegated Gmail mailbox when Gmail path is active
   source: src/followup-email-consumer/lead-sink/email-handler.ts
@@ -1017,8 +1018,9 @@
   processors:
     - Cloudflare
     - Google
+    - Cloudflare Email Service
   retention: unknown
-  who_can_see: card owner; operator when Gmail path is active
+  who_can_see: card owner; operator can read Gmail mailbox when Gmail path is active
   source: src/followup-email-consumer/lead-sink/email-handler.ts
   verified: false
 - id: email.visitor_followup
@@ -1032,8 +1034,9 @@
   processors:
     - Cloudflare
     - Google
-  retention: unknown (recipient mailbox; operator Gmail copy when Gmail path)
-  who_can_see: visitor (From, signature, body, vCard); operator Gmail when Gmail path
+    - Cloudflare Email Service
+  retention: unknown (recipient mailbox; operator Gmail copy when Gmail path is active)
+  who_can_see: visitor (From, signature, body, vCard); operator Gmail when Gmail path is active
   source: src/email/format-visitor-follow-up.ts
   verified: false
 - id: email.operator_mailbox_visibility
@@ -1043,7 +1046,7 @@
   storage: Google Gmail
   processors:
     - Google
-  retention: unknown
+  retention: unknown (Google mailbox policy)
   who_can_see: operator
   source: src/email/email-provider.ts
   verified: false
