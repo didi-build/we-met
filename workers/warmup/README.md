@@ -39,10 +39,11 @@ If `WARMUP_SEEDS` or `WARMUP_FROM` is missing or empty, or `WARMUP_FROM` is not 
 
 ## KV state (`WARMUP_STATE`)
 
-| Key       | Value                             | Meaning                                                                                                                          |
-| --------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `enabled` | `true` or anything else / missing | Kill switch. Sends run only when this key is exactly the string `true`. Missing means off.                                       |
-| `paused`  | JSON                              | Auto-pause latch: `{ "reason": "...", "at": "<ISO8601>", "alertSent": true }`. Delete this key to resume after fixing the issue. |
+| Key            | Value                             | Meaning                                                                                                                                                                                                      |
+| -------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `enabled`      | `true` or anything else / missing | Kill switch. Sends run only when this key is exactly the string `true`. Missing means off.                                                                                                                   |
+| `paused`       | JSON (or any non-empty string)    | Auto-pause latch: `{ "reason": "...", "at": "<ISO8601>" }`. Any non-empty value blocks sending. Delete this key to resume after fixing the issue. Legacy values may include `"alertSent": true`.             |
+| `paused_alert` | JSON                              | One-shot alert tracking for the current pause episode: `{ "episode": "<sha256 hex of raw paused>", "sentAt": "<ISO8601>" }`. Harmless if stale after `paused` changes; resume still means deleting `paused`. |
 
 Hard send caps (fail closed if KV cannot be read): at most **15** successful sends per UTC calendar day and **220** per UTC calendar month, tracked in keys `cap:day:YYYY-MM-DD` and `cap:month:YYYY-MM`.
 
