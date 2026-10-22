@@ -30,6 +30,8 @@ The machine-readable map is [`data-map.yml`](./data-map.yml).
 
 **Proposed baseline tag after merge (maintainer creates; do not tag in this PR):** `privacy-audit-2026-10-22` at merge commit on `main`.
 
+**Docs reconciliation (DIDI-687):** breach runbook [`docs/runbooks/privacy-breach.md`](../runbooks/privacy-breach.md); privacy page and [`account-deletion.md`](../runbooks/account-deletion.md) aligned to `data-map.yml` (email-path / Cloudflare Email Service copy deferred to DIDI-699).
+
 ## Map scope note
 
 `data-map.yml` lists **one entry per column in the effective D1 schema after applying all migrations in order**. Migration `0005_cards_rebuild_mvp.sql` drops the legacy `cards.email` column from `0001`; that column is **not** in the map because it is not present in a migrated database. If a future drift checker parses only `CREATE TABLE` statements in individual files without applying ordering, it must account for renames and drops.
