@@ -1,8 +1,11 @@
 import type { WarmupEnv, WarmupSecrets } from "./config";
 import {
-  markWarmupPauseAlertSent,
+  isWarmupInvalidPausedState,
   readWarmupPaused,
+  readWarmupPausedAlert,
   writeWarmupPaused,
+  writeWarmupPausedAlert,
+  warmupPausedEpisodeId,
   type WarmupPausedState,
 } from "./state";
 import { pauseReasonForSendError } from "./send-error";
@@ -18,14 +21,14 @@ export async function setWarmupPaused(
   }
   const existing = await readWarmupPaused(kv);
   if (existing && existing !== "read_failed") {
-    return existing;
+    return existing.state;
   }
   const state: WarmupPausedState = { reason, at };
   const ok = await writeWarmupPaused(kv, state);
   return ok ? state : null;
 }
 
-/** Send the pause alert when `paused` exists and `alertSent` is not set. Safe to call on every tick. */
+/** Send the pause alert when `paused` exists and no alert was sent for this episode. Safe to call on every tick. */
 export async function deliverPauseAlertIfPending(
   env: WarmupEnv,
   secrets: WarmupSecrets,
@@ -38,12 +41,22 @@ export async function deliverPauseAlertIfPending(
   if (!paused || paused === "read_failed") {
     return false;
   }
-  if (paused.alertSent) {
+  if (paused.state.alertSent) {
     return false;
   }
-  const sent = await sendWarmupPauseAlert(env, secrets, paused);
+  const alertState = await readWarmupPausedAlert(kv);
+  if (alertState === "read_failed") {
+    console.warn("warmup_pause_alert_state_read_failed");
+    return false;
+  }
+  const episode = await warmupPausedEpisodeId(paused.raw);
+  if (alertState?.episode === episode) {
+    return false;
+  }
+  const malformed = isWarmupInvalidPausedState(paused.state);
+  const sent = await sendWarmupPauseAlert(env, secrets, paused.state, malformed);
   if (sent) {
-    await markWarmupPauseAlertSent(kv);
+    await writeWarmupPausedAlert(kv, episode, new Date().toISOString());
   }
   return sent;
 }
@@ -52,6 +65,7 @@ export async function sendWarmupPauseAlert(
   env: WarmupEnv,
   secrets: WarmupSecrets,
   paused: WarmupPausedState,
+  malformed: boolean,
 ): Promise<boolean> {
   const alertTo = env.WARMUP_ALERT_TO?.trim();
   if (!alertTo || !env.EMAIL) {
@@ -61,14 +75,22 @@ export async function sendWarmupPauseAlert(
     return false;
   }
   const subject = "We Met warmup worker paused";
-  const text = [
-    "The we-met warmup cron worker auto-paused sending.",
-    "",
-    `Reason: ${paused.reason}`,
-    `At: ${paused.at}`,
-    "",
-    "To resume: delete the paused key in WARMUP_STATE KV (or fix the underlying issue), then ensure enabled is true.",
-  ].join("\n");
+  const text = malformed
+    ? [
+        "The we-met warmup cron worker auto-paused sending.",
+        "",
+        "The paused key in WARMUP_STATE KV is malformed and must be fixed or deleted.",
+        "",
+        "To resume: delete the paused key in WARMUP_STATE KV (or fix the underlying issue), then ensure enabled is true.",
+      ].join("\n")
+    : [
+        "The we-met warmup cron worker auto-paused sending.",
+        "",
+        `Reason: ${paused.reason}`,
+        `At: ${paused.at}`,
+        "",
+        "To resume: delete the paused key in WARMUP_STATE KV (or fix the underlying issue), then ensure enabled is true.",
+      ].join("\n");
   const html = text
     .split("\n")
     .map((line) => (line.length === 0 ? "<br>" : `<p>${line}</p>`))
@@ -104,7 +126,7 @@ export async function pauseWarmupAndAlertOnce(
     return;
   }
   const at = new Date().toISOString();
-  let paused = await readWarmupPaused(kv);
+  const paused = await readWarmupPaused(kv);
   if (paused === "read_failed") {
     return;
   }
@@ -113,7 +135,6 @@ export async function pauseWarmupAndAlertOnce(
     if (!created) {
       return;
     }
-    paused = created;
   }
   await deliverPauseAlertIfPending(env, secrets);
 }

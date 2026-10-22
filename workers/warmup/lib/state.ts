@@ -2,11 +2,12 @@ import type { WarmupEnv } from "./config";
 
 export const WARMUP_KV_ENABLED = "enabled";
 export const WARMUP_KV_PAUSED = "paused";
+export const WARMUP_KV_PAUSED_ALERT = "paused_alert";
 
 export type WarmupPausedState = {
   reason: string;
   at: string;
-  /** Set after the one-shot alert for this pause episode. */
+  /** Legacy: set after the one-shot alert for this pause episode (prefer `paused_alert` KV). */
   alertSent?: boolean;
 };
 
@@ -14,6 +15,16 @@ export type WarmupPausedState = {
 export const WARMUP_INVALID_PAUSED_STATE: WarmupPausedState = {
   reason: "invalid_paused_kv_value",
   at: "1970-01-01T00:00:00.000Z",
+};
+
+export type WarmupPausedReadResult = {
+  state: WarmupPausedState;
+  raw: string;
+};
+
+export type WarmupPausedAlertState = {
+  episode: string;
+  sentAt: string;
 };
 
 function parseWarmupPausedValue(raw: string): WarmupPausedState {
@@ -26,6 +37,21 @@ function parseWarmupPausedValue(raw: string): WarmupPausedState {
     // fall through to invalid
   }
   return WARMUP_INVALID_PAUSED_STATE;
+}
+
+export function isWarmupInvalidPausedState(state: WarmupPausedState): boolean {
+  return (
+    state.reason === WARMUP_INVALID_PAUSED_STATE.reason &&
+    state.at === WARMUP_INVALID_PAUSED_STATE.at
+  );
+}
+
+export async function warmupPausedEpisodeId(raw: string): Promise<string> {
+  const data = new TextEncoder().encode(raw);
+  const hash = await crypto.subtle.digest("SHA-256", data);
+  return [...new Uint8Array(hash)]
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 export type WarmupGateResult =
@@ -52,7 +78,7 @@ export async function readWarmupEnabled(
 
 export async function readWarmupPaused(
   kv: KVNamespace | undefined,
-): Promise<WarmupPausedState | null | "read_failed"> {
+): Promise<WarmupPausedReadResult | null | "read_failed"> {
   if (!kv) {
     return null;
   }
@@ -61,9 +87,48 @@ export async function readWarmupPaused(
     if (!raw) {
       return null;
     }
-    return parseWarmupPausedValue(raw);
+    return { state: parseWarmupPausedValue(raw), raw };
   } catch {
     return "read_failed";
+  }
+}
+
+export async function readWarmupPausedAlert(
+  kv: KVNamespace,
+): Promise<WarmupPausedAlertState | null | "read_failed"> {
+  let raw: string | null;
+  try {
+    raw = await kv.get(WARMUP_KV_PAUSED_ALERT);
+  } catch {
+    return "read_failed";
+  }
+  if (!raw) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(raw) as WarmupPausedAlertState;
+    if (typeof parsed.episode === "string" && typeof parsed.sentAt === "string") {
+      return parsed;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export async function writeWarmupPausedAlert(
+  kv: KVNamespace,
+  episode: string,
+  sentAt: string,
+): Promise<boolean> {
+  try {
+    await kv.put(
+      WARMUP_KV_PAUSED_ALERT,
+      JSON.stringify({ episode, sentAt } satisfies WarmupPausedAlertState),
+    );
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -86,7 +151,7 @@ export async function checkWarmupSendGate(
     return { ok: false, reason: "kv_read_failed" };
   }
   if (paused) {
-    return { ok: false, reason: "paused", paused };
+    return { ok: false, reason: "paused", paused: paused.state };
   }
   return { ok: true };
 }
@@ -101,12 +166,4 @@ export async function writeWarmupPaused(
   } catch {
     return false;
   }
-}
-
-export async function markWarmupPauseAlertSent(kv: KVNamespace): Promise<boolean> {
-  const paused = await readWarmupPaused(kv);
-  if (!paused || paused === "read_failed") {
-    return false;
-  }
-  return writeWarmupPaused(kv, { ...paused, alertSent: true });
 }
