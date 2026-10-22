@@ -318,7 +318,7 @@
   table: app_settings
   column: key
   whose: operational
-  data: Setting name (e.g. signups_open, lead_email_enabled)
+  data: Setting name (e.g. signups_open, lead_email_enabled, email_provider)
   purpose: feature flags
   storage: D1
   processors:
@@ -879,40 +879,42 @@
   table: lead_delivery_ledger
   column: gmail_message_id
   whose: operational
-  data: Gmail API message id after send
-  purpose: operator mailbox correlation
+  data: Legacy Gmail API message id column (schema from migration 0002; consumer markSent does not write it at HEAD)
+  purpose: reserved; correlation lives in external_ref
   storage: D1
   processors:
     - Cloudflare
   retention: indefinite (kept after account deletion per ADR 0025 and privacy page)
   who_can_see: operator
-  source: docs/decisions/0022-lead-delivery-ledger.md
+  source: src/followup-email-consumer/lead-delivery-ledger.ts
   verified: true
 - id: lead_delivery_ledger.gmail_thread_id
   table: lead_delivery_ledger
   column: gmail_thread_id
   whose: operational
-  data: Gmail API thread id after send
-  purpose: operator mailbox correlation
+  data: Legacy Gmail API thread id column (schema from migration 0002; consumer markSent does not write it at HEAD)
+  purpose: reserved; correlation lives in external_ref
   storage: D1
   processors:
     - Cloudflare
   retention: indefinite (kept after account deletion per ADR 0025 and privacy page)
   who_can_see: operator
-  source: docs/decisions/0022-lead-delivery-ledger.md
+  source: src/followup-email-consumer/lead-delivery-ledger.ts
   verified: true
 - id: lead_delivery_ledger.external_ref
   table: lead_delivery_ledger
   column: external_ref
   whose: operational
-  data: Opaque JSON correlation ids from sink handler (Gmail ids only for email sink)
-  purpose: record to append handoff
+  data:
+    Opaque flat JSON from email sink after send — Gmail path { gmailMessageId, gmailThreadId }; Cloudflare path {
+    provider, messageId } (no visitor PII)
+  purpose: record-to-append threading handoff and operator correlation
   storage: D1
   processors:
     - Cloudflare
   retention: indefinite (kept after account deletion per ADR 0025 and privacy page)
   who_can_see: operator
-  source: docs/decisions/0022-lead-delivery-ledger.md
+  source: src/followup-email-consumer/lead-sink/email-handler.ts
   verified: true
 - id: storage.r2.card_photo
   whose: card_owner
@@ -997,24 +999,26 @@
   whose: visitor
   data: Email to card owner with visitor name, email, phone from exchange
   purpose: notify owner of new lead
-  storage: Operator Gmail mailbox (sent via Gmail API today)
+  storage:
+    Card owner inbox; sent via Gmail API when app_settings.email_provider is gmail (default), or Cloudflare Email
+    Service binding when email_provider is cloudflare
   processors:
     - Cloudflare
     - Google
-  retention: unknown (mailbox retention; not stored in D1)
-  who_can_see: card owner; operator can read mailbox
+  retention: unknown (recipient mailbox; Gmail operator copy when Gmail path; Cloudflare-side retention unknown)
+  who_can_see: card owner; operator can read delegated Gmail mailbox when Gmail path is active
   source: src/followup-email-consumer/lead-sink/email-handler.ts
   verified: false
 - id: email.owner_lead_append
   whose: visitor
   data: Email append to owner thread with visitor job title, company, note
   purpose: complete lead details to owner
-  storage: Operator Gmail mailbox
+  storage: same as email.owner_lead_record (provider-selected)
   processors:
     - Cloudflare
     - Google
   retention: unknown
-  who_can_see: card owner; operator
+  who_can_see: card owner; operator when Gmail path is active
   source: src/followup-email-consumer/lead-sink/email-handler.ts
   verified: false
 - id: email.visitor_followup
@@ -1024,37 +1028,82 @@
     shows given, optional nickname in brackets, and family; body includes card display name (or Google name), role,
     photo, vCard with Google email and full Google name in FN
   purpose: reciprocate contact after exchange
-  storage: Visitor inbox via Gmail API send
+  storage: Visitor inbox; provider same as email.owner_lead_record
   processors:
     - Cloudflare
     - Google
-  retention: unknown (recipient and operator mailbox copies)
-  who_can_see: visitor (From, signature, body, vCard); operator mailbox
+  retention: unknown (recipient mailbox; operator Gmail copy when Gmail path)
+  who_can_see: visitor (From, signature, body, vCard); operator Gmail when Gmail path
   source: src/email/format-visitor-follow-up.ts
   verified: false
 - id: email.operator_mailbox_visibility
   whose: operational
-  data: Full MIME of sent lead and follow-up messages in operator-controlled Gmail
-  purpose: email delivery mechanism side effect
+  data: Full MIME of sent lead and follow-up messages in operator-controlled Gmail when email_provider is gmail
+  purpose: Gmail delivery mechanism side effect (not used for Cloudflare provider path)
   storage: Google Gmail
   processors:
     - Google
   retention: unknown
   who_can_see: operator
-  source: src/components/landing/PrivacyPolicyContent.tsx
+  source: src/email/email-provider.ts
   verified: false
-- id: email.provider.placeholder
+- id: config.app_settings.email_provider
   whose: operational
-  data: PLACEHOLDER — outbound email provider (DIDI-628 deciding Cloudflare Email Service vs Gmail)
-  purpose: transactional email delivery
-  storage: TBD
+  data: D1 app_settings row email_provider = gmail (default when missing or unknown) or cloudflare
+  purpose: selects outbound email adapter in follow-up consumer
+  storage: D1 app_settings (key and value columns)
   processors:
-    - TBD
+    - Cloudflare
+  retention: indefinite (no purge job in repo)
+  who_can_see: operator
+  source: src/app-settings/defaults.ts
+  verified: true
+- id: binding.consumer_send_email
+  whose: operational
+  data:
+    Cloudflare Workers send_email binding EMAIL on follow-up consumer Workers; carries outbound MIME (visitor and card
+    owner PII in message bodies) when email_provider is cloudflare
+  purpose: Cloudflare Email Service delivery from hello@mail.we-met.link
+  storage: Cloudflare Email Service (transit; vendor retention unknown)
+  processors:
+    - Cloudflare
   retention: unknown
-  who_can_see: unknown
-  source: docs/decisions/0018-lead-sink.md
+  who_can_see: Cloudflare as processor; card owner and visitor as recipients
+  source: workers/we-met-followup-email-consumer/wrangler.production.jsonc
   verified: false
-  notes: Replace this row when DIDI-628 lands; do not treat as factual until then.
+- id: binding.worker_assets
+  whose: operational
+  data: OpenNext static asset bundle served from ASSETS binding (no app user PII in binding)
+  purpose: serve built JS/CSS and static files
+  storage: Worker assets binding on app Worker
+  processors:
+    - Cloudflare
+  retention: deployment lifetime
+  who_can_see: public visitors
+  source: wrangler.jsonc
+  verified: true
+- id: binding.worker_images
+  whose: card_owner
+  data: Card photo bytes in transit through Cloudflare Images binding during ingestCardPhotoFromRequest
+  purpose: validate and resize card photos before R2 write
+  storage: Cloudflare Images (transit)
+  processors:
+    - Cloudflare
+  retention: unknown (vendor processing retention not documented in repo)
+  who_can_see: Cloudflare
+  source: src/images/ingest-card-photo.ts
+  verified: false
+- id: binding.worker_self_reference
+  whose: operational
+  data: Service binding WORKER_SELF_REFERENCE to we-met Worker (internal fetches; no separate data store)
+  purpose: OpenNext self-invocation
+  storage: Cloudflare Workers service binding
+  processors:
+    - Cloudflare
+  retention: n/a
+  who_can_see: operator
+  source: wrangler.jsonc
+  verified: true
 - id: logs.worker_app
   whose: operational
   data: Worker logs, invocation logs, persisted traces (query strings redacted)
@@ -1175,4 +1224,14 @@
   retention: until user clears site data
   who_can_see: visitor device
   source: src/components/hi/hi-chip-popover-position.ts
+  verified: true
+- id: browser.local_storage_details_sent
+  whose: visitor
+  data: Per-slug flag we-met-hi-details-sent:<slug> = 1 after successful details step (no name, email, or token)
+  purpose: show Contact sent on exchange UI for one-and-done details (DIDI-605)
+  storage: visitor browser localStorage
+  processors: []
+  retention: until user clears site data
+  who_can_see: visitor device only
+  source: src/lib/hi-card/details-sent-storage.ts
   verified: true
