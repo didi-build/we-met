@@ -15,7 +15,7 @@ wrangler deploy --config workers/warmup/wrangler.jsonc
 Before the first production deploy:
 
 1. **KV**: Create a KV namespace for warmup state (`WARMUP_STATE`). Replace the placeholder `id` under `kv_namespaces` in `wrangler.jsonc` with the real namespace id (committing that id in git is fine).
-2. **Queues**: Create queues `we-met-warmup-send-retry`, `we-met-warmup-send-dlq`, `we-met-warmup-email-events`, and `we-met-warmup-email-events-dlq` in the Cloudflare account (names must match `wrangler.jsonc`), or rename consistently in config and in the dashboard. Until the email-events queues exist, leave the placeholder queue ids in `wrangler.jsonc`; production deploy guards reject those placeholders the same way as the zero KV id.
+2. **Queues**: Create queues `we-met-warmup-send-retry`, `we-met-warmup-send-dlq`, `we-met-warmup-email-events`, and `we-met-warmup-email-events-dlq` in the Cloudflare account (names must match `wrangler.jsonc`), or rename consistently in config and in the dashboard. The committed `wrangler.jsonc` already uses the final email-events queue names; production deploy guards reject zero UUID placeholder queue names if they appear in consumer `queue` or `dead_letter_queue` fields (same idea as the zero KV id).
 
 ## Secrets (names only; never commit values)
 
@@ -86,7 +86,7 @@ Malformed bodies or `eventSchemaVersion !== 1` are logged and retried with bound
 - Each tick rolls against a fixed probability targeting ~200 sends per month, subject to the KV kill switch, pause latch, and hard caps.
 - Recipients are chosen at random from `WARMUP_SEEDS`; any other recipient is rejected and logged (addresses are never logged in full).
 - Sends use the `EMAIL` (`send_email`) binding with `from` taken only from `WARMUP_FROM`. Transient failures enqueue a retry on `WARMUP_SEND_QUEUE` with explicit `max_retries` / `retry_delay` and a dead-letter queue; explicit DLQ publishes are guarded in code.
-- The `queue()` handler routes `we-met-warmup-send-retry` to send retries and `we-met-warmup-email-events` to `processEmailEventsBatch`. An unknown `batch.queue` throws.
+- The `queue()` handler routes `we-met-warmup-send-retry` to send retries and `we-met-warmup-email-events` to `processEmailEventsBatch`. Any other `batch.queue` is logged and its messages are acked without processing.
 
 ## Local dry-run
 

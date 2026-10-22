@@ -34,7 +34,6 @@ const WARMUP_WORKER_NAME = "we-met-warmup-cron";
 const WARMUP_RETRY_QUEUE = "we-met-warmup-send-retry";
 const WARMUP_DLQ = "we-met-warmup-send-dlq";
 const WARMUP_STATE_BINDING = "WARMUP_STATE";
-const WARMUP_EMAIL_EVENTS_DLQ_BINDING = "WARMUP_EMAIL_EVENTS_DLQ";
 const WARMUP_EMAIL_EVENTS_MAX_RETRIES = 3;
 const WARMUP_EMAIL_EVENTS_MAX_BATCH_SIZE = 10;
 import { previewLoginReachableForWorkerEnv } from "./lib/preview-login-guard.mjs";
@@ -411,31 +410,6 @@ function checkWarmupProduction(config) {
   }
   if (!producerQueues.includes(WARMUP_DLQ)) {
     fail(`warmup must declare queue producer "${WARMUP_DLQ}"`);
-  }
-  const emailEventsProducer = producers.find(
-    (row) => row.binding === WARMUP_EMAIL_EVENTS_DLQ_BINDING,
-  );
-  if (!emailEventsProducer) {
-    fail(
-      `warmup must declare queue producer binding "${WARMUP_EMAIL_EVENTS_DLQ_BINDING}"`,
-    );
-  }
-  const emailEventsDlqQueue =
-    typeof emailEventsProducer.queue === "string"
-      ? emailEventsProducer.queue.trim()
-      : "";
-  if (
-    !emailEventsDlqQueue ||
-    emailEventsDlqQueue === WARMUP_EMAIL_EVENTS_DLQ_PLACEHOLDER
-  ) {
-    fail(
-      `warmup ${WARMUP_EMAIL_EVENTS_DLQ_BINDING} queue must be set to "${WARMUP_EMAIL_EVENTS_DLQ}" (not the placeholder id)`,
-    );
-  }
-  if (emailEventsDlqQueue !== WARMUP_EMAIL_EVENTS_DLQ) {
-    fail(
-      `warmup ${WARMUP_EMAIL_EVENTS_DLQ_BINDING} queue must be "${WARMUP_EMAIL_EVENTS_DLQ}"`,
-    );
   }
   const consumers = config.queues?.consumers ?? [];
   if (consumers.length !== 2) {

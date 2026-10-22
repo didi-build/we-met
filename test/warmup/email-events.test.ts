@@ -4,11 +4,12 @@ import type { WarmupEnv } from "../../workers/warmup/lib/config";
 import {
   WARMUP_KV_NONSEED_ALERT_PREFIX,
   nonSeedAlertDedupeKey,
+  sendNonSeedEmailEventAlertOnce,
 } from "../../workers/warmup/lib/email-event-alert";
+import { parseWarmupSecrets } from "../../workers/warmup/lib/config";
 import { processEmailEventsBatch } from "../../workers/warmup/lib/email-events";
 import {
   WARMUP_EMAIL_EVENTS_QUEUE,
-  WARMUP_EMAIL_EVENTS_QUEUE_PLACEHOLDER,
   WARMUP_SEND_RETRY_QUEUE,
 } from "../../workers/warmup/lib/queue-names";
 import {
@@ -217,7 +218,36 @@ describe("warmup email events (unit)", () => {
     expect(message.ack).not.toHaveBeenCalled();
   });
 
-  it("routes queue batches by name and throws on unknown queue", async () => {
+  it("escapes event-derived values in non-seed alert HTML", async () => {
+    const send = vi.fn(async (message: { to: string; html: string; text: string }) => {
+      expect(message.html).not.toContain("<script>");
+      expect(message.html).toContain(
+        "cf.email.sending.message.complained&quot;&gt;&lt;img",
+      );
+      expect(message.html).toContain("&lt;script&gt;evil&lt;/script&gt;");
+      expect(message.html).toContain("x&lt;script&gt;@example.com");
+      expect(message.text).toContain('complained"><img');
+      return { messageId: "alert" };
+    });
+    const kv = warmupKvEnabled();
+    const env: WarmupEnv = {
+      ...secretsEnv,
+      EMAIL: { send },
+      WARMUP_STATE: kv,
+    };
+    const secrets = parseWarmupSecrets(env);
+    expect(secrets).not.toBeNull();
+
+    const sent = await sendNonSeedEmailEventAlertOnce(env, secrets!, {
+      dedupeKey: nonSeedAlertDedupeKey("<script>evil</script>"),
+      eventType: 'cf.email.sending.message.complained"><img src=x onerror=alert(1)>',
+      recipientRedacted: "x<script>@example.com",
+    });
+    expect(sent).toBe(true);
+    expect(send).toHaveBeenCalledOnce();
+  });
+
+  it("routes configured queue names and acks unknown queues", async () => {
     const kv = warmupKvEnabled();
     const env: WarmupEnv = {
       ...secretsEnv,
@@ -243,31 +273,19 @@ describe("warmup email events (unit)", () => {
     await handleWarmupQueue(batch as never, env);
     expect(batch.messages[0].ack).toHaveBeenCalled();
 
-    const placeholderBatch = {
-      queue: WARMUP_EMAIL_EVENTS_QUEUE_PLACEHOLDER,
-      messages: [
-        emailQueueMessage(
-          "q2",
-          baseEvent({
-            type: "cf.email.sending.message.bounced",
-            bounceType: "soft",
-            recipient: "seed@example.com",
-          }),
-        ),
-      ],
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const unknownMessage = emailQueueMessage("unk", baseEvent({}));
+    const unknownBatch = {
+      queue: "unknown-queue",
+      messages: [unknownMessage],
     };
-    await handleWarmupQueue(placeholderBatch as never, env);
-    expect(placeholderBatch.messages[0].ack).toHaveBeenCalled();
-
-    await expect(
-      handleWarmupQueue(
-        {
-          queue: "unknown-queue",
-          messages: [],
-        } as never,
-        env,
-      ),
-    ).rejects.toThrow("warmup_unknown_queue:unknown-queue");
+    await handleWarmupQueue(unknownBatch as never, env);
+    expect(warn).toHaveBeenCalledWith(
+      "warmup_unknown_queue",
+      expect.objectContaining({ queue: "unknown-queue", messageCount: 1 }),
+    );
+    expect(unknownMessage.ack).toHaveBeenCalledOnce();
+    warn.mockRestore();
 
     const retryBatch = {
       queue: WARMUP_SEND_RETRY_QUEUE,

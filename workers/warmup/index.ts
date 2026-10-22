@@ -5,11 +5,7 @@ import {
 } from "./lib/cron-tick";
 import { processEmailEventsBatch } from "./lib/email-events";
 import { processWarmupQueueBatch } from "./lib/queue-batch";
-import {
-  WARMUP_EMAIL_EVENTS_QUEUE,
-  WARMUP_EMAIL_EVENTS_QUEUE_PLACEHOLDER,
-  WARMUP_SEND_RETRY_QUEUE,
-} from "./lib/queue-names";
+import { WARMUP_EMAIL_EVENTS_QUEUE, WARMUP_SEND_RETRY_QUEUE } from "./lib/queue-names";
 import type { WarmupEnv, WarmupQueueBody } from "./lib/config";
 
 export async function executeWarmupScheduled(
@@ -33,6 +29,19 @@ export async function handleWarmupScheduled(
   }
 }
 
+function ackUnknownQueueBatch(
+  batch: MessageBatch<WarmupQueueBody | unknown>,
+  queueName: string,
+): void {
+  console.warn("warmup_unknown_queue", {
+    queue: queueName,
+    messageCount: batch.messages.length,
+  });
+  for (const message of batch.messages) {
+    message.ack();
+  }
+}
+
 export async function handleWarmupQueue(
   batch: MessageBatch<WarmupQueueBody | unknown>,
   env: WarmupEnv,
@@ -42,14 +51,11 @@ export async function handleWarmupQueue(
     await processWarmupQueueBatch(batch as MessageBatch<WarmupQueueBody>, env);
     return;
   }
-  if (
-    queueName === WARMUP_EMAIL_EVENTS_QUEUE ||
-    queueName === WARMUP_EMAIL_EVENTS_QUEUE_PLACEHOLDER
-  ) {
+  if (queueName === WARMUP_EMAIL_EVENTS_QUEUE) {
     await processEmailEventsBatch(batch as MessageBatch<unknown>, env);
     return;
   }
-  throw new Error(`warmup_unknown_queue:${queueName}`);
+  ackUnknownQueueBatch(batch, queueName);
 }
 
 const warmupWorker = {

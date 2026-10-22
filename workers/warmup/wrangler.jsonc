@@ -30,10 +30,6 @@
         "queue": "we-met-warmup-send-dlq",
         "binding": "WARMUP_DLQ",
       },
-      {
-        "queue": "we-met-warmup-email-events-dlq",
-        "binding": "WARMUP_EMAIL_EVENTS_DLQ",
-      },
     ],
     "consumers": [
       {

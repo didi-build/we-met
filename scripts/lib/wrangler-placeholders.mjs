@@ -9,7 +9,11 @@ export const D1_PLACEHOLDER_NONPROD = "00000000-0000-0000-0000-000000000002";
 /** Placeholder KV namespace id in workers/warmup/wrangler.jsonc until production id is committed or injected. */
 export const WARMUP_KV_PLACEHOLDER_ID = "00000000-0000-0000-0000-000000000000";
 
-/** Placeholder queue names in workers/warmup/wrangler.jsonc until DIDI-721 provisions Email Sending subscriptions. */
+/**
+ * Warmup email-events queue names (committed in workers/warmup/wrangler.jsonc).
+ * Deploy guards reject the zero UUID placeholders below if they appear in consumer
+ * queue or dead_letter_queue fields (same idea as WARMUP_KV_PLACEHOLDER_ID).
+ */
 export const WARMUP_EMAIL_EVENTS_QUEUE = "we-met-warmup-email-events";
 export const WARMUP_EMAIL_EVENTS_DLQ = "we-met-warmup-email-events-dlq";
 export const WARMUP_EMAIL_EVENTS_QUEUE_PLACEHOLDER =

@@ -1,4 +1,5 @@
 import type { WarmupEnv, WarmupSecrets } from "./config";
+import { escapeHtmlForEmail } from "./escape-html";
 import { redactEmailForLog } from "./redact-email";
 
 /** Dedupe non-seed urgent alerts per Email Sending message id (separate from pause-episode dedupe). */
@@ -57,19 +58,25 @@ export async function sendNonSeedEmailEventAlertOnce(
   }
 
   const subject = "We Met urgent: app mail bounce or complaint";
+  const dedupeId = context.dedupeKey.slice(WARMUP_KV_NONSEED_ALERT_PREFIX.length);
   const text = [
     "Cloudflare Email Sending reported a bounce or complaint for a non-seed recipient.",
     "",
     `Event type: ${context.eventType}`,
     `Recipient (redacted): ${context.recipientRedacted}`,
-    `Dedupe id: ${context.dedupeKey.slice(WARMUP_KV_NONSEED_ALERT_PREFIX.length)}`,
+    `Dedupe id: ${dedupeId}`,
     "",
     "Warm-up sending was not paused. Investigate app mail deliverability.",
   ].join("\n");
-  const html = text
-    .split("\n")
-    .map((line) => (line.length === 0 ? "<br>" : `<p>${line}</p>`))
-    .join("");
+  const html = [
+    "<p>Cloudflare Email Sending reported a bounce or complaint for a non-seed recipient.</p>",
+    "<br>",
+    `<p>Event type: ${escapeHtmlForEmail(context.eventType)}</p>`,
+    `<p>Recipient (redacted): ${escapeHtmlForEmail(context.recipientRedacted)}</p>`,
+    `<p>Dedupe id: ${escapeHtmlForEmail(dedupeId)}</p>`,
+    "<br>",
+    "<p>Warm-up sending was not paused. Investigate app mail deliverability.</p>",
+  ].join("");
 
   try {
     await env.EMAIL.send({
