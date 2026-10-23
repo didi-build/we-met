@@ -226,9 +226,58 @@ describe("cloudflare-provision-api (unit)", () => {
     await expect(client.getD1Database("missing-db")).resolves.toBeNull();
   });
 
-  it("isCloudflareNotFound recognizes common codes", () => {
-    expect(isCloudflareNotFound(404, [{ code: 7404 }])).toBe(true);
-    expect(isCloudflareNotFound(200, [])).toBe(false);
+  it("getD1Database uses list API with name query", async () => {
+    const fetchImpl = vi.fn(async (url: string) => {
+      expect(url).toBe(
+        "https://api.cloudflare.com/client/v4/accounts/acct/d1/database?name=" +
+          encodeURIComponent("we-met-db"),
+      );
+      return {
+        status: 200,
+        text: async () =>
+          JSON.stringify({
+            success: true,
+            result: [{ name: "we-met-db", uuid: "uuid-1" }],
+          }),
+      };
+    });
+    const client = createCloudflareProvisionClient(
+      fetchImpl as unknown as typeof fetch,
+      {
+        accountId: "acct",
+        apiToken: "token",
+      },
+    );
+    await expect(client.getD1Database("we-met-db")).resolves.toEqual({
+      name: "we-met-db",
+      uuid: "uuid-1",
+    });
+  });
+
+  it("createCloudflareProvisionClient throws on non-404 with not-found-like error codes", async () => {
+    const fetchImpl = vi.fn(async () => ({
+      status: 403,
+      text: async () =>
+        JSON.stringify({
+          success: false,
+          errors: [{ code: 10013, message: "not found" }],
+        }),
+    }));
+    const client = createCloudflareProvisionClient(
+      fetchImpl as unknown as typeof fetch,
+      {
+        accountId: "acct",
+        apiToken: "token",
+      },
+    );
+    await expect(client.getD1Database("we-met-db")).rejects.toThrow(/failed/);
+  });
+
+  it("isCloudflareNotFound only treats HTTP 404 as not found", () => {
+    expect(isCloudflareNotFound(404)).toBe(true);
+    expect(isCloudflareNotFound(403)).toBe(false);
+    expect(isCloudflareNotFound(500)).toBe(false);
+    expect(isCloudflareNotFound(200)).toBe(false);
   });
 });
 

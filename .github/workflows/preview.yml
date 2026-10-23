@@ -29,6 +29,10 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - name: Fetch main for non-prod resource gate
+        run: git fetch origin main --depth=1
+      - name: Verify non-prod D1/R2 exist on main (no preview provision)
+        run: node scripts/verify-preview-nonprod-resources.mjs
       - name: Deploy-time guards (preview, committed config)
         run: node scripts/check-deploy-guards.mjs --target preview --config wrangler.jsonc
       - name: Prepare Wrangler config (non-prod D1 IDs)

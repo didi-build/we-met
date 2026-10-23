@@ -4,7 +4,10 @@ import { pathToFileURL } from "node:url";
 
 const WORKFLOWS_DIR = ".github/workflows";
 const ALLOWED_BOOTSTRAP_FILE = "bootstrap.yml";
-const ALLOWED_MIGRATE_NONPROD_FILE = "migrate-nonprod.yml";
+const ALLOWED_MIGRATE_NONPROD_FILES = new Set([
+  "migrate-nonprod.yml",
+  "provision-nonprod-main.yml",
+]);
 const ALLOWED_DEPLOY_PRODUCTION_FILE = "deploy-production.yml";
 const SECRET_NAME = "BOOTSTRAP_TOKEN";
 const MIGRATE_NONPROD_SECRET = "CLOUDFLARE_API_TOKEN_MIGRATE_NONPROD";
@@ -47,7 +50,7 @@ export function findMigrateNonprodCredentialViolations(workflowsDir) {
     if (!entry.isFile()) continue;
     const name = entry.name;
     if (!name.endsWith(".yml") && !name.endsWith(".yaml")) continue;
-    if (name === ALLOWED_MIGRATE_NONPROD_FILE) continue;
+    if (ALLOWED_MIGRATE_NONPROD_FILES.has(name)) continue;
     const text = readFileSync(join(workflowsDir, name), "utf8");
     if (text.includes(MIGRATE_NONPROD_SECRET) || text.includes(MIGRATE_NONPROD_ENV)) {
       violations.push(name);
@@ -93,7 +96,7 @@ function runCli() {
   const migrateViolations = findMigrateNonprodCredentialViolations(WORKFLOWS_DIR);
   if (migrateViolations.length > 0) {
     console.error(
-      `${MIGRATE_NONPROD_SECRET} and environment name ${MIGRATE_NONPROD_ENV} must only appear in .github/workflows/${ALLOWED_MIGRATE_NONPROD_FILE}. Offenders:\n`,
+      `${MIGRATE_NONPROD_SECRET} and environment name ${MIGRATE_NONPROD_ENV} must only appear in ${[...ALLOWED_MIGRATE_NONPROD_FILES].map((f) => `.github/workflows/${f}`).join(" or ")}. Offenders:\n`,
     );
     for (const file of migrateViolations) {
       console.error(`  - ${file}`);

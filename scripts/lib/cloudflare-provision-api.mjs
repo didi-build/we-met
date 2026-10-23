@@ -50,13 +50,8 @@ export function extractD1Row(payload) {
  * @param {number} status
  * @param {unknown[]} errors
  */
-export function isCloudflareNotFound(status, errors) {
-  if (status === 404) return true;
-  const list = Array.isArray(errors) ? errors : [];
-  return list.some((entry) => {
-    const code = entry?.code;
-    return code === 7404 || code === 10013 || code === 10007;
-  });
+export function isCloudflareNotFound(status) {
+  return status === 404;
 }
 
 /**
@@ -87,7 +82,7 @@ export function createCloudflareProvisionClient(fetchImpl, config) {
     const data = parseCloudflareJsonBody(text, label);
     if (!data.success) {
       const errors = data.errors ?? [];
-      if (isCloudflareNotFound(response.status, errors)) {
+      if (isCloudflareNotFound(response.status)) {
         const err = new Error(`Cloudflare API ${label}: not found`);
         err.isNotFound = true;
         throw err;
@@ -110,13 +105,28 @@ export function createCloudflareProvisionClient(fetchImpl, config) {
       try {
         const result = await request(
           "GET",
-          `/accounts/${accountId}/d1/database/${encodeURIComponent(name)}`,
+          `/accounts/${accountId}/d1/database?name=${encodeURIComponent(name)}`,
         );
-        const row = extractD1Row(result);
-        if (!row) {
-          throw new Error(`Cloudflare API D1 get ${name} returned unexpected shape`);
+        if (!Array.isArray(result)) {
+          throw new Error(
+            `Cloudflare API D1 list for ${name} returned non-array result`,
+          );
         }
-        return row;
+        const matches = [];
+        for (const item of result) {
+          const row = extractD1Row(item);
+          if (!row) {
+            throw new Error(`Cloudflare API D1 list returned unexpected shape`);
+          }
+          if (row.name === name) matches.push(row);
+        }
+        if (matches.length === 0) return null;
+        if (matches.length > 1) {
+          throw new Error(
+            `Cloudflare API D1 list for ${name} matched more than one database`,
+          );
+        }
+        return matches[0];
       } catch (err) {
         if (err.isNotFound) return null;
         throw err;
