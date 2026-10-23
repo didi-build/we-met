@@ -1,12 +1,5 @@
 export type FollowupEmailErrorCode =
-  | "gmail_secret_missing"
-  | "gmail_invalid_service_account_json"
-  | `gmail_token_http_${number}`
-  | "gmail_token_missing_access_token"
-  | `gmail_send_http_${number}`
-  | "gmail_network_error"
   | "nonprod_mail_redirect_unset"
-  | "owner_from_email_missing"
   | "cloudflare_from_email_missing"
   | "cloudflare_binding_missing"
   | "from_display_name_missing"
@@ -45,9 +38,7 @@ export function followupEmailErrorLogFields(
   if (error instanceof FollowupEmailError) {
     const fields: FollowupEmailErrorLogFields = { code: error.code };
     if (
-      (error.code === "gmail_secret_missing" ||
-        error.code === "owner_from_email_missing" ||
-        error.code === "cloudflare_from_email_missing" ||
+      (error.code === "cloudflare_from_email_missing" ||
         error.code === "from_display_name_missing") &&
       error.secretName
     ) {

@@ -77,8 +77,6 @@ function createCloudflareBindingSendEmailThatThrowsNameTypeError(): {
     throw new Error(CLOUDFLARE_EMAIL_ADDRESS_NAME_TYPE_ERROR);
   });
   const sendEmail = createConsumerOutboundEmailSend({
-    GMAIL_SERVICE_ACCOUNT_JSON: "{}",
-    GMAIL_SENDER: "delegated@example.com",
     EMAIL: { send: emailSend },
   });
   return { emailSend, sendEmail };
@@ -93,7 +91,6 @@ function createDeps(
   const sendEmail =
     overrides.sendEmail ?? vi.fn(async () => ({ messageId: "g1", threadId: "t1" }));
   const outboundFrom = overrides.outboundFrom ?? {
-    ownerFromEmail: "hello@we-met.link",
     cloudflareFromEmail: "hello@mail.we-met.link",
   };
   const now = overrides.now ?? (() => new Date("2026-10-12T12:00:00.000Z"));
@@ -162,16 +159,6 @@ function createDeps(
   };
 }
 
-function cloudflareLeadEmailControls() {
-  return {
-    leadEmailEnabled: true,
-    emailProvider: "cloudflare" as const,
-    visitorEmailMode: "direct" as const,
-    dailyCapGlobal: 150,
-    dailyCapPerCard: 50,
-  };
-}
-
 function sinkRecordBody(overrides: Record<string, unknown> = {}) {
   return {
     type: "lead_sink_record",
@@ -194,9 +181,9 @@ describe("processFollowupQueueBatch (unit)", () => {
     await processFollowupQueueBatch({ messages: [message] }, deps);
 
     expect(deps.sendEmail).toHaveBeenCalledOnce();
-    const sent = vi.mocked(deps.sendEmail).mock.calls[0][1];
+    const sent = vi.mocked(deps.sendEmail).mock.calls[0][0];
     expect(sent.to).toBe("test-inbox@example.com");
-    expect(sent.from).toBe("hello@we-met.link");
+    expect(sent.from).toBe("hello@mail.we-met.link");
     expect(sent.fromDisplayName).toBe("Demo via We Met");
     expect(sent.replyTo).toBe("owner@example.com");
     expect(message.ack).toHaveBeenCalledOnce();
@@ -207,7 +194,7 @@ describe("processFollowupQueueBatch (unit)", () => {
     const message = createMessage(visitorBody(), { attempts: 2 });
     const deps = createDeps({
       sendEmail: vi.fn(async () => {
-        throw new FollowupEmailError("gmail_network_error");
+        throw new FollowupEmailError("cloudflare_E_RATE_LIMIT_EXCEEDED");
       }),
     });
 
@@ -216,7 +203,7 @@ describe("processFollowupQueueBatch (unit)", () => {
     expect(deps.logVisitorFollowupAttemptFailure).toHaveBeenCalledWith(
       "lead-1",
       2,
-      { code: "gmail_network_error" },
+      { code: "cloudflare_E_RATE_LIMIT_EXCEEDED" },
       true,
     );
     expect(message.retry).toHaveBeenCalledOnce();
@@ -232,7 +219,7 @@ describe("processFollowupQueueBatch (unit)", () => {
       const message = createMessage(visitorBody(), { attempts: attempt });
       const deps = createDeps({
         sendEmail: vi.fn(async () => {
-          throw new FollowupEmailError("gmail_network_error");
+          throw new FollowupEmailError("cloudflare_E_RATE_LIMIT_EXCEEDED");
         }),
       });
       await processFollowupQueueBatch({ messages: [message] }, deps);
@@ -256,7 +243,7 @@ describe("processFollowupQueueBatch (unit)", () => {
     });
     const deps = createDeps({
       sendEmail: vi.fn(async () => {
-        throw new FollowupEmailError("gmail_network_error");
+        throw new FollowupEmailError("cloudflare_E_RATE_LIMIT_EXCEEDED");
       }),
     });
 
@@ -265,11 +252,11 @@ describe("processFollowupQueueBatch (unit)", () => {
     expect(deps.logVisitorFollowupAttemptFailure).toHaveBeenCalledWith(
       "lead-1",
       MAX_VISITOR_FOLLOWUP_ATTEMPTS,
-      { code: "gmail_network_error" },
+      { code: "cloudflare_E_RATE_LIMIT_EXCEEDED" },
       false,
     );
     expect(deps.logVisitorFollowupPermanentFailure).toHaveBeenCalledWith("lead-1", {
-      code: "gmail_network_error",
+      code: "cloudflare_E_RATE_LIMIT_EXCEEDED",
     });
     expect(message.ack).toHaveBeenCalledOnce();
     expect(message.retry).not.toHaveBeenCalled();
@@ -288,7 +275,7 @@ describe("processFollowupQueueBatch (unit)", () => {
 
     await processFollowupQueueBatch({ messages: [message] }, deps);
 
-    const sent = vi.mocked(deps.sendEmail).mock.calls[0][1];
+    const sent = vi.mocked(deps.sendEmail).mock.calls[0][0];
     expect(sent.fromDisplayName).toBe(PLATFORM_FROM_DISPLAY_NAME);
     expect(sent.replyTo).toBe("owner@example.com");
   });
@@ -320,12 +307,11 @@ describe("processFollowupQueueBatch (unit)", () => {
     );
   });
 
-  it("never calls send when WE_MET_OWNER_FROM_EMAIL is unset; retries then permanent failure", async () => {
+  it("never calls send when WE_MET_EMAIL_FROM_CLOUDFLARE is unset; retries then permanent failure", async () => {
     const send = vi.fn(async () => ({ messageId: null, threadId: null }));
     const depsUnset = createDeps({
       outboundFrom: {
-        ownerFromEmail: undefined,
-        cloudflareFromEmail: "hello@mail.we-met.link",
+        cloudflareFromEmail: undefined,
       },
       sendEmail: send,
     });
@@ -336,7 +322,10 @@ describe("processFollowupQueueBatch (unit)", () => {
     expect(depsUnset.logVisitorFollowupAttemptFailure).toHaveBeenCalledWith(
       "lead-1",
       3,
-      { code: "owner_from_email_missing", secretName: "WE_MET_OWNER_FROM_EMAIL" },
+      {
+        code: "cloudflare_from_email_missing",
+        secretName: "WE_MET_EMAIL_FROM_CLOUDFLARE",
+      },
       true,
     );
 
@@ -345,8 +334,7 @@ describe("processFollowupQueueBatch (unit)", () => {
     });
     const depsFinal = createDeps({
       outboundFrom: {
-        ownerFromEmail: "",
-        cloudflareFromEmail: "hello@mail.we-met.link",
+        cloudflareFromEmail: "",
       },
       sendEmail: send,
     });
@@ -355,7 +343,10 @@ describe("processFollowupQueueBatch (unit)", () => {
     expect(msgFinal.ack).toHaveBeenCalledOnce();
     expect(depsFinal.logVisitorFollowupPermanentFailure).toHaveBeenCalledWith(
       "lead-1",
-      { code: "owner_from_email_missing", secretName: "WE_MET_OWNER_FROM_EMAIL" },
+      {
+        code: "cloudflare_from_email_missing",
+        secretName: "WE_MET_EMAIL_FROM_CLOUDFLARE",
+      },
     );
   });
 
@@ -422,7 +413,7 @@ describe("processFollowupQueueBatch (unit)", () => {
     );
     const deps = createDeps({ weMetEnv: "preview" });
     await processFollowupQueueBatch({ messages: [message] }, deps);
-    const sent = vi.mocked(deps.sendEmail).mock.calls[0][1];
+    const sent = vi.mocked(deps.sendEmail).mock.calls[0][0];
     expect(sent.to).toBe("test-inbox@example.com");
     expect(sent.subject).toContain("visitor@example.com");
   });
@@ -431,7 +422,7 @@ describe("processFollowupQueueBatch (unit)", () => {
     const message = createMessage(visitorBody());
     const deps = createDeps({ weMetEnv: "production", testMailTo: undefined });
     await processFollowupQueueBatch({ messages: [message] }, deps);
-    const sent = vi.mocked(deps.sendEmail).mock.calls[0][1];
+    const sent = vi.mocked(deps.sendEmail).mock.calls[0][0];
     expect(sent.to).toBe("visitor@example.com");
     expect(sent.subject).not.toContain("[we-met test");
     expect(sent.textPlain).not.toContain("Test delivery (visitor typed)");
@@ -463,7 +454,7 @@ describe("processFollowupQueueBatch (unit)", () => {
     expect(message.ack).toHaveBeenCalledOnce();
   });
 
-  it("threads lead_sink_append_details when record email was sent", async () => {
+  it("sends lead_sink_append_details unthreaded when record external_ref is Gmail-era", async () => {
     const ledger = new MemoryConsumerLeadDeliveryLedger();
     ledger.seedSent(
       "lead-1",
@@ -493,13 +484,12 @@ describe("processFollowupQueueBatch (unit)", () => {
     await processFollowupQueueBatch({ messages: [message] }, deps);
 
     expect(deps.sendEmail).toHaveBeenCalledOnce();
-    const sent = vi.mocked(deps.sendEmail).mock.calls[0][1];
+    const sent = vi.mocked(deps.sendEmail).mock.calls[0][0];
     expect(sent.subject).toBe(
       "Re: [we-met test → owner@example.com] New lead added: Alex Visitor",
     );
-    expect(sent.inReplyTo).toBe("<lead-1.sink-1.record@we-met.link>");
-    expect(sent.references).toBe("<lead-1.sink-1.record@we-met.link>");
-    expect(sent.threadId).toBe("gmail-thread-record");
+    expect(sent.inReplyTo).toBeUndefined();
+    expect(sent.references).toBeUndefined();
     expect(message.ack).toHaveBeenCalledOnce();
   });
 
@@ -512,9 +502,9 @@ describe("processFollowupQueueBatch (unit)", () => {
     await processFollowupQueueBatch({ messages: [message] }, deps);
 
     expect(deps.sendEmail).toHaveBeenCalledOnce();
-    const sent = vi.mocked(deps.sendEmail).mock.calls[0][1];
+    const sent = vi.mocked(deps.sendEmail).mock.calls[0][0];
     expect(sent.to).toBe("test-inbox@example.com");
-    expect(sent.from).toBe("hello@we-met.link");
+    expect(sent.from).toBe("hello@mail.we-met.link");
     expect(sent.fromDisplayName).toBe(PLATFORM_FROM_DISPLAY_NAME);
     expect(message.ack).toHaveBeenCalledOnce();
     expect(message.retry).not.toHaveBeenCalled();
@@ -601,7 +591,7 @@ describe("processFollowupQueueBatch (unit)", () => {
       leadId: "lead-1",
       sinkId: "sink-1",
       phase: "record",
-      errorCode: "gmail_network_error",
+      errorCode: "cloudflare_E_RATE_LIMIT_EXCEEDED",
       updatedAt: "2026-10-12T12:00:00.000Z",
     });
     ledger.seedQueued("lead-1", "sink-1", "append");
@@ -625,9 +615,8 @@ describe("processFollowupQueueBatch (unit)", () => {
 
     await processFollowupQueueBatch({ messages: [message] }, deps);
 
-    const sent = vi.mocked(deps.sendEmail).mock.calls[0][1];
+    const sent = vi.mocked(deps.sendEmail).mock.calls[0][0];
     expect(sent.inReplyTo).toBeUndefined();
-    expect(sent.threadId).toBeUndefined();
     expect(message.ack).toHaveBeenCalledOnce();
   });
 
@@ -638,7 +627,7 @@ describe("processFollowupQueueBatch (unit)", () => {
     const deps = createDeps(
       {
         sendEmail: vi.fn(async () => {
-          throw new FollowupEmailError("gmail_network_error");
+          throw new FollowupEmailError("cloudflare_E_RATE_LIMIT_EXCEEDED");
         }),
       },
       ledger,
@@ -663,7 +652,7 @@ describe("processFollowupQueueBatch (unit)", () => {
     const deps = createDeps(
       {
         sendEmail: vi.fn(async () => {
-          throw new FollowupEmailError("gmail_network_error");
+          throw new FollowupEmailError("cloudflare_E_RATE_LIMIT_EXCEEDED");
         }),
       },
       ledger,
@@ -675,11 +664,11 @@ describe("processFollowupQueueBatch (unit)", () => {
     expect(message.retry).not.toHaveBeenCalled();
     const row = ledger.getRowState("lead-1", "sink-1", "record");
     expect(row?.status).toBe("failed");
-    expect(row?.errorCode).toBe("gmail_network_error");
+    expect(row?.errorCode).toBe("cloudflare_E_RATE_LIMIT_EXCEEDED");
     expect(row?.nextAttemptAt).toBeNull();
   });
 
-  it("never sends sink email when WE_MET_OWNER_FROM_EMAIL is missing", async () => {
+  it("never sends sink email when WE_MET_EMAIL_FROM_CLOUDFLARE is missing", async () => {
     const ledger = new MemoryConsumerLeadDeliveryLedger();
     ledger.seedQueued("lead-1", "sink-1", "record");
     const send = vi.fn(async () => ({ messageId: "g1", threadId: "t1" }));
@@ -687,8 +676,7 @@ describe("processFollowupQueueBatch (unit)", () => {
     const deps = createDeps(
       {
         outboundFrom: {
-          ownerFromEmail: undefined,
-          cloudflareFromEmail: "hello@mail.we-met.link",
+          cloudflareFromEmail: undefined,
         },
         sendEmail: send,
       },
@@ -806,15 +794,12 @@ describe("processFollowupQueueBatch (unit)", () => {
     await processFollowupQueueBatch({ messages: [msgA, msgB] }, deps);
 
     expect(send).toHaveBeenCalledTimes(2);
-    const calls = vi.mocked(deps.sendEmail).mock.calls;
-    expect(calls[0]![1].messageId).toBe("<lead-1.sink-a.record@we-met.link>");
-    expect(calls[1]![1].messageId).toBe("<lead-1.sink-b.record@we-met.link>");
     expect(
       JSON.parse(ledger.getRowState("lead-1", "sink-a", "record")!.externalRef!),
-    ).toMatchObject({ gmailThreadId: "thread-0" });
+    ).toEqual({ provider: "cloudflare", messageId: "msg-0" });
     expect(
       JSON.parse(ledger.getRowState("lead-1", "sink-b", "record")!.externalRef!),
-    ).toMatchObject({ gmailThreadId: "thread-1" });
+    ).toEqual({ provider: "cloudflare", messageId: "msg-1" });
   });
 
   it("does not block visitor follow-up when email sink fails first in batch", async () => {
@@ -822,11 +807,13 @@ describe("processFollowupQueueBatch (unit)", () => {
     ledger.seedQueued("lead-1", "sink-1", "record");
     const sink = createMessage(sinkRecordBody(), { id: "sink" });
     const visitor = createMessage(visitorBody(), { id: "visitor" });
-    const send = vi.fn(async (_provider, email: { messageId?: string }) => {
-      if (email.messageId?.includes("sink-1")) {
-        throw new FollowupEmailError("gmail_network_error");
+    let sendCalls = 0;
+    const send = vi.fn(async () => {
+      sendCalls += 1;
+      if (sendCalls === 1) {
+        throw new FollowupEmailError("cloudflare_E_RATE_LIMIT_EXCEEDED");
       }
-      return { messageId: "v1", threadId: "vt1" };
+      return { messageId: "v1", threadId: null };
     });
     const deps = createDeps({ sendEmail: send }, ledger);
 
@@ -844,11 +831,13 @@ describe("processFollowupQueueBatch (unit)", () => {
     ledger.seedQueued("lead-1", "sink-b", "record");
     const sinkA = createMessage(sinkRecordBody({ sinkId: "sink-a" }), { id: "sink-a" });
     const sinkB = createMessage(sinkRecordBody({ sinkId: "sink-b" }), { id: "sink-b" });
-    const send = vi.fn(async (_provider, email: { messageId?: string }) => {
-      if (email.messageId?.includes("sink-a")) {
-        throw new FollowupEmailError("gmail_network_error");
+    let sendCalls = 0;
+    const send = vi.fn(async () => {
+      sendCalls += 1;
+      if (sendCalls === 1) {
+        throw new FollowupEmailError("cloudflare_E_RATE_LIMIT_EXCEEDED");
       }
-      return { messageId: "g-b", threadId: "t-b" };
+      return { messageId: "g-b", threadId: null };
     });
     const deps = createDeps({ sendEmail: send }, ledger);
 
@@ -878,7 +867,7 @@ describe("processFollowupQueueBatch (unit)", () => {
       {
         ledger: ledgerBroken,
         sendEmail: vi.fn(async () => {
-          throw new FollowupEmailError("gmail_network_error");
+          throw new FollowupEmailError("cloudflare_E_RATE_LIMIT_EXCEEDED");
         }),
       },
       ledger,
@@ -893,7 +882,7 @@ describe("processFollowupQueueBatch (unit)", () => {
     expect(deps.logLeadSinkLedgerRecordFailed).toHaveBeenCalledWith(
       "lead-1",
       "sink-1",
-      "gmail_network_error",
+      "cloudflare_E_RATE_LIMIT_EXCEEDED",
     );
   });
 
@@ -917,7 +906,7 @@ describe("processFollowupQueueBatch (unit)", () => {
       {
         ledger: ledgerBroken,
         sendEmail: vi.fn(async () => {
-          throw new FollowupEmailError("gmail_network_error");
+          throw new FollowupEmailError("cloudflare_E_RATE_LIMIT_EXCEEDED");
         }),
       },
       ledger,
@@ -930,7 +919,7 @@ describe("processFollowupQueueBatch (unit)", () => {
     expect(deps.logLeadSinkLedgerMarkFailed).toHaveBeenCalledWith(
       "lead-1",
       "sink-1",
-      "gmail_network_error",
+      "cloudflare_E_RATE_LIMIT_EXCEEDED",
     );
   });
 
@@ -958,7 +947,6 @@ describe("processFollowupQueueBatch (unit)", () => {
     const message = createMessage(sinkRecordBody());
     const deps = createDeps(
       {
-        readLeadEmailControls: vi.fn(async () => cloudflareLeadEmailControls()),
         sendEmail: vi.fn(async () => ({
           messageId: "<record@mail.we-met.link>",
           threadId: null,
@@ -970,11 +958,8 @@ describe("processFollowupQueueBatch (unit)", () => {
     await processFollowupQueueBatch({ messages: [message] }, deps);
 
     expect(deps.sendEmail).toHaveBeenCalledOnce();
-    const [provider, sent] = vi.mocked(deps.sendEmail).mock.calls[0]!;
-    expect(provider).toBe("cloudflare");
+    const sent = vi.mocked(deps.sendEmail).mock.calls[0]![0];
     expect(sent.from).toBe("hello@mail.we-met.link");
-    expect(sent.messageId).toBeUndefined();
-    expect(sent.threadId).toBeUndefined();
     expect(
       JSON.parse(ledger.getRowState("lead-1", "sink-1", "record")!.externalRef!),
     ).toEqual({
@@ -1009,26 +994,19 @@ describe("processFollowupQueueBatch (unit)", () => {
       cardSlug: "demo",
       sourceUrl: "https://we-met.link/hi/demo",
     });
-    const deps = createDeps(
-      {
-        readLeadEmailControls: vi.fn(async () => cloudflareLeadEmailControls()),
-      },
-      ledger,
-    );
+    const deps = createDeps({}, ledger);
 
     await processFollowupQueueBatch({ messages: [message] }, deps);
 
-    const [, sent] = vi.mocked(deps.sendEmail).mock.calls[0]!;
+    const sent = vi.mocked(deps.sendEmail).mock.calls[0]![0];
     expect(sent.inReplyTo).toBeUndefined();
     expect(sent.references).toBeUndefined();
-    expect(sent.messageId).toBeUndefined();
-    expect(sent.threadId).toBeUndefined();
     expect(message.ack).toHaveBeenCalledOnce();
   });
 
   it("sends Cloudflare append unthreaded when record ref is null", async () => {
     const ledger = new MemoryConsumerLeadDeliveryLedger();
-    ledger.seedFailed("lead-1", "sink-1", "record", "gmail_network_error");
+    ledger.seedFailed("lead-1", "sink-1", "record", "cloudflare_E_RATE_LIMIT_EXCEEDED");
     ledger.seedQueued("lead-1", "sink-1", "append");
     const message = createMessage({
       type: "lead_sink_append_details",
@@ -1046,16 +1024,11 @@ describe("processFollowupQueueBatch (unit)", () => {
       cardSlug: "demo",
       sourceUrl: "https://we-met.link/hi/demo",
     });
-    const deps = createDeps(
-      {
-        readLeadEmailControls: vi.fn(async () => cloudflareLeadEmailControls()),
-      },
-      ledger,
-    );
+    const deps = createDeps({}, ledger);
 
     await processFollowupQueueBatch({ messages: [message] }, deps);
 
-    const [, sent] = vi.mocked(deps.sendEmail).mock.calls[0]!;
+    const sent = vi.mocked(deps.sendEmail).mock.calls[0]![0];
     expect(sent.inReplyTo).toBeUndefined();
     expect(sent.references).toBeUndefined();
     expect(message.ack).toHaveBeenCalledOnce();
@@ -1064,9 +1037,7 @@ describe("processFollowupQueueBatch (unit)", () => {
   it("never calls send when Cloudflare From is malformed; visitor retries then permanent failure", async () => {
     const send = vi.fn();
     const depsRetry = createDeps({
-      readLeadEmailControls: vi.fn(async () => cloudflareLeadEmailControls()),
       outboundFrom: {
-        ownerFromEmail: "hello@we-met.link",
         cloudflareFromEmail: "not an email",
       },
       sendEmail: send,
@@ -1089,9 +1060,7 @@ describe("processFollowupQueueBatch (unit)", () => {
       attempts: MAX_VISITOR_FOLLOWUP_ATTEMPTS,
     });
     const depsFinal = createDeps({
-      readLeadEmailControls: vi.fn(async () => cloudflareLeadEmailControls()),
       outboundFrom: {
-        ownerFromEmail: "hello@we-met.link",
         cloudflareFromEmail: "a@b.com, c@d.com",
       },
       sendEmail: send,
@@ -1111,9 +1080,7 @@ describe("processFollowupQueueBatch (unit)", () => {
   it("never calls send when Cloudflare From is unset; visitor retries then permanent failure", async () => {
     const send = vi.fn();
     const depsUnset = createDeps({
-      readLeadEmailControls: vi.fn(async () => cloudflareLeadEmailControls()),
       outboundFrom: {
-        ownerFromEmail: "hello@we-met.link",
         cloudflareFromEmail: undefined,
       },
       sendEmail: send,
@@ -1136,8 +1103,7 @@ describe("processFollowupQueueBatch (unit)", () => {
       attempts: MAX_VISITOR_FOLLOWUP_ATTEMPTS,
     });
     const depsFinal = createDeps({
-      readLeadEmailControls: vi.fn(async () => cloudflareLeadEmailControls()),
-      outboundFrom: { ownerFromEmail: "hello@we-met.link", cloudflareFromEmail: "" },
+      outboundFrom: { cloudflareFromEmail: "" },
       sendEmail: send,
     });
     await processFollowupQueueBatch({ messages: [msgFinal] }, depsFinal);
@@ -1159,9 +1125,7 @@ describe("processFollowupQueueBatch (unit)", () => {
     const message = createMessage(sinkRecordBody(), { attempts: 3 });
     const deps = createDeps(
       {
-        readLeadEmailControls: vi.fn(async () => cloudflareLeadEmailControls()),
         outboundFrom: {
-          ownerFromEmail: "hello@we-met.link",
           cloudflareFromEmail: undefined,
         },
         sendEmail: send,
@@ -1192,7 +1156,6 @@ describe("processFollowupQueueBatch (unit)", () => {
     const message = createMessage(sinkRecordBody());
     const deps = createDeps(
       {
-        readLeadEmailControls: vi.fn(async () => cloudflareLeadEmailControls()),
         sendEmail: vi.fn(async () => {
           throw new FollowupEmailError("cloudflare_E_CONTENT_TOO_LARGE");
         }),
@@ -1238,29 +1201,15 @@ describe("processFollowupQueueBatch (unit)", () => {
       cardSlug: "demo",
       sourceUrl: "https://we-met.link/hi/demo",
     });
-    const deps = createDeps(
-      {
-        readLeadEmailControls: vi.fn(async () => ({
-          leadEmailEnabled: true,
-          emailProvider: "cloudflare" as const,
-          visitorEmailMode: "direct" as const,
-          dailyCapGlobal: 150,
-          dailyCapPerCard: 50,
-        })),
-      },
-      ledger,
-    );
+    const deps = createDeps({}, ledger);
 
     await processFollowupQueueBatch({ messages: [message] }, deps);
 
     expect(deps.sendEmail).toHaveBeenCalledOnce();
-    const [provider, sent] = vi.mocked(deps.sendEmail).mock.calls[0];
-    expect(provider).toBe("cloudflare");
+    const sent = vi.mocked(deps.sendEmail).mock.calls[0]![0];
     expect(sent.from).toBe("hello@mail.we-met.link");
     expect(sent.inReplyTo).toBe("<record@mail.we-met.link>");
     expect(sent.references).toBe("<record@mail.we-met.link>");
-    expect(sent.threadId).toBeUndefined();
-    expect(sent.messageId).toBeUndefined();
     expect(message.ack).toHaveBeenCalledOnce();
   });
 
@@ -1269,7 +1218,6 @@ describe("processFollowupQueueBatch (unit)", () => {
       createCloudflareBindingSendEmailThatThrowsNameTypeError();
     const message = createMessage(visitorBody(), { attempts: 2 });
     const deps = createDeps({
-      readLeadEmailControls: vi.fn(async () => cloudflareLeadEmailControls()),
       sendEmail,
     });
 
@@ -1292,7 +1240,6 @@ describe("processFollowupQueueBatch (unit)", () => {
     const message = createMessage(sinkRecordBody());
     const deps = createDeps(
       {
-        readLeadEmailControls: vi.fn(async () => cloudflareLeadEmailControls()),
         sendEmail,
       },
       ledger,

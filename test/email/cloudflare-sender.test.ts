@@ -37,8 +37,6 @@ describe("createCloudflareEmailSender (unit)", () => {
       subject: "Hi",
       textPlain: "plain",
       textHtml: "<p>html</p>",
-      messageId: "<ignored@we-met.link>",
-      threadId: "gmail-thread",
       attachments: [
         {
           filename: "card.vcf",

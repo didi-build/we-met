@@ -237,7 +237,7 @@ describe("processLeadSinkQueueMessage with fake sink (unit)", () => {
     ledger.seedQueued("lead-1", "sink-1", "record");
     const handler = createFakeLeadSinkHandler({
       deliverRecord: async () => {
-        throw new FollowupEmailError("gmail_network_error");
+        throw new FollowupEmailError("cloudflare_E_RATE_LIMIT_EXCEEDED");
       },
     });
     const recordFailedAttempt = vi.fn(async () => {
