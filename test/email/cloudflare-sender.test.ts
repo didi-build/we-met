@@ -256,5 +256,7 @@ describe("isRetryableFollowupEmailError (unit)", () => {
     expect(isRetryableFollowupEmailError("cloudflare_send_validation_failed")).toBe(
       false,
     );
+    expect(isRetryableFollowupEmailError("cloudflare_E_VALIDATION_ERROR")).toBe(false);
+    expect(isRetryableFollowupEmailError("cloudflare_E_FIELD_MISSING")).toBe(false);
   });
 });

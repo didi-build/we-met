@@ -9,6 +9,8 @@ const CLOUDFLARE_NON_RETRYABLE_PREFIXES = ["E_HEADER_"];
 const CLOUDFLARE_NON_RETRYABLE_EXACT = new Set([
   "E_RECIPIENT_SUPPRESSED",
   "E_CONTENT_TOO_LARGE",
+  "E_VALIDATION_ERROR",
+  "E_FIELD_MISSING",
 ]);
 
 function cloudflareCodeFromErrorCode(code: FollowupEmailErrorCode): string | null {

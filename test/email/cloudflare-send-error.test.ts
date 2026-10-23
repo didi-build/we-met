@@ -9,6 +9,15 @@ describe("isPermanentCloudflareSendError (unit)", () => {
     expect(isPermanentCloudflareSendError(error)).toBe(true);
   });
 
+  it("treats plain objects with a message field as permanent when the text matches", () => {
+    expect(
+      isPermanentCloudflareSendError({
+        message:
+          "Incorrect type for the 'name' field on 'EmailAddress': the provided value is not of type 'string'.",
+      }),
+    ).toBe(true);
+  });
+
   it("does not treat transient transport errors as permanent", () => {
     expect(isPermanentCloudflareSendError(new Error("timeout"))).toBe(false);
     const suppressed = new Error("suppressed");
