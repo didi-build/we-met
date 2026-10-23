@@ -170,14 +170,14 @@ Closed date:
 
 ## Tabletop walk-through: leaked Cloudflare or Worker credential
 
-**Scenario:** A **Cloudflare API token** with Workers or Email Service access, or a **Worker secret** value (`WE_MET_EMAIL_FROM_CLOUDFLARE`, `WE_MET_FROM_DISPLAY_NAME`, or deploy tokens), was committed to a public fork, exposed in a screenshot, or shared in chat.
+**Scenario:** A **GitHub environment secret** from the `CLOUDFLARE_API_TOKEN_*` set (or a maintainer **Wrangler login** session), an **app Worker secret** (`WE_MET_TOKEN_SECRET`, `GOOGLE_CLIENT_SECRET`, `TURNSTILE_SECRET_KEY`), or the retired **Gmail service account** JSON key (still live until [DIDI-799](https://linear.app/didi-build/issue/DIDI-799) revokes it) was committed to a public fork, exposed in a screenshot, or shared in chat. `WE_MET_EMAIL_FROM_CLOUDFLARE` and `WE_MET_FROM_DISPLAY_NAME` are sending configuration, not credentials.
 
 **Goal:** Practice containment, scoping, RROSH, and record-keeping without touching production data stores in the exercise.
 
 ### Facilitator script
 
 1. **Inject (0:00):** “A contributor reports that a Wrangler token export appeared in a public GitHub gist titled ‘we-met debug’. The gist was live for about 45 minutes.”
-2. **Contain (0:05):** Participants list immediate actions: revoke the Cloudflare token, rotate Worker secrets, audit GitHub org access, search git history for other leaks. **Do not** run destructive SQL in the exercise.
+2. **Contain (0:05):** Participants list immediate actions: revoke the Cloudflare API token or Gmail service account key (retired send path; revoke in Google Cloud when that key leaked), rotate app Worker secrets and GitHub env secrets as needed, audit GitHub org access, search git history for other leaks. **Do not** run destructive SQL in the exercise.
 3. **Scope (0:15):**
    - Could an attacker have **sent** mail as We Met via Email Service or queue consumers?
    - Could they have **read** production D1 or R2 with the leaked credential? (State assumptions explicitly.)

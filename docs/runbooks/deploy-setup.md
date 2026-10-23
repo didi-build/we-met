@@ -219,9 +219,9 @@ npx wrangler secret put WE_MET_TEST_MAIL_TO --name we-met-followup-email-consume
 
 `WE_MET_TEST_MAIL_TO` is **non-prod only** (never on the production consumer). Confirm binding names with `npx wrangler versions view <version-id> --name we-met-followup-email-consumer-nonprod`.
 
-After setup, `npx wrangler secret list --name we-met-followup-email-consumer-nonprod` must show **exactly** `WE_MET_EMAIL_FROM_CLOUDFLARE`, `WE_MET_FROM_DISPLAY_NAME`, and `WE_MET_TEST_MAIL_TO` (matches [Deploy consumer non-prod](../../.github/workflows/deploy-consumer-nonprod.yml)).
+After setup, `npx wrangler secret list --name we-met-followup-email-consumer-nonprod` must include `WE_MET_EMAIL_FROM_CLOUDFLARE`, `WE_MET_FROM_DISPLAY_NAME`, and `WE_MET_TEST_MAIL_TO` (matches [Deploy consumer non-prod](../../.github/workflows/deploy-consumer-nonprod.yml)). The three legacy Gmail-era names (`GMAIL_SERVICE_ACCOUNT_JSON`, `GMAIL_SENDER`, `WE_MET_OWNER_FROM_EMAIL`) may also appear until [DIDI-799](https://linear.app/didi-build/issue/DIDI-799) deletes them.
 
-**Retries:** visitor follow-up uses `max_retries: 30` with exponential backoff capped at 30 minutes (~**12 hours** worst-case delay before permanent failure — see [environments.md](../architecture/environments.md)). Unsupported queue types retry on the same schedule until Cloudflare deletes them at the limit. A missing mail secret or provider outage drops the visitor email with only log lines (`visitor_followup_attempt_failure` / `visitor_followup_permanent_failure`).
+**Retries:** visitor follow-up uses `max_retries: 30` with exponential backoff capped at 30 minutes (~**12 hours** worst-case delay before permanent failure; see [environments.md](../architecture/environments.md)). Unsupported queue types retry on the same schedule until Cloudflare deletes them at the limit. A missing mail secret or provider outage drops the visitor email with only log lines (`visitor_followup_attempt_failure` / `visitor_followup_permanent_failure`).
 
 ### Production follow-up email consumer (first deploy, DIDI-599)
 
@@ -240,7 +240,7 @@ The first deploy **attaches the consumer to the production queue** and **starts 
 
 **Recovery:** if the consumer deploy step fails after the app deploy succeeded, re-run the **full** Deploy production job after fixing the error ([deploy.md](./deploy.md)).
 
-**Verified (2026-10-14):** production consumer Worker secrets **survive** a CI redeploy (secret names still present after a successful consumer deploy step). Gmail-era secret names were removed in [DIDI-795](https://linear.app/didi-build/issue/DIDI-795); the [first-deploy checklist](#production-follow-up-email-consumer-first-deploy-didi-599) step 3 above reflects the current two production names.
+**Verified (2026-10-14):** production consumer Worker secrets **survive** a CI redeploy (secret names still present after a successful consumer deploy step). Code no longer reads Gmail-era secret names ([DIDI-795](https://linear.app/didi-build/issue/DIDI-795)); Wrangler deletion is [DIDI-799](https://linear.app/didi-build/issue/DIDI-799). The [first-deploy checklist](#production-follow-up-email-consumer-first-deploy-didi-599) step 3 above reflects the two required production names.
 
 Production consumer secrets (same two names as step 3):
 

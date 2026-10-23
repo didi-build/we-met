@@ -838,7 +838,7 @@ other_items:
     verified: false
   - id: logs.cloudflare_email_sending_activity
     whose: visitor
-    data: Per outbound send — Email Service Activity log and emailSendingAdaptive
+    data: Per outbound send, Email Service Activity log and emailSendingAdaptive
       GraphQL events with from, to,
       subject, messageId, sessionId, status, delivery and authentication fields,
       and errorDetail (visitor and card-owner addresses and subject lines; not
