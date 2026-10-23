@@ -1,4 +1,4 @@
-# 0020. Inject D1 database IDs at deploy time from GitHub variables
+# 0020. Inject D1 database IDs at deploy time from GitHub environment secrets
 
 - **Status:** accepted
 - **Date:** 2026-10-11
@@ -9,6 +9,7 @@
 
 ## Decision
 
+- The two **GitHub environment variable** bullets below for `WE_MET_D1_DATABASE_ID_*` are **superseded for CI** by the [DIDI-793 amendment](#amendment-2026-10-23-didi-793-mask-d1-database-ids-in-github-actions-logs); workflows pass values via environment **secrets** (`secrets.*`) with the same runtime env var names.
 - **`scripts/prepare-wrangler-config.mjs`** writes a gitignored config at the **repository root** (`wrangler.ci.jsonc` for deploy/preview, `wrangler.d1-nonprod.ci.jsonc` for remote non-prod migrations) by substituting placeholders before `wrangler deploy`, `wrangler preview`, or production D1 migrations. Output must be a direct child of the repo root so Wrangler resolves `main`, `assets.directory`, and `migrations_dir` correctly.
 - **GitHub `preview` environment variable** `WE_MET_D1_DATABASE_ID_NONPROD` — used by the preview workflow; operators export the same value locally for `npm run db:migrate:remote`.
 - **GitHub `production` environment variable** `WE_MET_D1_DATABASE_ID_PRODUCTION` — required for `--target production` (non-prod placeholder may remain in the `previews` block).
@@ -32,3 +33,8 @@
 - **D1 id handoff (extends this ADR, does not replace it):** after provision, ids are written to gitignored **`provision-d1-ids.json`** (`{ "d1": { "<database_name>": "<uuid>" } }`) and the step sets `::add-mask::` for each id. **`prepare-wrangler-config.mjs`** reads `WE_MET_PROVISION_D1_IDS_FILE` (or the default path) and substitutes placeholders. Existing **`WE_MET_D1_DATABASE_ID_PRODUCTION`** / **`WE_MET_D1_DATABASE_ID_NONPROD`** remain supported; when both env and file are set for a database, they must agree. **D1 ids never appear in Actions logs or provision stdout** (only database/bucket names and `present`/`created`).
 - **Additional databases:** primary bindings keep the two existing env var names. Further databases use `WE_MET_D1_DATABASE_ID_<SLUG>_PRODUCTION` or `_NONPROD` where `<SLUG>` is the production `database_name` with hyphens replaced by underscores (the `-nonprod` suffix is stripped before building the slug for non-prod names). Adding a database beyond the two placeholder ids still requires a **`prepare-wrangler-config.mjs`** change for new placeholders ([deploy runbook](../runbooks/deploy.md#add-a-d1-database-or-r2-bucket-pr-only)).
 - **R2 buckets** have no GitHub variables; provision only ensures the bucket exists. Prod vs `-nonprod` pairing is enforced by deploy-time guards.
+
+## Amendment (2026-10-23, DIDI-793): mask D1 database ids in GitHub Actions logs
+
+- **CI workflows** pass `WE_MET_D1_DATABASE_ID_PRODUCTION`, `WE_MET_D1_DATABASE_ID_NONPROD`, and any `WE_MET_D1_DATABASE_ID_<SLUG>_*` override only via **`secrets.*`** (never **`vars.*`**), because GitHub echoes variable values in step `env` blocks. Runtime env var names are unchanged; values live in **GitHub environment secrets** ([DIDI-794](https://linear.app/didi-build/issue/DIDI-794) adds them). Operators still obtain UUIDs from `wrangler d1 list` or the Cloudflare dashboard for local export — secrets are not readable back from GitHub.
+- **`scripts/check-workflow-d1-id-secrets.mjs`** (in `npm run check`) scans `.github/workflows/*.{yml,yaml}` and fails on case-insensitive `vars` / `VARS` references to `WE_MET_D1_DATABASE_ID_*` (dot or bracket forms).

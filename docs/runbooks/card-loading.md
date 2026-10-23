@@ -75,7 +75,7 @@ npm run cards:load -- --file data/cards.local.json
 
 ## Remote non-prod D1 (`we-met-db-nonprod`)
 
-Requires `WE_MET_D1_DATABASE_ID_NONPROD` (same variable as CI preview deploys). The script writes a temporary SQL file and runs `wrangler d1 execute` with a generated `wrangler.d1-nonprod.ci.jsonc` config (removed after the run).
+Requires `WE_MET_D1_DATABASE_ID_NONPROD` (same UUID as the **`preview`** environment secret used by CI). The script writes a temporary SQL file and runs `wrangler d1 execute` with a generated `wrangler.d1-nonprod.ci.jsonc` config (removed after the run).
 
 `prepare-wrangler-config.mjs` adds a top-level `migrations_dir` on that generated config (alongside `d1_databases[].migrations_dir`) so migration paths resolve from the repo root. Wrangler may print **Unexpected fields: migrations_dir** for the top-level key; that warning is harmless for `d1 execute` and can be ignored.
 

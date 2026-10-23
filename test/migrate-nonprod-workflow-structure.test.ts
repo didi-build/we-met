@@ -73,4 +73,9 @@ describe("Migrate non-prod workflow structure (unit)", () => {
     expect(workflow).not.toContain("WE_MET_D1_DATABASE_ID_PRODUCTION");
     expect(workflow).not.toContain("CLOUDFLARE_API_TOKEN_PRODUCTION");
   });
+
+  it("does not pass non-prod D1 id through GitHub variables (log leak)", () => {
+    expect(workflow).not.toContain("vars.WE_MET_D1_DATABASE_ID_NONPROD");
+    expect(workflow).toContain("secrets.WE_MET_D1_DATABASE_ID_NONPROD");
+  });
 });

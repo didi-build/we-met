@@ -38,7 +38,7 @@ All PR previews bind the **same** remote D1 database **`we-met-db-nonprod`**. Th
 
 ## Consequences
 
-- GitHub **`preview` environment** secret `CLOUDFLARE_API_TOKEN_NONPROD` and variables `WE_MET_D1_DATABASE_ID_NONPROD`, `WE_MET_TURNSTILE_SITE_KEY_NONPROD`, plus repository secret `CLOUDFLARE_ACCOUNT_ID`, are required for previews.
+- GitHub **`preview` environment** secrets `CLOUDFLARE_API_TOKEN_NONPROD` and `WE_MET_D1_DATABASE_ID_NONPROD`, variable `WE_MET_TURNSTILE_SITE_KEY_NONPROD`, plus repository secret `CLOUDFLARE_ACCOUNT_ID`, are required for previews.
 - Operators set shared preview Worker secrets once via `wrangler preview base-config secret` (documented in [deploy.md](../runbooks/deploy.md)).
 - Non-prod Turnstile is bound to the account **workers.dev** subdomain; preview hostnames must stay on workers.dev (not custom preview domains).
 
