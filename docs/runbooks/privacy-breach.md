@@ -177,7 +177,7 @@ Closed date:
 ### Facilitator script
 
 1. **Inject (0:00):** “A contributor reports that a Wrangler token export appeared in a public GitHub gist titled ‘we-met debug’. The gist was live for about 45 minutes.”
-2. **Contain (0:05):** Participants list immediate actions: revoke the Cloudflare API token or Gmail service account key (retired send path; revoke in Google Cloud when that key leaked), rotate app Worker secrets and GitHub env secrets as needed, audit GitHub org access, search git history for other leaks. **Do not** run destructive SQL in the exercise.
+2. **Contain (0:05):** Participants list immediate actions: revoke the leaked Cloudflare API token (or end the Wrangler login session), or revoke the retired Gmail key (Google service account JSON, still live until [DIDI-799](https://linear.app/didi-build/issue/DIDI-799)) in Google Cloud; rotate app Worker secrets and GitHub env secrets as needed, audit GitHub org access, search git history for other leaks. **Do not** run destructive SQL in the exercise.
 3. **Scope (0:15):**
    - Could an attacker have **sent** mail as We Met via Email Service or queue consumers?
    - Could they have **read** production D1 or R2 with the leaked credential? (State assumptions explicitly.)
