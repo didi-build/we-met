@@ -6,6 +6,11 @@ import {
   nonSeedAlertDedupeKey,
   sendNonSeedEmailEventAlertOnce,
 } from "../../workers/warmup/lib/email-event-alert";
+import {
+  WARMUP_KV_NONSEED_ALERT_WINDOW,
+  WARMUP_NONSEED_ALERT_MAX_INDIVIDUAL_PER_HOUR,
+  WARMUP_NONSEED_ALERT_WINDOW_MS,
+} from "../../workers/warmup/lib/nonseed-alert-rate";
 import { parseWarmupSecrets } from "../../workers/warmup/lib/config";
 import { processEmailEventsBatch } from "../../workers/warmup/lib/email-events";
 import {
@@ -30,6 +35,7 @@ function baseEvent(overrides: {
   recipient?: string;
   bounceType?: string;
   schemaVersion?: number;
+  messageId?: string;
 }): Record<string, unknown> {
   const recipient = overrides.recipient ?? "seed@example.com";
   const type = overrides.type ?? "cf.email.sending.message.complained";
@@ -39,7 +45,7 @@ function baseEvent(overrides: {
     source: { type: "email.sending", domain: "mail.we-met.link" },
     payload: {
       eventId: "evt-00000000-0000-4000-8000-000000000001",
-      messageId: "msg-00000000-0000-4000-8000-000000000002",
+      messageId: overrides.messageId ?? "msg-00000000-0000-4000-8000-000000000002",
       recipient,
       subject: "test",
       terminal: true,
@@ -243,7 +249,7 @@ describe("warmup email events (unit)", () => {
       eventType: 'cf.email.sending.message.complained"><img src=x onerror=alert(1)>',
       recipientRedacted: "x<script>@example.com",
     });
-    expect(sent).toBe(true);
+    expect(sent).toBe("sent_individual");
     expect(send).toHaveBeenCalledOnce();
   });
 
@@ -292,6 +298,83 @@ describe("warmup email events (unit)", () => {
       messages: [],
     };
     await expect(handleWarmupQueue(retryBatch as never, env)).resolves.toBeUndefined();
+  });
+
+  it("rate-caps non-seed alerts with a summary then silence until the window resets", async () => {
+    const send = vi.fn(async (_message: { subject: string }) => ({
+      messageId: "alert",
+    }));
+    const kv = warmupKvEnabled();
+    const env: WarmupEnv = {
+      ...secretsEnv,
+      EMAIL: { send },
+      WARMUP_STATE: kv,
+    };
+
+    const fixedStart = new Date("2026-10-22T12:00:00.000Z");
+    vi.useFakeTimers();
+    vi.setSystemTime(fixedStart);
+    try {
+      const cap = WARMUP_NONSEED_ALERT_MAX_INDIVIDUAL_PER_HOUR;
+      const messages = Array.from({ length: cap + 3 }, (_, index) =>
+        emailQueueMessage(
+          `q${index}`,
+          baseEvent({
+            type: "cf.email.sending.message.complained",
+            recipient: `user${index}@example.com`,
+            messageId: `msg-cap-${index}`,
+          }),
+        ),
+      );
+
+      for (const message of messages) {
+        await processEmailEventsBatch({ messages: [message] }, env);
+        expect(message.ack).toHaveBeenCalledOnce();
+      }
+
+      const alertCalls = send.mock.calls.map((call) => call[0] as { subject: string });
+      const individual = alertCalls.filter(
+        (m) => m.subject === "We Met urgent: app mail bounce or complaint",
+      );
+      const summary = alertCalls.filter((m) => m.subject.includes("alert rate limit"));
+      expect(individual).toHaveLength(cap);
+      expect(summary).toHaveLength(1);
+      expect(alertCalls).toHaveLength(cap + 1);
+
+      const windowRaw = await kv.get(WARMUP_KV_NONSEED_ALERT_WINDOW);
+      expect(windowRaw).toBeTruthy();
+      const window = JSON.parse(windowRaw!) as {
+        summarySent: boolean;
+        suppressedCount: number;
+      };
+      expect(window.summarySent).toBe(true);
+      expect(window.suppressedCount).toBe(3);
+
+      vi.setSystemTime(
+        new Date(fixedStart.getTime() + WARMUP_NONSEED_ALERT_WINDOW_MS + 1),
+      );
+      const afterReset = emailQueueMessage(
+        "after-reset",
+        baseEvent({
+          type: "cf.email.sending.message.complained",
+          recipient: "fresh@example.com",
+          messageId: "msg-after-reset",
+        }),
+      );
+      await processEmailEventsBatch({ messages: [afterReset] }, env);
+      expect(afterReset.ack).toHaveBeenCalledOnce();
+
+      const afterSubjects = send.mock.calls.map(
+        (call) => (call[0] as { subject: string }).subject,
+      );
+      expect(
+        afterSubjects.filter(
+          (s) => s === "We Met urgent: app mail bounce or complaint",
+        ),
+      ).toHaveLength(cap + 1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("stores non-seed dedupe keys separate from pause episode keys", async () => {

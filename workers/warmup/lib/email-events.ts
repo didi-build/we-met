@@ -164,12 +164,20 @@ export async function handleParsedEmailSendingEvent(
     eventType: event.type,
     recipient: recipientRedacted,
   });
-  const sent = await sendNonSeedEmailEventAlertOnce(env, secrets, {
+  const alertResult = await sendNonSeedEmailEventAlertOnce(env, secrets, {
     dedupeKey,
     eventType: event.type,
     recipientRedacted,
   });
-  if (!sent) {
+  if (
+    alertResult === "sent_individual" ||
+    alertResult === "sent_summary" ||
+    alertResult === "suppressed" ||
+    alertResult === "deduped"
+  ) {
+    return "acked";
+  }
+  if (alertResult === "skipped" || alertResult === "failed") {
     const kv = env.WARMUP_STATE;
     const alertTo = env.WARMUP_ALERT_TO?.trim();
     if (!kv || !alertTo || !env.EMAIL || !parseWarmupSecrets(env)) {
