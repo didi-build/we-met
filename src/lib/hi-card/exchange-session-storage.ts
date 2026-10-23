@@ -5,6 +5,8 @@ export type HiExchangeSession = {
   firstName: string;
   visitorEmail: string;
   leadToken: string;
+  ownerEmail: string;
+  ownerPhone: string;
 };
 
 export function exchangeSessionStorageKey(slug: string): string {
@@ -26,10 +28,12 @@ export function readExchangeSession(slug: string): HiExchangeSession | null {
     const visitorEmail =
       typeof parsed.visitorEmail === "string" ? parsed.visitorEmail : "";
     const leadToken = typeof parsed.leadToken === "string" ? parsed.leadToken : "";
+    const ownerEmail = typeof parsed.ownerEmail === "string" ? parsed.ownerEmail : "";
+    const ownerPhone = typeof parsed.ownerPhone === "string" ? parsed.ownerPhone : "";
     if (!leadToken) {
       return null;
     }
-    return { firstName, visitorEmail, leadToken };
+    return { firstName, visitorEmail, leadToken, ownerEmail, ownerPhone };
   } catch {
     return null;
   }

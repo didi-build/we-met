@@ -98,6 +98,83 @@ describe("HiPageClient visitor receipt (component)", () => {
     ).toBeTruthy();
   });
 
+  it("clears session and shows reload fallback when vcard=expired is in the URL", () => {
+    const slug = "vcard-expired";
+    const token = createDetailsToken(
+      "receipt-test-secret",
+      {
+        leadId: "lead-1",
+        cardId: "test-id",
+        cardSlug: slug,
+        visitorEmail: "sam@example.com",
+        visitorName: "Sam",
+      },
+      Math.floor(Date.now() / 1000),
+    );
+    window.sessionStorage.setItem(
+      exchangeSessionStorageKey(slug),
+      JSON.stringify({
+        firstName: "Sam",
+        visitorEmail: "sam@example.com",
+        leadToken: token,
+        ownerEmail: "owner@example.com",
+        ownerPhone: "",
+      }),
+    );
+    window.localStorage.setItem(exchangeCompletedStorageKey(slug), "1");
+    window.history.replaceState({}, "", `/hi/${slug}?vcard=expired`);
+
+    const pageCard = toHiPageCard(exampleCardRecord({ slug }));
+    render(
+      <ThemeProvider>
+        <HiPageClient card={pageCard} photoUrl={null} />
+      </ThemeProvider>,
+    );
+
+    expect(window.sessionStorage.getItem(exchangeSessionStorageKey(slug))).toBeNull();
+    expect(window.location.search).toBe("");
+    expect(screen.getByRole("button", { name: /Contact sent/i })).toBeTruthy();
+    expect(screen.queryByText(/Save .* contact/i)).toBeNull();
+  });
+
+  it("keeps session and resets save UI when vcard=limited is in the URL", async () => {
+    const slug = "vcard-limited";
+    const token = createDetailsToken(
+      "receipt-test-secret",
+      {
+        leadId: "lead-1",
+        cardId: "test-id",
+        cardSlug: slug,
+        visitorEmail: "sam@example.com",
+        visitorName: "Sam",
+      },
+      Math.floor(Date.now() / 1000),
+    );
+    window.sessionStorage.setItem(
+      exchangeSessionStorageKey(slug),
+      JSON.stringify({
+        firstName: "Sam",
+        visitorEmail: "sam@example.com",
+        leadToken: token,
+        ownerEmail: "owner@example.com",
+        ownerPhone: "",
+      }),
+    );
+    window.localStorage.setItem(exchangeCompletedStorageKey(slug), "1");
+    window.history.replaceState({}, "", `/hi/${slug}?vcard=limited`);
+
+    const pageCard = toHiPageCard(exampleCardRecord({ slug }));
+    render(
+      <ThemeProvider>
+        <HiPageClient card={pageCard} photoUrl={null} />
+      </ThemeProvider>,
+    );
+
+    expect(window.sessionStorage.getItem(exchangeSessionStorageKey(slug))).toBeTruthy();
+    expect(window.location.search).toBe("");
+    expect(screen.getByRole("button", { name: /Save .* contact/i })).toBeTruthy();
+  });
+
   it("shows receipt when session exists and never stores lead token in localStorage", () => {
     const slug = "receipt-slug";
     const token = createDetailsToken(
@@ -117,6 +194,8 @@ describe("HiPageClient visitor receipt (component)", () => {
         firstName: "Sam",
         visitorEmail: "sam@example.com",
         leadToken: token,
+        ownerEmail: "maya@example.com",
+        ownerPhone: "",
       }),
     );
     window.localStorage.setItem(exchangeCompletedStorageKey(slug), "1");

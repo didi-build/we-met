@@ -29,10 +29,12 @@ export type HiCardCtaMode =
   | { kind: "exchange" }
   | {
       kind: "receipt";
+      slug: string;
       visitorFirst: string;
       ownerContact: HiOwnerContact | null;
       leadToken: string;
       detailsSent: boolean;
+      vcardSaveResetSignal: number;
       onTellMore: () => void;
       onVcardFailure: () => void;
     }
@@ -176,11 +178,13 @@ export function HiCardPresentation({
               >
                 {showReceipt && ctaMode.kind === "receipt" ? (
                   <HiVisitorReceipt
+                    slug={ctaMode.slug}
                     ownerFirst={ownerFirst}
                     visitorFirst={ctaMode.visitorFirst}
                     ownerContact={ctaMode.ownerContact}
                     leadToken={ctaMode.leadToken}
                     detailsSent={ctaMode.detailsSent}
+                    vcardSaveResetSignal={ctaMode.vcardSaveResetSignal}
                     onTellMore={ctaMode.onTellMore}
                     onVcardFailure={ctaMode.onVcardFailure}
                   />

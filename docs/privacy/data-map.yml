@@ -1345,7 +1345,8 @@
   whose: visitor
   data:
     Signed details token (leadToken) with visitor name and email, lead and card ids in the token payload (2h TTL);
-    stored in sessionStorage JSON we-met-hi-exchange-session:<slug> alongside visitor firstName and visitorEmail
+    stored in sessionStorage JSON we-met-hi-exchange-session:<slug> alongside visitor firstName and visitorEmail,
+    and ownerEmail / ownerPhone from the exchange response (for receipt Email/Call after redirect)
   purpose: receipt UI, second-step details form authorization, and token-gated owner vCard download (POST /api/exchange/vcard)
   storage: visitor browser sessionStorage (per slug; cleared on expiry, vCard error, or explicit clear)
   processors:

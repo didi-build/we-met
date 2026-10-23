@@ -21,6 +21,10 @@ import {
 import { captureSheetOpener, restoreSheetFocus } from "@/lib/hi-card/sheet-focus";
 import type { HiOwnerContact, HiPageCard } from "@/lib/hi-card/hi-page-card";
 import type { HiExchangeOwnerContact } from "@/components/hi/hi-exchange-api";
+import {
+  parseVcardReturnReason,
+  VCARD_RETURN_QUERY_KEY,
+} from "@/lib/hi-card/vcard-return-query";
 import type { MouseEvent } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -47,6 +51,7 @@ export function HiPageClient({ card, photoUrl, plan = "free" }: HiPageClientProp
   const [detailsSent, setDetailsSent] = useState(false);
   const [exchangeCompleted, setExchangeCompleted] = useState(false);
   const [sessionActive, setSessionActive] = useState(false);
+  const [vcardSaveResetSignal, setVcardSaveResetSignal] = useState(0);
 
   const degradeToReloadFallback = useCallback(() => {
     clearExchangeSession(card.slug);
@@ -58,6 +63,24 @@ export function HiPageClient({ card, photoUrl, plan = "free" }: HiPageClientProp
   useEffect(() => {
     setDetailsSent(readDetailsSentFlag(card.slug));
     setExchangeCompleted(readExchangeCompletedFlag(card.slug));
+
+    const params = new URLSearchParams(window.location.search);
+    const vcardReturn = parseVcardReturnReason(params.get(VCARD_RETURN_QUERY_KEY));
+    if (vcardReturn) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete(VCARD_RETURN_QUERY_KEY);
+      const nextPath = `${url.pathname}${url.search}${url.hash}`;
+      window.history.replaceState(window.history.state, "", nextPath);
+      if (vcardReturn === "expired") {
+        clearExchangeSession(card.slug);
+        setSessionActive(false);
+        setLeadToken("");
+        setOwnerContact(null);
+        return;
+      }
+      setVcardSaveResetSignal((n) => n + 1);
+    }
+
     const session = readExchangeSession(card.slug);
     if (!session) {
       return;
@@ -69,6 +92,10 @@ export function HiPageClient({ card, photoUrl, plan = "free" }: HiPageClientProp
     setSessionActive(true);
     setVisitorFirst(session.firstName);
     setLeadToken(session.leadToken);
+    setOwnerContact({
+      email: session.ownerEmail,
+      phone: session.ownerPhone,
+    });
   }, [card.slug]);
 
   const markDetailsSent = useCallback(() => {
@@ -88,6 +115,8 @@ export function HiPageClient({ card, photoUrl, plan = "free" }: HiPageClientProp
         ownerContact,
         leadToken,
         detailsSent,
+        slug: card.slug,
+        vcardSaveResetSignal,
         onTellMore: () => {
           sheetOpenerRef.current = null;
           pendingSheetFocusRestoreRef.current = false;
@@ -107,6 +136,8 @@ export function HiPageClient({ card, photoUrl, plan = "free" }: HiPageClientProp
     ownerContact,
     leadToken,
     detailsSent,
+    vcardSaveResetSignal,
+    card.slug,
     degradeToReloadFallback,
   ]);
 
@@ -155,6 +186,8 @@ export function HiPageClient({ card, photoUrl, plan = "free" }: HiPageClientProp
         firstName: nextFirstName,
         visitorEmail,
         leadToken: token,
+        ownerEmail: owner.email,
+        ownerPhone: owner.phone,
       });
       writeExchangeCompletedFlag(card.slug);
     },

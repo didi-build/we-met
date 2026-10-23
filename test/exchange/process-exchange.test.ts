@@ -137,6 +137,46 @@ describe("processExchange (unit)", () => {
     expect(deps.followupMessages).toHaveLength(0);
   });
 
+  it("does not return owner fields on turnstile_failed", async () => {
+    const repo = new MemoryCardRepository();
+    const card = await repo.upsertCard(exampleCardInput());
+    const deps = createDeps({
+      turnstile: { verify: async () => ({ success: false }) },
+    });
+
+    const result = await processExchange(baseInput(), card, [], deps);
+    expect(result.status).toBe("turnstile_failed");
+    expect(result).not.toHaveProperty("body");
+  });
+
+  it("does not return owner fields on rate_limited", async () => {
+    const repo = new MemoryCardRepository();
+    const card = await repo.upsertCard(exampleCardInput());
+    const deps = createDeps({
+      rateLimiter: { check: async () => ({ allowed: false }) },
+    });
+
+    const result = await processExchange(baseInput(), card, [], deps);
+    expect(result.status).toBe("rate_limited");
+    expect(result).not.toHaveProperty("body");
+  });
+
+  it("does not return owner fields on enqueue_failed", async () => {
+    const repo = new MemoryCardRepository();
+    const card = await repo.upsertCard(exampleCardInput());
+    const deps = createDeps({
+      followupQueue: {
+        enqueueVisitorFollowup: async () => {
+          throw new Error("missing binding");
+        },
+      },
+    });
+
+    const result = await processExchange(baseInput(), card, [], deps);
+    expect(result.status).toBe("enqueue_failed");
+    expect(result).not.toHaveProperty("body");
+  });
+
   it("rejects failed Turnstile", async () => {
     const repo = new MemoryCardRepository();
     const card = await repo.upsertCard(exampleCardInput());

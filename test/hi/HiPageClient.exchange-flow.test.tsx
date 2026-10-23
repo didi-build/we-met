@@ -157,7 +157,7 @@ describe("HiPageClient exchange flow (component)", () => {
       expect(postHiExchange).toHaveBeenCalled();
       expect(screen.getByText(/Sent to/)).toBeTruthy();
       expect(screen.getByRole("link", { name: /^Email$/i }).getAttribute("href")).toBe(
-        "mailto:owner-secret%40example.com",
+        "mailto:owner-secret@example.com",
       );
     });
 
@@ -173,6 +173,8 @@ describe("HiPageClient exchange flow (component)", () => {
       firstName: "Sam",
       visitorEmail: "sam@example.com",
       leadToken,
+      ownerEmail: "owner-secret@example.com",
+      ownerPhone: "+1 555 0100",
     });
     expect(window.localStorage.getItem(exchangeCompletedStorageKey(record.slug))).toBe(
       "1",
@@ -206,6 +208,8 @@ describe("HiPageClient exchange flow (component)", () => {
         firstName: "Sam",
         visitorEmail: "sam@example.com",
         leadToken,
+        ownerEmail: "",
+        ownerPhone: "",
       }),
     );
     window.localStorage.setItem(exchangeCompletedStorageKey(slug), "1");

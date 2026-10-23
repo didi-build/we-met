@@ -1,14 +1,4 @@
-export const VCARD_DOWNLOAD_FRAME_ID = "we-met-vcard-download-frame";
+export const VCARD_POST_PATH = "/api/exchange/vcard";
 
-export function vcardIframeIndicatesApiError(bodyText: string): boolean {
-  const trimmed = bodyText.trim();
-  if (!trimmed.startsWith("{")) {
-    return false;
-  }
-  try {
-    const parsed = JSON.parse(trimmed) as { error?: unknown };
-    return typeof parsed.error === "string";
-  } catch {
-    return false;
-  }
-}
+/** Top-level form POST target for Save contact (single switch point). */
+export const VCARD_FORM_SUBMIT_TARGET = "_self";

@@ -20,6 +20,10 @@ describe("readVCardRequestBody", () => {
       body: "token=signed.token",
     });
     const result = await readVCardRequestBody(request);
-    expect(result).toEqual({ ok: true, value: { token: "signed.token" } });
+    expect(result).toEqual({
+      ok: true,
+      value: { token: "signed.token" },
+      isFormEncoded: true,
+    });
   });
 });
