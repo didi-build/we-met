@@ -1,10 +1,8 @@
-# DIDI-744: Add We Met to your contacts (design spec)
+# Contacts setup (add We Met to Google contacts)
 
-**Status:** Design only. Implementation: [DIDI-747](https://linear.app/didi-build/issue/DIDI-747). Google verification gating: [DIDI-750](https://linear.app/didi-build/issue/DIDI-750).
+Design-only spec. Approved MagicPath: [crisply-hill-9145](https://designs.magicpath.ai/v1/crisply-hill-9145), revision `464215324636635136`.
 
-**MagicPath:** [crisply-hill-9145](https://designs.magicpath.ai/v1/crisply-hill-9145), revision `464215324636635136`.
-
-## Goal
+## Purpose
 
 After publish, the **Your card is live** dialog helps card owners save We Met as one Google Contact so follow-up email from We Met is less likely to land in Spam. The feature is a **single row** inside the existing published dialog (`src/components/app/editor/AppEditorDialogs.tsx`). No dismiss control on the row, no manual fallback, no separate page, no editor tip.
 
@@ -48,7 +46,7 @@ Dialog with link row and **Open card** only. No contacts row.
 
 **Footnote (centered):** Google asks once. We only create or update the We Met contact.
 
-**Eligibility (server, not UI):** Row shows only when the owner is eligible (see Product rules). Until Google verification ([DIDI-750](https://linear.app/didi-build/issue/DIDI-750)), only Google test users see the row.
+**Eligibility (server, not UI):** Row shows only when the owner is eligible (see Product and backend rules). Until Google OAuth app verification completes, only Google test users see the row.
 
 ### Working
 
@@ -86,7 +84,7 @@ When a **new** sending address is added in server config and the owner's contact
 
 **Primary control:** **Add to my We Met contact** (app primary pill button, full width, not Google-branded).
 
-## Product and backend rules (for DIDI-747)
+## Product and backend rules
 
 - **One-time Google People API contacts consent** with incremental auth (`include_granted_scopes=true`). **Do not store a refresh token** for this flow.
 - **Persist only** `owner.contact_added_at` plus which sender addresses were added (no extra PII in D1 beyond that).
@@ -94,7 +92,7 @@ When a **new** sending address is added in server config and the owner's contact
 - Before showing the row, call **`people.searchContacts`** (or equivalent) and show the row only if We Met is **not** already a matching contact.
 - **No manual fallback** (removed from scope).
 - Decline or Workspace admin block: row **hidden**, no error UI.
-- Until Google verification ([DIDI-750](https://linear.app/didi-build/issue/DIDI-750)): row visible only for **Google test users**.
+- Until Google OAuth app verification completes: row visible only for **Google test users**.
 
 ## Styling tokens
 
@@ -220,11 +218,15 @@ Note: Working mobile dark uses the same visual language as light; capture set in
 
 Static MagicPath exports live in `reference/` with a `.txt` suffix so they are not picked up by TypeScript, ESLint, or Prettier:
 
-- `Didi744.tsx.txt`
-- `DIDI744ContactsSetupStepBaselineABC.tsx.txt`
+- `contacts-setup.tsx.txt`
+- `wrapper.tsx.txt`
 - `kit.tsx.txt`
 - `wm.css.txt`
 - `App.tsx.txt`
 - `index.css.txt`
 
 Do not import these into the app build.
+
+## Changes
+
+- 2026-10-22: Initial spec, one-time Google contacts consent, no manual fallback ([DIDI-744](https://linear.app/didi-build/issue/DIDI-744)). Built in DIDI-747.
