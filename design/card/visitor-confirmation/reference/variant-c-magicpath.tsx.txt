@@ -1,0 +1,361 @@
+import { useState, type ReactNode } from "react";
+import {
+  ThemeRoot, Switcher, Seg, param, btnPrimary, btnOutline, type Mode,
+  CheckIcon, MailIcon, PhoneIcon, ContactIcon, CopyIcon, NoteIcon,
+  LinkedInIcon, InstagramIcon, GlobeIcon, WeMetMark, LeafIcon,
+} from "./kit";
+
+/* DIDI-742: visitor confirmation state on the card (/hi/<slug>).
+   Baseline = today's post-exchange card. A, B, C = proposed confirmation states. */
+
+type Variant = "baseline" | "a" | "b" | "c";
+type Step = "before" | "after" | "reload";
+
+const OWNER = {
+  name: "Maya Chen",
+  first: "Maya",
+  initials: "MC",
+  role: "Product designer, Northwind Studio",
+  email: "maya@northwind.studio",
+  phone: "+1 416 555 0142",
+  about:
+    "I help early-stage teams turn rough ideas into products people enjoy using. Ten years across fintech, health and tools for small business.",
+  services: ["Product design", "Design systems", "UX audits"],
+};
+const VISITOR_FIRST = "Sam";
+
+const VARIANTS: { id: Variant; label: string; desc: string }[] = [
+  { id: "baseline", label: "Baseline", desc: "Today: disabled Contact sent button and a thanks line." },
+  { id: "a", label: "A Inline", desc: "The CTA becomes Save contact; email and phone sit right under it as tappable rows." },
+  { id: "b", label: "B Panel", desc: "A connected panel inside the card: status, contact rows with copy, Save contact and an add-a-note link." },
+  { id: "c", label: "C Receipt", desc: "A compact receipt header, then a big Save contact button and a two-up email and call row." },
+];
+
+function Avatar({ size = 136, ring = true }: { size?: number; ring?: boolean }) {
+  return (
+    <div
+      aria-hidden
+      className="flex shrink-0 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--surface-2)] font-semibold tracking-[-0.02em] text-[var(--ink)]"
+      style={{ width: size, height: size, fontSize: size * 0.32, boxShadow: ring ? "0 0 0 6px var(--bg)" : undefined }}
+    >
+      {OWNER.initials}
+    </div>
+  );
+}
+
+function LinkChips({ align = "end" }: { align?: "end" | "center" | "start" }) {
+  const links = [
+    { label: "LinkedIn", icon: <LinkedInIcon /> },
+    { label: "Instagram", icon: <InstagramIcon /> },
+    { label: "Website", icon: <GlobeIcon /> },
+  ];
+  const j = align === "end" ? "justify-end" : align === "center" ? "justify-center" : "justify-start";
+  return (
+    <ul className={`m-0 flex list-none flex-wrap gap-2 p-0 ${j}`}>
+      {links.map((l) => (
+        <li key={l.label}>
+          <a
+            href="#"
+            onClick={(e) => e.preventDefault()}
+            aria-label={l.label}
+            title={l.label}
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-[var(--line)] text-[var(--ink)] no-underline transition-colors hover:bg-[var(--ink)] hover:text-[var(--bg)]"
+          >
+            {l.icon}
+          </a>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function CardBody() {
+  return (
+    <>
+      <div className="mt-6">
+        <h3 className="text-[22px] font-semibold leading-[1.15] tracking-[-0.02em]">About</h3>
+        <p className="mt-2.5 text-[16px] leading-[1.55] text-[var(--ink-muted)]">{OWNER.about}</p>
+      </div>
+      <div className="mt-6 flex flex-col gap-3.5 border-t border-[var(--line)] pt-6">
+        <h3 className="text-[22px] font-semibold leading-[1.15] tracking-[-0.02em]">What I do</h3>
+        <ul className="m-0 flex list-none flex-wrap gap-2 p-0">
+          {OWNER.services.map((s) => (
+            <li key={s} className="rounded-full bg-[var(--accent-soft)] px-4 py-2 text-[15px] font-medium">{s}</li>
+          ))}
+        </ul>
+      </div>
+    </>
+  );
+}
+
+function Footer() {
+  return (
+    <nav aria-label="We Met" className="mt-auto">
+      <ul className="m-0 flex list-none flex-wrap items-center justify-center gap-0.5 p-0 text-[15px] font-medium text-[var(--ink-muted)]">
+        <li className="pl-2">Powered by</li>
+        <li className="inline-flex min-h-11 items-center gap-2 px-2"><WeMetMark />We Met</li>
+        <li aria-hidden className="h-[3px] w-[3px] rounded-full bg-[var(--line-strong)]" />
+        <li className="inline-flex min-h-11 items-center gap-2 px-2"><LeafIcon />Didi Build</li>
+      </ul>
+    </nav>
+  );
+}
+
+/** Faithful shell of HiCardPresentation (paid plan, no banner). */
+function CardPage({ cta, linksTop, hideLinks }: { cta: ReactNode; linksTop?: ReactNode; hideLinks?: boolean }) {
+  return (
+    <div className="relative isolate overflow-hidden">
+      <div aria-hidden className="pointer-events-none absolute -top-[200px] left-1/2 z-[-1] h-[420px] w-[520px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,var(--accent-soft),transparent)]" />
+      <main className="mx-auto flex min-h-[844px] w-full max-w-[420px] flex-col items-center gap-12 px-6 pb-5 pt-4 text-center">
+        <section aria-label={OWNER.name} className="relative mt-[84px] w-full rounded-[24px] border border-[var(--line)] bg-[var(--surface)] px-6 py-7 text-left">
+          <div className="-mt-24 flex flex-col gap-6">
+            <div className="flex flex-col items-center gap-3.5 text-center">
+              <Avatar />
+              <div className="flex min-w-0 flex-col items-center gap-1">
+                <p className="text-[28px] font-semibold leading-[1.15] tracking-[-0.03em]">I'm {OWNER.first}</p>
+                <p className="text-[15px] font-medium leading-[1.45] text-[var(--ink-muted)] text-balance">{OWNER.role}</p>
+              </div>
+            </div>
+            <section aria-label="Exchange contact" className="-mt-1 flex flex-col gap-1">{cta}</section>
+            {linksTop}
+            <div aria-hidden className="h-px bg-[var(--line)]" />
+          </div>
+          <CardBody />
+          {!hideLinks && <div className="mt-6 pt-4"><LinkChips /></div>}
+        </section>
+        <Footer />
+      </main>
+    </div>
+  );
+}
+
+function ExchangeButton({ disabled, label }: { disabled?: boolean; label: string }) {
+  return (
+    <button type="button" disabled={disabled} aria-disabled={disabled} className={`${btnPrimary} min-h-14 w-full text-[17px]`}>
+      {label}
+    </button>
+  );
+}
+
+/* ---------- shared bits for proposals ---------- */
+
+function useSave() {
+  const [saved, setSaved] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const save = () => {
+    if (busy) return;
+    setBusy(true);
+    window.setTimeout(() => { setBusy(false); setSaved(true); }, 650);
+  };
+  return { saved, busy, save };
+}
+
+function SaveButton({ s, label = "Save contact", className = "" }: { s: ReturnType<typeof useSave>; label?: string; className?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={s.save}
+      aria-busy={s.busy}
+      className={`${s.saved ? btnOutline : btnPrimary} min-h-14 w-full text-[17px] ${className}`}
+    >
+      {s.busy ? (
+        <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden />
+      ) : s.saved ? (
+        <CheckIcon size={20} />
+      ) : (
+        <ContactIcon size={20} />
+      )}
+      {s.busy ? "Preparing contact" : s.saved ? "Saved, tap to save again" : label}
+    </button>
+  );
+}
+
+function Row({ icon, label, value, href, copy, compact }: { icon: ReactNode; label: string; value: string; href: string; copy?: boolean; compact?: boolean }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="flex min-h-14 items-center gap-3">
+      <a href={href} onClick={(e) => e.preventDefault()} className="group flex min-w-0 flex-1 items-center gap-3 rounded-[12px] py-1.5 no-underline">
+        {!compact && <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] text-[var(--ink)]">{icon}</span>}
+        <span className="flex min-w-0 flex-col leading-tight">
+          <span className="text-[13px] font-medium text-[var(--ink-muted)]">{label}</span>
+          <span className="break-all text-[16px] font-medium text-[var(--ink)] group-hover:underline">{value}</span>
+        </span>
+      </a>
+      {copy && (
+        <button
+          type="button"
+          aria-label={`Copy ${label.toLowerCase()}`}
+          onClick={() => { setCopied(true); window.setTimeout(() => setCopied(false), 1400); }}
+          className="flex h-11 min-w-11 items-center justify-center gap-1.5 rounded-full px-3 text-[13px] font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)]"
+        >
+          {copied ? <><CheckIcon size={16} />Copied</> : <CopyIcon size={18} />}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function FollowLine({ className = "" }: { className?: string }) {
+  return <p className={`text-[15px] font-medium leading-normal text-[var(--ink-muted)] ${className}`}>{OWNER.first} will follow up by email.</p>;
+}
+
+function DetailsNote({ step, onAdd }: { step: Step; onAdd: () => void }) {
+  if (step === "after")
+    return (
+      <p className="wm-fade inline-flex items-center gap-1.5 text-[14px] font-medium text-[var(--ink-muted)]">
+        <CheckIcon size={16} /> Your details and note were sent too.
+      </p>
+    );
+  return (
+    <button type="button" onClick={onAdd} className="inline-flex min-h-11 items-center gap-1.5 self-start rounded-full px-1 text-[14px] font-medium text-[var(--ink-muted)] underline decoration-1 underline-offset-[3px] hover:text-[var(--ink)]">
+      <NoteIcon size={16} /> Add your job title or a note
+    </button>
+  );
+}
+
+/* ---------- Variants ---------- */
+
+function Baseline({ step }: { step: Step }) {
+  // Today: after step 1 the thanks line shows; after details the button reads "Contact sent" (disabled).
+  if (step === "reload")
+    return <CardPage cta={<><ExchangeButton disabled label="Contact sent" /></>} />;
+  return (
+    <CardPage
+      cta={
+        <>
+          <ExchangeButton disabled={step === "after"} label={step === "after" ? "Contact sent" : "Exchange contact"} />
+          <p role="status" className="wm-fade mt-1 text-center text-[15px] font-medium leading-normal">Thanks, {VISITOR_FIRST}. Talk soon.</p>
+        </>
+      }
+    />
+  );
+}
+
+function ReloadFallback() {
+  // Exchange token gone (reload / new tab / after ~2 h): today's card, with a quiet sent state.
+  return (
+    <CardPage
+      cta={
+        <>
+          <ExchangeButton disabled label="Contact sent" />
+          <p className="mt-1 text-center text-[14px] font-medium leading-normal text-[var(--ink-muted)]">{OWNER.first} has your details and will follow up by email.</p>
+        </>
+      }
+    />
+  );
+}
+
+function VariantA({ step, onAdd }: { step: Step; onAdd: () => void }) {
+  const s = useSave();
+  if (step === "reload") return <ReloadFallback />;
+  return (
+    <CardPage
+      cta={
+        <div className="wm-fade flex flex-col gap-3">
+          <p role="status" className="inline-flex items-center justify-center gap-1.5 text-center text-[15px] font-semibold">
+            <CheckIcon size={18} /> Contact sent to {OWNER.first}
+          </p>
+          <SaveButton s={s} />
+          <div className="flex flex-col divide-y divide-[var(--line)]">
+            <Row icon={<MailIcon />} label="Email" value={OWNER.email} href={`mailto:${OWNER.email}`} />
+            <Row icon={<PhoneIcon />} label="Phone" value={OWNER.phone} href="tel:+14165550142" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <FollowLine />
+            <DetailsNote step={step} onAdd={onAdd} />
+          </div>
+        </div>
+      }
+    />
+  );
+}
+
+function VariantB({ step, onAdd }: { step: Step; onAdd: () => void }) {
+  const s = useSave();
+  if (step === "reload") return <ReloadFallback />;
+  return (
+    <CardPage
+      hideLinks
+      cta={
+        <div className="wm-fade flex flex-col gap-4 rounded-[20px] border border-[var(--line)] bg-[var(--bg)] p-4">
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--accent-ink)]"><CheckIcon size={18} /></span>
+            <div className="flex flex-col leading-tight">
+              <p role="status" className="text-[16px] font-semibold">You're connected</p>
+              <FollowLine className="!text-[14px]" />
+            </div>
+          </div>
+          <div className="flex flex-col divide-y divide-[var(--line)] border-y border-[var(--line)]">
+            <Row icon={<MailIcon />} label="Email" value={OWNER.email} href={`mailto:${OWNER.email}`} copy compact />
+            <Row icon={<PhoneIcon />} label="Phone" value={OWNER.phone} href="tel:+14165550142" copy compact />
+          </div>
+          <SaveButton s={s} />
+          <div className="flex flex-col gap-2 border-t border-[var(--line)] pt-3">
+            <p className="text-[13px] font-medium text-[var(--ink-muted)]">Elsewhere</p>
+            <LinkChips align="start" />
+          </div>
+          <DetailsNote step={step} onAdd={onAdd} />
+        </div>
+      }
+    />
+  );
+}
+
+function VariantC({ step, onAdd }: { step: Step; onAdd: () => void }) {
+  const s = useSave();
+  if (step === "reload") return <ReloadFallback />;
+  return (
+    <CardPage
+      cta={
+        <div className="wm-fade flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-3 rounded-full border border-[var(--line)] px-4 py-2">
+            <span role="status" className="inline-flex items-center gap-1.5 text-[14px] font-semibold"><CheckIcon size={16} />Sent to {OWNER.first}</span>
+            <span className="text-[13px] font-medium text-[var(--ink-muted)]">{step === "after" ? "With your note" : "Just now"}</span>
+          </div>
+          <SaveButton s={s} label={`Save ${OWNER.first}'s contact`} />
+          <div className="grid grid-cols-2 gap-2">
+            <a href={`mailto:${OWNER.email}`} onClick={(e) => e.preventDefault()} className={`${btnOutline} min-h-12 w-full px-4 text-[15px]`}><MailIcon size={18} />Email</a>
+            <a href="tel:+14165550142" onClick={(e) => e.preventDefault()} className={`${btnOutline} min-h-12 w-full px-4 text-[15px]`}><PhoneIcon size={18} />Call</a>
+          </div>
+          <p className="text-center text-[14px] leading-normal text-[var(--ink-muted)]">
+            {OWNER.email} · {OWNER.phone}
+          </p>
+          <FollowLine className="text-center" />
+          {step === "before" && (
+            <button type="button" onClick={onAdd} className="mx-auto inline-flex min-h-11 items-center gap-1.5 rounded-full px-2 text-[14px] font-medium text-[var(--ink-muted)] underline decoration-1 underline-offset-[3px] hover:text-[var(--ink)]">
+              <NoteIcon size={16} /> Tell {OWNER.first} more about you
+            </button>
+          )}
+          {step === "after" && <p className="wm-fade text-center text-[14px] font-medium text-[var(--ink-muted)]">Your details were added. Thanks, {VISITOR_FIRST}.</p>}
+        </div>
+      }
+    />
+  );
+}
+
+/* ---------- Root ---------- */
+
+export default function Didi742() {
+  const [variant, setVariant] = useState<Variant>(param("v", "a") as Variant);
+  const [mode, setMode] = useState<Mode>(param("theme", "light") as Mode);
+  const [step, setStep] = useState<Step>(param("step", "before") as Step);
+  const capture = param("capture", "0") === "1";
+  const current = VARIANTS.find((v) => v.id === variant) ?? VARIANTS[0];
+  const onAdd = () => setStep("after");
+  return (
+    <ThemeRoot mode={mode}>
+      <Switcher title="DIDI-742" hidden={capture}>
+        <Seg label="Design" value={variant} onChange={setVariant} options={VARIANTS.map((v) => ({ id: v.id, label: v.label }))} />
+        <Seg label="State" value={step} onChange={setStep} options={[{ id: "before", label: "Before details" }, { id: "after", label: "After details" }, { id: "reload", label: "After reload" }]} />
+        <Seg label="Theme" value={mode} onChange={setMode} options={[{ id: "light", label: "Light" }, { id: "dark", label: "Dark" }]} />
+        <p className="basis-full text-[12px] leading-snug text-[var(--ink-muted)]">{current.desc}</p>
+      </Switcher>
+      <div key={`${variant}-${step}`}>
+        {variant === "baseline" && <Baseline step={step} />}
+        {variant === "a" && <VariantA step={step} onAdd={onAdd} />}
+        {variant === "b" && <VariantB step={step} onAdd={onAdd} />}
+        {variant === "c" && <VariantC step={step} onAdd={onAdd} />}
+      </div>
+    </ThemeRoot>
+  );
+}
