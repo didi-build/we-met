@@ -57,8 +57,8 @@ export function LandingHome({ urls, getStartedLabel }: LandingHomeProps) {
             through either our operator&apos;s Google mailbox or Cloudflare Email
             Service; the active provider sees the full message for delivery. We only
             store delivery information (like whether an email was sent), not the
-            contents of your leads. When someone exchanges with you, their name and
-            email go to your inbox with Reply-To set to them. When we turn on visitor
+            contents of your leads. When someone exchanges with you, the details they
+            share go to your inbox with Reply-To set to them. When we turn on visitor
             follow-up email, they may receive your contact card and your Google account
             email address in that message. Read our <a href={urls.privacy}>Privacy</a>{" "}
             and <a href={urls.terms}>Terms</a> pages for more.

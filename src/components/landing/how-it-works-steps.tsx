@@ -27,7 +27,7 @@ export const HOW_IT_WORKS_STEPS: HowItWorksStep[] = [
   },
   {
     title: "Follow up from your inbox",
-    body: "Their name and email land in your inbox. Reply-To is them so you can follow up.",
+    body: "The details they share land in your inbox. Reply-To is them so you can follow up.",
     chip: "You get all the lead details",
     vignettes: [<LeadEmailVignette key="lead" />],
   },

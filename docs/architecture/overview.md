@@ -2,7 +2,7 @@
 
 ## Purpose
 
-**We Met** hosts digital exchange-contact cards: a visitor opens a card URL, shares their details, and the owner receives their name and email by email (Reply-To the visitor). Visitor follow-up email is optional (`visitor_email_mode=direct`; default **owner relay** skips it; [0027](../decisions/0027-owner-relay-visitor-follow-up.md)). The MVP adds Google sign-in, a card editor on the app host, and per-account published cards on `/hi/<slug>` ([0025](../decisions/0025-we-met-mvp-accounts-sign-in-and-app-backend.md)).
+**We Met** hosts digital exchange-contact cards: a visitor opens a card URL, shares their details, and the owner receives the details they share by email (Reply-To the visitor). Visitor follow-up email is optional (`visitor_email_mode=direct`; default **owner relay** skips it; [0027](../decisions/0027-owner-relay-visitor-follow-up.md)). The MVP adds Google sign-in, a card editor on the app host, and per-account published cards on `/hi/<slug>` ([0025](../decisions/0025-we-met-mvp-accounts-sign-in-and-app-backend.md)).
 
 ## Boundaries
 

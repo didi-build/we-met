@@ -76,9 +76,8 @@ export function PrivacyPolicyContent() {
 
       <h2 className="lp-legal-h2">What the people you meet can see</h2>
       <p className="lp-body">
-        When someone exchanges details with you, we email their name and email to you.
-        Reply-To is the visitor. We do not email them your contact card unless we turn
-        on visitor follow-up email.
+        By default, we don&apos;t email them your contact card or your Google account
+        email address; you follow up from your own inbox, with Reply-To set to them.
       </p>
       <p className="lp-body">
         When we turn on visitor follow-up email, they may receive a follow-up email from
