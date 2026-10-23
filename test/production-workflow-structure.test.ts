@@ -203,10 +203,15 @@ function assertDeployJobCloudflareTokenIsolation(deploySection: string): void {
 
   const consumerPrepare = deployStepByName(steps, CONSUMER_PREPARE_STEP_NAME);
   const consumerGuards = deployStepByName(steps, CONSUMER_GUARDS_STEP_NAME);
-  if (consumerPrepare.block.includes("secrets.CLOUDFLARE")) {
-    throw new Error(
-      `${CONSUMER_PREPARE_STEP_NAME} must not reference Cloudflare secrets`,
-    );
+  const allowedConsumerPrepareSecrets = ["secrets.WE_MET_D1_DATABASE_ID_PRODUCTION"];
+  const consumerPrepareSecretRefs =
+    consumerPrepare.block.match(/secrets\.[A-Z0-9_]+/g) ?? [];
+  for (const ref of consumerPrepareSecretRefs) {
+    if (!allowedConsumerPrepareSecrets.includes(ref)) {
+      throw new Error(
+        `${CONSUMER_PREPARE_STEP_NAME} must only reference ${allowedConsumerPrepareSecrets.join(", ")} (found ${ref})`,
+      );
+    }
   }
   if (consumerGuards.block.includes("secrets.")) {
     throw new Error(`${CONSUMER_GUARDS_STEP_NAME} must not reference secrets.*`);

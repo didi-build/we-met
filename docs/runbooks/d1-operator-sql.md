@@ -21,7 +21,7 @@ The **binding** name passed to `wrangler d1 execute` is always **`WE_MET_DB`** (
 
 ## Non-prod remote (`we-met-db-nonprod`)
 
-1. Export the non-prod database UUID (GitHub **`preview`** environment secret **`WE_MET_D1_DATABASE_ID_NONPROD`**, or `wrangler d1 list` after login):
+1. Export the non-prod database UUID from `npx wrangler d1 list` (after `wrangler login`) or the Cloudflare dashboard — not from GitHub (environment secrets cannot be read back):
 
 ```bash
 export WE_MET_D1_DATABASE_ID_NONPROD='<nonprod-db-uuid>'
@@ -70,7 +70,7 @@ Wrangler may warn **Unexpected fields: migrations_dir** on the generated config;
 
 Production schema changes belong in the **Deploy production** workflow ([deploy.md](./deploy.md)). For **reviewed one-off operator SQL** only:
 
-1. Export **`WE_MET_D1_DATABASE_ID_PRODUCTION`** (GitHub **`production`** environment secret).
+1. Export **`WE_MET_D1_DATABASE_ID_PRODUCTION`** from `npx wrangler d1 list` or the Cloudflare dashboard (not from GitHub secrets).
 2. Generate production app config (same as deploy):
 
 ```bash
