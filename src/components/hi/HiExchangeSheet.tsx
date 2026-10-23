@@ -13,6 +13,7 @@ import { substituteFirstName } from "@/lib/copy/substitute-first-name";
 import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { HiExchangeFailureMessage } from "./HiExchangeFailureMessage";
+import type { HiExchangeOwnerContact } from "./hi-exchange-api";
 import { postHiDetails, postHiExchange } from "./hi-exchange-api";
 import { prefersReducedMotion, runSheetCloseAnimation } from "./hi-sheet-motion";
 import { useFocusTrap } from "./useFocusTrap";
@@ -29,7 +30,12 @@ type HiExchangeSheetProps = {
   firstName: string;
   leadToken: string;
   onClose: () => void;
-  onExchangeSuccess: (firstName: string, token: string) => void;
+  onExchangeSuccess: (
+    firstName: string,
+    token: string,
+    owner: HiExchangeOwnerContact,
+    visitorEmail: string,
+  ) => void;
   onDetailsSuccess?: () => void;
 };
 
@@ -334,7 +340,7 @@ export function HiExchangeSheet({
     }
     const nextFirstName = firstNameFromName(name);
     setToken(result.token);
-    onExchangeSuccess(nextFirstName, result.token);
+    onExchangeSuccess(nextFirstName, result.token, result.owner, email.trim());
     if (!prefersReducedMotion()) {
       setExchangeLeaving(true);
       await new Promise((resolve) => window.setTimeout(resolve, 200));

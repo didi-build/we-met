@@ -6,6 +6,7 @@ import {
   sendNonSeedEmailEventAlertOnce,
 } from "./email-event-alert";
 import { parseWarmupSecrets, type WarmupEnv, type WarmupSecrets } from "./config";
+import { NonSeedAlertRateSession } from "./nonseed-alert-rate";
 import { pauseWarmupAndAlertOnce } from "./pause";
 import { redactEmailForLog } from "./redact-email";
 import {
@@ -39,6 +40,11 @@ export type EmailEventQueueMessage = {
   body: unknown;
   ack(): void;
   retry(options?: { delaySeconds?: number }): void;
+};
+
+export type EmailEventsBatchContext = {
+  nowMs: number;
+  rateSession: NonSeedAlertRateSession | null;
 };
 
 export function parseEmailSendingEvent(body: unknown): ParsedEmailSendingEvent {
@@ -118,6 +124,7 @@ export async function handleParsedEmailSendingEvent(
   secrets: WarmupSecrets,
   event: EmailSendingEvent,
   queueMessageId: string,
+  batchContext?: EmailEventsBatchContext,
 ): Promise<"acked" | "retry"> {
   const action = classifyEmailSendingEvent(event);
   const recipientRedacted = recipientRedactedForEmailEvent(event.payload.recipient);
@@ -164,12 +171,40 @@ export async function handleParsedEmailSendingEvent(
     eventType: event.type,
     recipient: recipientRedacted,
   });
-  const sent = await sendNonSeedEmailEventAlertOnce(env, secrets, {
-    dedupeKey,
-    eventType: event.type,
-    recipientRedacted,
-  });
-  if (!sent) {
+  const kv = env.WARMUP_STATE;
+  let rateSession = batchContext?.rateSession ?? null;
+  if (batchContext && kv && !rateSession) {
+    const opened = await NonSeedAlertRateSession.open(kv, env, batchContext.nowMs);
+    if (opened === "read_failed") {
+      return "retry";
+    }
+    batchContext.rateSession = opened;
+    rateSession = opened;
+  }
+
+  const alertResult = await sendNonSeedEmailEventAlertOnce(
+    env,
+    secrets,
+    {
+      dedupeKey,
+      eventType: event.type,
+      recipientRedacted,
+    },
+    {
+      now: new Date(batchContext?.nowMs ?? Date.now()),
+      rateSession,
+      commitRateSession: batchContext === undefined,
+    },
+  );
+  if (
+    alertResult === "sent_individual" ||
+    alertResult === "sent_summary" ||
+    alertResult === "suppressed" ||
+    alertResult === "deduped"
+  ) {
+    return "acked";
+  }
+  if (alertResult === "skipped" || alertResult === "failed") {
     const kv = env.WARMUP_STATE;
     const alertTo = env.WARMUP_ALERT_TO?.trim();
     if (!kv || !alertTo || !env.EMAIL || !parseWarmupSecrets(env)) {
@@ -201,6 +236,11 @@ export async function processEmailEventsBatch(
     return;
   }
 
+  const batchContext: EmailEventsBatchContext = {
+    nowMs: Date.now(),
+    rateSession: null,
+  };
+
   for (const message of batch.messages) {
     const parsed = parseEmailSendingEvent(message.body);
     if (!parsed.ok) {
@@ -218,12 +258,22 @@ export async function processEmailEventsBatch(
       secrets,
       parsed.event,
       message.id,
+      batchContext,
     );
     if (outcome === "retry") {
       message.retry();
       continue;
     }
     message.ack();
+  }
+
+  if (batchContext.rateSession?.isDirty()) {
+    const written = await batchContext.rateSession.commit(kv);
+    if (!written) {
+      console.error("warmup_email_event_alert_window_write_failed", {
+        scope: "batch",
+      });
+    }
   }
 }
 

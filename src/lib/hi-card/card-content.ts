@@ -4,6 +4,7 @@ import type {
   CardRecord,
   CardServiceItem,
 } from "@/card-data/types";
+import type { PublicHiCardPayload } from "@/lib/hi-card/public-card-payload";
 
 export function cardInitials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -65,12 +66,30 @@ export type CardContentFlags = {
   hasLinks: boolean;
 };
 
-export function cardContentFlags(card: CardRecord): CardContentFlags {
+/** Card shape HiCardPresentation can render (public payload or in-app preview record). */
+export type HiCardPresentationModel = PublicHiCardPayload | CardRecord;
+
+export type CardContentFlagsInput = Pick<
+  CardRecord,
+  "role" | "alternate" | "about" | "services" | "links"
+> & {
+  photoKey?: string | null;
+  hasPhoto?: boolean;
+};
+
+function hiCardHasPhoto(card: CardContentFlagsInput): boolean {
+  if (typeof card.hasPhoto === "boolean") {
+    return card.hasPhoto;
+  }
+  return Boolean(card.photoKey);
+}
+
+export function cardContentFlags(card: CardContentFlagsInput): CardContentFlags {
   const paragraphs = card.about?.paragraphs?.filter((p) => p.trim()) ?? [];
   const serviceItems = card.services?.items?.filter((s) => s.title?.trim()) ?? [];
   const linkEntries = cardLinkEntries(card.links);
   return {
-    hasPhoto: Boolean(card.photoKey),
+    hasPhoto: hiCardHasPhoto(card),
     hasRole: Boolean(card.role?.trim()),
     hasAlternate: Boolean(card.alternate?.url?.trim() && card.alternate?.label?.trim()),
     hasAbout: Boolean(card.about?.title?.trim() && paragraphs.length),

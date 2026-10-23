@@ -139,6 +139,61 @@ describe("check-deploy-guards (unit)", () => {
     expect(result.stderr).toContain("preview queue");
   });
 
+  it("fails when production D1 has no previews counterpart binding", () => {
+    const { path } = writeTempConfig((config) => {
+      const previews = config.previews as Record<string, unknown>;
+      previews.d1_databases = [];
+    });
+    const result = runGuards("production", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("previews.d1_databases is required");
+  });
+
+  it("fails when previews D1 database_name is not prod name plus -nonprod", () => {
+    const { path } = writeTempConfig((config) => {
+      const previews = config.previews as Record<string, unknown>;
+      const previewD1 = previews.d1_databases as { database_name: string }[];
+      previewD1[0].database_name = "we-met-db-wrong-nonprod";
+    });
+    const result = runGuards("production", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(/we-met-db-nonprod|preview D1/);
+  });
+
+  it("fails when previews R2 bucket_name is not prod name plus -nonprod", () => {
+    const { path } = writeTempConfig((config) => {
+      const previews = config.previews as Record<string, unknown>;
+      const previewR2 = previews.r2_buckets as { bucket_name: string }[];
+      previewR2[0].bucket_name = "we-met-assets-wrong-nonprod";
+    });
+    const result = runGuards("production", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(/we-met-assets-nonprod|preview R2/);
+  });
+
+  it("fails when production D1 database_name is missing in pairing check", () => {
+    const { path } = writeTempConfig((config) => {
+      const d1 = config.d1_databases as { database_name?: string }[];
+      delete d1[0].database_name;
+    });
+    const result = runGuards("production", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(/database_name is required|production D1 name/);
+  });
+
+  it("fails when preview D1 binding name is not paired with production", () => {
+    const { path } = writeTempConfig((config) => {
+      const previews = config.previews as Record<string, unknown>;
+      const previewD1 = previews.d1_databases as { binding: string }[];
+      previewD1[0].binding = "WE_MET_DB_OTHER";
+    });
+    const result = runGuards("production", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(
+      /production missing D1 binding "WE_MET_DB_OTHER"|previews missing D1 binding "WE_MET_DB"/,
+    );
+  });
+
   it("fails when preview D1 database_name is production", () => {
     const { path } = writeTempConfig((config) => {
       const previews = config.previews as Record<string, unknown>;

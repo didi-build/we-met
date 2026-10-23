@@ -56,7 +56,7 @@ Contacts OAuth success redirects to the app with `?contacts_setup=success`; decl
 `EditorCard` matches `design/app/app.js` (slug, name, role, optional phone, photo URL, about[], services[], links, alternate).
 
 - **Display name** (`name`): optional in the editor UI; shown on the public card. When empty at publish, the server resolves it to the signed-in Google name (publish pipeline; see DIDI-640).
-- **Phone** (`phone`): optional; stored in draft JSON and, after publish, in `contact_json.phone` (empty string means none). Shared with people only after an exchange (follow-up email vCard), not on the public card page or in owner lead emails. Allowed characters: digits, spaces, and `+ - ( ) .`; trimmed length at most 20; at least 7 digits when non-empty. Control characters (including newlines) are rejected.
+- **Phone** (`phone`): optional; stored in draft JSON and, after publish, in `contact_json.phone` (empty string means none). Not on the public `/hi` page payload before exchange; after a successful `POST /api/exchange`, the JSON body may include `ownerPhone` when set. Also shared via follow-up email vCard and `POST /api/exchange/vcard`. Allowed characters: digits, spaces, and `+ - ( ) .`; trimmed length at most 20; at least 7 digits when non-empty. Control characters (including newlines) are rejected.
 
 `published` is `null` until the first successful publish. The owner’s current published slug is always treated as available by `checkSlug`.
 
@@ -105,7 +105,21 @@ Client maps **5xx** and network failures to `network`.
 
 `POST /api/exchange` and `POST /api/details` ([0008](../decisions/0008-api-routes-exchange-and-details.md)) return **503** with body `{ "error": "lead_email_unavailable" }` when `lead_email_enabled` is off or daily caps would be exceeded — no ledger row, queue message, or `daily_send_counts` change ([0025](../decisions/0025-we-met-mvp-accounts-sign-in-and-app-backend.md) phase 4).
 
-`POST /api/exchange/vcard` (DIDI-743) returns the owner vCard after an exchange. The client sends the signed **details token** from `POST /api/exchange` in the **request body** only (`application/json` or `application/x-www-form-urlencoded` field `token`), never in the URL. Query-string tokens are not accepted. The token is verified with the same secret, version, and TTL as `POST /api/details` (`src/exchange/token.ts`). **400** `{ "error": "invalid_input" }` when the token is missing or malformed, or `Content-Type` is not JSON or form-encoded. **401** `{ "error": "invalid_token" }` for invalid, expired, or wrong-card tokens, and when the request `Host` is not a card-serving host (no owner data in the response). **404** `{ "error": "card_not_found" }` when the card is unpublished or missing. **429** `{ "error": "rate_limited" }` uses the exchange rate limiter with key `vcard:<client-ip>` (separate from `POST /api/exchange`). **GET** returns **405** with `Allow: POST`. Success is **200** with `Content-Type: text/vcard; charset=utf-8`, `Content-Disposition: attachment; filename="<name>.vcf"`, `Cache-Control: no-store`, and a vCard body matching the follow-up email attachment (`buildOwnerVCardAttachment`). This route is **not** gated on `lead_email_enabled` (no email is sent).
+On **200** success, `POST /api/exchange` returns JSON `{ "token": "<details-token>", "ownerEmail": "<accounts.email>", "ownerPhone"?: "<contact_json.phone>" }`. `ownerPhone` is omitted when the card has no phone. The token is the same signed details token used for `POST /api/details` and `POST /api/exchange/vcard` (~2h TTL). Owner inbox and phone are not in the public `/hi` page RSC payload before exchange ([DIDI-641](../decisions/0004-card-data-and-branding.md), DIDI-746).
+
+`POST /api/exchange/vcard` (DIDI-743) returns the owner vCard after an exchange. The client sends the signed **details token** from `POST /api/exchange` in the **request body** only (`application/json` or `application/x-www-form-urlencoded` field `token`), never in the URL. Query-string tokens are not accepted. Optional form field `slug` is used only for **303** redirect targets when the token cannot be verified; it must pass `isValidSlug` or the redirect is `/`. The token is verified with the same secret, version, and TTL as `POST /api/details` (`src/exchange/token.ts`).
+
+**JSON** (`Content-Type: application/json`): **400** `{ "error": "invalid_input" }` when the token is missing or malformed, or `Content-Type` is not JSON or form-encoded. **401** `{ "error": "invalid_token" }` for invalid, expired, or wrong-card tokens, and when the request `Host` is not a card-serving host (no owner data in the response). **404** `{ "error": "card_not_found" }` when the card is unpublished or missing. **429** `{ "error": "rate_limited" }` uses the exchange rate limiter with key `vcard:<client-ip>` (separate from `POST /api/exchange`). **500** `{ "error": "server_error" }` on attachment build failure.
+
+**Form** (`Content-Type: application/x-www-form-urlencoded`, Save contact on `/hi`): failures return **303 See Other** with a **relative** `Location` only (never absolute URLs or `//host`). Slug in the path comes from the verified token’s `cardSlug`, else from form `slug` when valid; otherwise `Location: /`. The token is never placed in the query string. Query param `vcard` is `expired` or `limited`:
+
+| Condition                                         | `vcard`   | `/hi` client behaviour                  |
+| ------------------------------------------------- | --------- | --------------------------------------- |
+| `invalid_input` (missing/malformed token or body) | `expired` | Reload fallback; clear exchange session |
+| `invalid_host`, `invalid_token`, `card_not_found` | `expired` | Reload fallback; clear exchange session |
+| `rate_limited`, `server_error`                    | `limited` | Reset Save UI; keep exchange session    |
+
+**GET** returns **405** with `Allow: POST`. Success is **200** with `Content-Type: text/vcard; charset=utf-8`, `Content-Disposition: attachment; filename="<name>.vcf"`, `Cache-Control: no-store`, and a vCard body matching the follow-up email attachment (`buildOwnerVCardAttachment`). This route is **not** gated on `lead_email_enabled` (no email is sent).
 
 ## UI expectations
 

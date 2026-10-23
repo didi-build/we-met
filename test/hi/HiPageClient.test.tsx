@@ -9,6 +9,7 @@ import { WE_MET_CARD_HOME_URL } from "@/lib/hi-card/card-content";
 import { detailsSentStorageKey } from "@/lib/hi-card/details-sent-storage";
 import { exampleCardInput } from "../helpers/example-card";
 import type { CardRecord } from "@/card-data/types";
+import { serializePublicHiCard } from "@/lib/hi-card/public-card-payload";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -81,7 +82,7 @@ function renderCard(overrides: Partial<CardRecord> = {}, plan = "free" as const)
   };
   return render(
     <ThemeProvider>
-      <HiPageClient card={card} photoUrl={null} plan={plan} />
+      <HiPageClient card={serializePublicHiCard(card)} photoUrl={null} plan={plan} />
     </ThemeProvider>,
   );
 }
@@ -187,7 +188,7 @@ describe("HiPageClient (component)", () => {
     rectSpy.mockRestore();
   });
 
-  it("disables exchange buttons when the details-sent flag is set", () => {
+  it("disables exchange buttons when the details-sent flag is set without a receipt session", () => {
     window.localStorage.setItem(detailsSentStorageKey("didi"), "1");
     renderCard();
     const mainExchange = screen.getByRole("button", {
