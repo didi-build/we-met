@@ -342,12 +342,14 @@ d1_tables:
         source: src/followup-email-consumer/lead-sink/email-handler.ts
       gmail_message_id:
         data: Legacy Gmail API message id column (schema from migration 0002; unused
-          at HEAD; always null in production as of 2026-10-23)
+          at HEAD; per CTO D1 query 2026-10-23, zero non-null in production, six
+          non-null in non-prod)
         purpose: legacy schema only; correlation lives in external_ref
         source: src/followup-email-consumer/lead-delivery-ledger.ts
       gmail_thread_id:
         data: Legacy Gmail API thread id column (schema from migration 0002; unused
-          at HEAD; always null in production as of 2026-10-23)
+          at HEAD; per CTO D1 query 2026-10-23, zero non-null in production, six
+          non-null in non-prod)
         purpose: legacy schema only; correlation lives in external_ref
         source: src/followup-email-consumer/lead-delivery-ledger.ts
       id:
