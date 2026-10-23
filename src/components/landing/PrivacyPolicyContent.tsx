@@ -76,9 +76,9 @@ export function PrivacyPolicyContent() {
 
       <h2 className="lp-legal-h2">What the people you meet can see</h2>
       <p className="lp-body">
-        When someone exchanges details with you, they can save your contact card on the
-        spot in their browser after the exchange. We do not email them your card by
-        default.
+        When someone exchanges details with you, we email their name and email to you.
+        Reply-To is the visitor. We do not email them your contact card unless we turn
+        on visitor follow-up email.
       </p>
       <p className="lp-body">
         When we turn on visitor follow-up email, they may receive a follow-up email from
@@ -89,15 +89,15 @@ export function PrivacyPolicyContent() {
         photo, and your contact card attached.
       </p>
       <p className="lp-body">
-        Whether they save your card on the spot or receive that optional email, if you
-        added a phone number it is included in the contact card they get.{" "}
+        When we send that optional follow-up email, if you added a phone number it is
+        included in the contact card attached.{" "}
         <strong>
-          Your Google account email address is shared with everyone who exchanges
-          details with you:
+          Your Google account email address is included for visitors who receive that
+          optional follow-up:
         </strong>{" "}
-        it is in your contact card, and replies to optional follow-up mail go to it. The
-        contact card uses your full Google name. Don&apos;t create a card if you are not
-        comfortable sharing that address.
+        it is in the contact card and replies go to it. The contact card uses your full
+        Google name. Don&apos;t create a card if you are not comfortable sharing that
+        address when visitor follow-up email is on.
       </p>
 
       <h2 className="lp-legal-h2">Google Contacts setup</h2>

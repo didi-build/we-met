@@ -27,7 +27,7 @@ export const HOW_IT_WORKS_STEPS: HowItWorksStep[] = [
   },
   {
     title: "Follow up from your inbox",
-    body: "They save your contact card on the spot. You get a ready-to-send follow-up in your inbox.",
+    body: "Their name and email land in your inbox. Reply-To is them so you can follow up.",
     chip: "You get all the lead details",
     vignettes: [<LeadEmailVignette key="lead" />],
   },
