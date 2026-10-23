@@ -16,5 +16,8 @@ describe("toHiPageCard (unit)", () => {
     expect(pageCard.contact).not.toHaveProperty("phone");
     expect(JSON.stringify(pageCard)).not.toContain("owner@example.com");
     expect(JSON.stringify(pageCard)).not.toContain("+1 555 0100");
+    expect(pageCard.accountId).toBe(record.accountId);
+    expect(pageCard.contact.urls).toEqual(record.contact.urls);
+    expect(pageCard.contact.vcardNote).toBe(record.contact.vcardNote);
   });
 });

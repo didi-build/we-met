@@ -34,6 +34,7 @@ export type HiCardCtaMode =
       leadToken: string;
       detailsSent: boolean;
       onTellMore: () => void;
+      onVcardFailure: () => void;
     }
   | { kind: "reload-fallback" };
 
@@ -181,6 +182,7 @@ export function HiCardPresentation({
                     leadToken={ctaMode.leadToken}
                     detailsSent={ctaMode.detailsSent}
                     onTellMore={ctaMode.onTellMore}
+                    onVcardFailure={ctaMode.onVcardFailure}
                   />
                 ) : showReloadFallback ? (
                   <>

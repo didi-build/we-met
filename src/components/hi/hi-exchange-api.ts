@@ -64,7 +64,7 @@ export async function postHiExchange(payload: HiExchangePayload): Promise<
       token: data?.token ?? "",
       owner: {
         email: data?.ownerEmail ?? "",
-        phone: data?.ownerPhone ?? "",
+        phone: typeof data?.ownerPhone === "string" ? data.ownerPhone : "",
       },
     };
   } catch (error) {

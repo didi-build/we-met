@@ -3,6 +3,7 @@ const EXCHANGE_COMPLETED_KEY_PREFIX = "we-met-hi-exchange-completed:";
 
 export type HiExchangeSession = {
   firstName: string;
+  visitorEmail: string;
   leadToken: string;
 };
 
@@ -22,11 +23,13 @@ export function readExchangeSession(slug: string): HiExchangeSession | null {
     }
     const parsed = JSON.parse(raw) as Partial<HiExchangeSession>;
     const firstName = typeof parsed.firstName === "string" ? parsed.firstName : "";
+    const visitorEmail =
+      typeof parsed.visitorEmail === "string" ? parsed.visitorEmail : "";
     const leadToken = typeof parsed.leadToken === "string" ? parsed.leadToken : "";
     if (!leadToken) {
       return null;
     }
-    return { firstName, leadToken };
+    return { firstName, visitorEmail, leadToken };
   } catch {
     return null;
   }

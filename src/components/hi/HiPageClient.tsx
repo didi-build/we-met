@@ -6,11 +6,13 @@ import { HiExchangeSheet } from "@/components/hi/HiExchangeSheet";
 import { HiStickyExchangeBar } from "@/components/hi/HiStickyExchangeBar";
 import type { CardPlan } from "@/card-data/types";
 import { cardInitials } from "@/lib/hi-card/card-content";
+import { isDetailsTokenExpired } from "@/lib/hi-card/details-token-client";
 import {
   readDetailsSentFlag,
   writeDetailsSentFlag,
 } from "@/lib/hi-card/details-sent-storage";
 import {
+  clearExchangeSession,
   readExchangeCompletedFlag,
   readExchangeSession,
   writeExchangeCompletedFlag,
@@ -46,15 +48,27 @@ export function HiPageClient({ card, photoUrl, plan = "free" }: HiPageClientProp
   const [exchangeCompleted, setExchangeCompleted] = useState(false);
   const [sessionActive, setSessionActive] = useState(false);
 
+  const degradeToReloadFallback = useCallback(() => {
+    clearExchangeSession(card.slug);
+    setSessionActive(false);
+    setLeadToken("");
+    setOwnerContact(null);
+  }, [card.slug]);
+
   useEffect(() => {
     setDetailsSent(readDetailsSentFlag(card.slug));
     setExchangeCompleted(readExchangeCompletedFlag(card.slug));
     const session = readExchangeSession(card.slug);
-    if (session) {
-      setSessionActive(true);
-      setVisitorFirst(session.firstName);
-      setLeadToken(session.leadToken);
+    if (!session) {
+      return;
     }
+    if (isDetailsTokenExpired(session.leadToken)) {
+      clearExchangeSession(card.slug);
+      return;
+    }
+    setSessionActive(true);
+    setVisitorFirst(session.firstName);
+    setLeadToken(session.leadToken);
   }, [card.slug]);
 
   const markDetailsSent = useCallback(() => {
@@ -79,6 +93,7 @@ export function HiPageClient({ card, photoUrl, plan = "free" }: HiPageClientProp
           pendingSheetFocusRestoreRef.current = false;
           setSheetOpen(true);
         },
+        onVcardFailure: degradeToReloadFallback,
       };
     }
     if (showReloadFallback) {
@@ -92,6 +107,7 @@ export function HiPageClient({ card, photoUrl, plan = "free" }: HiPageClientProp
     ownerContact,
     leadToken,
     detailsSent,
+    degradeToReloadFallback,
   ]);
 
   const updateStickyFromScroll = useCallback(() => {
@@ -124,13 +140,22 @@ export function HiPageClient({ card, photoUrl, plan = "free" }: HiPageClientProp
   }, [updateStickyFromScroll]);
 
   const handleExchangeSuccess = useCallback(
-    (nextFirstName: string, token: string, owner: HiExchangeOwnerContact) => {
+    (
+      nextFirstName: string,
+      token: string,
+      owner: HiExchangeOwnerContact,
+      visitorEmail: string,
+    ) => {
       setVisitorFirst(nextFirstName);
       setLeadToken(token);
       setOwnerContact({ email: owner.email, phone: owner.phone });
       setSessionActive(true);
       setExchangeCompleted(true);
-      writeExchangeSession(card.slug, { firstName: nextFirstName, leadToken: token });
+      writeExchangeSession(card.slug, {
+        firstName: nextFirstName,
+        visitorEmail,
+        leadToken: token,
+      });
       writeExchangeCompletedFlag(card.slug);
     },
     [card.slug],

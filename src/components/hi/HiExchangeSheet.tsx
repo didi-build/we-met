@@ -34,6 +34,7 @@ type HiExchangeSheetProps = {
     firstName: string,
     token: string,
     owner: HiExchangeOwnerContact,
+    visitorEmail: string,
   ) => void;
   onDetailsSuccess?: () => void;
 };
@@ -339,7 +340,7 @@ export function HiExchangeSheet({
     }
     const nextFirstName = firstNameFromName(name);
     setToken(result.token);
-    onExchangeSuccess(nextFirstName, result.token, result.owner);
+    onExchangeSuccess(nextFirstName, result.token, result.owner, email.trim());
     if (!prefersReducedMotion()) {
       setExchangeLeaving(true);
       await new Promise((resolve) => window.setTimeout(resolve, 200));

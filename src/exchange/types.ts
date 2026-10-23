@@ -35,7 +35,7 @@ export type CardEmailSnapshot = {
 export type ExchangeSuccessResponse = {
   token: string;
   ownerEmail: string;
-  ownerPhone: string;
+  ownerPhone?: string;
 };
 
 export type ExchangeErrorCode =

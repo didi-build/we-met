@@ -9,6 +9,7 @@ import {
   exchangeCompletedStorageKey,
   exchangeSessionStorageKey,
 } from "@/lib/hi-card/exchange-session-storage";
+import { createDetailsToken } from "@/exchange/token";
 import { exampleCardRecord } from "../helpers/example-card";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -99,10 +100,24 @@ describe("HiPageClient visitor receipt (component)", () => {
 
   it("shows receipt when session exists and never stores lead token in localStorage", () => {
     const slug = "receipt-slug";
-    const token = "lead-token-abc";
+    const token = createDetailsToken(
+      "receipt-test-secret",
+      {
+        leadId: "lead-1",
+        cardId: "test-id",
+        cardSlug: slug,
+        visitorEmail: "sam@example.com",
+        visitorName: "Sam",
+      },
+      Math.floor(Date.now() / 1000),
+    );
     window.sessionStorage.setItem(
       exchangeSessionStorageKey(slug),
-      JSON.stringify({ firstName: "Sam", leadToken: token }),
+      JSON.stringify({
+        firstName: "Sam",
+        visitorEmail: "sam@example.com",
+        leadToken: token,
+      }),
     );
     window.localStorage.setItem(exchangeCompletedStorageKey(slug), "1");
 
