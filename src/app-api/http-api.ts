@@ -3,6 +3,7 @@ import { createHttpAuthApi } from "@/app-api/http-auth";
 import {
   AppApiError,
   type AppCardBundle,
+  type ContactsSetupUi,
   type EditorCard,
   type SlugCheckResult,
 } from "@/app-api/types";
@@ -169,7 +170,10 @@ export function createHttpApi(): AppApi {
       }
     },
 
-    async publish(card: EditorCard): Promise<{ url: string }> {
+    async publish(card: EditorCard): Promise<{
+      url: string;
+      contactsSetup: ContactsSetupUi;
+    }> {
       const response = await fetch("/api/app/card/publish", {
         method: "POST",
         credentials: "same-origin",
@@ -188,7 +192,7 @@ export function createHttpApi(): AppApi {
       if (!response.ok) {
         throw await readApiError(response);
       }
-      return (await response.json()) as { url: string };
+      return (await response.json()) as { url: string; contactsSetup: ContactsSetupUi };
     },
   };
 }

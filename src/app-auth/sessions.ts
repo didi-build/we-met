@@ -193,7 +193,10 @@ export async function loadAccountForSession(
   accountId: string,
 ): Promise<AccountRow | null> {
   return await db
-    .prepare("SELECT id, google_sub, email, name, status FROM accounts WHERE id = ?")
+    .prepare(
+      `SELECT id, google_sub, email, name, status, contact_added_at, contact_sender_addresses
+       FROM accounts WHERE id = ?`,
+    )
     .bind(accountId)
     .first<AccountRow>();
 }

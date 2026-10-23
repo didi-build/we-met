@@ -1,7 +1,7 @@
 "use client";
 
 import type { AppApi } from "@/app-api/app-api";
-import { AppApiError, type EditorCard } from "@/app-api/types";
+import { AppApiError, type ContactsSetupUi, type EditorCard } from "@/app-api/types";
 import { useCallback, useMemo, useState } from "react";
 
 export function publishBlockers(input: {
@@ -59,7 +59,10 @@ export function usePublish(
       : "live";
 
   const handlePublish = useCallback(
-    async (onSuccess: (url: string) => void, onBlocked: (message: string) => void) => {
+    async (
+      onSuccess: (result: { url: string; contactsSetup: ContactsSetupUi }) => void,
+      onBlocked: (message: string) => void,
+    ) => {
       const b = blockersFn();
       if (b.length) {
         onBlocked(publishBlockerSentence(b));
@@ -74,7 +77,7 @@ export function usePublish(
           }
         }
         const result = await api.publish(card);
-        onSuccess(result.url);
+        onSuccess(result);
         return { blocked: false as const, published: true as const };
       } catch (err) {
         if (err instanceof AppApiError) {

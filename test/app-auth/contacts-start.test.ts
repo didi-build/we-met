@@ -1,0 +1,131 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { GET as contactsStartGet } from "@/app/api/auth/google/contacts/start/route";
+import { CONTACTS_OAUTH_COOKIE_NAME, SESSION_COOKIE_NAME } from "@/app-auth/cookies";
+import { upsertAccountFromGoogle } from "@/app-auth/accounts";
+import { createSession } from "@/app-auth/sessions";
+import { withIsolatedLocalD1 } from "../helpers/d1";
+
+const routeMocks = vi.hoisted(() => ({
+  env: {} as Record<string, unknown>,
+  headerMap: new Map<string, string>(),
+}));
+
+vi.mock("@opennextjs/cloudflare", () => ({
+  getCloudflareContext: vi.fn(async () => ({ env: routeMocks.env })),
+}));
+
+vi.mock("next/headers", () => ({
+  headers: vi.fn(async () => {
+    const headers = new Headers();
+    for (const [key, value] of routeMocks.headerMap.entries()) {
+      headers.set(key, value);
+    }
+    return headers;
+  }),
+}));
+
+function setRequestHeaders(init: Record<string, string>) {
+  routeMocks.headerMap.clear();
+  for (const [key, value] of Object.entries(init)) {
+    routeMocks.headerMap.set(key.toLowerCase(), value);
+  }
+}
+
+describe("contacts OAuth start (integration)", () => {
+  beforeEach(() => {
+    routeMocks.env = {
+      WE_MET_BASE_URL: "https://we-met.link",
+      WE_MET_ENV: "local",
+      WE_MET_APP_ORIGIN: "http://localhost:3000",
+      WE_MET_PREVIEW_HOST_SUFFIX: "",
+      GOOGLE_CLIENT_ID: "client",
+      GOOGLE_CLIENT_SECRET: "secret",
+      WE_MET_CONTACT_SENDER_ADDRESSES: "hello@we-met.link",
+      CONTACTS_SETUP_ALLOWLIST: "owner@example.com",
+      CONTACTS_SETUP_ENABLED_FOR_ALL: "false",
+    };
+    setRequestHeaders({ host: "localhost:3000" });
+  });
+
+  it("returns 401 without a session cookie", async () => {
+    await withIsolatedLocalD1(async (db) => {
+      routeMocks.env.WE_MET_DB = db;
+      const response = await contactsStartGet(
+        new Request("http://localhost:3000/api/auth/google/contacts/start"),
+      );
+      expect(response.status).toBe(401);
+    });
+  });
+
+  it("returns 403 when the owner is not on the allowlist", async () => {
+    await withIsolatedLocalD1(async (db) => {
+      routeMocks.env.WE_MET_DB = db;
+      const account = await upsertAccountFromGoogle(db, {
+        sub: "sub",
+        email: "stranger@example.com",
+        name: "Stranger",
+      });
+      expect(account.ok).toBe(true);
+      if (!account.ok) {
+        return;
+      }
+      const session = await createSession(db, account.account.id);
+      setRequestHeaders({
+        host: "localhost:3000",
+        cookie: `${SESSION_COOKIE_NAME}=${session.token}`,
+      });
+      const response = await contactsStartGet(
+        new Request("http://localhost:3000/api/auth/google/contacts/start"),
+      );
+      expect(response.status).toBe(403);
+    });
+  });
+
+  it("returns 404 on preview env", async () => {
+    routeMocks.env.WE_MET_ENV = "preview";
+    setRequestHeaders({ host: "pr-1-we-met.example.workers.dev" });
+    const response = await contactsStartGet(
+      new Request(
+        "https://pr-1-we-met.example.workers.dev/api/auth/google/contacts/start",
+      ),
+    );
+    expect(response.status).toBe(404);
+    routeMocks.env.WE_MET_ENV = "local";
+    setRequestHeaders({ host: "localhost:3000" });
+  });
+
+  it("redirects with contacts OAuth cookie attributes when eligible", async () => {
+    await withIsolatedLocalD1(async (db) => {
+      routeMocks.env.WE_MET_DB = db;
+      const account = await upsertAccountFromGoogle(db, {
+        sub: "sub-eligible",
+        email: "owner@example.com",
+        name: "Owner",
+      });
+      expect(account.ok).toBe(true);
+      if (!account.ok) {
+        return;
+      }
+      await db
+        .prepare("UPDATE accounts SET status = 'active' WHERE id = ?")
+        .bind(account.account.id)
+        .run();
+      const session = await createSession(db, account.account.id);
+      setRequestHeaders({
+        host: "localhost:3000",
+        cookie: `${SESSION_COOKIE_NAME}=${session.token}`,
+      });
+      const response = await contactsStartGet(
+        new Request("http://localhost:3000/api/auth/google/contacts/start"),
+      );
+      expect(response.status).toBe(302);
+      const cookie = response.headers.get("set-cookie") ?? "";
+      expect(cookie).toContain(`${CONTACTS_OAUTH_COOKIE_NAME}=`);
+      expect(cookie).toContain("HttpOnly");
+      expect(cookie).toContain("Secure");
+      expect(cookie).toContain("SameSite=Lax");
+      expect(cookie).toContain("Path=/");
+      expect(cookie).toContain("Max-Age=");
+    });
+  });
+});

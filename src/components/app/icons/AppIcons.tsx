@@ -76,6 +76,26 @@ export function CameraIcon({ size, className }: IconProps) {
     </svg>
   );
 }
+export function ContactCardIcon({ size, className }: IconProps) {
+  return (
+    <svg
+      aria-hidden
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <circle cx="9" cy="11" r="2" />
+      <path d="M6 16c.6-1.4 1.7-2 3-2s2.4.6 3 2M14 10h4M14 14h3" />
+    </svg>
+  );
+}
 export function CheckIcon({ size, className }: IconProps) {
   return (
     <svg

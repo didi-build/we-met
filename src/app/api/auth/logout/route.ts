@@ -1,4 +1,7 @@
-import { clearSessionCookieValue } from "@/app-auth/cookies";
+import {
+  clearContactsSetupSuppressCookieValue,
+  clearSessionCookieValue,
+} from "@/app-auth/cookies";
 import {
   apiError,
   apiJson,
@@ -38,5 +41,6 @@ export async function POST(request: Request) {
 
   const response = apiJson({}, { status: 200 });
   response.headers.append("set-cookie", clearSessionCookieValue());
+  response.headers.append("set-cookie", clearContactsSetupSuppressCookieValue());
   return response;
 }
