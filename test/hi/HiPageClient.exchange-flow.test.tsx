@@ -184,8 +184,11 @@ describe("HiPageClient exchange flow (component)", () => {
       const key = window.localStorage.key(i);
       const value = key ? window.localStorage.getItem(key) : "";
       expect(value).not.toContain(leadToken);
+      expect(value).not.toContain("owner-secret@example.com");
+      expect(value).not.toContain("+1 555 0100");
     }
     expect(window.location.href).not.toContain(leadToken);
+    expect(window.location.href).not.toContain("owner-secret@example.com");
   });
 
   it("clears an expired session and shows reload fallback", () => {

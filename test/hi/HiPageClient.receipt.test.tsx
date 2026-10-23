@@ -133,8 +133,17 @@ describe("HiPageClient visitor receipt (component)", () => {
 
     expect(window.sessionStorage.getItem(exchangeSessionStorageKey(slug))).toBeNull();
     expect(window.location.search).toBe("");
+    expect(window.location.href).not.toContain("owner@example.com");
     expect(screen.getByRole("button", { name: /Contact sent/i })).toBeTruthy();
     expect(screen.queryByText(/Save .* contact/i)).toBeNull();
+    expect(screen.queryByRole("link", { name: /^Email$/i })).toBeNull();
+    expect(screen.queryByRole("link", { name: /^Call$/i })).toBeNull();
+    for (let i = 0; i < window.localStorage.length; i += 1) {
+      const value = window.localStorage.key(i)
+        ? window.localStorage.getItem(window.localStorage.key(i)!)
+        : "";
+      expect(value).not.toContain("owner@example.com");
+    }
   });
 
   it("keeps session and resets save UI when vcard=limited is in the URL", async () => {
@@ -219,6 +228,8 @@ describe("HiPageClient visitor receipt (component)", () => {
       const key = window.localStorage.key(i);
       const value = key ? window.localStorage.getItem(key) : "";
       expect(value).not.toContain(token);
+      expect(value).not.toContain("owner@example.com");
+      expect(value).not.toContain("maya@example.com");
     }
   });
 });

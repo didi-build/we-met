@@ -1348,7 +1348,10 @@
     stored in sessionStorage JSON we-met-hi-exchange-session:<slug> alongside visitor firstName and visitorEmail,
     and ownerEmail / ownerPhone from the exchange response (for receipt Email/Call after redirect)
   purpose: receipt UI, second-step details form authorization, and token-gated owner vCard download (POST /api/exchange/vcard)
-  storage: visitor browser sessionStorage (per slug; cleared on expiry, vCard error, or explicit clear)
+  storage:
+    visitor browser sessionStorage only (single JSON key we-met-hi-exchange-session:<slug>; owner contact
+    fields are not written to localStorage, the URL, logs, or analytics; cleared on expiry, ?vcard=expired,
+    or explicit clear)
   processors:
     - Cloudflare
   retention: 2 hours or until cleared (src/exchange/token.ts); not stored server-side after issue
