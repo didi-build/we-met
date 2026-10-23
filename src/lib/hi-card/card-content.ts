@@ -4,6 +4,7 @@ import type {
   CardRecord,
   CardServiceItem,
 } from "@/card-data/types";
+import type { PublicHiCardPayload } from "@/lib/hi-card/public-card-payload";
 
 export function cardInitials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -65,12 +66,25 @@ export type CardContentFlags = {
   hasLinks: boolean;
 };
 
-export function cardContentFlags(card: CardRecord): CardContentFlags {
+/** Card shape HiCardPresentation can render (public payload or in-app preview record). */
+export type HiCardPresentationModel = PublicHiCardPayload | CardRecord;
+
+function hiCardHasPhoto(card: HiCardPresentationModel): boolean {
+  if ("hasPhoto" in card && typeof card.hasPhoto === "boolean") {
+    return card.hasPhoto;
+  }
+  if ("photoKey" in card) {
+    return Boolean(card.photoKey);
+  }
+  return false;
+}
+
+export function cardContentFlags(card: HiCardPresentationModel): CardContentFlags {
   const paragraphs = card.about?.paragraphs?.filter((p) => p.trim()) ?? [];
   const serviceItems = card.services?.items?.filter((s) => s.title?.trim()) ?? [];
   const linkEntries = cardLinkEntries(card.links);
   return {
-    hasPhoto: Boolean(card.photoKey),
+    hasPhoto: hiCardHasPhoto(card),
     hasRole: Boolean(card.role?.trim()),
     hasAlternate: Boolean(card.alternate?.url?.trim() && card.alternate?.label?.trim()),
     hasAbout: Boolean(card.about?.title?.trim() && paragraphs.length),

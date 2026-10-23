@@ -635,15 +635,18 @@
   data:
     Structured contact JSON (given and family from Google sign-in by default, optional nickname, org, title, phone,
     vcard note, URLs)
-  purpose: visitor follow-up From display (given), signature (ownerEmailDisplayName), vCard; phone not on public page
+  purpose:
+    visitor follow-up From display (given), signature (ownerEmailDisplayName), and server-built vCard; not sent to the
+    browser on public /hi before exchange
   storage: D1
   processors:
     - Cloudflare
   retention: until card retired
   who_can_see:
     operator; visitors after exchange via follow-up email From, signature, body, and vCard attachment, or POST
-    /api/exchange/vcard with a valid details token (including when lead_email_enabled is off)
-  source: migrations/0005_cards_rebuild_mvp.sql
+    /api/exchange/vcard with a valid details token (including when lead_email_enabled is off). Public /hi shows name,
+    role, about, services, and links from page_copy_json and links_json only (see src/lib/hi-card/public-card-payload.ts).
+  source: src/lib/hi-card/public-card-payload.ts
   verified: true
 - id: cards.copy_json
   table: cards

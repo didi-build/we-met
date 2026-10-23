@@ -7,12 +7,13 @@ import { HiWeMetBannerBand, HiWeMetBannerTop } from "@/components/hi/HiWeMetBann
 import { HiWhatIDoChips } from "@/components/hi/HiWhatIDoChips";
 import { DidiBuildLeafIcon, WeMetMarkIcon } from "@/components/hi/icons/HiCardIcons";
 import { Button } from "@/components/ui/Button";
-import type { CardPlan, CardRecord } from "@/card-data/types";
+import type { CardPlan } from "@/card-data/types";
 import {
   cardContentFlags,
   cardGreeting,
   cardInitials,
   cardLinkEntries,
+  type HiCardPresentationModel,
   servicesForChips,
   WE_MET_CARD_HOME_URL,
 } from "@/lib/hi-card/card-content";
@@ -22,7 +23,7 @@ import type { MouseEvent, Ref } from "react";
 import { useEffect, useState } from "react";
 
 export type HiCardPresentationProps = {
-  card: CardRecord;
+  card: HiCardPresentationModel;
   photoUrl: string | null;
   plan?: CardPlan;
   /** No exchange flow (button inert; sheet/sticky live outside this component). */

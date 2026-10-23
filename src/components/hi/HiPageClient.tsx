@@ -3,7 +3,8 @@
 import { HiCardPresentation } from "@/components/hi/HiCardPresentation";
 import { HiExchangeSheet } from "@/components/hi/HiExchangeSheet";
 import { HiStickyExchangeBar } from "@/components/hi/HiStickyExchangeBar";
-import type { CardPlan, CardRecord } from "@/card-data/types";
+import type { CardPlan } from "@/card-data/types";
+import type { PublicHiCardPayload } from "@/lib/hi-card/public-card-payload";
 import { cardInitials } from "@/lib/hi-card/card-content";
 import { substituteFirstName } from "@/lib/copy/substitute-first-name";
 import {
@@ -15,7 +16,7 @@ import type { MouseEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 type HiPageClientProps = {
-  card: CardRecord;
+  card: PublicHiCardPayload;
   photoUrl: string | null;
   plan?: CardPlan;
 };
