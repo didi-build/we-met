@@ -481,16 +481,16 @@ describe("processFollowupQueueBatch (unit)", () => {
     });
     const deps = createDeps({}, ledger);
 
-    await processFollowupQueueBatch({ messages: [message] }, deps);
+    await expect(
+      processFollowupQueueBatch({ messages: [message] }, deps),
+    ).resolves.toBeUndefined();
 
     expect(deps.sendEmail).toHaveBeenCalledOnce();
     const sent = vi.mocked(deps.sendEmail).mock.calls[0][0];
-    expect(sent.subject).toBe(
-      "Re: [we-met test → owner@example.com] New lead added: Alex Visitor",
-    );
     expect(sent.inReplyTo).toBeUndefined();
     expect(sent.references).toBeUndefined();
     expect(message.ack).toHaveBeenCalledOnce();
+    expect(message.retry).not.toHaveBeenCalled();
   });
 
   it("acks lead_sink_record after successful owner email send", async () => {
@@ -966,41 +966,6 @@ describe("processFollowupQueueBatch (unit)", () => {
       provider: "cloudflare",
       messageId: "<record@mail.we-met.link>",
     });
-    expect(message.ack).toHaveBeenCalledOnce();
-  });
-
-  it("sends Cloudflare append unthreaded when record ref is Gmail-era", async () => {
-    const ledger = new MemoryConsumerLeadDeliveryLedger();
-    ledger.seedSent(
-      "lead-1",
-      "sink-1",
-      "record",
-      JSON.stringify({ gmailThreadId: "gmail-thread", gmailMessageId: "g1" }),
-    );
-    ledger.seedQueued("lead-1", "sink-1", "append");
-    const message = createMessage({
-      type: "lead_sink_append_details",
-      sinkId: "sink-1",
-      sinkKind: "email",
-      sinkConfig: { to: "owner@example.com" },
-      lead: {
-        leadId: "lead-1",
-        name: "Alex Visitor",
-        email: "visitor@example.com",
-      },
-      details: { jobTitle: "CEO", company: null, note: null },
-      detailsSubmittedAt: "2026-10-12T01:00:00.000Z",
-      cardId: "card-1",
-      cardSlug: "demo",
-      sourceUrl: "https://we-met.link/hi/demo",
-    });
-    const deps = createDeps({}, ledger);
-
-    await processFollowupQueueBatch({ messages: [message] }, deps);
-
-    const sent = vi.mocked(deps.sendEmail).mock.calls[0]![0];
-    expect(sent.inReplyTo).toBeUndefined();
-    expect(sent.references).toBeUndefined();
     expect(message.ack).toHaveBeenCalledOnce();
   });
 

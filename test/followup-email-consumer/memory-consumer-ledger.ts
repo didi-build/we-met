@@ -49,8 +49,8 @@ export class MemoryConsumerLeadDeliveryLedger implements ConsumerLeadDeliveryLed
     sinkId: string,
     phase: LeadDeliveryPhase,
     externalRef: string | null = JSON.stringify({
-      gmailMessageId: "gmail-1",
-      gmailThreadId: "thread-1",
+      provider: "cloudflare",
+      messageId: "<record@mail.we-met.link>",
     }),
   ): void {
     this.rows.set(key(leadId, sinkId, phase), {

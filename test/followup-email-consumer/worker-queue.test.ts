@@ -178,57 +178,81 @@ describe("follow-up email consumer worker queue (integration)", () => {
     errorSpy.mockRestore();
   });
 
-  it("sends when app_settings email_provider is gmail (legacy row ignored)", async () => {
-    const emailSend = vi.fn(async () => ({ messageId: "<msg@mail.we-met.link>" }));
-    const ack = vi.fn();
-    const retry = vi.fn();
+  it.each([
+    {
+      label: "email_provider row is missing",
+      includeEmailProvider: false,
+      emailProvider: "",
+    },
+    { label: 'email_provider is ""', includeEmailProvider: true, emailProvider: "" },
+    {
+      label: "email_provider is smtp",
+      includeEmailProvider: true,
+      emailProvider: "smtp",
+    },
+    {
+      label: "email_provider is gmail",
+      includeEmailProvider: true,
+      emailProvider: "gmail",
+    },
+  ])(
+    "sends via Cloudflare EMAIL binding when $label",
+    async ({ includeEmailProvider, emailProvider }) => {
+      const emailSend = vi.fn(async () => ({ messageId: "<msg@mail.we-met.link>" }));
+      const ack = vi.fn();
+      const retry = vi.fn();
 
-    const env: FollowupConsumerEnv = {
-      WE_MET_ENV: "preview",
-      WE_MET_BASE_URL: "https://we-met.link",
-      WE_MET_EMAIL_FROM_CLOUDFLARE: "hello@mail.we-met.link",
-      WE_MET_FROM_DISPLAY_NAME: "Diadem at We Met",
-      WE_MET_TEST_MAIL_TO: "test-inbox@example.com",
-      WE_MET_ASSETS: { get: vi.fn() } as never,
-      WE_MET_DB: createNoopConsumerD1({
+      const appSettings: Record<string, string> = {
         lead_email_enabled: "1",
-        email_provider: "gmail",
         visitor_email_mode: "direct",
         daily_cap_global: "150",
         daily_cap_per_card: "50",
-      }),
-      EMAIL: { send: emailSend },
-    };
+      };
+      if (includeEmailProvider) {
+        appSettings.email_provider = emailProvider;
+      }
 
-    await followupEmailConsumer.queue(
-      {
-        messages: [
-          {
-            id: "m1",
-            attempts: 1,
-            body: {
-              type: "visitor_followup",
-              lead: {
-                leadId: "lead-3",
-                submittedAt: "2026-10-12T00:00:00.000Z",
-                environment: "preview",
-                isTestLead: true,
-                name: "Alex Visitor",
-                email: "visitor@example.com",
-                phone: null,
+      const env: FollowupConsumerEnv = {
+        WE_MET_ENV: "preview",
+        WE_MET_BASE_URL: "https://we-met.link",
+        WE_MET_EMAIL_FROM_CLOUDFLARE: "hello@mail.we-met.link",
+        WE_MET_FROM_DISPLAY_NAME: "Diadem at We Met",
+        WE_MET_TEST_MAIL_TO: "test-inbox@example.com",
+        WE_MET_ASSETS: { get: vi.fn() } as never,
+        WE_MET_DB: createNoopConsumerD1(appSettings),
+        EMAIL: { send: emailSend },
+      };
+
+      await followupEmailConsumer.queue(
+        {
+          messages: [
+            {
+              id: "m1",
+              attempts: 1,
+              body: {
+                type: "visitor_followup",
+                lead: {
+                  leadId: "lead-legacy-provider",
+                  submittedAt: "2026-10-12T00:00:00.000Z",
+                  environment: "preview",
+                  isTestLead: true,
+                  name: "Alex Visitor",
+                  email: "visitor@example.com",
+                  phone: null,
+                },
+                card,
               },
-              card,
+              ack,
+              retry,
             },
-            ack,
-            retry,
-          },
-        ],
-      },
-      env,
-    );
+          ],
+        },
+        env,
+      );
 
-    expect(emailSend).toHaveBeenCalledOnce();
-    expect(ack).toHaveBeenCalledOnce();
-    expect(retry).not.toHaveBeenCalled();
-  });
+      expect(emailSend).toHaveBeenCalledOnce();
+      expect(ack).toHaveBeenCalledOnce();
+      expect(retry).not.toHaveBeenCalled();
+    },
+  );
 });
