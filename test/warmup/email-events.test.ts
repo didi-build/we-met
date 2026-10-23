@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { handleWarmupQueue } from "../../workers/warmup/index";
-import type { WarmupEnv } from "../../workers/warmup/lib/config";
+import {
+  WARMUP_NONSEED_ALERT_MAX_INDIVIDUAL_PER_HOUR_DEFAULT,
+  type WarmupEnv,
+} from "../../workers/warmup/lib/config";
 import {
   WARMUP_KV_NONSEED_ALERT_PREFIX,
   nonSeedAlertDedupeKey,
@@ -8,7 +11,6 @@ import {
 } from "../../workers/warmup/lib/email-event-alert";
 import {
   WARMUP_KV_NONSEED_ALERT_WINDOW,
-  WARMUP_NONSEED_ALERT_MAX_INDIVIDUAL_PER_HOUR,
   WARMUP_NONSEED_ALERT_WINDOW_MS,
 } from "../../workers/warmup/lib/nonseed-alert-rate";
 import { parseWarmupSecrets } from "../../workers/warmup/lib/config";
@@ -61,6 +63,18 @@ function baseEvent(overrides: {
     };
   }
   return body;
+}
+
+function kvWithFailingWindowPut(base: KVNamespace): KVNamespace {
+  return {
+    ...base,
+    put: async (key: string, value: string, options?: { expirationTtl?: number }) => {
+      if (key === WARMUP_KV_NONSEED_ALERT_WINDOW) {
+        throw new Error("kv_rate_limited");
+      }
+      return base.put(key, value, options);
+    },
+  } as KVNamespace;
 }
 
 function emailQueueMessage(
@@ -315,7 +329,7 @@ describe("warmup email events (unit)", () => {
     vi.useFakeTimers();
     vi.setSystemTime(fixedStart);
     try {
-      const cap = WARMUP_NONSEED_ALERT_MAX_INDIVIDUAL_PER_HOUR;
+      const cap = WARMUP_NONSEED_ALERT_MAX_INDIVIDUAL_PER_HOUR_DEFAULT;
       const messages = Array.from({ length: cap + 3 }, (_, index) =>
         emailQueueMessage(
           `q${index}`,
@@ -346,9 +360,11 @@ describe("warmup email events (unit)", () => {
       const window = JSON.parse(windowRaw!) as {
         summarySent: boolean;
         suppressedCount: number;
+        individualAlertAtMs: number[];
       };
       expect(window.summarySent).toBe(true);
       expect(window.suppressedCount).toBe(3);
+      expect(window.individualAlertAtMs).toHaveLength(cap);
 
       vi.setSystemTime(
         new Date(fixedStart.getTime() + WARMUP_NONSEED_ALERT_WINDOW_MS + 1),
@@ -375,6 +391,113 @@ describe("warmup email events (unit)", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("respects WARMUP_NONSEED_ALERT_MAX_INDIVIDUAL_PER_HOUR when set to 2", async () => {
+    const send = vi.fn(async (_message: { subject: string }) => ({
+      messageId: "alert",
+    }));
+    const kv = warmupKvEnabled();
+    const env: WarmupEnv = {
+      ...secretsEnv,
+      WARMUP_NONSEED_ALERT_MAX_INDIVIDUAL_PER_HOUR: "2",
+      EMAIL: { send },
+      WARMUP_STATE: kv,
+    };
+
+    for (let index = 0; index < 3; index += 1) {
+      const message = emailQueueMessage(
+        `cap2-${index}`,
+        baseEvent({
+          recipient: `cap2-${index}@example.com`,
+          messageId: `msg-cap2-${index}`,
+        }),
+      );
+      await processEmailEventsBatch({ messages: [message] }, env);
+      expect(message.ack).toHaveBeenCalledOnce();
+    }
+
+    const subjects = send.mock.calls.map(
+      (call) => (call[0] as { subject: string }).subject,
+    );
+    expect(
+      subjects.filter((s) => s === "We Met urgent: app mail bounce or complaint"),
+    ).toHaveLength(2);
+    expect(subjects.filter((s) => s.includes("alert rate limit"))).toHaveLength(1);
+  });
+
+  it("acks and dedupes when the window KV write fails after a successful send", async () => {
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+    const send = vi.fn(async (_message: { subject: string }) => ({
+      messageId: "alert",
+    }));
+    const baseKv = warmupKvEnabled();
+    const kv = kvWithFailingWindowPut(baseKv);
+    const env: WarmupEnv = {
+      ...secretsEnv,
+      EMAIL: { send },
+      WARMUP_STATE: kv,
+    };
+
+    const message = emailQueueMessage(
+      "window-fail",
+      baseEvent({
+        recipient: "window-fail@example.com",
+        messageId: "msg-window-fail",
+      }),
+    );
+    await processEmailEventsBatch({ messages: [message] }, env);
+
+    expect(message.ack).toHaveBeenCalledOnce();
+    expect(message.retry).not.toHaveBeenCalled();
+    expect(send).toHaveBeenCalledOnce();
+    expect(await kv.get(nonSeedAlertDedupeKey("msg-window-fail"))).toBeTruthy();
+    expect(errorLog).toHaveBeenCalledWith(
+      "warmup_email_event_alert_window_write_failed",
+      expect.objectContaining({ scope: "batch" }),
+    );
+    errorLog.mockRestore();
+  });
+
+  it("still pauses on seed complaint after non-seed cap without touching the window key", async () => {
+    const send = vi.fn(async (_message: { subject: string }) => ({
+      messageId: "alert",
+    }));
+    const kv = warmupKvEnabled();
+    const env: WarmupEnv = {
+      ...secretsEnv,
+      EMAIL: { send },
+      WARMUP_STATE: kv,
+    };
+
+    const cap = WARMUP_NONSEED_ALERT_MAX_INDIVIDUAL_PER_HOUR_DEFAULT;
+    for (let index = 0; index < cap + 1; index += 1) {
+      const message = emailQueueMessage(
+        `ns-${index}`,
+        baseEvent({
+          recipient: `ns-${index}@example.com`,
+          messageId: `msg-ns-${index}`,
+        }),
+      );
+      await processEmailEventsBatch({ messages: [message] }, env);
+    }
+
+    const windowBefore = await kv.get(WARMUP_KV_NONSEED_ALERT_WINDOW);
+    expect(windowBefore).toBeTruthy();
+
+    const seedMessage = emailQueueMessage("seed-after-cap", baseEvent({}));
+    await processEmailEventsBatch({ messages: [seedMessage] }, env);
+    expect(seedMessage.ack).toHaveBeenCalledOnce();
+
+    expect(await kv.get(WARMUP_KV_NONSEED_ALERT_WINDOW)).toBe(windowBefore);
+    expect(await kv.get(WARMUP_KV_PAUSED)).toBeTruthy();
+    const pauseAlerts = send.mock.calls.filter(
+      (call) =>
+        (call[0] as { subject: string }).subject !==
+          "We Met urgent: app mail bounce or complaint" &&
+        !(call[0] as { subject: string }).subject.includes("alert rate limit"),
+    );
+    expect(pauseAlerts.length).toBeGreaterThanOrEqual(1);
   });
 
   it("stores non-seed dedupe keys separate from pause episode keys", async () => {
