@@ -29,10 +29,10 @@ export function PrivacyPolicyContent() {
       <p className="lp-body">
         <em>People who exchange details with you.</em> When someone taps &quot;Exchange
         contact&quot; on your card, they enter their name and email, and can add a phone
-        number, job title, company and a note. We email their name and email to you
-        (Reply-To is the visitor) so you can follow up. We do not keep their lead
-        contents in our database. We keep only delivery records: whether an email was
-        queued, sent or failed, when, and an error code if it failed.
+        number, job title, company and a note. We email these details to you (Reply-To
+        is the visitor) so you can follow up. We do not keep their lead contents in our
+        database. We keep only delivery records: whether an email was queued, sent or
+        failed, when, and an error code if it failed.
       </p>
       <p className="lp-body">
         <em>Visitor card pages.</em> After someone submits the optional details step on
@@ -59,9 +59,9 @@ export function PrivacyPolicyContent() {
         built into We Met today.
       </p>
       <p className="lp-body">
-        <em>Gmail (Google).</em> Owner lead notifications are sent through a Google
-        mailbox we control, using Google&apos;s Gmail API. When visitor follow-up email
-        is turned on, those messages use the same path. Google receives the full
+        <em>Gmail (Google).</em> Owner lead notifications can be sent through a Google
+        mailbox we control, using Google&apos;s Gmail API. When we turn on visitor
+        follow-up email, those messages can use the same path. Google receives the full
         message: who it is to and from (including reply addresses), the subject, the
         text and HTML body, and any attachments (such as contact cards). Our operator
         can read these messages in that mailbox. We do not keep the text of these emails
@@ -81,12 +81,12 @@ export function PrivacyPolicyContent() {
         default.
       </p>
       <p className="lp-body">
-        When visitor follow-up email is turned on, they may receive a follow-up email
-        from your first name via We Met (for example, &quot;Diadem via We Met&quot;).
-        The signature shows your Google first name, your display name in brackets when
-        you use one, and your Google last name. That email also includes your display
-        name on the card (or your Google name if you left display name blank), your role
-        and photo, and your contact card attached.
+        When we turn on visitor follow-up email, they may receive a follow-up email from
+        your first name via We Met (for example, &quot;Diadem via We Met&quot;). The
+        signature shows your Google first name, your display name in brackets when you
+        use one, and your Google last name. That email also includes your display name
+        on the card (or your Google name if you left display name blank), your role and
+        photo, and your contact card attached.
       </p>
       <p className="lp-body">
         Whether they save your card on the spot or receive that optional email, if you
@@ -102,15 +102,22 @@ export function PrivacyPolicyContent() {
 
       <h2 className="lp-legal-h2">Google Contacts setup</h2>
       <p className="lp-body">
-        If you choose &quot;Add We Met to my contacts&quot; after you publish, we ask
-        Google for one-time access to your Google Contacts. We use it only to create or
-        update a single &quot;We Met&quot; contact with our sending addresses. We do not
-        read, store, or share any of your other contacts. We do not store Google access
-        tokens. We only store that you completed setup and which sender addresses we
-        recorded on your account.
+        If you choose &quot;Add We Met to my contacts&quot; after you publish, Google
+        will ask you to let We Met see, edit, download and delete your contacts (the
+        Google Contacts scope). We use that access only during setup: to create or
+        update a single &quot;We Met&quot; contact with our sending addresses. To avoid
+        duplicates, we search your contacts only for our sending addresses and read the
+        name and email of any match during setup. We don&apos;t keep it. We do not store
+        Google access tokens. We only store that you completed setup and which sender
+        addresses we recorded on your account.
       </p>
       <p className="lp-body">
-        We Met&apos;s use of information received from Google APIs will adhere to the{" "}
+        The &quot;We Met&quot; contact stays in your Google Contacts until you delete it
+        there, even if you revoke We Met&apos;s access or delete your We Met account.
+      </p>
+      <p className="lp-body">
+        We Met&apos;s use and transfer to any other app of information received from
+        Google APIs will adhere to the{" "}
         <a href="https://developers.google.com/terms/api-services-user-data-policy">
           Google API Services User Data Policy
         </a>

@@ -45,7 +45,7 @@ Agents should extend behavior only through these interfaces, not ad hoc fetches 
 | `/api/auth/*`          | App (+ local)   | Google sign-in, preview test login, logout ([0025](../decisions/0025-we-met-mvp-accounts-sign-in-and-app-backend.md)). |
 | `/api/app/*`           | App (+ local)   | Session, draft, publish, slug check, photo ([app-api-contract](./app-api-contract.md)).                                |
 
-**Legacy mapping:** `didi.build/hi` → `/hi/didi`. **`didi.build` is not redirected.** Owner vCard is available after exchange via token-gated `POST /api/exchange/vcard` (default owner relay) and may be attached in optional visitor follow-up email when `visitor_email_mode` is `direct` (no public `/hi/<slug>/contact.vcf`; [DIDI-641](https://linear.app/didi-build/issue/DIDI-641), [0027](../decisions/0027-owner-relay-visitor-follow-up.md)). Slug rules: [0003](../decisions/0003-urls-and-lookup.md). Exchange API: [0008](../decisions/0008-api-routes-exchange-and-details.md).
+**Legacy mapping:** `didi.build/hi` → `/hi/didi`. **`didi.build` is not redirected.** Owner vCard is available after exchange via token-gated `POST /api/exchange/vcard` in both `visitor_email_mode` values and may be attached in optional visitor follow-up email when `visitor_email_mode` is `direct` (no public `/hi/<slug>/contact.vcf`; [DIDI-641](https://linear.app/didi-build/issue/DIDI-641), [0027](../decisions/0027-owner-relay-visitor-follow-up.md)). Slug rules: [0003](../decisions/0003-urls-and-lookup.md). Exchange API: [0008](../decisions/0008-api-routes-exchange-and-details.md).
 
 ## Theming
 

@@ -1313,17 +1313,22 @@
 - id: auth.google_contacts
   whose: card_owner
   data:
-    One-time Google OAuth contacts scope and People API calls to create or update a single We Met contact with configured
-    sender addresses; access token discarded after callback (no refresh token)
+    One-time Google OAuth contacts scope and People API calls; searchContacts for configured sender addresses (reads
+    matched contact names and emails during setup only); create or update a single We Met contact with those addresses;
+    access token discarded after callback (no refresh token)
   purpose: optional Add We Met to my contacts setup after publish (DIDI-747)
-  storage: Google People API (transit); accounts.contact_added_at and accounts.contact_sender_addresses only in D1
+  storage:
+    We Met contact persists in the owner Google Contacts until the owner deletes it; accounts.contact_added_at and
+    accounts.contact_sender_addresses in D1 only (no Google tokens)
   processors:
     - Google
     - Cloudflare
-  retention: persisted flags until account tombstone; Google tokens not stored per privacy page and ADR 0026
-  who_can_see: operator; Google as processor during the one-time API calls
+  retention:
+    We Met contact in Google until owner deletes; D1 flags until account tombstone; Google tokens not stored per privacy
+    page and ADR 0026
+  who_can_see: card owner in Google Contacts; operator for D1 flags; Google as processor during setup API calls
   source: src/app-auth/google-people-api.ts
-  verified: true
+  verified: false
 - id: abuse.turnstile
   whose: visitor
   data: Turnstile response token and client IP sent to Cloudflare siteverify

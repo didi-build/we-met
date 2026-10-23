@@ -60,9 +60,9 @@ export function LandingHome({ urls, getStartedLabel }: LandingHomeProps) {
             contents of your leads. By default, visitors save your contact card on the
             spot; you get their details in your inbox with Reply-To set to them. Anyone
             who exchanges with you sees your Google account email address in that
-            contact card (and in optional visitor follow-up email when that mode is on).
-            Read our <a href={urls.privacy}>Privacy</a> and{" "}
-            <a href={urls.terms}>Terms</a> pages for more.
+            contact card (and when we turn on visitor follow-up email). Read our{" "}
+            <a href={urls.privacy}>Privacy</a> and <a href={urls.terms}>Terms</a> pages
+            for more.
           </p>
         </section>
 
