@@ -1,10 +1,18 @@
 /**
  * One-time helper: convert legacy flat data-map list YAML to nodrift schema_version 1.
- * Not used in CI; kept for reproducibility. Equivalence is enforced by test/nodrift/data-map-equivalence.test.ts.
+ * Not used in CI. After converting, run scripts/verify-data-map-conversion.mjs on the flat file.
  */
+import { createRequire } from "node:module";
 import fs from "node:fs";
 import path from "node:path";
-import yaml from "yaml";
+import { fileURLToPath } from "node:url";
+
+const require = createRequire(import.meta.url);
+const yaml = require(
+  require.resolve("yaml", {
+    paths: [path.dirname(require.resolve("@didi-build/nodrift/package.json"))],
+  }),
+);
 
 const FIELD_KEYS = [
   "whose",
@@ -72,10 +80,25 @@ function bindingForOtherItem(id) {
     return "WORKER_SELF_REFERENCE";
   }
   if (id === "storage.nonprod_environment") {
-    return ["WE_MET_DB", "WE_MET_ASSETS", "WE_MET_FOLLOWUP_EMAIL_QUEUE"];
+    return ["WE_MET_ASSETS", "WE_MET_FOLLOWUP_EMAIL_QUEUE"];
   }
   return undefined;
 }
+
+const PRODUCTION_D1_BINDING_ITEM = {
+  id: "binding.d1_we_met_db",
+  binding: "WE_MET_DB",
+  whose: "operational",
+  data: "D1 database binding on production app and follow-up consumer Workers; card-owner and visitor personal data lives in d1_tables column rows, not in the binding itself",
+  purpose: "primary application datastore (production routes and consumer)",
+  storage: "D1 via Wrangler WE_MET_DB binding (database name in wrangler.jsonc)",
+  processors: ["Cloudflare"],
+  retention: "per-column retention in d1_tables; binding has no separate retention",
+  who_can_see: "operator",
+  source:
+    "wrangler.jsonc; workers/we-met-followup-email-consumer/wrangler.production.jsonc",
+  verified: true,
+};
 
 export function convertFlatDataMap(flatEntries) {
   if (!Array.isArray(flatEntries)) {
@@ -126,6 +149,11 @@ export function convertFlatDataMap(flatEntries) {
       }
       return item;
     });
+
+  if (!other_items.some((item) => item.id === PRODUCTION_D1_BINDING_ITEM.id)) {
+    other_items.push(PRODUCTION_D1_BINDING_ITEM);
+    other_items.sort((a, b) => a.id.localeCompare(b.id));
+  }
 
   return {
     schema_version: 1,

@@ -24,8 +24,8 @@ Copy this file for each incident (do not edit this template in place).
 
 ## Reporting and notification
 
-- **Reported to the OPC:** yes / no — date:
-- **Individuals notified:** yes / no — date:
+- **Reported to the OPC:** yes / no; date:
+- **Individuals notified:** yes / no; date:
 - **If not reported or not notified, brief reason:**
 - **Other organizations notified:**
 

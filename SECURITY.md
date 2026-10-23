@@ -2,16 +2,8 @@
 
 ## Reporting a vulnerability
 
-Use GitHub's private **Report a vulnerability** feature for this repository when it is available.
-
-If that feature is not enabled, use: `TODO: contact email`
+Report security issues through this repository's **Security** tab on GitHub: open **Report a vulnerability** to send a private report to maintainers. Do not open a public issue for exploitable vulnerabilities.
 
 ## Supported versions
 
-`TODO: which branches or releases receive security fixes`
-
-## Response expectations
-
-`TODO: how you triage and respond to reports`
-
-_This document is a starting skeleton, not legal advice. Review it with qualified counsel before relying on it._
+Security fixes are applied on the default branch (`main`) and released through the normal deployment process for We Met.

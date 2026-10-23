@@ -1,7 +1,24 @@
+/**
+ * One-off: verify grouped docs/privacy/data-map.yml matches a legacy flat YAML list.
+ *
+ * Usage: node scripts/verify-data-map-conversion.mjs <path-to-flat.yml>
+ *
+ * Paste the printed summary into the PR when converting the map. Not run in CI or npm test.
+ *
+ * Allows extra other_items ids that exist only for nodrift Check 2 (not in the flat map):
+ * binding.d1_we_met_db
+ */
+import { createRequire } from "node:module";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import yaml from "yaml";
+
+const require = createRequire(import.meta.url);
+const yaml = require(
+  require.resolve("yaml", {
+    paths: [path.dirname(require.resolve("@didi-build/nodrift/package.json"))],
+  }),
+);
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const nodriftApi = path.join(
@@ -11,6 +28,8 @@ const nodriftApi = path.join(
 const { expandDataMap, parseDataMap } = await import(
   new URL(`file://${nodriftApi}`).href
 );
+
+const EXTRA_OTHER_ITEM_IDS = new Set(["binding.d1_we_met_db"]);
 
 const KEPT_FIELDS = [
   "whose",
@@ -56,7 +75,13 @@ function pickKeptFields(entry) {
 }
 
 function main() {
-  const flatPath = path.join(repoRoot, "test/fixtures/data-map-flat-pre-nodrift.yml");
+  const flatPath = process.argv[2];
+  if (!flatPath) {
+    console.error(
+      "usage: node scripts/verify-data-map-conversion.mjs <path-to-flat.yml>",
+    );
+    process.exit(2);
+  }
   const mapPath = path.join(repoRoot, "docs/privacy/data-map.yml");
   const flat = yaml.parse(fs.readFileSync(flatPath, "utf8"));
   const mapText = fs.readFileSync(mapPath, "utf8");
@@ -71,36 +96,40 @@ function main() {
   }
 
   const expanded = expandDataMap(parsed.map);
-  if (expanded.length !== flat.length) {
-    console.error(
-      `entry count mismatch: flat=${flat.length} expanded=${expanded.length}`,
-    );
-    process.exit(1);
-  }
+  const expandedById = new Map(expanded.map((e) => [e.id, expandedPlain(e)]));
+  const flatIds = new Set(flat.map((e) => e.id));
 
-  const byId = new Map(expanded.map((e) => [e.id, expandedPlain(e)]));
   const mismatches = [];
   for (const flatEntry of flat) {
     const expected = pickKeptFields(flatEntry);
-    const actual = byId.get(flatEntry.id);
+    const actual = expandedById.get(flatEntry.id);
     if (!actual) {
       mismatches.push(`missing expanded entry for ${flatEntry.id}`);
       continue;
     }
     if (JSON.stringify(actual) !== JSON.stringify(expected)) {
-      mismatches.push(`${flatEntry.id}`);
+      mismatches.push(flatEntry.id);
     }
+  }
+
+  const extraExpanded = expanded.filter(
+    (e) => !flatIds.has(e.id) && !EXTRA_OTHER_ITEM_IDS.has(e.id),
+  );
+  if (extraExpanded.length > 0) {
+    mismatches.push(
+      `unexpected expanded ids: ${extraExpanded.map((e) => e.id).join(", ")}`,
+    );
   }
 
   if (mismatches.length > 0) {
     console.error(
-      `data map equivalence failed for ${mismatches.length} entries (first 5): ${mismatches.slice(0, 5).join(", ")}`,
+      `equivalence failed (${mismatches.length}): ${mismatches.slice(0, 8).join("; ")}`,
     );
     process.exit(1);
   }
 
   console.log(
-    `data-map equivalence ok: ${flat.length} entries, ${Object.keys(parsed.map.d1_tables).length} D1 tables`,
+    `equivalence ok: ${flat.length} flat entries, ${expanded.length} expanded entries (${EXTRA_OTHER_ITEM_IDS.size} allowed extra other_items id), ${Object.keys(parsed.map.d1_tables).length} D1 tables`,
   );
 }
 

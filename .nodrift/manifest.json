@@ -18,12 +18,6 @@
       "kind": "owned",
       "version": "0.1.0",
       "sha256": "9f400d30bfc2d64d4f8cc73b4ff0d7ae94b79d3d04e1894162ebb36e73a9d00a"
-    },
-    {
-      "path": "docs/runbooks/breach-response.md",
-      "kind": "owned",
-      "version": "0.1.0",
-      "sha256": "d4c31eee8c77abc8aded5458a66088941b257533bc349603a148848a7ece6d1c"
     }
   ]
 }

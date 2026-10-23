@@ -600,6 +600,20 @@ other_items:
     who_can_see: operator; Google as processor
     source: src/app-auth/google-oauth.ts
     verified: true
+  - id: binding.d1_we_met_db
+    binding: WE_MET_DB
+    whose: operational
+    data: D1 database binding on production app and follow-up consumer Workers;
+      card-owner and visitor personal data lives in d1_tables column rows, not in
+      the binding itself
+    purpose: primary application datastore (production routes and consumer)
+    storage: D1 via Wrangler WE_MET_DB binding (database name in wrangler.jsonc)
+    processors:
+      - Cloudflare
+    retention: per-column retention in d1_tables; binding has no separate retention
+    who_can_see: operator
+    source: wrangler.jsonc; workers/we-met-followup-email-consumer/wrangler.production.jsonc
+    verified: true
   - id: binding.consumer_send_email
     whose: operational
     data: Cloudflare Workers send_email binding EMAIL on follow-up consumer Workers;
@@ -964,7 +978,6 @@ other_items:
     verified: false
   - id: storage.nonprod_environment
     binding:
-      - WE_MET_DB
       - WE_MET_ASSETS
       - WE_MET_FOLLOWUP_EMAIL_QUEUE
     whose: operational
