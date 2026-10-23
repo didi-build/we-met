@@ -203,15 +203,22 @@ function assertDeployJobCloudflareTokenIsolation(deploySection: string): void {
 
   const consumerPrepare = deployStepByName(steps, CONSUMER_PREPARE_STEP_NAME);
   const consumerGuards = deployStepByName(steps, CONSUMER_GUARDS_STEP_NAME);
-  if (consumerPrepare.block.includes("secrets.")) {
-    throw new Error(`${CONSUMER_PREPARE_STEP_NAME} must not reference secrets.*`);
+  if (consumerPrepare.block.includes("secrets.CLOUDFLARE")) {
+    throw new Error(
+      `${CONSUMER_PREPARE_STEP_NAME} must not reference Cloudflare secrets`,
+    );
   }
   if (consumerGuards.block.includes("secrets.")) {
     throw new Error(`${CONSUMER_GUARDS_STEP_NAME} must not reference secrets.*`);
   }
-  if (!consumerPrepare.block.includes("vars.WE_MET_D1_DATABASE_ID_PRODUCTION")) {
+  if (!consumerPrepare.block.includes("secrets.WE_MET_D1_DATABASE_ID_PRODUCTION")) {
     throw new Error(
-      `${CONSUMER_PREPARE_STEP_NAME} must use vars.WE_MET_D1_DATABASE_ID_PRODUCTION`,
+      `${CONSUMER_PREPARE_STEP_NAME} must use secrets.WE_MET_D1_DATABASE_ID_PRODUCTION`,
+    );
+  }
+  if (consumerPrepare.block.includes("vars.WE_MET_D1_DATABASE_ID_PRODUCTION")) {
+    throw new Error(
+      `${CONSUMER_PREPARE_STEP_NAME} must not use vars for production D1 id (log leak)`,
     );
   }
 }
@@ -236,7 +243,7 @@ const EXPECTED_DEPLOY_STEPS_BLOCK = `    steps:
         env:
           CLOUDFLARE_API_TOKEN: \${{ secrets.CLOUDFLARE_API_TOKEN_PRODUCTION }}
           CLOUDFLARE_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          WE_MET_D1_DATABASE_ID_PRODUCTION: \${{ vars.WE_MET_D1_DATABASE_ID_PRODUCTION }}
+          WE_MET_D1_DATABASE_ID_PRODUCTION: \${{ secrets.WE_MET_D1_DATABASE_ID_PRODUCTION }}
         run: |
           set -euo pipefail
           node scripts/provision-resources.mjs \\
@@ -245,7 +252,7 @@ const EXPECTED_DEPLOY_STEPS_BLOCK = `    steps:
             --output provision-d1-ids.json
       - name: Prepare Wrangler config (production D1 IDs)
         env:
-          WE_MET_D1_DATABASE_ID_PRODUCTION: \${{ vars.WE_MET_D1_DATABASE_ID_PRODUCTION }}
+          WE_MET_D1_DATABASE_ID_PRODUCTION: \${{ secrets.WE_MET_D1_DATABASE_ID_PRODUCTION }}
           WE_MET_PROVISION_D1_IDS_FILE: provision-d1-ids.json
         run: |
           set -euo pipefail
@@ -256,7 +263,7 @@ const EXPECTED_DEPLOY_STEPS_BLOCK = `    steps:
         run: node scripts/check-deploy-guards.mjs --target production --config wrangler.ci.jsonc
       - name: Prepare follow-up email consumer Wrangler config (production D1 ID)
         env:
-          WE_MET_D1_DATABASE_ID_PRODUCTION: \${{ vars.WE_MET_D1_DATABASE_ID_PRODUCTION }}
+          WE_MET_D1_DATABASE_ID_PRODUCTION: \${{ secrets.WE_MET_D1_DATABASE_ID_PRODUCTION }}
           WE_MET_PROVISION_D1_IDS_FILE: provision-d1-ids.json
         run: |
           set -euo pipefail
@@ -443,6 +450,12 @@ describe("Deploy production workflow structure (unit)", () => {
     expect(workflow).not.toContain("CLOUDFLARE_API_TOKEN_NONPROD");
     expect(workflow).not.toContain("WE_MET_D1_DATABASE_ID_NONPROD");
     expect(workflow).not.toContain("WE_MET_TURNSTILE_SITE_KEY_NONPROD");
+  });
+
+  it("does not pass production D1 id through GitHub variables (log leak)", () => {
+    const deploySection = extractDeployJobSection(workflow);
+    expect(deploySection).not.toContain("vars.WE_MET_D1_DATABASE_ID_PRODUCTION");
+    expect(deploySection).toContain("secrets.WE_MET_D1_DATABASE_ID_PRODUCTION");
   });
 
   it("isolates Cloudflare API tokens across deploy job steps", () => {
