@@ -25,6 +25,7 @@ Do not break these; each links to the canonical doc.
 - **Email templates are fixed**; user-supplied fields are escaped plain text: [0004](docs/decisions/0004-card-data-and-branding.md).
 - **Owner email** lives only on **`accounts.email`**. Email lead sinks use config `{ "to": "account_email" }`; the app resolves that sentinel at enqueue ([0025](docs/decisions/0025-we-met-mvp-accounts-sign-in-and-app-backend.md)).
 - **Card photos** enter only through **`ingestCardPhotoFromRequest`** (`src/images/ingest-card-photo.ts`); nothing else writes to R2 ([0012](docs/decisions/0012-r2-images-single-ingestion.md)). **`saveDraft`** updates `card_drafts.draft_json` only — it does not change `photo_key` (photo POST/DELETE only).
+- **Contacts setup** uses one-time Google People API consent; **never store Google OAuth tokens** for that flow ([0026](docs/decisions/0026-contacts-setup-google-people.md)).
 - **`cards:load` never targets production**; publish production cards through the app editor ([card-loading](docs/runbooks/card-loading.md), [0025](docs/decisions/0025-we-met-mvp-accounts-sign-in-and-app-backend.md)).
 - **No personal card data or card images** in git; load from gitignored files into **local or non-prod D1 only**: [0010](docs/decisions/0010-card-data-d1-and-load-script.md).
 

@@ -1283,6 +1283,23 @@ textarea.ap-input {
   animation: ap-rise 0.3s cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
 
+@keyframes ap-contacts-progress {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(300%);
+  }
+}
+
+.ap-contacts-progress-fill {
+  animation: ap-contacts-progress 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.ap-contacts-google {
+  font-family: "Roboto", Figtree, system-ui, sans-serif;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ap *,
   .ap *::before,

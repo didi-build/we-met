@@ -13,10 +13,16 @@ export type EditorCard = {
   alternate: { url: string; label: string };
 };
 
+export type ContactsSetupUi =
+  | { visible: false }
+  | { visible: true; variant: "default" }
+  | { visible: true; variant: "reappear"; newSenderAddress: string };
+
 export type AppSession = {
   email: string;
   name: string;
   allowed: boolean;
+  contactsSetup: ContactsSetupUi;
 };
 
 export type AppCardBundle = {

@@ -1,7 +1,13 @@
 "use client";
 
 import { useAppApi } from "@/app-api/AppApiProvider";
-import { AppApiError, type AppSession, type EditorCard } from "@/app-api/types";
+import {
+  AppApiError,
+  type AppSession,
+  type ContactsSetupUi,
+  type EditorCard,
+} from "@/app-api/types";
+import type { ContactsSetupPhase } from "@/components/app/editor/PublishedContactsSetup";
 import { CARD_FIELD_LIMITS } from "@/card-data/limits";
 import { AppEditorBottomBar } from "@/components/app/editor/AppEditorBottomBar";
 import { AppCardPreview } from "@/components/app/editor/AppCardPreview";
@@ -88,6 +94,11 @@ export function AppCardEditor({
 
   const [card, setCard] = useState<EditorCard>(initialDraft);
   const [published, setPublished] = useState<EditorCard | null>(initialPublished);
+  const [contactsSetup, setContactsSetup] = useState<ContactsSetupUi>(
+    session.contactsSetup ?? { visible: false },
+  );
+  const [contactsSetupPhase, setContactsSetupPhase] =
+    useState<ContactsSetupPhase | null>(null);
   const [triedPublish, setTriedPublish] = useState(false);
   const [tab, setTab] = useState<EditorTab>("edit");
   const [blockedOpen, setBlockedOpen] = useState(false);
@@ -208,7 +219,64 @@ export function AppCardEditor({
     [],
   );
 
+  useEffect(() => {
+    setContactsSetup(session.contactsSetup ?? { visible: false });
+  }, [session.contactsSetup]);
+
+  const startContactsOAuth = useCallback(() => {
+    window.location.assign("/api/auth/google/contacts/start");
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const params = new URLSearchParams(window.location.search);
+    const status = params.get("contacts_setup");
+    if (!status) {
+      return;
+    }
+    params.delete("contacts_setup");
+    const url = new URL(window.location.href);
+    url.search = params.toString();
+    window.history.replaceState({}, "", url.pathname + url.search);
+
+    if (status === "declined") {
+      void api.getSession().then((s) => {
+        if (s) {
+          onSessionRestored(s);
+          setContactsSetup(s.contactsSetup);
+        }
+      });
+      return;
+    }
+    if (status === "success") {
+      openDialog("published");
+      setContactsSetupPhase("working");
+      void (async () => {
+        const s = await api.getSession();
+        if (s) {
+          onSessionRestored(s);
+          setContactsSetup(s.contactsSetup);
+        }
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        setContactsSetupPhase("success");
+      })();
+    }
+  }, [api, onSessionRestored, openDialog]);
+
   const closeDialog = useCallback(() => {
+    if (dialog === "published") {
+      if (contactsSetupPhase === "success") {
+        void api.getSession().then((s) => {
+          if (s) {
+            onSessionRestored(s);
+            setContactsSetup(s.contactsSetup);
+          }
+        });
+      }
+      setContactsSetupPhase(null);
+    }
     setDialog(null);
     document.body.style.overflow = "";
     dialogOpenerRef.current?.focus({ preventScroll: true });
@@ -216,7 +284,7 @@ export function AppCardEditor({
       URL.revokeObjectURL(cropOpenSrc);
       setCropOpenSrc(null);
     }
-  }, [cropOpenSrc]);
+  }, [api, contactsSetupPhase, cropOpenSrc, dialog, onSessionRestored]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -325,13 +393,15 @@ export function AppCardEditor({
   const runPublishFlow = useCallback(async () => {
     setTriedPublish(true);
     const result = await runPublish(
-      (url) => {
+      ({ url, contactsSetup: setup }) => {
         setBlockedOpen(false);
         setPublished(structuredClone(card));
         markMine(card.slug);
         setPubUrl(url);
         setPubTitle("Your card is live");
         setCopyLabel("Copy link");
+        setContactsSetup(setup);
+        setContactsSetupPhase(null);
         openDialog("published");
         setAnnounce("Your card is live.");
       },
@@ -1341,6 +1411,10 @@ export function AppCardEditor({
         isPreviewEnv={isPreviewEnv}
         previewSecret={previewSecret}
         onPreviewLogin={onPreviewLogin ?? onSignIn}
+        contactsSetup={contactsSetup}
+        contactsSetupPhase={contactsSetupPhase}
+        onContactsContinueGoogle={startContactsOAuth}
+        onContactsAddAddress={startContactsOAuth}
       />
 
       <p className="ap-sr" role="status" aria-live="polite" id={announceId}>

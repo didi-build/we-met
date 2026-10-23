@@ -78,6 +78,7 @@ export async function POST(request: Request) {
         email: account.email,
         name: account.name,
         allowed: true,
+        contactsSetup: { visible: false },
       },
     },
     { status: 200 },

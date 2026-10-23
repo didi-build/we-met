@@ -8,6 +8,8 @@ export type AccountRow = {
   email: string;
   name: string;
   status: "waitlisted" | "active" | "suspended" | "deleted";
+  contact_added_at?: string | null;
+  contact_sender_addresses?: string | null;
 };
 
 export type AccountSignInResult =

@@ -1,5 +1,10 @@
 export const SESSION_COOKIE_NAME = "__Host-wm_session";
 export const OAUTH_COOKIE_NAME = "__Host-wm_oauth";
+export const CONTACTS_OAUTH_COOKIE_NAME = "__Host-wm_contacts_oauth";
+export const CONTACTS_SETUP_SUPPRESS_COOKIE_NAME = "__Host-wm_cs_hide";
+
+const CONTACTS_OAUTH_COOKIE_MAX_AGE = 10 * 60;
+const CONTACTS_SETUP_SUPPRESS_MAX_AGE = 24 * 60 * 60;
 
 export const SESSION_SLIDING_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
 
@@ -70,4 +75,52 @@ export function clearOAuthCookieValue(): string {
     "SameSite=Lax",
     "Max-Age=0",
   ].join("; ");
+}
+
+export function contactsOAuthCookieValue(state: string): string {
+  return [
+    `${CONTACTS_OAUTH_COOKIE_NAME}=${encodeURIComponent(state)}`,
+    "Path=/",
+    "HttpOnly",
+    "Secure",
+    "SameSite=Lax",
+    `Max-Age=${CONTACTS_OAUTH_COOKIE_MAX_AGE}`,
+  ].join("; ");
+}
+
+export function clearContactsOAuthCookieValue(): string {
+  return [
+    `${CONTACTS_OAUTH_COOKIE_NAME}=`,
+    "Path=/",
+    "HttpOnly",
+    "Secure",
+    "SameSite=Lax",
+    "Max-Age=0",
+  ].join("; ");
+}
+
+export function contactsSetupSuppressCookieValue(): string {
+  return [
+    `${CONTACTS_SETUP_SUPPRESS_COOKIE_NAME}=1`,
+    "Path=/",
+    "HttpOnly",
+    "Secure",
+    "SameSite=Lax",
+    `Max-Age=${CONTACTS_SETUP_SUPPRESS_MAX_AGE}`,
+  ].join("; ");
+}
+
+export function clearContactsSetupSuppressCookieValue(): string {
+  return [
+    `${CONTACTS_SETUP_SUPPRESS_COOKIE_NAME}=`,
+    "Path=/",
+    "HttpOnly",
+    "Secure",
+    "SameSite=Lax",
+    "Max-Age=0",
+  ].join("; ");
+}
+
+export function isContactsSetupSuppressed(cookies: Map<string, string>): boolean {
+  return cookies.get(CONTACTS_SETUP_SUPPRESS_COOKIE_NAME) === "1";
 }
