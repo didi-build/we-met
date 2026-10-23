@@ -69,17 +69,22 @@ export type CardContentFlags = {
 /** Card shape HiCardPresentation can render (public payload or in-app preview record). */
 export type HiCardPresentationModel = PublicHiCardPayload | CardRecord;
 
-function hiCardHasPhoto(card: HiCardPresentationModel): boolean {
-  if ("hasPhoto" in card && typeof card.hasPhoto === "boolean") {
+export type CardContentFlagsInput = Pick<
+  CardRecord,
+  "role" | "alternate" | "about" | "services" | "links"
+> & {
+  photoKey?: string | null;
+  hasPhoto?: boolean;
+};
+
+function hiCardHasPhoto(card: CardContentFlagsInput): boolean {
+  if (typeof card.hasPhoto === "boolean") {
     return card.hasPhoto;
   }
-  if ("photoKey" in card) {
-    return Boolean(card.photoKey);
-  }
-  return false;
+  return Boolean(card.photoKey);
 }
 
-export function cardContentFlags(card: HiCardPresentationModel): CardContentFlags {
+export function cardContentFlags(card: CardContentFlagsInput): CardContentFlags {
   const paragraphs = card.about?.paragraphs?.filter((p) => p.trim()) ?? [];
   const serviceItems = card.services?.items?.filter((s) => s.title?.trim()) ?? [];
   const linkEntries = cardLinkEntries(card.links);

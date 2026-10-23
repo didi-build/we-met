@@ -59,6 +59,18 @@ export function resolveVisitorFromDisplayName(
   return `${first} via We Met`;
 }
 
+/** Fallback From display name when building Cloudflare `EMAIL.send` payloads. */
+export const CLOUDFLARE_FROM_DISPLAY_NAME_FALLBACK = "We Met";
+
+/** Non-empty From `name` for Cloudflare Email Sending (runtime requires a string). */
+export function resolveCloudflareFromName(fromDisplayName?: string): string {
+  const trimmed = fromDisplayName?.trim();
+  if (!trimmed) {
+    return CLOUDFLARE_FROM_DISPLAY_NAME_FALLBACK;
+  }
+  return trimmed;
+}
+
 export function resolveFromDisplayName(fromDisplayName: string | undefined): string {
   const trimmed = fromDisplayName?.trim();
   if (

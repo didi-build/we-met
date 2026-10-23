@@ -17,10 +17,29 @@ import {
   servicesForChips,
   WE_MET_CARD_HOME_URL,
 } from "@/lib/hi-card/card-content";
+import { HiVisitorReceipt } from "@/components/hi/HiVisitorReceipt";
 import { HI_CONTACT_SENT_BUTTON_LABEL } from "@/lib/hi-card/contact-sent-label";
+import type { HiOwnerContact } from "@/lib/hi-card/hi-page-card";
+import { ownerFirstName } from "@/lib/hi-card/hi-page-card";
+import { receiptReloadFollowUpLine } from "@/lib/hi-card/visitor-receipt-copy";
 import Image from "next/image";
 import type { MouseEvent, Ref } from "react";
 import { useEffect, useState } from "react";
+
+export type HiCardCtaMode =
+  | { kind: "exchange" }
+  | {
+      kind: "receipt";
+      slug: string;
+      visitorFirst: string;
+      ownerContact: HiOwnerContact | null;
+      leadToken: string;
+      detailsSent: boolean;
+      vcardSaveResetSignal: number;
+      onTellMore: () => void;
+      onVcardFailure: () => void;
+    }
+  | { kind: "reload-fallback" };
 
 export type HiCardPresentationProps = {
   card: HiCardPresentationModel;
@@ -39,7 +58,8 @@ export type HiCardPresentationProps = {
   onOpenExchange?: (event: MouseEvent<HTMLButtonElement>) => void;
   thanksLine?: string | null;
   /** After details were sent on this device; exchange sheet cannot open. */
-  contactSent?: boolean;
+  detailsSent?: boolean;
+  ctaMode?: HiCardCtaMode;
 };
 
 function ExchangeRing({ small }: { small?: boolean }) {
@@ -66,7 +86,8 @@ export function HiCardPresentation({
   onOpenExchange,
   thanksLine,
   greetingOverride,
-  contactSent = false,
+  detailsSent = false,
+  ctaMode = { kind: "exchange" },
 }: HiCardPresentationProps) {
   const { copy, pageCopy } = card;
   const flags = cardContentFlags(card);
@@ -85,6 +106,10 @@ export function HiCardPresentation({
   }));
   const linkEntries = cardLinkEntries(card.links);
   const showBanner = plan === "free";
+  const ownerFirst = ownerFirstName(card.name);
+  const showReceipt = !preview && ctaMode.kind === "receipt";
+  const showReloadFallback = !preview && ctaMode.kind === "reload-fallback";
+  const exchangeDisabled = detailsSent && ctaMode.kind === "exchange";
 
   const cardTopMargin =
     embedded || showBanner ? "mt-[84px]" : "mt-[clamp(16px,5svh,48px)]";
@@ -152,52 +177,84 @@ export function HiCardPresentation({
                 aria-label={copy.exchangeAriaLabel}
                 className="-mt-1 flex flex-col gap-1"
               >
-                <div className="relative isolate flex">
-                  {!contactSent && <ExchangeRing />}
-                  {preview ? (
+                {showReceipt && ctaMode.kind === "receipt" ? (
+                  <HiVisitorReceipt
+                    slug={ctaMode.slug}
+                    ownerFirst={ownerFirst}
+                    visitorFirst={ctaMode.visitorFirst}
+                    ownerContact={ctaMode.ownerContact}
+                    leadToken={ctaMode.leadToken}
+                    detailsSent={ctaMode.detailsSent}
+                    vcardSaveResetSignal={ctaMode.vcardSaveResetSignal}
+                    onTellMore={ctaMode.onTellMore}
+                    onVcardFailure={ctaMode.onVcardFailure}
+                  />
+                ) : showReloadFallback ? (
+                  <>
                     <Button
                       type="button"
-                      tabIndex={-1}
+                      disabled
+                      aria-disabled
                       className="min-h-14 w-full text-[17px] font-semibold"
                     >
-                      Exchange contact
+                      {HI_CONTACT_SENT_BUTTON_LABEL}
                     </Button>
-                  ) : (
-                    <Button
-                      ref={exchangeButtonRef}
-                      type="button"
-                      onClick={onOpenExchange}
-                      disabled={contactSent}
-                      aria-disabled={contactSent}
-                      className="min-h-14 w-full text-[17px] font-semibold"
-                    >
-                      {contactSent ? HI_CONTACT_SENT_BUTTON_LABEL : "Exchange contact"}
-                    </Button>
-                  )}
-                </div>
-                {flags.hasAlternate &&
-                  card.alternate &&
-                  (!interactive ? (
-                    <span className="hi-link-alternate inline-flex min-h-11 items-center self-center px-2 text-[15px] font-medium">
-                      {card.alternate.label}
-                    </span>
-                  ) : (
-                    <a
-                      href={card.alternate.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="hi-link-alternate inline-flex min-h-11 items-center self-center px-2 text-[15px] font-medium"
-                    >
-                      {card.alternate.label}
-                    </a>
-                  ))}
-                {thanksLine && (
-                  <p
-                    role="status"
-                    className="m-0 mt-1 animate-hi-fade text-center text-[15px] font-medium leading-normal text-ink"
-                  >
-                    {thanksLine}
-                  </p>
+                    <p className="m-0 mt-1 text-center text-[14px] font-medium leading-normal text-ink-muted">
+                      {receiptReloadFollowUpLine(ownerFirst)}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div className="relative isolate flex">
+                      {!exchangeDisabled && <ExchangeRing />}
+                      {preview ? (
+                        <Button
+                          type="button"
+                          tabIndex={-1}
+                          className="min-h-14 w-full text-[17px] font-semibold"
+                        >
+                          Exchange contact
+                        </Button>
+                      ) : (
+                        <Button
+                          ref={exchangeButtonRef}
+                          type="button"
+                          onClick={onOpenExchange}
+                          disabled={exchangeDisabled}
+                          aria-disabled={exchangeDisabled}
+                          className="min-h-14 w-full text-[17px] font-semibold"
+                        >
+                          {exchangeDisabled
+                            ? HI_CONTACT_SENT_BUTTON_LABEL
+                            : "Exchange contact"}
+                        </Button>
+                      )}
+                    </div>
+                    {flags.hasAlternate &&
+                      card.alternate &&
+                      (!interactive ? (
+                        <span className="hi-link-alternate inline-flex min-h-11 items-center self-center px-2 text-[15px] font-medium">
+                          {card.alternate.label}
+                        </span>
+                      ) : (
+                        <a
+                          href={card.alternate.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="hi-link-alternate inline-flex min-h-11 items-center self-center px-2 text-[15px] font-medium"
+                        >
+                          {card.alternate.label}
+                        </a>
+                      ))}
+                    {thanksLine && (
+                      <p
+                        role="status"
+                        className="m-0 mt-1 animate-hi-fade text-center text-[15px] font-medium leading-normal text-ink"
+                      >
+                        {thanksLine}
+                      </p>
+                    )}
+                  </>
                 )}
               </section>
 

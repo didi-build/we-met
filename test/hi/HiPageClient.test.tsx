@@ -188,7 +188,7 @@ describe("HiPageClient (component)", () => {
     rectSpy.mockRestore();
   });
 
-  it("disables exchange buttons when the details-sent flag is set", () => {
+  it("disables exchange buttons when the details-sent flag is set without a receipt session", () => {
     window.localStorage.setItem(detailsSentStorageKey("didi"), "1");
     renderCard();
     const mainExchange = screen.getByRole("button", {

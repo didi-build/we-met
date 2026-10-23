@@ -284,11 +284,19 @@ function assertExactKeys(
   value: Record<string, unknown>,
   allowed: readonly string[],
   path: string,
+  mode: "exact" | "subset" = "subset",
 ): void {
   const allowedSet = new Set(allowed);
   for (const key of Object.keys(value)) {
     if (!allowedSet.has(key)) {
       throw new Error(`unexpected key ${path}.${key}`);
+    }
+  }
+  if (mode === "exact") {
+    for (const key of allowed) {
+      if (!(key in value)) {
+        throw new Error(`missing key ${path}.${key}`);
+      }
     }
   }
 }
@@ -305,6 +313,7 @@ export function assertPublicHiCardPayloadShape(payload: PublicHiCardPayload): vo
     payload.pageCopy as Record<string, unknown>,
     PUBLIC_HI_CARD_PAGE_COPY_KEYS,
     "payload.pageCopy",
+    "exact",
   );
 
   if (payload.about) {
@@ -312,6 +321,7 @@ export function assertPublicHiCardPayloadShape(payload: PublicHiCardPayload): vo
       payload.about as Record<string, unknown>,
       PUBLIC_HI_CARD_ABOUT_KEYS,
       "payload.about",
+      "exact",
     );
     if (!Array.isArray(payload.about.paragraphs)) {
       throw new Error("payload.about.paragraphs must be an array");
@@ -323,12 +333,14 @@ export function assertPublicHiCardPayloadShape(payload: PublicHiCardPayload): vo
       payload.services as Record<string, unknown>,
       PUBLIC_HI_CARD_SERVICES_KEYS,
       "payload.services",
+      "exact",
     );
     for (const [index, item] of payload.services.items.entries()) {
       assertExactKeys(
         item as Record<string, unknown>,
         PUBLIC_HI_CARD_SERVICE_ITEM_KEYS,
         `payload.services.items[${index}]`,
+        "exact",
       );
     }
   }
@@ -346,6 +358,7 @@ export function assertPublicHiCardPayloadShape(payload: PublicHiCardPayload): vo
       payload.alternate as Record<string, unknown>,
       PUBLIC_HI_CARD_ALTERNATE_KEYS,
       "payload.alternate",
+      "exact",
     );
   }
 
@@ -353,16 +366,19 @@ export function assertPublicHiCardPayloadShape(payload: PublicHiCardPayload): vo
     payload.copy as Record<string, unknown>,
     PUBLIC_HI_CARD_COPY_KEYS,
     "payload.copy",
+    "exact",
   );
   assertExactKeys(
     payload.copy.exchangeSheet as Record<string, unknown>,
     PUBLIC_HI_CARD_EXCHANGE_SHEET_KEYS,
     "payload.copy.exchangeSheet",
+    "exact",
   );
   assertExactKeys(
     payload.copy.exchangeSheet.errors as Record<string, unknown>,
     PUBLIC_HI_CARD_COPY_ERROR_KEYS,
     "payload.copy.exchangeSheet.errors",
+    "exact",
   );
 }
 

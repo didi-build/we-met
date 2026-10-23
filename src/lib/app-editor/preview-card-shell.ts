@@ -1,4 +1,8 @@
+import { VISITOR_RECEIPT_COPY } from "@/app-card/default-card-copy";
 import type { CardCopy, CardPageCopy, CardRecord } from "@/card-data/types";
+
+/** Editor preview uses the same receipt copy strings as live cards (receipt UI is disabled in preview). */
+export const PREVIEW_VISITOR_RECEIPT_COPY = VISITOR_RECEIPT_COPY;
 
 /** Static visitor copy for editor preview only (exchange is disabled). */
 export const PREVIEW_CARD_COPY: CardCopy = {

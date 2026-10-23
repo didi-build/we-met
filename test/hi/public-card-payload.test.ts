@@ -8,8 +8,7 @@ import {
   serializePublicHiCard,
 } from "@/lib/hi-card/public-card-payload";
 
-/** Unique strings for fields that must not reach the public /hi browser payload. */
-export const PUBLIC_HI_CARD_LEAK_SENTINELS = {
+const PUBLIC_HI_CARD_LEAK_SENTINELS = {
   id: "__DIDI758_SENTINEL_CARD_ID__",
   accountId: "__DIDI758_SENTINEL_ACCOUNT_ID__",
   email: "__DIDI758_SENTINEL_OWNER_EMAIL__",

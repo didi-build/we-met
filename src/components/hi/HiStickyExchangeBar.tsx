@@ -14,7 +14,7 @@ type HiStickyExchangeBarProps = {
   photoAlt: string;
   exchangeButtonRef?: Ref<HTMLButtonElement>;
   onExchange: (event: React.MouseEvent<HTMLButtonElement>) => void;
-  contactSent?: boolean;
+  exchangeLocked?: boolean;
 };
 
 export function HiStickyExchangeBar({
@@ -26,7 +26,7 @@ export function HiStickyExchangeBar({
   photoAlt,
   exchangeButtonRef,
   onExchange,
-  contactSent = false,
+  exchangeLocked = false,
 }: HiStickyExchangeBarProps) {
   return (
     <div
@@ -64,7 +64,7 @@ export function HiStickyExchangeBar({
           )}
         </div>
         <div className="relative isolate shrink-0">
-          {!contactSent && (
+          {!exchangeLocked && (
             <span
               aria-hidden
               className="pointer-events-none absolute inset-0 -z-10 rounded-pill"
@@ -79,11 +79,11 @@ export function HiStickyExchangeBar({
             ref={exchangeButtonRef}
             type="button"
             onClick={onExchange}
-            disabled={contactSent}
-            aria-disabled={contactSent}
+            disabled={exchangeLocked}
+            aria-disabled={exchangeLocked}
             className="min-h-10 px-6 text-sm"
           >
-            {contactSent ? HI_CONTACT_SENT_BUTTON_LABEL : "Exchange"}
+            {exchangeLocked ? HI_CONTACT_SENT_BUTTON_LABEL : "Exchange"}
           </Button>
         </div>
       </div>

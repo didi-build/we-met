@@ -1,4 +1,7 @@
+import { VISITOR_RECEIPT_COPY } from "@/app-card/default-card-copy";
 import type { CardRecord } from "@/card-data/types";
+
+export const LANDING_VISITOR_RECEIPT_COPY = VISITOR_RECEIPT_COPY;
 
 /** Static landing hero preview — not loaded from D1, R2, or design/ at runtime. */
 export const LANDING_CARD_PREVIEW_PHOTO_URL = "/landing-preview/didi.png";

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CardEmailSnapshot } from "@/exchange/types";
+import { createConsumerOutboundEmailSend } from "@/email/email-provider";
 import { FollowupEmailError } from "@/email/followup-email-error";
 import {
   followupEmailRetryDelaySeconds,
@@ -64,6 +65,24 @@ function createMessage(
 }
 
 const PLATFORM_FROM_DISPLAY_NAME = "Diadem at We Met";
+
+const CLOUDFLARE_EMAIL_ADDRESS_NAME_TYPE_ERROR =
+  "Incorrect type for the 'name' field on 'EmailAddress': the provided value is not of type 'string'.";
+
+function createCloudflareBindingSendEmailThatThrowsNameTypeError(): {
+  emailSend: ReturnType<typeof vi.fn>;
+  sendEmail: ReturnType<typeof createConsumerOutboundEmailSend>;
+} {
+  const emailSend = vi.fn(async () => {
+    throw new Error(CLOUDFLARE_EMAIL_ADDRESS_NAME_TYPE_ERROR);
+  });
+  const sendEmail = createConsumerOutboundEmailSend({
+    GMAIL_SERVICE_ACCOUNT_JSON: "{}",
+    GMAIL_SENDER: "delegated@example.com",
+    EMAIL: { send: emailSend },
+  });
+  return { emailSend, sendEmail };
+}
 
 function createDeps(
   overrides: Partial<FollowupConsumerDeps> = {},
@@ -1243,6 +1262,51 @@ describe("processFollowupQueueBatch (unit)", () => {
     expect(sent.threadId).toBeUndefined();
     expect(sent.messageId).toBeUndefined();
     expect(message.ack).toHaveBeenCalledOnce();
+  });
+
+  it("acks visitor follow-up without retry when Cloudflare EMAIL.send rejects From name shape", async () => {
+    const { emailSend, sendEmail } =
+      createCloudflareBindingSendEmailThatThrowsNameTypeError();
+    const message = createMessage(visitorBody(), { attempts: 2 });
+    const deps = createDeps({
+      readLeadEmailControls: vi.fn(async () => cloudflareLeadEmailControls()),
+      sendEmail,
+    });
+
+    await processFollowupQueueBatch({ messages: [message] }, deps);
+
+    expect(emailSend).toHaveBeenCalledOnce();
+    expect(deps.logVisitorFollowupPermanentFailure).toHaveBeenCalledWith("lead-1", {
+      code: "cloudflare_send_validation_failed",
+    });
+    expect(deps.logVisitorFollowupAttemptFailure).not.toHaveBeenCalled();
+    expect(message.ack).toHaveBeenCalledOnce();
+    expect(message.retry).not.toHaveBeenCalled();
+  });
+
+  it("acks lead sink record without retry when Cloudflare EMAIL.send rejects From name shape", async () => {
+    const ledger = new MemoryConsumerLeadDeliveryLedger();
+    ledger.seedQueued("lead-1", "sink-1", "record");
+    const { emailSend, sendEmail } =
+      createCloudflareBindingSendEmailThatThrowsNameTypeError();
+    const message = createMessage(sinkRecordBody());
+    const deps = createDeps(
+      {
+        readLeadEmailControls: vi.fn(async () => cloudflareLeadEmailControls()),
+        sendEmail,
+      },
+      ledger,
+    );
+
+    await processFollowupQueueBatch({ messages: [message] }, deps);
+
+    expect(emailSend).toHaveBeenCalledOnce();
+    expect(message.ack).toHaveBeenCalledOnce();
+    expect(message.retry).not.toHaveBeenCalled();
+    expect(ledger.getRowState("lead-1", "sink-1", "record")?.status).toBe("failed");
+    expect(ledger.getRowState("lead-1", "sink-1", "record")?.errorCode).toBe(
+      "cloudflare_send_validation_failed",
+    );
   });
 
   it("acks visitor follow-up on permanent Cloudflare recipient suppression", async () => {

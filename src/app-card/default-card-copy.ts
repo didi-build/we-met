@@ -1,5 +1,21 @@
 import type { CardCopy } from "@/card-data/types";
 
+/** Visitor confirmation receipt copy (Variant C, DIDI-742). */
+export const VISITOR_RECEIPT_COPY = {
+  sentTo: "Sent to {ownerFirst}",
+  receiptTimeNow: "Just now",
+  receiptTimeWithNote: "With your note",
+  saveContact: "Save {ownerFirst}'s contact",
+  saveBusy: "Preparing contact",
+  saveDone: "Saved, tap to save again",
+  emailLink: "Email",
+  callLink: "Call",
+  followUp: "{ownerFirst} will follow up by email.",
+  tellMore: "Tell {ownerFirst} more about you",
+  afterDetails: "Your details were added. Thanks, {visitorFirst}.",
+  reloadFollowUp: "{ownerFirst} has your details and will follow up by email.",
+} as const;
+
 /** Default visitor exchange copy for newly published MVP cards (mono variant). */
 export const DEFAULT_MVP_CARD_COPY: CardCopy = {
   thanksMessage: "Thanks, {firstName}. Talk soon.",
