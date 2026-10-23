@@ -29,6 +29,7 @@ const PRIVACY_H2 = [
   "What we collect",
   "Who can see the emails",
   "What the people you meet can see",
+  "Google Contacts setup",
   "Who we share data with",
   "How long we keep it",
   "Deleting your data",

@@ -42,9 +42,10 @@ export function TermsPolicyContent({ urls }: { urls: LandingUrls }) {
 
       <h2 className="lp-legal-h2">Emails</h2>
       <p className="lp-body">
-        We Met sends email to the card owner and to the person who submitted their
-        details, only to deliver and follow up that exchange. We limit how many emails
-        can be sent and may pause sending at any time.
+        We Met emails the card owner when someone exchanges contact details (Reply-To is
+        the visitor so the owner can follow up). We Met may email the visitor a
+        follow-up when that optional mode is on. We limit how many emails can be sent
+        and may pause sending at any time.
       </p>
 
       <h2 className="lp-legal-h2">Privacy</h2>

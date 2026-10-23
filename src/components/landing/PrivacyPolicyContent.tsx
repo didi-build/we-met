@@ -29,8 +29,9 @@ export function PrivacyPolicyContent() {
       <p className="lp-body">
         <em>People who exchange details with you.</em> When someone taps &quot;Exchange
         contact&quot; on your card, they enter their name and email, and can add a phone
-        number, job title, company and a note. We send these to you by email. We do not
-        keep them in our database. We keep only delivery records: whether an email was
+        number, job title, company and a note. We email their name and email to you
+        (Reply-To is the visitor) so you can follow up. We do not keep their lead
+        contents in our database. We keep only delivery records: whether an email was
         queued, sent or failed, when, and an error code if it failed.
       </p>
       <p className="lp-body">
@@ -58,12 +59,13 @@ export function PrivacyPolicyContent() {
         built into We Met today.
       </p>
       <p className="lp-body">
-        <em>Gmail (Google).</em> Owner lead notifications and visitor follow-up emails
-        can be sent through a Google mailbox we control, using Google&apos;s Gmail API.
-        Google receives the full message: who it is to and from (including reply
-        addresses), the subject, the text and HTML body, and any attachments (such as
-        contact cards). Our operator can read these messages in that mailbox. We do not
-        keep the text of these emails in our database.
+        <em>Gmail (Google).</em> Owner lead notifications are sent through a Google
+        mailbox we control, using Google&apos;s Gmail API. When visitor follow-up email
+        is turned on, those messages use the same path. Google receives the full
+        message: who it is to and from (including reply addresses), the subject, the
+        text and HTML body, and any attachments (such as contact cards). Our operator
+        can read these messages in that mailbox. We do not keep the text of these emails
+        in our database.
       </p>
       <p className="lp-body">
         <em>Cloudflare Email Service.</em> The same kinds of email can instead be sent
@@ -74,29 +76,132 @@ export function PrivacyPolicyContent() {
 
       <h2 className="lp-legal-h2">What the people you meet can see</h2>
       <p className="lp-body">
-        When someone exchanges details with you, they get a follow-up email from your
-        first name via We Met (for example, &quot;Diadem via We Met&quot;). The
-        signature shows your Google first name, your display name in brackets when you
-        use one, and your Google last name. The email also includes your display name on
-        the card (or your Google name if you left display name blank), your role and
-        photo, and your contact card attached. If you added a phone number, it is
-        included in that contact card after an exchange.{" "}
+        When someone exchanges details with you, they can save your contact card on the
+        spot in their browser after the exchange. We do not email them your card by
+        default.
+      </p>
+      <p className="lp-body">
+        When visitor follow-up email is turned on, they may receive a follow-up email
+        from your first name via We Met (for example, &quot;Diadem via We Met&quot;).
+        The signature shows your Google first name, your display name in brackets when
+        you use one, and your Google last name. That email also includes your display
+        name on the card (or your Google name if you left display name blank), your role
+        and photo, and your contact card attached.
+      </p>
+      <p className="lp-body">
+        Whether they save your card on the spot or receive that optional email, if you
+        added a phone number it is included in the contact card they get.{" "}
         <strong>
           Your Google account email address is shared with everyone who exchanges
           details with you:
         </strong>{" "}
-        replies go to it, and it is in your contact card. The contact card uses your
-        full Google name. Don&apos;t create a card if you are not comfortable sharing
-        that address.
+        it is in your contact card, and replies to optional follow-up mail go to it. The
+        contact card uses your full Google name. Don&apos;t create a card if you are not
+        comfortable sharing that address.
+      </p>
+
+      <h2 className="lp-legal-h2">Google Contacts setup</h2>
+      <p className="lp-body">
+        If you choose &quot;Add We Met to my contacts&quot; after you publish, we ask
+        Google for one-time access to your Google Contacts. We use it only to create or
+        update a single &quot;We Met&quot; contact with our sending addresses. We do not
+        read, store, or share any of your other contacts. We do not store Google access
+        tokens. We only store that you completed setup and which sender addresses we
+        recorded on your account.
+      </p>
+      <p className="lp-body">
+        We Met&apos;s use of information received from Google APIs will adhere to the{" "}
+        <a href="https://developers.google.com/terms/api-services-user-data-policy">
+          Google API Services User Data Policy
+        </a>
+        , including the Limited Use requirements:
+      </p>
+      <p className="lp-body">
+        <strong>Limited Use:</strong> Your use of data obtained via the product&apos;s
+        specified scopes must comply with the below requirements. These requirements
+        apply to the raw data obtained from the scopes and data aggregated, anonymized,
+        or derived from them.
+      </p>
+      <ol className="lp-body">
+        <li>
+          Limit your use of data to providing or improving user-facing features that are
+          prominent in the requesting application&apos;s user interface;
+        </li>
+        <li>
+          Transfers of data are not allowed, except:
+          <ol>
+            <li>
+              To provide or improve your appropriate access or user-facing features that
+              are visible and prominent in the requesting application&apos;s user
+              interface and only with the user&apos;s consent;
+            </li>
+            <li>For security purposes (for example, investigating abuse);</li>
+            <li>To comply with applicable laws; or,</li>
+            <li>
+              As part of a merger, acquisition, or sale of assets of the developer after
+              obtaining explicit prior consent from the user.
+            </li>
+          </ol>
+        </li>
+        <li>
+          Don&apos;t allow humans to read the data, unless:
+          <ol>
+            <li>
+              You first obtained the user&apos;s affirmative agreement to view specific
+              messages, files, or other data, with the limited exception of use cases
+              approved by Google under additional terms applicable to the Nest Device
+              Access program;
+            </li>
+            <li>
+              It is necessary for security purposes (for example, investigating a bug or
+              abuse);
+            </li>
+            <li>It is necessary to comply with applicable law; or</li>
+            <li>
+              The data (including derivations) is aggregated and used for internal
+              operations in accordance with applicable privacy and other jurisdictional
+              legal requirements.
+            </li>
+          </ol>
+        </li>
+      </ol>
+      <p className="lp-body">
+        All other transfers, uses, or sales of user data are prohibited, including:
+      </p>
+      <ol className="lp-body">
+        <li>
+          Transferring or selling user data to third parties like advertising platforms,
+          data brokers, or any information resellers.
+        </li>
+        <li>
+          Transferring, selling, or using user data for serving ads, including
+          retargeting, personalized or interest-based advertising.
+        </li>
+        <li>
+          Transferring, selling, or using user data to determine credit-worthiness or
+          for lending purposes.
+        </li>
+      </ol>
+      <p className="lp-body">
+        You must ensure that your employees, agents, contractors, and successors comply
+        with this Google API Services User Data Policy.
+      </p>
+      <p className="lp-body">
+        You can revoke We Met&apos;s access to your Google Contacts anytime in your{" "}
+        <a href="https://myaccount.google.com/permissions">
+          Google Account permissions
+        </a>
+        .
       </p>
 
       <h2 className="lp-legal-h2">Who we share data with</h2>
       <p className="lp-body">
         We use Cloudflare to host We Met, store data, and pass messages between our
         systems (including Cloudflare Email Service when that sending path is active).
-        We use Google so you can sign in with Google, and to send email when the Gmail
-        path is active. We don&apos;t sell personal information and we don&apos;t use it
-        for advertising.
+        We use Google so you can sign in with Google, to send email when the Gmail path
+        is active, and for optional one-time Google Contacts access when you choose
+        &quot;Add We Met to my contacts&quot;. We don&apos;t sell personal information
+        and we don&apos;t use it for advertising.
       </p>
       <p className="lp-body">
         Cloudflare and Google may process personal information in Canada, the United

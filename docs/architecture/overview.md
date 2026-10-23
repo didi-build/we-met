@@ -2,7 +2,7 @@
 
 ## Purpose
 
-**We Met** hosts digital exchange-contact cards: a visitor opens a card URL, shares their details, and both sides get email with the exchange. The MVP adds Google sign-in, a card editor on the app host, and per-account published cards on `/hi/<slug>` ([0025](../decisions/0025-we-met-mvp-accounts-sign-in-and-app-backend.md)).
+**We Met** hosts digital exchange-contact cards: a visitor opens a card URL, shares their details, saves the owner's contact card on the spot, and the owner gets a lead email (Reply-To the visitor). Visitor follow-up email is optional (`visitor_email_mode=direct`; default **owner relay** skips it; [0027](../decisions/0027-owner-relay-visitor-follow-up.md)). The MVP adds Google sign-in, a card editor on the app host, and per-account published cards on `/hi/<slug>` ([0025](../decisions/0025-we-met-mvp-accounts-sign-in-and-app-backend.md)).
 
 ## Boundaries
 
@@ -45,7 +45,7 @@ Agents should extend behavior only through these interfaces, not ad hoc fetches 
 | `/api/auth/*`          | App (+ local)   | Google sign-in, preview test login, logout ([0025](../decisions/0025-we-met-mvp-accounts-sign-in-and-app-backend.md)). |
 | `/api/app/*`           | App (+ local)   | Session, draft, publish, slug check, photo ([app-api-contract](./app-api-contract.md)).                                |
 
-**Legacy mapping:** `didi.build/hi` → `/hi/didi`. **`didi.build` is not redirected.** Owner vCard is attached in the follow-up email after exchange only (no public `/hi/<slug>/contact.vcf`; [DIDI-641](https://linear.app/didi-build/issue/DIDI-641)). Slug rules: [0003](../decisions/0003-urls-and-lookup.md). Exchange API: [0008](../decisions/0008-api-routes-exchange-and-details.md).
+**Legacy mapping:** `didi.build/hi` → `/hi/didi`. **`didi.build` is not redirected.** Owner vCard is available after exchange via token-gated `POST /api/exchange/vcard` (default owner relay) and may be attached in optional visitor follow-up email when `visitor_email_mode` is `direct` (no public `/hi/<slug>/contact.vcf`; [DIDI-641](https://linear.app/didi-build/issue/DIDI-641), [0027](../decisions/0027-owner-relay-visitor-follow-up.md)). Slug rules: [0003](../decisions/0003-urls-and-lookup.md). Exchange API: [0008](../decisions/0008-api-routes-exchange-and-details.md).
 
 ## Theming
 

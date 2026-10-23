@@ -1094,8 +1094,10 @@
   verified: true
 - id: email.owner_lead_record
   whose: visitor
-  data: Email to card owner with visitor name, email, phone from exchange
-  purpose: notify owner of new lead
+  data:
+    Email to card owner with visitor name, email, phone from exchange; Reply-To is visitor email (owner relay
+    default; ADR 0027)
+  purpose: notify owner of new lead so they can follow up from their inbox
   storage:
     Card owner inbox; sent via Gmail API when app_settings.email_provider is gmail (default), or Cloudflare Email
     Service binding when email_provider is cloudflare
@@ -1164,6 +1166,19 @@
   whose: operational
   data: D1 app_settings row email_provider = gmail (default when missing or unknown) or cloudflare
   purpose: selects outbound email adapter in follow-up consumer
+  storage: D1 app_settings (key and value columns)
+  processors:
+    - Cloudflare
+  retention: indefinite (no purge job in repo)
+  who_can_see: operator
+  source: src/app-settings/defaults.ts
+  verified: true
+- id: config.app_settings.visitor_email_mode
+  whose: operational
+  data: D1 app_settings row visitor_email_mode = owner_relay (default when missing or unknown) or direct
+  purpose:
+    owner_relay skips visitor follow-up enqueue and send; direct enables queue.visitor_followup and
+    email.visitor_followup (ADR 0027)
   storage: D1 app_settings (key and value columns)
   processors:
     - Cloudflare
@@ -1294,6 +1309,20 @@
   retention: "persisted fields: until account deletion; OAuth tokens not stored per privacy page"
   who_can_see: operator; Google as processor
   source: src/app-auth/google-oauth.ts
+  verified: true
+- id: auth.google_contacts
+  whose: card_owner
+  data:
+    One-time Google OAuth contacts scope and People API calls to create or update a single We Met contact with configured
+    sender addresses; access token discarded after callback (no refresh token)
+  purpose: optional Add We Met to my contacts setup after publish (DIDI-747)
+  storage: Google People API (transit); accounts.contact_added_at and accounts.contact_sender_addresses only in D1
+  processors:
+    - Google
+    - Cloudflare
+  retention: persisted flags until account tombstone; Google tokens not stored per privacy page and ADR 0026
+  who_can_see: operator; Google as processor during the one-time API calls
+  source: src/app-auth/google-people-api.ts
   verified: true
 - id: abuse.turnstile
   whose: visitor

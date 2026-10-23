@@ -57,9 +57,11 @@ export function LandingHome({ urls, getStartedLabel }: LandingHomeProps) {
             through either our operator&apos;s Google mailbox or Cloudflare Email
             Service; the active provider sees the full message for delivery. We only
             store delivery information (like whether an email was sent), not the
-            contents of your leads. Anyone you exchange details with also gets your
-            Google account email address, so replies go to it and it is in your contact
-            card. Read our <a href={urls.privacy}>Privacy</a> and{" "}
+            contents of your leads. By default, visitors save your contact card on the
+            spot; you get their details in your inbox with Reply-To set to them. Anyone
+            who exchanges with you sees your Google account email address in that
+            contact card (and in optional visitor follow-up email when that mode is on).
+            Read our <a href={urls.privacy}>Privacy</a> and{" "}
             <a href={urls.terms}>Terms</a> pages for more.
           </p>
         </section>
