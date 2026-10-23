@@ -2,7 +2,7 @@
 
 ## Purpose
 
-**We Met** hosts digital exchange-contact cards: a visitor opens a card URL, shares their details, and both sides get email with the exchange. The MVP adds Google sign-in, a card editor on the app host, and per-account published cards on `/hi/<slug>` ([0025](../decisions/0025-we-met-mvp-accounts-sign-in-and-app-backend.md)).
+**We Met** hosts digital exchange-contact cards: a visitor opens a card URL, shares their details, and the owner receives the details they share by email (Reply-To the visitor). Visitor follow-up email is optional (`visitor_email_mode=direct`; default **owner relay** skips it; [0027](../decisions/0027-owner-relay-visitor-follow-up.md)). The MVP adds Google sign-in, a card editor on the app host, and per-account published cards on `/hi/<slug>` ([0025](../decisions/0025-we-met-mvp-accounts-sign-in-and-app-backend.md)).
 
 ## Boundaries
 
@@ -28,7 +28,7 @@ Agents should extend behavior only through these interfaces, not ad hoc fetches 
 | **Accounts**     | Google identity, waitlist, and owner email.                                           | `accounts` + `sessions` in D1; owner inbox only on `accounts.email`; email sinks use `account_email` sentinel resolved at enqueue ([0025](../decisions/0025-we-met-mvp-accounts-sign-in-and-app-backend.md)).                                                                   |
 | **App API**      | Editor auth and card CRUD.                                                            | JSON routes under `/api/app/*` and `/api/auth/*` on the app host only; client interface **`AppApi`** ([app-api-contract](./app-api-contract.md)).                                                                                                                               |
 | **Lead sink**    | Deliver a lead to one destination (`kind` implementation).                            | **`LeadSink`**: record lead, append details, note delivery failure. **`email`** kind implemented in the follow-up consumer ([0023](../decisions/0023-owner-email-lead-sink-consumer.md)).                                                                                       |
-| **Email sender** | Send fixed-template **visitor** follow-up and owner sink mail.                        | Gmail via follow-up consumer; non-prod redirects to `WE_MET_TEST_MAIL_TO`.                                                                                                                                                                                                      |
+| **Email sender** | Send fixed-template **visitor** follow-up and owner sink mail.                        | Cloudflare Email Service via the follow-up consumer; non-prod redirects to `WE_MET_TEST_MAIL_TO`.                                                                                                                                                                               |
 | **Base URL**     | One canonical origin for absolute links in email and metadata (`https://…`, no path). | Single config value per environment (see [environments](./environments.md)); never scatter hostnames in code.                                                                                                                                                                   |
 | **Lookup**       | Resolve which card serves a request.                                                  | Order: **hostname** (custom domain later) → **path** (`/hi/<slug>`) → **live** card record. Reserved hostnames: [0014](../decisions/0014-reserved-hostnames-and-paths.md); reserved slugs at publish: [0025](../decisions/0025-we-met-mvp-accounts-sign-in-and-app-backend.md). |
 
@@ -45,7 +45,7 @@ Agents should extend behavior only through these interfaces, not ad hoc fetches 
 | `/api/auth/*`          | App (+ local)   | Google sign-in, preview test login, logout ([0025](../decisions/0025-we-met-mvp-accounts-sign-in-and-app-backend.md)). |
 | `/api/app/*`           | App (+ local)   | Session, draft, publish, slug check, photo ([app-api-contract](./app-api-contract.md)).                                |
 
-**Legacy mapping:** `didi.build/hi` → `/hi/didi`. **`didi.build` is not redirected.** Owner vCard is attached in the follow-up email after exchange only (no public `/hi/<slug>/contact.vcf`; [DIDI-641](https://linear.app/didi-build/issue/DIDI-641)). Slug rules: [0003](../decisions/0003-urls-and-lookup.md). Exchange API: [0008](../decisions/0008-api-routes-exchange-and-details.md).
+**Legacy mapping:** `didi.build/hi` → `/hi/didi`. **`didi.build` is not redirected.** Owner vCard is available after exchange via token-gated `POST /api/exchange/vcard` in both `visitor_email_mode` values and may be attached in optional visitor follow-up email when `visitor_email_mode` is `direct` (no public `/hi/<slug>/contact.vcf`; [DIDI-641](https://linear.app/didi-build/issue/DIDI-641), [0027](../decisions/0027-owner-relay-visitor-follow-up.md)). Slug rules: [0003](../decisions/0003-urls-and-lookup.md). Exchange API: [0008](../decisions/0008-api-routes-exchange-and-details.md).
 
 ## Theming
 

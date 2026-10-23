@@ -41,29 +41,6 @@ export function LandingHome({ urls, getStartedLabel }: LandingHomeProps) {
 
         <HowItWorksSection />
 
-        <section
-          className="lp-wrap lp-privacy"
-          aria-labelledby="privacy-title"
-          role="region"
-        >
-          <div className="lp-privacy-head">
-            <p className="lp-eyebrow">Privacy</p>
-            <h2 className="lp-h2" id="privacy-title">
-              A note on your emails.
-            </h2>
-          </div>
-          <p className="lp-body">
-            Emails we send when you use We Met (like contact-exchange notifications) go
-            through either our operator&apos;s Google mailbox or Cloudflare Email
-            Service; the active provider sees the full message for delivery. We only
-            store delivery information (like whether an email was sent), not the
-            contents of your leads. Anyone you exchange details with also gets your
-            Google account email address, so replies go to it and it is in your contact
-            card. Read our <a href={urls.privacy}>Privacy</a> and{" "}
-            <a href={urls.terms}>Terms</a> pages for more.
-          </p>
-        </section>
-
         <section className="lp-wrap lp-final" aria-labelledby="cta-title">
           <div className="lp-final-panel">
             <h2 className="lp-h2" id="cta-title">

@@ -6,7 +6,7 @@ Complete these steps **before** relying on CI previews or production deploys. Ho
 
 Run this **first** as the maintainer. Use **`npx wrangler login`** (OAuth) for all Cloudflare commands in this section — **no** `CLOUDFLARE_API_TOKEN` environment variables.
 
-Use the same **generated config** as CI: `node scripts/prepare-wrangler-config.mjs` → gitignored **`wrangler.ci.jsonc`** at the repo root, with real D1 IDs from environment variables (not a hand-copied `wrangler.local.jsonc`).
+Use the same **generated config** as CI: `node scripts/prepare-wrangler-config.mjs` → gitignored **`wrangler.ci.jsonc`** at the repo root, with real D1 IDs from your shell `export` (same env var names as CI secrets; not a hand-copied `wrangler.local.jsonc`).
 
 `NEXT_PUBLIC_TURNSTILE_SITE_KEY` is inlined at **build time**, so **production and preview each need their own `npm run build`** with the matching widget site key before deploy or preview.
 
@@ -280,17 +280,18 @@ After the production follow-up email consumer shipped (**2026-10-14**), the firs
 
 1. Create the **`preview`** environment (Settings → Environments → New environment): **no** required reviewers, **no** branch restriction (PR workflows run on `refs/pull/N/merge` and must not wait for approval). Security is equivalent to repository scope for these values; the environment exists for deployment history and symmetry with `production`. Add:
    - **Secret:** `CLOUDFLARE_API_TOKEN_NONPROD` (value from `we-met-ci-nonprod`)
-   - **Variables:** `WE_MET_D1_DATABASE_ID_NONPROD`, `WE_MET_TURNSTILE_SITE_KEY_NONPROD` (widget **we-met nonprod**)
+   - **Secrets:** `WE_MET_D1_DATABASE_ID_NONPROD` (same UUID as non-prod D1; masked in Actions logs)
+   - **Variables:** `WE_MET_TURNSTILE_SITE_KEY_NONPROD` (widget **we-met nonprod**)
 2. Create the **`production`** environment with yourself as a required reviewer. Under **Deployment branches**, choose **Selected branches** and allow **`main` only**.
 3. **Repository secret:** `CLOUDFLARE_ACCOUNT_ID` only (used by both workflows).
 4. **`production` environment secrets:** `CLOUDFLARE_API_TOKEN_PRODUCTION` (value from `we-met-ci-production`); `CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION` (value from `we-met-ci-consumer-production`).
-5. **`production` environment variables:** `WE_MET_D1_DATABASE_ID_PRODUCTION`, `WE_MET_TURNSTILE_SITE_KEY_PRODUCTION` (widget **we-met production**).
+5. **`production` environment secrets:** `WE_MET_D1_DATABASE_ID_PRODUCTION` (masked in Actions logs). **Variables:** `WE_MET_TURNSTILE_SITE_KEY_PRODUCTION` (widget **we-met production**).
 6. Create the **`migrate-nonprod`** environment with yourself as required reviewer. **Deployment branches:** **`main` only**. Turn **Prevent self-review** **off** (you are the only reviewer; runs you push must still be approvable). Add:
    - **Secret:** `CLOUDFLARE_API_TOKEN_MIGRATE_NONPROD` (from `we-met-ci-migrate-nonprod`; **never** as a repository or organization secret)
-   - **Variable:** `WE_MET_D1_DATABASE_ID_NONPROD` (same value as `preview`)
+   - **Secret:** `WE_MET_D1_DATABASE_ID_NONPROD` (same value as `preview`)
 7. Create the **`consumer-nonprod`** environment: **no** required reviewers (non-prod, like `preview`). **Deployment branches:** **`main` only**. Add:
    - **Secret:** `CLOUDFLARE_API_TOKEN_CONSUMER_NONPROD` (from `we-met-ci-consumer-nonprod`)
-   - **Variable:** `WE_MET_D1_DATABASE_ID_NONPROD` (same value as `preview`)
+   - **Secret:** `WE_MET_D1_DATABASE_ID_NONPROD` (same value as `preview`)
 
 Remove or rename any legacy unsuffixed `CLOUDFLARE_API_TOKEN` secrets. Do **not** duplicate `CLOUDFLARE_ACCOUNT_ID` on the `preview` or `production` environments unless you intentionally use a different account (the repo uses one repo-level `CLOUDFLARE_ACCOUNT_ID` for both workflows).
 

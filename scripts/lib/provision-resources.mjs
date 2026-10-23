@@ -203,7 +203,7 @@ export function validateD1IdsAgainstEnv(resolvedD1Ids, target, env) {
     }
     if (expected !== cloudflareId) {
       errors.push(
-        `D1 "${databaseName}" id from Cloudflare does not match ${envName}; update the variable or provision file`,
+        `D1 "${databaseName}" id from Cloudflare does not match ${envName}; update the GitHub secret, shell export, or provision file`,
       );
     }
   }
