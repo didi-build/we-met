@@ -1,6 +1,7 @@
 import { assertSeedRecipient } from "./allowlist";
 import type { WarmupEnv } from "./config";
-import { extractEmailSendErrorCode } from "./send-error";
+import { warmupEmailFrom } from "./from-address";
+import { extractEmailSendErrorCode, isPermanentWarmupSendError } from "./send-error";
 import { redactEmailForLog } from "./redact-email";
 
 export type WarmupSendPayload = {
@@ -16,6 +17,7 @@ export type WarmupSendResult =
       ok: false;
       code: "missing_secrets" | "not_in_seeds" | "missing_binding" | "send_failed";
       errorCode?: string;
+      permanent?: boolean;
     };
 
 export async function sendWarmupEmail(
@@ -39,7 +41,7 @@ export async function sendWarmupEmail(
 
   try {
     const result = await env.EMAIL.send({
-      from: { email: secrets.from },
+      from: warmupEmailFrom(secrets.from),
       to: payload.to,
       subject: payload.subject,
       text: payload.text,
@@ -57,6 +59,7 @@ export async function sendWarmupEmail(
       error: error instanceof Error ? error.message : "unknown",
       errorCode,
     });
-    return { ok: false, code: "send_failed", errorCode };
+    const permanent = isPermanentWarmupSendError(error);
+    return { ok: false, code: "send_failed", errorCode, permanent };
   }
 }

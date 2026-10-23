@@ -10,6 +10,7 @@ import {
   warmupPausedEpisodeId,
   type WarmupPausedState,
 } from "./state";
+import { warmupEmailFrom } from "./from-address";
 import { pauseReasonForSendError } from "./send-error";
 
 export async function setWarmupPaused(
@@ -117,7 +118,7 @@ export async function sendWarmupPauseAlert(
     .join("");
   try {
     await env.EMAIL.send({
-      from: { email: secrets.from },
+      from: warmupEmailFrom(secrets.from),
       to: alertTo,
       subject,
       text,

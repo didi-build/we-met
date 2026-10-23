@@ -20,14 +20,19 @@ const secretsEnv = {
 
 describe("warmup auto-pause and alert (unit)", () => {
   it("sets paused and sends exactly one alert on E_RECIPIENT_SUPPRESSED", async () => {
-    const send = vi.fn(async (message: { to: string; from: { email: string } }) => {
-      if (message.to === "seed@example.com") {
-        const err = new Error("suppressed");
-        (err as Error & { code: string }).code = "E_RECIPIENT_SUPPRESSED";
-        throw err;
-      }
-      return { messageId: "alert-1" };
-    });
+    const send = vi.fn(
+      async (message: {
+        to: string;
+        from: string | { email: string; name?: string };
+      }) => {
+        if (message.to === "seed@example.com") {
+          const err = new Error("suppressed");
+          (err as Error & { code: string }).code = "E_RECIPIENT_SUPPRESSED";
+          throw err;
+        }
+        return { messageId: "alert-1" };
+      },
+    );
     const kv = warmupKvEnabled();
     const env: WarmupEnv = {
       ...secretsEnv,
@@ -60,6 +65,7 @@ describe("warmup auto-pause and alert (unit)", () => {
     expect(alertCalls).toHaveLength(1);
     expect(alertCalls[0][0].from).toEqual({
       email: "warmup@mail.we-met.link",
+      name: "We Met",
     });
 
     send.mockClear();
@@ -70,18 +76,23 @@ describe("warmup auto-pause and alert (unit)", () => {
 
   it("retries the pause alert after the attempt cooldown when the first send fails", async () => {
     let alertAttempts = 0;
-    const send = vi.fn(async (message: { to: string; from: { email: string } }) => {
-      if (message.to === "seed@example.com") {
-        const err = new Error("suppressed");
-        (err as Error & { code: string }).code = "E_RECIPIENT_SUPPRESSED";
-        throw err;
-      }
-      alertAttempts += 1;
-      if (alertAttempts === 1) {
-        throw new Error("alert transport failed");
-      }
-      return { messageId: "alert-ok" };
-    });
+    const send = vi.fn(
+      async (message: {
+        to: string;
+        from: string | { email: string; name?: string };
+      }) => {
+        if (message.to === "seed@example.com") {
+          const err = new Error("suppressed");
+          (err as Error & { code: string }).code = "E_RECIPIENT_SUPPRESSED";
+          throw err;
+        }
+        alertAttempts += 1;
+        if (alertAttempts === 1) {
+          throw new Error("alert transport failed");
+        }
+        return { messageId: "alert-ok" };
+      },
+    );
 
     const kv = warmupKvEnabled();
     const env: WarmupEnv = {

@@ -12,7 +12,7 @@ export type WarmupEnv = {
   WARMUP_ALERT_TO?: string;
   EMAIL?: {
     send(message: {
-      from: { email: string };
+      from: { email: string; name?: string } | string;
       to: string;
       subject: string;
       text: string;
