@@ -1,6 +1,5 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { findVarsD1DatabaseIdReference } from "../scripts/check-workflow-d1-id-secrets.mjs";
 
 describe("Migrate non-prod workflow structure (unit)", () => {
   const workflow = readFileSync(".github/workflows/migrate-nonprod.yml", "utf8");
@@ -76,7 +75,7 @@ describe("Migrate non-prod workflow structure (unit)", () => {
   });
 
   it("does not pass non-prod D1 id through GitHub variables (log leak)", () => {
-    expect(findVarsD1DatabaseIdReference(workflow)).toBeNull();
+    expect(workflow).not.toContain("vars.WE_MET_D1_DATABASE_ID_NONPROD");
     expect(workflow).toContain("secrets.WE_MET_D1_DATABASE_ID_NONPROD");
   });
 });
