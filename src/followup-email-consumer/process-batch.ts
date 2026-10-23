@@ -4,7 +4,6 @@ import {
   followupEmailErrorLogFields,
   type FollowupEmailErrorLogFields,
 } from "@/email/followup-email-error";
-import type { EmailProvider } from "@/email/email-provider";
 import {
   createConsumerOutboundEmailSend,
   type ConsumerOutboundEmailSend,
@@ -60,11 +59,8 @@ export type FollowupQueueBatch = {
 export type FollowupConsumerEnv = {
   WE_MET_ENV: string;
   WE_MET_BASE_URL: string;
-  GMAIL_SENDER: string;
-  GMAIL_SERVICE_ACCOUNT_JSON: string;
   EMAIL?: import("@/email/cloudflare-sender").CloudflareSendEmailBinding;
   WE_MET_TEST_MAIL_TO?: string;
-  WE_MET_OWNER_FROM_EMAIL?: string;
   WE_MET_EMAIL_FROM_CLOUDFLARE?: string;
   WE_MET_FROM_DISPLAY_NAME?: string;
   WE_MET_ASSETS: R2Bucket;
@@ -132,7 +128,6 @@ export function createFollowupConsumerDepsFromEnv(
   const ledger = createConsumerLeadDeliveryLedger(env.WE_MET_DB);
   const sendEmail = createConsumerOutboundEmailSend(env);
   const outboundFrom: OutboundFromSecrets = {
-    ownerFromEmail: env.WE_MET_OWNER_FROM_EMAIL,
     cloudflareFromEmail: env.WE_MET_EMAIL_FROM_CLOUDFLARE,
   };
   const logLedgerRowMissing = (leadId: string, sinkId: string) => {
@@ -249,9 +244,8 @@ export function createFollowupConsumerDepsFromEnv(
 async function sendVisitorFollowup(
   message: NonNullable<ReturnType<typeof parseVisitorFollowupMessage>>,
   deps: FollowupConsumerDeps,
-  emailProvider: EmailProvider,
 ): Promise<void> {
-  const ownerFrom = resolveOutboundFromEmail(emailProvider, deps.outboundFrom);
+  const ownerFrom = resolveOutboundFromEmail(deps.outboundFrom);
   const platformFromDisplayName = resolveFromDisplayName(deps.fromDisplayName);
   const fromDisplayName = resolveVisitorFromDisplayName(
     message.card.contact.name.given,
@@ -281,7 +275,7 @@ async function sendVisitorFollowup(
     deps,
   );
 
-  await deps.sendEmail(emailProvider, {
+  await deps.sendEmail({
     from: ownerFrom,
     fromDisplayName,
     to: recipient.to,
@@ -342,7 +336,7 @@ async function processQueueMessage(
   }
 
   try {
-    await sendVisitorFollowup(parsed, deps, leadEmailControls.emailProvider);
+    await sendVisitorFollowup(parsed, deps);
     message.ack();
   } catch (error) {
     const errorFields = followupEmailErrorLogFields(error);

@@ -13,10 +13,6 @@ export type OutboundEmail = {
   textPlain: string;
   textHtml: string;
   attachments?: EmailAttachment[];
-  /** Gmail API thread id (optional). */
-  threadId?: string;
-  /** RFC 5322 Message-ID header value (optional). */
-  messageId?: string;
   inReplyTo?: string;
   references?: string;
 };

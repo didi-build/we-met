@@ -21,7 +21,7 @@ function baseLeadSubjectName(visitorName: string): string {
   return sanitizeEmailHeaderValue(`New lead added: ${safeName}`);
 }
 
-/** Record and append subjects share non-prod prefix logic for Gmail threading. */
+/** Record and append subjects share non-prod prefix logic for mailbox threading. */
 export function formatOwnerLeadEmailSubjects(
   visitorName: string,
   nonProdSinkDestinationLabel?: string,
@@ -126,30 +126,4 @@ export function buildOwnerLeadAppendEmail(input: OwnerLeadAppendEmailInput): {
       html: true,
     }),
   };
-}
-
-export function ownerLeadMessageIdDomain(ownerFromEmail: string): string {
-  const at = ownerFromEmail.indexOf("@");
-  if (at <= 0) {
-    return ownerFromEmail;
-  }
-  return ownerFromEmail.slice(at + 1);
-}
-
-export function buildOwnerLeadRecordMessageId(
-  leadId: string,
-  sinkId: string,
-  ownerFromEmail: string,
-): string {
-  const domain = ownerLeadMessageIdDomain(ownerFromEmail);
-  return `<${leadId}.${sinkId}.record@${domain}>`;
-}
-
-export function buildOwnerLeadAppendMessageId(
-  leadId: string,
-  sinkId: string,
-  ownerFromEmail: string,
-): string {
-  const domain = ownerLeadMessageIdDomain(ownerFromEmail);
-  return `<${leadId}.${sinkId}.append@${domain}>`;
 }
