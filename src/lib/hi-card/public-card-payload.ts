@@ -2,25 +2,93 @@ import type {
   CardAbout,
   CardAlternate,
   CardCopy,
-  CardPageCopy,
+  CardCopyExchangeSheet,
+  CardCopyExchangeSheetErrors,
+  CardPublicLinkType,
   CardPublicLinksMap,
   CardRecord,
   CardServices,
 } from "@/card-data/types";
 
+const PUBLIC_LINK_TYPES: readonly CardPublicLinkType[] = [
+  "website",
+  "linkedin",
+  "github",
+  "instagram",
+];
+
 /** Fields the public /hi UI reads before an exchange (server → browser). */
-export type PublicHiCardPageCopy = Pick<CardPageCopy, "headshotAlt">;
+export type PublicHiCardPageCopy = {
+  headshotAlt: string;
+};
+
+export type PublicHiCardAbout = {
+  title: string;
+  paragraphs: string[];
+};
+
+export type PublicHiCardServiceItem = {
+  title: string;
+  description: string;
+};
+
+export type PublicHiCardServices = {
+  title: string;
+  items: PublicHiCardServiceItem[];
+};
+
+export type PublicHiCardCopyErrors = {
+  nameRequired: string;
+  emailRequired: string;
+  emailInvalid: string;
+};
+
+export type PublicHiCardExchangeSheet = {
+  exchangeTitle: string;
+  detailsTitle: string;
+  detailsIntro: string;
+  nameLabel: string;
+  emailLabel: string;
+  phoneLabel: string;
+  phoneOptional: string;
+  countryCodeAriaLabel: string;
+  submitExchange: string;
+  submitDetails: string;
+  consent: string;
+  closeLabel: string;
+  exchangeFormAriaLabel: string;
+  detailsFormAriaLabel: string;
+  notePlaceholder: string;
+  jobTitleLabel: string;
+  companyLabel: string;
+  noteLabel: string;
+  pendingExchange: string;
+  pendingDetails: string;
+  detailsSaved: string;
+  networkErrorMessage: string;
+  exchangeNotSavedPrefix: string;
+  exchangeNotSavedEmail: string;
+  exchangeNotSavedSuffix: string;
+  errors: PublicHiCardCopyErrors;
+};
+
+export type PublicHiCardCopy = {
+  thanksMessage: string;
+  exchangeAriaLabel: string;
+  footerNavLabel: string;
+  exchangeSheet: PublicHiCardExchangeSheet;
+};
 
 export type PublicHiCardPayload = {
   slug: string;
   name: string;
   role?: string;
-  about?: CardAbout;
-  services?: CardServices;
+  about?: PublicHiCardAbout;
+  services?: PublicHiCardServices;
   links?: CardPublicLinksMap;
   alternate?: CardAlternate;
   pageCopy: PublicHiCardPageCopy;
-  copy: CardCopy;
+  copy: PublicHiCardCopy;
   hasPhoto: boolean;
 };
 
@@ -38,98 +106,275 @@ export const PUBLIC_HI_CARD_PAYLOAD_KEYS: readonly (keyof PublicHiCardPayload)[]
   "hasPhoto",
 ];
 
-const FORBIDDEN_TOP_LEVEL_KEYS = [
-  "accountId",
-  "id",
-  "email",
-  "status",
-  "displayName",
-  "variant",
-  "bookingLinks",
-  "contact",
-  "updatedAt",
-  "photoKey",
+export const PUBLIC_HI_CARD_PAGE_COPY_KEYS = ["headshotAlt"] as const;
+
+export const PUBLIC_HI_CARD_ABOUT_KEYS = ["title", "paragraphs"] as const;
+
+export const PUBLIC_HI_CARD_SERVICE_ITEM_KEYS = ["title", "description"] as const;
+
+export const PUBLIC_HI_CARD_SERVICES_KEYS = ["title", "items"] as const;
+
+export const PUBLIC_HI_CARD_LINK_KEYS = PUBLIC_LINK_TYPES;
+
+export const PUBLIC_HI_CARD_ALTERNATE_KEYS = ["url", "label"] as const;
+
+export const PUBLIC_HI_CARD_COPY_KEYS = [
+  "thanksMessage",
+  "exchangeAriaLabel",
+  "footerNavLabel",
+  "exchangeSheet",
 ] as const;
 
+export const PUBLIC_HI_CARD_EXCHANGE_SHEET_KEYS = [
+  "exchangeTitle",
+  "detailsTitle",
+  "detailsIntro",
+  "nameLabel",
+  "emailLabel",
+  "phoneLabel",
+  "phoneOptional",
+  "countryCodeAriaLabel",
+  "submitExchange",
+  "submitDetails",
+  "consent",
+  "closeLabel",
+  "exchangeFormAriaLabel",
+  "detailsFormAriaLabel",
+  "notePlaceholder",
+  "jobTitleLabel",
+  "companyLabel",
+  "noteLabel",
+  "pendingExchange",
+  "pendingDetails",
+  "detailsSaved",
+  "networkErrorMessage",
+  "exchangeNotSavedPrefix",
+  "exchangeNotSavedEmail",
+  "exchangeNotSavedSuffix",
+  "errors",
+] as const;
+
+export const PUBLIC_HI_CARD_COPY_ERROR_KEYS = [
+  "nameRequired",
+  "emailRequired",
+  "emailInvalid",
+] as const;
+
+function pickPublicAbout(about?: CardAbout): PublicHiCardAbout | undefined {
+  if (!about?.title?.trim()) {
+    return undefined;
+  }
+  const paragraphs = (about.paragraphs ?? []).filter((p) => p.trim());
+  if (!paragraphs.length) {
+    return undefined;
+  }
+  return { title: about.title, paragraphs };
+}
+
+function pickPublicServices(services?: CardServices): PublicHiCardServices | undefined {
+  if (!services?.title?.trim()) {
+    return undefined;
+  }
+  const items = (services.items ?? [])
+    .filter((item) => item.title?.trim())
+    .map((item) => ({
+      title: item.title,
+      description: item.description ?? "",
+    }));
+  if (!items.length) {
+    return undefined;
+  }
+  return { title: services.title, items };
+}
+
+function pickPublicLinks(map?: CardPublicLinksMap): CardPublicLinksMap | undefined {
+  if (!map) {
+    return undefined;
+  }
+  const result: CardPublicLinksMap = {};
+  for (const type of PUBLIC_LINK_TYPES) {
+    const url = map[type]?.trim();
+    if (url) {
+      result[type] = url;
+    }
+  }
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
+function pickPublicAlternate(alternate?: CardAlternate): CardAlternate | undefined {
+  if (!alternate?.url?.trim() || !alternate?.label?.trim()) {
+    return undefined;
+  }
+  return { url: alternate.url, label: alternate.label };
+}
+
+function pickPublicCopyErrors(
+  errors: CardCopyExchangeSheetErrors,
+): PublicHiCardCopyErrors {
+  return {
+    nameRequired: errors.nameRequired,
+    emailRequired: errors.emailRequired,
+    emailInvalid: errors.emailInvalid,
+  };
+}
+
+function pickPublicExchangeSheet(
+  sheet: CardCopyExchangeSheet,
+): PublicHiCardExchangeSheet {
+  return {
+    exchangeTitle: sheet.exchangeTitle,
+    detailsTitle: sheet.detailsTitle,
+    detailsIntro: sheet.detailsIntro,
+    nameLabel: sheet.nameLabel,
+    emailLabel: sheet.emailLabel,
+    phoneLabel: sheet.phoneLabel,
+    phoneOptional: sheet.phoneOptional,
+    countryCodeAriaLabel: sheet.countryCodeAriaLabel,
+    submitExchange: sheet.submitExchange,
+    submitDetails: sheet.submitDetails,
+    consent: sheet.consent,
+    closeLabel: sheet.closeLabel,
+    exchangeFormAriaLabel: sheet.exchangeFormAriaLabel,
+    detailsFormAriaLabel: sheet.detailsFormAriaLabel,
+    notePlaceholder: sheet.notePlaceholder,
+    jobTitleLabel: sheet.jobTitleLabel,
+    companyLabel: sheet.companyLabel,
+    noteLabel: sheet.noteLabel,
+    pendingExchange: sheet.pendingExchange,
+    pendingDetails: sheet.pendingDetails,
+    detailsSaved: sheet.detailsSaved,
+    networkErrorMessage: sheet.networkErrorMessage,
+    exchangeNotSavedPrefix: sheet.exchangeNotSavedPrefix,
+    exchangeNotSavedEmail: sheet.exchangeNotSavedEmail,
+    exchangeNotSavedSuffix: sheet.exchangeNotSavedSuffix,
+    errors: pickPublicCopyErrors(sheet.errors),
+  };
+}
+
+function pickPublicCopy(copy: CardCopy): PublicHiCardCopy {
+  return {
+    thanksMessage: copy.thanksMessage,
+    exchangeAriaLabel: copy.exchangeAriaLabel,
+    footerNavLabel: copy.footerNavLabel,
+    exchangeSheet: pickPublicExchangeSheet(copy.exchangeSheet),
+  };
+}
+
 export function serializePublicHiCard(card: CardRecord): PublicHiCardPayload {
+  const role = card.role?.trim();
+  const about = pickPublicAbout(card.about);
+  const services = pickPublicServices(card.services);
+  const links = pickPublicLinks(card.links);
+  const alternate = pickPublicAlternate(card.alternate);
   return {
     slug: card.slug,
     name: card.name,
-    role: card.role,
-    about: card.about,
-    services: card.services,
-    links: card.links,
-    alternate: card.alternate,
+    ...(role ? { role } : {}),
+    ...(about ? { about } : {}),
+    ...(services ? { services } : {}),
+    ...(links ? { links } : {}),
+    ...(alternate ? { alternate } : {}),
     pageCopy: { headshotAlt: card.pageCopy.headshotAlt },
-    copy: card.copy,
+    copy: pickPublicCopy(card.copy),
     hasPhoto: Boolean(card.photoKey),
   };
 }
 
-const FORBIDDEN_NESTED_KEYS = new Set([
-  "contact",
-  "accountId",
-  "photoKey",
-  "bookingLinks",
-  "displayName",
-  "vcardNote",
-  "family",
-  "given",
-  "nickname",
-  "urls",
-]);
-
-function assertNoForbiddenNestedKeys(value: unknown, path = "payload"): void {
-  if (value === null || typeof value !== "object") {
-    return;
-  }
-  if (Array.isArray(value)) {
-    for (const [index, item] of value.entries()) {
-      assertNoForbiddenNestedKeys(item, `${path}[${index}]`);
+function assertExactKeys(
+  value: Record<string, unknown>,
+  allowed: readonly string[],
+  path: string,
+): void {
+  const allowedSet = new Set(allowed);
+  for (const key of Object.keys(value)) {
+    if (!allowedSet.has(key)) {
+      throw new Error(`unexpected key ${path}.${key}`);
     }
-    return;
-  }
-  for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
-    if (FORBIDDEN_NESTED_KEYS.has(key)) {
-      throw new Error(`public hi card payload must not include ${path}.${key}`);
-    }
-    if (key === "phone" || key === "email" || key === "org") {
-      throw new Error(`public hi card payload must not include ${path}.${key}`);
-    }
-    assertNoForbiddenNestedKeys(nested, `${path}.${key}`);
   }
 }
 
-/** Assert the serialized payload cannot leak owner account or non-rendered contact fields. */
-export function assertNoPublicHiCardLeaks(
-  payload: PublicHiCardPayload,
-  ownerEmail: string,
-): void {
-  const record = payload as Record<string, unknown>;
-  for (const key of FORBIDDEN_TOP_LEVEL_KEYS) {
-    if (key in record) {
-      throw new Error(`public hi card payload must not include ${key}`);
+/** Pin exact keys at every level of the public /hi payload (regression guard). */
+export function assertPublicHiCardPayloadShape(payload: PublicHiCardPayload): void {
+  assertExactKeys(
+    payload as Record<string, unknown>,
+    PUBLIC_HI_CARD_PAYLOAD_KEYS,
+    "payload",
+  );
+
+  assertExactKeys(
+    payload.pageCopy as Record<string, unknown>,
+    PUBLIC_HI_CARD_PAGE_COPY_KEYS,
+    "payload.pageCopy",
+  );
+
+  if (payload.about) {
+    assertExactKeys(
+      payload.about as Record<string, unknown>,
+      PUBLIC_HI_CARD_ABOUT_KEYS,
+      "payload.about",
+    );
+    if (!Array.isArray(payload.about.paragraphs)) {
+      throw new Error("payload.about.paragraphs must be an array");
     }
   }
 
-  const allowed = new Set<string>(PUBLIC_HI_CARD_PAYLOAD_KEYS);
-  for (const key of Object.keys(record)) {
-    if (!allowed.has(key)) {
-      throw new Error(`unexpected public hi card key: ${key}`);
+  if (payload.services) {
+    assertExactKeys(
+      payload.services as Record<string, unknown>,
+      PUBLIC_HI_CARD_SERVICES_KEYS,
+      "payload.services",
+    );
+    for (const [index, item] of payload.services.items.entries()) {
+      assertExactKeys(
+        item as Record<string, unknown>,
+        PUBLIC_HI_CARD_SERVICE_ITEM_KEYS,
+        `payload.services.items[${index}]`,
+      );
     }
   }
 
-  const pageCopyKeys = Object.keys(payload.pageCopy);
-  if (pageCopyKeys.length !== 1 || pageCopyKeys[0] !== "headshotAlt") {
-    throw new Error(
-      `public hi pageCopy must only include headshotAlt, got: ${pageCopyKeys.join(", ")}`,
+  if (payload.links) {
+    assertExactKeys(
+      payload.links as Record<string, unknown>,
+      PUBLIC_HI_CARD_LINK_KEYS,
+      "payload.links",
     );
   }
 
-  const json = JSON.stringify(payload);
-  if (ownerEmail && json.includes(ownerEmail)) {
-    throw new Error("public hi card payload must not include owner email");
+  if (payload.alternate) {
+    assertExactKeys(
+      payload.alternate as Record<string, unknown>,
+      PUBLIC_HI_CARD_ALTERNATE_KEYS,
+      "payload.alternate",
+    );
   }
 
-  assertNoForbiddenNestedKeys(payload);
+  assertExactKeys(
+    payload.copy as Record<string, unknown>,
+    PUBLIC_HI_CARD_COPY_KEYS,
+    "payload.copy",
+  );
+  assertExactKeys(
+    payload.copy.exchangeSheet as Record<string, unknown>,
+    PUBLIC_HI_CARD_EXCHANGE_SHEET_KEYS,
+    "payload.copy.exchangeSheet",
+  );
+  assertExactKeys(
+    payload.copy.exchangeSheet.errors as Record<string, unknown>,
+    PUBLIC_HI_CARD_COPY_ERROR_KEYS,
+    "payload.copy.exchangeSheet.errors",
+  );
+}
+
+/** Assert none of the given sentinel strings appear in the serialized JSON. */
+export function assertNoSentinelsInPublicHiCardJson(
+  payload: PublicHiCardPayload,
+  sentinels: readonly string[],
+): void {
+  const json = JSON.stringify(payload);
+  for (const sentinel of sentinels) {
+    if (sentinel && json.includes(sentinel)) {
+      throw new Error(`public hi card JSON must not contain sentinel: ${sentinel}`);
+    }
+  }
 }

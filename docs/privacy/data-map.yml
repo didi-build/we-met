@@ -547,7 +547,9 @@
   processors:
     - Cloudflare
   retention: until card retired
-  who_can_see: public visitors
+  who_can_see:
+    operator; v1 public /hi does not send variant to the browser (mono palette only via hi-theme-bootstrap); not
+    visible on public /hi
   source: migrations/0005_cards_rebuild_mvp.sql
   verified: true
 - id: cards.display_name
@@ -560,7 +562,9 @@
   processors:
     - Cloudflare
   retention: until card retired
-  who_can_see: public visitors; visitors who exchange (email body when set, else Google name fallback)
+  who_can_see:
+    public visitors on /hi only as the published name fallback when page_copy name is missing (serialized as name, not
+    display_name); visitors who exchange (email body when set, else Google name fallback)
   source: migrations/0005_cards_rebuild_mvp.sql
   verified: true
 - id: cards.account_id
@@ -599,7 +603,9 @@
   processors:
     - Cloudflare
   retention: until replaced, retired, or account deletion
-  who_can_see: public visitors
+  who_can_see:
+    operator; public visitors receive photo bytes at /hi/<slug>/photo.jpg only (R2 key not sent to the browser on
+    public /hi; see src/lib/hi-card/public-card-payload.ts)
   source: migrations/0005_cards_rebuild_mvp.sql
   verified: true
 - id: cards.links_json
@@ -612,7 +618,9 @@
   processors:
     - Cloudflare
   retention: until card retired
-  who_can_see: public visitors
+  who_can_see:
+    public visitors on /hi for website, linkedin, github, and instagram URLs only (bookingUrl is not sent to the
+    browser; see src/lib/hi-card/public-card-payload.ts)
   source: migrations/0005_cards_rebuild_mvp.sql
   verified: true
 - id: cards.page_copy_json
@@ -625,7 +633,10 @@
   processors:
     - Cloudflare
   retention: until card retired
-  who_can_see: public visitors
+  who_can_see:
+    public visitors on /hi for name, role, about, services, links, alternate, and headshotAlt (serialized by
+    src/lib/hi-card/public-card-payload.ts); pageTitle in HTML title and OG/Twitter tags only (not in client card
+    props); emailFromName not sent to the browser (email templates only)
   source: migrations/0005_cards_rebuild_mvp.sql
   verified: true
 - id: cards.contact_json
@@ -644,9 +655,9 @@
   retention: until card retired
   who_can_see:
     operator; visitors after exchange via follow-up email From, signature, body, and vCard attachment, or POST
-    /api/exchange/vcard with a valid details token (including when lead_email_enabled is off). Public /hi shows name,
-    role, about, services, and links from page_copy_json and links_json only (see src/lib/hi-card/public-card-payload.ts).
-  source: src/lib/hi-card/public-card-payload.ts
+    /api/exchange/vcard with a valid details token (including when lead_email_enabled is off); not serialized on public
+    /hi (see src/lib/hi-card/public-card-payload.ts)
+  source: migrations/0005_cards_rebuild_mvp.sql
   verified: true
 - id: cards.copy_json
   table: cards
