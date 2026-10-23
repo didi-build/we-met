@@ -1052,8 +1052,10 @@
   verified: false
 - id: queue.visitor_followup
   whose: visitor
-  data: Visitor lead (name, email, phone) and card email snapshot in visitor_followup message
-  purpose: async visitor follow-up email
+  data:
+    Visitor lead (name, email, phone) and card email snapshot in visitor_followup message; enqueued only when
+    app_settings.visitor_email_mode is exact lowercase direct (default owner_relay skips enqueue; ADR 0027)
+  purpose: async visitor follow-up email (direct mode only)
   storage: Cloudflare Queue (we-met-followup-email)
   processors:
     - Cloudflare
@@ -1131,10 +1133,11 @@
 - id: email.visitor_followup
   whose: visitor
   data:
-    Follow-up email to visitor; From display "{owner contact given} via We Met" (platform fallback if unsafe); signature
-    shows given, optional nickname in brackets, and family; body includes card display name (or Google name), role,
-    photo, vCard with Google email and full Google name in FN
-  purpose: reciprocate contact after exchange
+    Follow-up email to visitor when app_settings.visitor_email_mode is exact lowercase direct (default owner_relay; no
+    send; ADR 0027); From display "{owner contact given} via We Met" (platform fallback if unsafe); signature shows
+    given, optional nickname in brackets, and family; body includes card display name (or Google name), role, photo,
+    vCard with Google email and full Google name in FN
+  purpose: reciprocate contact after exchange (direct mode only)
   storage: Visitor inbox; provider same as email.owner_lead_record
   processors:
     - Cloudflare

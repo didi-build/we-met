@@ -8,9 +8,12 @@ export const leadEmailCapacityAlwaysAllowed = {
 export const defaultLeadEmailControls = {
   leadEmailEnabled: true,
   emailProvider: "gmail" as const,
+  visitorEmailMode: "direct" as const,
   dailyCapGlobal: 150,
   dailyCapPerCard: 50,
 };
+
+export const readVisitorEmailModeDirect = async () => "direct" as const;
 
 export const leadEmailConsumerEnabled = {
   readLeadEmailControls: vi.fn(async () => defaultLeadEmailControls),

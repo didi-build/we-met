@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
+import { readLeadEmailControls } from "@/app-settings/caps";
 import {
   APP_SETTING_DAILY_CAP_GLOBAL,
   APP_SETTING_DAILY_CAP_PER_CARD,
   APP_SETTING_LEAD_EMAIL_ENABLED,
+  APP_SETTING_VISITOR_EMAIL_MODE,
 } from "@/app-settings/defaults";
 import { MemoryCardRepository } from "@/card-data/memory-repository";
 import { createLeadDeliveryLedgerFromD1 } from "@/lead-delivery-ledger/d1-repository";
@@ -68,6 +70,10 @@ function exchangeDeps(
     baseUrl: "https://we-met.link",
     assertLeadEmailCapacity: (cardId: string, needed: number) =>
       assertLeadEmailCapacity(db, cardId, needed, now()),
+    readVisitorEmailMode: async () => {
+      const controls = await readLeadEmailControls(db);
+      return controls.visitorEmailMode;
+    },
     incrementDailySendCounts: async () => undefined,
     _followup: followup,
   };
@@ -130,6 +136,7 @@ describe("exchange and details abuse controls (D1 integration)", () => {
         [APP_SETTING_LEAD_EMAIL_ENABLED]: "1",
         [APP_SETTING_DAILY_CAP_GLOBAL]: "500",
         [APP_SETTING_DAILY_CAP_PER_CARD]: "10",
+        [APP_SETTING_VISITOR_EMAIL_MODE]: "direct",
       });
       const repo = new MemoryCardRepository();
       const card = await repo.upsertCard(exampleCardInput());
@@ -205,12 +212,65 @@ describe("exchange and details abuse controls (D1 integration)", () => {
     });
   });
 
-  it("increments owner and visitor counts with the ledger row on exchange", async () => {
+  it("increments owner count only on exchange when visitor_email_mode is owner_relay", async () => {
     await withIsolatedLocalD1(async (db) => {
       await seedSettings(db, {
         [APP_SETTING_LEAD_EMAIL_ENABLED]: "1",
         [APP_SETTING_DAILY_CAP_GLOBAL]: "500",
         [APP_SETTING_DAILY_CAP_PER_CARD]: "100",
+      });
+      const repo = new MemoryCardRepository();
+      const card = await repo.upsertCard(exampleCardInput());
+      const sinks = [
+        {
+          id: "sink-1",
+          cardId: card.id,
+          kind: "email",
+          config: { to: "owner@example.com" },
+          enabled: true,
+          createdAt: "",
+          updatedAt: "",
+        },
+      ];
+      const sinkMessages: unknown[] = [];
+      const deps = exchangeDeps(db, sinkMessages);
+      const result = await processExchange(
+        {
+          slug: card.slug,
+          name: "Visitor",
+          email: "visitor@example.com",
+          phone: null,
+          turnstileToken: "tok",
+        },
+        card,
+        sinks,
+        deps,
+      );
+      expect(result.status).toBe("success");
+      const owner = await db
+        .prepare(
+          `SELECT count FROM daily_send_counts WHERE day = ? AND card_id = ? AND kind = 'owner'`,
+        )
+        .bind("2026-10-16", card.id)
+        .first<{ count: number }>();
+      const visitor = await db
+        .prepare(
+          `SELECT count FROM daily_send_counts WHERE day = ? AND card_id = ? AND kind = 'visitor'`,
+        )
+        .bind("2026-10-16", card.id)
+        .first<{ count: number }>();
+      expect(owner?.count).toBe(1);
+      expect(visitor).toBeNull();
+    });
+  });
+
+  it("increments owner and visitor counts with the ledger row when mode is direct", async () => {
+    await withIsolatedLocalD1(async (db) => {
+      await seedSettings(db, {
+        [APP_SETTING_LEAD_EMAIL_ENABLED]: "1",
+        [APP_SETTING_DAILY_CAP_GLOBAL]: "500",
+        [APP_SETTING_DAILY_CAP_PER_CARD]: "100",
+        [APP_SETTING_VISITOR_EMAIL_MODE]: "direct",
       });
       const repo = new MemoryCardRepository();
       const card = await repo.upsertCard(exampleCardInput());
@@ -343,7 +403,7 @@ describe("exchange and details abuse controls (D1 integration)", () => {
     });
   });
 
-  it("starts new counts on a new UTC day with a fixed clock", async () => {
+  it("starts new owner_relay counts on a new UTC day with a fixed clock", async () => {
     await withIsolatedLocalD1(async (db) => {
       await seedSettings(db, {
         [APP_SETTING_LEAD_EMAIL_ENABLED]: "1",
@@ -390,6 +450,109 @@ describe("exchange and details abuse controls (D1 integration)", () => {
         baseUrl: "https://we-met.link",
         assertLeadEmailCapacity: (cardId: string, needed: number) =>
           assertLeadEmailCapacity(db, cardId, needed, new Date(nowMs)),
+        readVisitorEmailMode: async () => {
+          const controls = await readLeadEmailControls(db);
+          return controls.visitorEmailMode;
+        },
+        incrementDailySendCounts: async () => undefined,
+      });
+
+      await processExchange(
+        {
+          slug: card.slug,
+          name: "Visitor",
+          email: "visitor@example.com",
+          phone: null,
+          turnstileToken: "tok",
+        },
+        card,
+        sinks,
+        buildDeps(),
+      );
+      nowMs = new Date("2026-10-17T00:01:00.000Z").getTime();
+      sinkMessages.length = 0;
+      const second = await processExchange(
+        {
+          slug: card.slug,
+          name: "Visitor Two",
+          email: "visitor2@example.com",
+          phone: null,
+          turnstileToken: "tok",
+        },
+        card,
+        sinks,
+        buildDeps(),
+      );
+      expect(second.status).toBe("success");
+      const day16 = await db
+        .prepare(
+          `SELECT COALESCE(SUM(count), 0) AS c FROM daily_send_counts WHERE day = '2026-10-16' AND card_id = ?`,
+        )
+        .bind(card.id)
+        .first<{ c: number }>();
+      const day17 = await db
+        .prepare(
+          `SELECT COALESCE(SUM(count), 0) AS c FROM daily_send_counts WHERE day = '2026-10-17' AND card_id = ?`,
+        )
+        .bind(card.id)
+        .first<{ c: number }>();
+      expect(day16?.c).toBe(1);
+      expect(day17?.c).toBe(1);
+    });
+  });
+
+  it("starts new direct-mode counts on a new UTC day with a fixed clock", async () => {
+    await withIsolatedLocalD1(async (db) => {
+      await seedSettings(db, {
+        [APP_SETTING_LEAD_EMAIL_ENABLED]: "1",
+        [APP_SETTING_DAILY_CAP_GLOBAL]: "500",
+        [APP_SETTING_DAILY_CAP_PER_CARD]: "100",
+        [APP_SETTING_VISITOR_EMAIL_MODE]: "direct",
+      });
+      const repo = new MemoryCardRepository();
+      const card = await repo.upsertCard(exampleCardInput());
+      const sinks = [
+        {
+          id: "sink-1",
+          cardId: card.id,
+          kind: "email",
+          config: { to: "owner@example.com" },
+          enabled: true,
+          createdAt: "",
+          updatedAt: "",
+        },
+      ];
+      let nowMs = new Date("2026-10-16T23:59:00.000Z").getTime();
+      const sinkMessages: unknown[] = [];
+      const ledger = createLeadDeliveryLedgerFromD1(db);
+      const buildDeps = () => ({
+        turnstile: { verify: async () => ({ success: true }) },
+        rateLimiter: { check: async () => ({ allowed: true }) },
+        followupQueue: { enqueueVisitorFollowup: async () => undefined },
+        leadSinkQueue: {
+          enqueueLeadSink: async (message: unknown) => {
+            sinkMessages.push(message);
+          },
+        },
+        deliveryLedger: ledger,
+        deliveryLogger: {
+          logLedgerWriteFailed: vi.fn(),
+          logLedgerEnqueueFailed: vi.fn(),
+        },
+        tokenSecret: "secret",
+        environment: "preview",
+        clientIp: "203.0.113.1",
+        leadSinkLogger: { logSinkEnqueueFailure: vi.fn() },
+        createLeadId: () => `lead-day-direct-${nowMs}`,
+        createLedgerId: () => `ledger-day-direct-${nowMs}`,
+        now: () => new Date(nowMs),
+        baseUrl: "https://we-met.link",
+        assertLeadEmailCapacity: (cardId: string, needed: number) =>
+          assertLeadEmailCapacity(db, cardId, needed, new Date(nowMs)),
+        readVisitorEmailMode: async () => {
+          const controls = await readLeadEmailControls(db);
+          return controls.visitorEmailMode;
+        },
         incrementDailySendCounts: async () => undefined,
       });
 

@@ -3,8 +3,11 @@ import {
   APP_SETTING_DAILY_CAP_PER_CARD,
   APP_SETTING_EMAIL_PROVIDER,
   APP_SETTING_LEAD_EMAIL_ENABLED,
+  APP_SETTING_VISITOR_EMAIL_MODE,
   emailProviderFromSettingValue,
   leadEmailEnabledFromSettingValue,
+  visitorEmailModeFromSettingValue,
+  type VisitorEmailMode,
 } from "@/app-settings/defaults";
 import type { EmailProvider } from "@/email/email-provider";
 import type { D1Database } from "@cloudflare/workers-types";
@@ -12,6 +15,7 @@ import type { D1Database } from "@cloudflare/workers-types";
 export type LeadEmailControls = {
   leadEmailEnabled: boolean;
   emailProvider: EmailProvider;
+  visitorEmailMode: VisitorEmailMode;
   dailyCapGlobal: number | null;
   dailyCapPerCard: number | null;
 };
@@ -56,11 +60,12 @@ export async function readLeadEmailControls(
   const rows = await db
     .prepare(
       `SELECT key, value FROM app_settings
-       WHERE key IN (?, ?, ?, ?)`,
+       WHERE key IN (?, ?, ?, ?, ?)`,
     )
     .bind(
       APP_SETTING_LEAD_EMAIL_ENABLED,
       APP_SETTING_EMAIL_PROVIDER,
+      APP_SETTING_VISITOR_EMAIL_MODE,
       APP_SETTING_DAILY_CAP_GLOBAL,
       APP_SETTING_DAILY_CAP_PER_CARD,
     )
@@ -72,6 +77,9 @@ export async function readLeadEmailControls(
       byKey.get(APP_SETTING_LEAD_EMAIL_ENABLED),
     ),
     emailProvider: emailProviderFromSettingValue(byKey.get(APP_SETTING_EMAIL_PROVIDER)),
+    visitorEmailMode: visitorEmailModeFromSettingValue(
+      byKey.get(APP_SETTING_VISITOR_EMAIL_MODE),
+    ),
     dailyCapGlobal: parsePositiveCapValue(byKey.get(APP_SETTING_DAILY_CAP_GLOBAL)),
     dailyCapPerCard: parsePositiveCapValue(byKey.get(APP_SETTING_DAILY_CAP_PER_CARD)),
   };

@@ -261,6 +261,7 @@ async function processQueuedLeadSink(
   const handlerContext = {
     messageAttempts: message.attempts,
     emailProvider: leadEmailControls.emailProvider,
+    visitorEmailMode: leadEmailControls.visitorEmailMode,
   };
 
   try {

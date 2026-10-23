@@ -29,6 +29,7 @@ describe("lead email caps (unit)", () => {
     const controls = {
       leadEmailEnabled: true,
       emailProvider: "gmail" as const,
+      visitorEmailMode: "direct" as const,
       dailyCapGlobal: null,
       dailyCapPerCard: 100,
     };
@@ -41,6 +42,7 @@ describe("lead email caps (unit)", () => {
     const controls = {
       leadEmailEnabled: false,
       emailProvider: "gmail" as const,
+      visitorEmailMode: "direct" as const,
       dailyCapGlobal: 500,
       dailyCapPerCard: 100,
     };
@@ -49,10 +51,11 @@ describe("lead email caps (unit)", () => {
     ).toBe(false);
   });
 
-  it("exchange needs two slots; details needs one", () => {
+  it("direct exchange needs two slots; owner_relay exchange needs one", () => {
     const controls = {
       leadEmailEnabled: true,
       emailProvider: "gmail" as const,
+      visitorEmailMode: "direct" as const,
       dailyCapGlobal: 500,
       dailyCapPerCard: 10,
     };

@@ -7,11 +7,22 @@ import type { FollowupConsumerEnv } from "@/followup-email-consumer/process-batc
 import type { D1Database } from "@cloudflare/workers-types";
 
 function createNoopConsumerD1(): D1Database {
+  const appSettings: Record<string, string> = {
+    lead_email_enabled: "1",
+    email_provider: "gmail",
+    visitor_email_mode: "direct",
+    daily_cap_global: "150",
+    daily_cap_per_card: "50",
+  };
   const stmt = {
-    bind: () => ({
+    bind: (...keys: string[]) => ({
       run: async () => ({ meta: { changes: 0 } }),
       first: async () => null,
-      all: async () => ({ results: [] }),
+      all: async () => ({
+        results: keys
+          .filter((key) => key in appSettings)
+          .map((key) => ({ key, value: appSettings[key] })),
+      }),
     }),
   };
   return {

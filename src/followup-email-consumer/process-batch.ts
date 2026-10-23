@@ -91,6 +91,7 @@ export type FollowupConsumerDeps = {
   ): void;
   logMalformedVisitorFollowup(leadId: string | null): void;
   logVisitorFollowupDroppedPaused(leadId: string): void;
+  logVisitorFollowupSkippedOwnerRelay(leadId: string): void;
   logUnsupportedType(typeLabel: string): void;
   logMissingPhoto(key: string): void;
   logNonJpegPhoto(key: string): void;
@@ -186,6 +187,9 @@ export function createFollowupConsumerDepsFromEnv(
     },
     logVisitorFollowupDroppedPaused(leadId) {
       console.error("visitor_followup_dropped_paused", { leadId });
+    },
+    logVisitorFollowupSkippedOwnerRelay(leadId) {
+      console.error("visitor_followup_skipped_owner_relay", { leadId });
     },
     logUnsupportedType(typeLabel) {
       console.error("followup_unsupported_queue_type", { typeLabel });
@@ -327,6 +331,12 @@ async function processQueueMessage(
   const leadEmailControls = await deps.readLeadEmailControls();
   if (!leadEmailControls.leadEmailEnabled) {
     deps.logVisitorFollowupDroppedPaused(parsed.lead.leadId);
+    message.ack();
+    return;
+  }
+
+  if (leadEmailControls.visitorEmailMode === "owner_relay") {
+    deps.logVisitorFollowupSkippedOwnerRelay(parsed.lead.leadId);
     message.ack();
     return;
   }

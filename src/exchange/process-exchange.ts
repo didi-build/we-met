@@ -18,6 +18,7 @@ import type { TurnstileVerifier } from "@/exchange/turnstile";
 import { absoluteUrl } from "@/config/we-met";
 import type { ExchangeSuccessResponse, VisitorLead } from "@/exchange/types";
 import type { ValidatedExchangeInput } from "@/exchange/validation";
+import type { VisitorEmailMode } from "@/app-settings/defaults";
 import type { DailySendKind } from "@/lead-email/daily-send-counts";
 import { utcDayFromDate } from "@/lead-email/daily-send-counts";
 
@@ -37,6 +38,7 @@ export type ProcessExchangeDeps = {
   now: () => Date;
   baseUrl: string;
   assertLeadEmailCapacity: (cardId: string, needed: number) => Promise<boolean>;
+  readVisitorEmailMode: () => Promise<VisitorEmailMode>;
   incrementDailySendCounts: (
     cardId: string,
     kinds: readonly DailySendKind[],
@@ -89,7 +91,11 @@ export async function processExchange(
     return { status: "rate_limited" };
   }
 
-  if (!(await deps.assertLeadEmailCapacity(card.id, 2))) {
+  const visitorEmailMode = await deps.readVisitorEmailMode();
+  const sendVisitorFollowupEmail = visitorEmailMode === "direct";
+  const emailSlotsNeeded = sendVisitorFollowupEmail ? 2 : 1;
+
+  if (!(await deps.assertLeadEmailCapacity(card.id, emailSlotsNeeded))) {
     return { status: "lead_email_unavailable" };
   }
 
@@ -99,6 +105,9 @@ export async function processExchange(
 
   const day = utcDayFromDate(deps.now());
   const enabledSinks = sinks.filter((s) => s.enabled);
+  const dailySendKinds: DailySendKind[] = sendVisitorFollowupEmail
+    ? ["owner", "visitor"]
+    : ["owner"];
   const sinkDispatchDeps: LeadSinkDispatchDeps = {
     producer: deps.leadSinkQueue,
     sinkLogger: deps.leadSinkLogger,
@@ -108,7 +117,7 @@ export async function processExchange(
     createLedgerId: deps.createLedgerId,
     dailySendOnFirstLedger:
       enabledSinks.length > 0
-        ? { day, cardId: card.id, kinds: ["owner", "visitor"] }
+        ? { day, cardId: card.id, kinds: dailySendKinds }
         : undefined,
   };
 
@@ -123,17 +132,19 @@ export async function processExchange(
   );
 
   if (enabledSinks.length === 0) {
-    await deps.incrementDailySendCounts(card.id, ["owner", "visitor"]);
+    await deps.incrementDailySendCounts(card.id, dailySendKinds);
   }
 
-  try {
-    await deps.followupQueue.enqueueVisitorFollowup({
-      type: "visitor_followup",
-      lead,
-      card: cardSnapshot,
-    });
-  } catch {
-    return { status: "enqueue_failed" };
+  if (sendVisitorFollowupEmail) {
+    try {
+      await deps.followupQueue.enqueueVisitorFollowup({
+        type: "visitor_followup",
+        lead,
+        card: cardSnapshot,
+      });
+    } catch {
+      return { status: "enqueue_failed" };
+    }
   }
 
   const token = createDetailsToken(

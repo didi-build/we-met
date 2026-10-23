@@ -5,7 +5,10 @@ import { exampleCardInput } from "../helpers/example-card";
 import { processExchange } from "@/exchange/process-exchange";
 import type { ProcessExchangeDeps } from "@/exchange/process-exchange";
 import type { ValidatedExchangeInput } from "@/exchange/validation";
-import { leadEmailCapacityAlwaysAllowed } from "../helpers/lead-email-deps";
+import {
+  leadEmailCapacityAlwaysAllowed,
+  readVisitorEmailModeDirect,
+} from "../helpers/lead-email-deps";
 
 function baseInput(
   overrides: Partial<ValidatedExchangeInput> = {},
@@ -55,6 +58,7 @@ function createDeps(
     createLedgerId: () => "ledger-1",
     now: () => new Date("2026-10-12T12:00:00.000Z"),
     baseUrl: "https://we-met.link",
+    readVisitorEmailMode: readVisitorEmailModeDirect,
     ...leadEmailCapacityAlwaysAllowed,
     ...overrides,
   };
@@ -191,6 +195,56 @@ describe("processExchange (unit)", () => {
     expect(result.status).toBe("success");
     expect(logSinkEnqueueFailure).toHaveBeenCalledOnce();
     expect(sinkMessages).toHaveLength(1);
+  });
+
+  it("in owner_relay skips visitor follow-up, reserves one cap slot, and counts owner only", async () => {
+    const repo = new MemoryCardRepository();
+    const card = await repo.upsertCard(exampleCardInput());
+    const sinks = [
+      {
+        id: "sink-a",
+        cardId: card.id,
+        kind: "test_sink",
+        config: { to: "owner@example.com" },
+        enabled: true,
+        createdAt: "",
+        updatedAt: "",
+      },
+    ];
+    const capacityCheck = vi.fn(async () => true);
+    const incrementDailySendCounts = vi.fn(async () => {});
+    const deps = createDeps({
+      readVisitorEmailMode: async () => "owner_relay",
+      assertLeadEmailCapacity: capacityCheck,
+      incrementDailySendCounts,
+    });
+
+    const result = await processExchange(baseInput(), card, sinks, deps);
+
+    expect(result.status).toBe("success");
+    expect(capacityCheck).toHaveBeenCalledWith(card.id, 1);
+    expect(deps.followupMessages).toHaveLength(0);
+    expect(deps.sinkMessages).toHaveLength(1);
+    expect(incrementDailySendCounts).not.toHaveBeenCalled();
+    if (result.status === "success") {
+      expect(result.body.token.length).toBeGreaterThan(10);
+    }
+  });
+
+  it("in owner_relay with no sinks increments owner count only", async () => {
+    const repo = new MemoryCardRepository();
+    const card = await repo.upsertCard(exampleCardInput());
+    const incrementDailySendCounts = vi.fn(async () => {});
+    const deps = createDeps({
+      readVisitorEmailMode: async () => "owner_relay",
+      incrementDailySendCounts,
+    });
+
+    const result = await processExchange(baseInput(), card, [], deps);
+
+    expect(result.status).toBe("success");
+    expect(deps.followupMessages).toHaveLength(0);
+    expect(incrementDailySendCounts).toHaveBeenCalledWith(card.id, ["owner"]);
   });
 
   it("fails when visitor follow-up enqueue fails", async () => {
