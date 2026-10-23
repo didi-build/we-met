@@ -95,6 +95,8 @@ Client maps **5xx** and network failures to `network`.
 
 `POST /api/exchange` and `POST /api/details` ([0008](../decisions/0008-api-routes-exchange-and-details.md)) return **503** with body `{ "error": "lead_email_unavailable" }` when `lead_email_enabled` is off or daily caps would be exceeded — no ledger row, queue message, or `daily_send_counts` change ([0025](../decisions/0025-we-met-mvp-accounts-sign-in-and-app-backend.md) phase 4).
 
+`POST /api/exchange/vcard` (DIDI-743) returns the owner vCard after an exchange. The client sends the signed **details token** from `POST /api/exchange` in the **request body** only (`application/json` or `application/x-www-form-urlencoded` field `token`), never in the URL. The token is verified with the same secret, version, and TTL as `POST /api/details` (`src/exchange/token.ts`). **401** `{ "error": "invalid_token" }` for invalid, expired, or wrong-card tokens (no owner data in the response). **404** `{ "error": "card_not_found" }` when the card is unpublished or missing. **429** `{ "error": "rate_limited" }` uses the exchange rate limiter. **GET** returns **405**. Success is **200** with `Content-Type: text/vcard; charset=utf-8`, `Content-Disposition: attachment; filename="<name>.vcf"`, `Cache-Control: no-store`, and a vCard body matching the follow-up email attachment (`buildOwnerVCardAttachment`). This route is **not** gated on `lead_email_enabled` (no email is sent).
+
 ## UI expectations
 
 - Autosave draft ~800ms after edits; `beforeunload` when a save is still pending.

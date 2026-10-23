@@ -1244,13 +1244,24 @@
 - id: browser.details_exchange_token
   whose: visitor
   data: Signed details token with visitor name, email, lead and card ids (2h TTL)
-  purpose: second-step details form authorization
+  purpose: second-step details form authorization and token-gated owner vCard download (POST /api/exchange/vcard)
   storage: visitor browser (JSON response field, client-held)
   processors:
     - Cloudflare
   retention: 2 hours or until used/expired (src/exchange/token.ts); not stored server-side after issue
   who_can_see: visitor browser
   source: src/exchange/token.ts
+  verified: true
+- id: api.exchange_vcard_response
+  whose: card_owner
+  data: Owner vCard (name, org, title, work email, optional phone, URLs, note, optional JPEG photo) returned after valid exchange details token
+  purpose: let visitor save owner contact after exchange without a public .vcf URL
+  storage: not persisted; streamed in HTTP response only
+  processors:
+    - Cloudflare
+  retention: none (no-store response)
+  who_can_see: visitor who holds a valid details token within TTL
+  source: src/app/api/exchange/vcard/route.ts
   verified: true
 - id: browser.local_storage_theme
   whose: visitor
