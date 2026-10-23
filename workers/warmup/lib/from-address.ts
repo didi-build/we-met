@@ -2,6 +2,13 @@ import { redactEmailForLog } from "./redact-email";
 
 export const WARMUP_FROM_DOMAIN = "mail.we-met.link";
 
+/** Display name on every warm-up and alert `EMAIL.send` From address. */
+export const WARMUP_FROM_DISPLAY_NAME = "We Met";
+
+export function warmupEmailFrom(email: string): { email: string; name: string } {
+  return { email, name: WARMUP_FROM_DISPLAY_NAME };
+}
+
 export function isAllowedWarmupFromAddress(from: string): boolean {
   const normalized = from.trim().toLowerCase();
   const at = normalized.lastIndexOf("@");

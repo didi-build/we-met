@@ -59,4 +59,36 @@ describe("warmup cron tick (unit)", () => {
     }
     expect(send).toHaveBeenCalledOnce();
   });
+
+  it("sends permanent send failures to the DLQ without enqueueing retry", async () => {
+    const send = vi.fn(async () => {
+      throw new Error(
+        "Incorrect type for the 'name' field on 'EmailAddress': the provided value is not of type 'string'.",
+      );
+    });
+    const dlqSend = vi.fn(async () => ({ id: "dlq-1", metadata: null }));
+    const queueSend = vi.fn();
+    const env: WarmupEnv = {
+      WARMUP_SEEDS: "seed@example.com",
+      WARMUP_FROM: "warmup@mail.we-met.link",
+      EMAIL: { send },
+      WARMUP_STATE: warmupKvEnabled(),
+      WARMUP_DLQ: { send: dlqSend } as never,
+      WARMUP_SEND_QUEUE: { send: queueSend } as never,
+    };
+    let n = 0;
+    const result = await runWarmupCronTick(env, {
+      unit: () => {
+        n += 1;
+        return n === 1 ? 0 : 0.1;
+      },
+    });
+    expect(result).toEqual({
+      action: "send_failed",
+      enqueuedRetry: false,
+      permanent: true,
+    });
+    expect(dlqSend).toHaveBeenCalledOnce();
+    expect(queueSend).not.toHaveBeenCalled();
+  });
 });

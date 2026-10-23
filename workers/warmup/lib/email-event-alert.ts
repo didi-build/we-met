@@ -1,5 +1,6 @@
 import type { WarmupEnv, WarmupSecrets } from "./config";
 import { escapeHtmlForEmail } from "./escape-html";
+import { warmupEmailFrom } from "./from-address";
 import { redactEmailForLog } from "./redact-email";
 
 /** Dedupe non-seed urgent alerts per Email Sending message id (separate from pause-episode dedupe). */
@@ -80,7 +81,7 @@ export async function sendNonSeedEmailEventAlertOnce(
 
   try {
     await env.EMAIL.send({
-      from: { email: secrets.from },
+      from: warmupEmailFrom(secrets.from),
       to: alertTo,
       subject,
       text,

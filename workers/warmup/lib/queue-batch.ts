@@ -92,6 +92,15 @@ export async function processWarmupQueueBatch(
     }
 
     if (result.code === "send_failed") {
+      if (result.permanent) {
+        await sendToDlqIfAllowed(env, {
+          reason: "send_failed_permanent",
+          toRedacted: redactEmailForLog(body.to),
+          at: new Date().toISOString(),
+        });
+        message.ack();
+        continue;
+      }
       message.retry();
       continue;
     }

@@ -34,6 +34,26 @@ export function shouldPauseForSendError(errorCode: string | undefined): boolean 
   return lower.includes("reputation") || lower.includes("suspended");
 }
 
+const PERMANENT_SEND_MESSAGE_PATTERNS = [
+  /Incorrect type for/i,
+  /not of type ['"]string['"]/i,
+  /validation failed/i,
+] as const;
+
+/** Send binding errors that will not succeed on queue retry (malformed payload, type checks). */
+export function isPermanentWarmupSendError(error: unknown): boolean {
+  const message =
+    error instanceof Error ? error.message : typeof error === "string" ? error : "";
+  if (message.length > 0) {
+    for (const pattern of PERMANENT_SEND_MESSAGE_PATTERNS) {
+      if (pattern.test(message)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 export function pauseReasonForSendError(errorCode: string): string {
   if (errorCode === "E_RECIPIENT_SUPPRESSED") {
     return "recipient_suppressed (hard bounce or spam complaint on Cloudflare suppression list)";
