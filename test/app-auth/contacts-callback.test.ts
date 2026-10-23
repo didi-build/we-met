@@ -220,6 +220,82 @@ describe("contacts OAuth callback (integration)", () => {
     });
   });
 
+  it("declines without suppress when session cookie is missing", async () => {
+    await withIsolatedLocalD1(async (db) => {
+      routeMocks.env.WE_MET_DB = db;
+      const { accountId } = await seedEligibleOwner(db);
+      const state = "no-session";
+      await createContactsOAuthAttempt(db, {
+        state,
+        accountId,
+        pkceVerifier: "verifier",
+      });
+      setCookieHeader([`${CONTACTS_OAUTH_COOKIE_NAME}=${state}`]);
+      const response = await contactsCallbackGet(
+        new Request(
+          `http://localhost:3000/api/auth/google/contacts/callback?code=abc&state=${state}`,
+        ),
+      );
+      expect(response.headers.get("location")).toContain("contacts_setup=declined");
+      expect(suppressCookieSet(response)).toBe(false);
+      expect(
+        oauthMocks.exchangeGoogleCodeForContactsAccessToken,
+      ).not.toHaveBeenCalled();
+      const row = await db
+        .prepare("SELECT contact_added_at FROM accounts WHERE id = ?")
+        .bind(accountId)
+        .first<{ contact_added_at: string | null }>();
+      expect(row?.contact_added_at).toBeNull();
+    });
+  });
+
+  it("declines without suppress when session belongs to a different account", async () => {
+    await withIsolatedLocalD1(async (db) => {
+      routeMocks.env.WE_MET_DB = db;
+      const { accountId: attemptAccountId } = await seedEligibleOwner(db);
+      const other = await upsertAccountFromGoogle(db, {
+        sub: "sub-other",
+        email: "other@example.com",
+        name: "Other",
+      });
+      if (!other.ok) {
+        throw new Error("other account");
+      }
+      await db
+        .prepare("UPDATE accounts SET status = 'active' WHERE id = ?")
+        .bind(other.account.id)
+        .run();
+      routeMocks.env.CONTACTS_SETUP_ALLOWLIST = "owner@example.com,other@example.com";
+      const otherSession = await createSession(db, other.account.id);
+
+      const state = "wrong-session";
+      await createContactsOAuthAttempt(db, {
+        state,
+        accountId: attemptAccountId,
+        pkceVerifier: "verifier",
+      });
+      setCookieHeader([
+        `${SESSION_COOKIE_NAME}=${otherSession.token}`,
+        `${CONTACTS_OAUTH_COOKIE_NAME}=${state}`,
+      ]);
+      const response = await contactsCallbackGet(
+        new Request(
+          `http://localhost:3000/api/auth/google/contacts/callback?code=abc&state=${state}`,
+        ),
+      );
+      expect(response.headers.get("location")).toContain("contacts_setup=declined");
+      expect(suppressCookieSet(response)).toBe(false);
+      expect(
+        oauthMocks.exchangeGoogleCodeForContactsAccessToken,
+      ).not.toHaveBeenCalled();
+      const row = await db
+        .prepare("SELECT contact_added_at FROM accounts WHERE id = ?")
+        .bind(attemptAccountId)
+        .first<{ contact_added_at: string | null }>();
+      expect(row?.contact_added_at).toBeNull();
+    });
+  });
+
   it("declines when contacts OAuth cookie is missing", async () => {
     await withIsolatedLocalD1(async (db) => {
       routeMocks.env.WE_MET_DB = db;

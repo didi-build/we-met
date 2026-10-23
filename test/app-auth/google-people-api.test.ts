@@ -6,6 +6,28 @@ import {
 import { withIsolatedLocalD1 } from "../helpers/d1";
 
 const fetchMock = vi.fn();
+const PEOPLE_SEARCH_PATH = "/v1/people:searchContacts";
+const READ_MASK = "names,emailAddresses";
+
+function searchContactsCalls(): [string, RequestInit | undefined][] {
+  return fetchMock.mock.calls.filter((call) =>
+    String(call[0]).includes("searchContacts"),
+  ) as [string, RequestInit | undefined][];
+}
+
+function expectSearchContactsGet(
+  call: [string, RequestInit | undefined],
+  query: string,
+  pageSize: number,
+): void {
+  const url = new URL(String(call[0]));
+  expect(url.pathname).toBe(PEOPLE_SEARCH_PATH);
+  expect(call[1]?.method ?? "GET").toBe("GET");
+  expect(call[1]?.body).toBeUndefined();
+  expect(url.searchParams.get("query")).toBe(query);
+  expect(url.searchParams.get("readMask")).toBe(READ_MASK);
+  expect(url.searchParams.get("pageSize")).toBe(String(pageSize));
+}
 
 describe("google people contact sync (unit)", () => {
   beforeEach(() => {
@@ -31,6 +53,12 @@ describe("google people contact sync (unit)", () => {
       ok: true,
       addressesAdded: ["hello@we-met.link", "hello@mail.we-met.link"],
     });
+
+    const searches = searchContactsCalls();
+    expect(searches).toHaveLength(3);
+    expectSearchContactsGet(searches[0], "", 1);
+    expectSearchContactsGet(searches[1], "hello@we-met.link", 30);
+    expectSearchContactsGet(searches[2], "hello@mail.we-met.link", 30);
 
     const createCall = fetchMock.mock.calls.find((call) =>
       String(call[0]).includes("createContact"),
@@ -61,10 +89,19 @@ describe("google people contact sync (unit)", () => {
     ]);
     expect(result).toEqual({ ok: true, addressesAdded: ["hello@mail.we-met.link"] });
 
+    const searches = searchContactsCalls();
+    expect(searches).toHaveLength(2);
+    expectSearchContactsGet(searches[0], "", 1);
+    expectSearchContactsGet(searches[1], "hello@we-met.link", 30);
+
     const patchCall = fetchMock.mock.calls.find((call) =>
       String(call[0]).includes("updateContact"),
     );
     expect(patchCall).toBeTruthy();
+    const patchUrl = new URL(String(patchCall?.[0]));
+    expect(patchCall?.[1]?.method).toBe("PATCH");
+    expect(patchUrl.pathname).toBe("/v1/people/c9:updateContact");
+    expect(patchUrl.searchParams.get("updatePersonFields")).toBe("emailAddresses");
     const body = JSON.parse(String(patchCall?.[1]?.body));
     expect(body.emailAddresses[0]).toEqual({ value: "hello@we-met.link" });
     expect(body.emailAddresses[1]).toEqual({ value: "hello@mail.we-met.link" });

@@ -7,7 +7,16 @@ import type { D1Database } from "@cloudflare/workers-types";
 
 const PEOPLE_API = "https://people.googleapis.com/v1";
 const CONTACT_DISPLAY_NAME = "We Met";
-const READ_MASK = "names,emailAddresses,etag";
+const READ_MASK = "names,emailAddresses";
+
+function searchContactsPath(query: string, pageSize: number): string {
+  const params = new URLSearchParams({
+    query,
+    readMask: READ_MASK,
+    pageSize: String(pageSize),
+  });
+  return `/people:searchContacts?${params.toString()}`;
+}
 
 type PersonEmail = { value?: string; type?: string; formattedType?: string };
 type Person = {
@@ -56,9 +65,8 @@ async function peopleFetch(
 }
 
 async function warmUpSearchContacts(accessToken: string): Promise<boolean> {
-  const response = await peopleFetch(accessToken, "/people:searchContacts", {
-    method: "POST",
-    body: JSON.stringify({ query: "", readMask: READ_MASK, pageSize: 1 }),
+  const response = await peopleFetch(accessToken, searchContactsPath("", 1), {
+    method: "GET",
   });
   return response.ok;
 }
@@ -67,9 +75,8 @@ async function searchContactsByQuery(
   accessToken: string,
   query: string,
 ): Promise<SearchContactsResult> {
-  const response = await peopleFetch(accessToken, "/people:searchContacts", {
-    method: "POST",
-    body: JSON.stringify({ query, readMask: READ_MASK, pageSize: 30 }),
+  const response = await peopleFetch(accessToken, searchContactsPath(query, 30), {
+    method: "GET",
   });
   if (!response.ok) {
     return { ok: false, reason: "people_api_failed" };
