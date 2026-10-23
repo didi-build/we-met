@@ -54,6 +54,7 @@ import {
   exchangeCompletedStorageKey,
   exchangeSessionStorageKey,
 } from "@/lib/hi-card/exchange-session-storage";
+import { expectNoVisitorReceiptContactRow } from "./receipt-contact-test-helpers";
 
 vi.mock("@/components/hi/hi-sheet-motion", async (importOriginal) => {
   const mod = await importOriginal<typeof import("@/components/hi/hi-sheet-motion")>();
@@ -190,6 +191,67 @@ describe("HiPageClient exchange flow (component)", () => {
     }
     expect(window.location.href).not.toContain(leadToken);
     expect(window.location.href).not.toContain("owner-secret@example.com");
+  });
+
+  it("stores empty owner contact in session only and hides the email/call row after exchange", async () => {
+    const record = exampleCardRecord({ slug: "empty-owner-exchange" });
+    const pageCard = toHiPageCard(record);
+    const leadToken = "empty-owner-lead-token";
+
+    vi.mocked(postHiExchange).mockResolvedValue({
+      ok: true,
+      token: leadToken,
+      owner: { email: "", phone: "" },
+    });
+
+    render(
+      <ThemeProvider>
+        <HiPageClient card={pageCard} photoUrl={null} />
+      </ThemeProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Exchange contact/i }));
+    const dialog = screen.getByRole("dialog");
+    fireEvent.change(
+      dialog.querySelector('input[autocomplete="name"]') as HTMLInputElement,
+      { target: { value: "Sam Visitor" } },
+    );
+    fireEvent.change(
+      dialog.querySelector('input[autocomplete="email"]') as HTMLInputElement,
+      { target: { value: "sam@example.com" } },
+    );
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: sheetCopy.submitExchange }),
+    );
+
+    await waitFor(() => {
+      expect(postHiExchange).toHaveBeenCalled();
+      expect(screen.getByText(/Sent to/)).toBeTruthy();
+      expectNoVisitorReceiptContactRow();
+    });
+
+    const sessionKey = exchangeSessionStorageKey(record.slug);
+    const sessionRaw = window.sessionStorage.getItem(sessionKey);
+    expect(sessionRaw).toBeTruthy();
+    expect(JSON.parse(sessionRaw!)).toEqual({
+      firstName: "Sam",
+      visitorEmail: "sam@example.com",
+      leadToken,
+      ownerEmail: "",
+      ownerPhone: "",
+    });
+    expect(window.localStorage.getItem(exchangeCompletedStorageKey(record.slug))).toBe(
+      "1",
+    );
+
+    for (let i = 0; i < window.localStorage.length; i += 1) {
+      const key = window.localStorage.key(i);
+      const value = key ? window.localStorage.getItem(key) : "";
+      expect(value).not.toContain(leadToken);
+      expect(value).not.toContain("ownerEmail");
+      expect(value).not.toContain("ownerPhone");
+    }
+    expect(window.location.href).not.toContain(leadToken);
   });
 
   it("shows after-details receipt copy after the details step succeeds", async () => {
