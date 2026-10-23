@@ -65,6 +65,51 @@ describe("google people contact sync (unit)", () => {
       String(call[0]).includes("updateContact"),
     );
     expect(patchCall).toBeTruthy();
+    const body = JSON.parse(String(patchCall?.[1]?.body));
+    expect(body.emailAddresses[0]).toEqual({ value: "hello@we-met.link" });
+    expect(body.emailAddresses[1]).toEqual({ value: "hello@mail.we-met.link" });
+  });
+
+  it("preserves existing email address objects when appending", async () => {
+    const person = {
+      resourceName: "people/c9",
+      etag: "etag-9",
+      emailAddresses: [{ value: "Hello@We-Met.Link", type: "home" }],
+    };
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ results: [] }) })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ results: [{ person }] }),
+      })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+
+    await syncWeMetGoogleContact("token", [
+      "hello@we-met.link",
+      "hello@mail.we-met.link",
+    ]);
+
+    const patchCall = fetchMock.mock.calls.find((call) =>
+      String(call[0]).includes("updateContact"),
+    );
+    const body = JSON.parse(String(patchCall?.[1]?.body));
+    expect(body.emailAddresses[0]).toEqual({
+      value: "Hello@We-Met.Link",
+      type: "home",
+    });
+    expect(body.emailAddresses[1]).toEqual({ value: "hello@mail.we-met.link" });
+  });
+
+  it("does not create a contact when searchContacts fails", async () => {
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ results: [] }) })
+      .mockResolvedValueOnce({ ok: false, status: 503 });
+
+    const result = await syncWeMetGoogleContact("token", ["hello@we-met.link"]);
+    expect(result).toEqual({ ok: false, reason: "people_api_failed" });
+    expect(
+      fetchMock.mock.calls.some((call) => String(call[0]).includes("createContact")),
+    ).toBe(false);
   });
 
   it("does nothing when the contact already has every address", async () => {

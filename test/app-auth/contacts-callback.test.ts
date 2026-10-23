@@ -1,8 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GET as contactsCallbackGet } from "@/app/api/auth/google/contacts/callback/route";
-import { CONTACTS_OAUTH_COOKIE_NAME } from "@/app-auth/cookies";
+import {
+  CONTACTS_OAUTH_COOKIE_NAME,
+  CONTACTS_SETUP_SUPPRESS_COOKIE_NAME,
+  SESSION_COOKIE_NAME,
+} from "@/app-auth/cookies";
+import { sha256Base64Url } from "@/app-auth/crypto";
 import { createContactsOAuthAttempt } from "@/app-auth/contacts-oauth-attempts";
 import { upsertAccountFromGoogle } from "@/app-auth/accounts";
+import { createSession } from "@/app-auth/sessions";
 import { withIsolatedLocalD1 } from "../helpers/d1";
 
 const routeMocks = vi.hoisted(() => ({
@@ -54,6 +60,43 @@ function setRequestHeaders(init: Record<string, string>) {
   }
 }
 
+function setCookieHeader(parts: string[]) {
+  setRequestHeaders({ host: "localhost:3000", cookie: parts.join("; ") });
+}
+
+function suppressCookieSet(response: Response): boolean {
+  const raw =
+    response.headers.getSetCookie?.().join("\n") ??
+    response.headers.get("set-cookie") ??
+    "";
+  return raw.includes(`${CONTACTS_SETUP_SUPPRESS_COOKIE_NAME}=1`);
+}
+
+function suppressCookieAttributes(response: Response): string {
+  return (
+    response.headers.getSetCookie?.().join("\n") ??
+    response.headers.get("set-cookie") ??
+    ""
+  );
+}
+
+async function seedEligibleOwner(db: import("@cloudflare/workers-types").D1Database) {
+  const accountResult = await upsertAccountFromGoogle(db, {
+    sub: "sub-1",
+    email: "owner@example.com",
+    name: "Owner",
+  });
+  if (!accountResult.ok) {
+    throw new Error("account");
+  }
+  await db
+    .prepare("UPDATE accounts SET status = 'active' WHERE id = ?")
+    .bind(accountResult.account.id)
+    .run();
+  const session = await createSession(db, accountResult.account.id);
+  return { accountId: accountResult.account.id, sessionToken: session.token };
+}
+
 describe("contacts OAuth callback (integration)", () => {
   beforeEach(() => {
     oauthMocks.exchangeGoogleCodeForContactsAccessToken.mockReset();
@@ -75,20 +118,11 @@ describe("contacts OAuth callback (integration)", () => {
   it("does not persist the Google access token in D1", async () => {
     await withIsolatedLocalD1(async (db) => {
       routeMocks.env.WE_MET_DB = db;
-      const accountResult = await upsertAccountFromGoogle(db, {
-        sub: "sub-1",
-        email: "owner@example.com",
-        name: "Owner",
-      });
-      expect(accountResult.ok).toBe(true);
-      if (!accountResult.ok) {
-        return;
-      }
-
+      const { accountId, sessionToken } = await seedEligibleOwner(db);
       const state = "state-plain";
       await createContactsOAuthAttempt(db, {
         state,
-        accountId: accountResult.account.id,
+        accountId,
         pkceVerifier: "verifier",
       });
 
@@ -100,10 +134,13 @@ describe("contacts OAuth callback (integration)", () => {
         addressesAdded: ["hello@we-met.link", "hello@mail.we-met.link"],
       });
 
-      setRequestHeaders({
-        host: "localhost:3000",
-        cookie: `${CONTACTS_OAUTH_COOKIE_NAME}=${state}`,
-      });
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      setCookieHeader([
+        `${SESSION_COOKIE_NAME}=${sessionToken}`,
+        `${CONTACTS_OAUTH_COOKIE_NAME}=${state}`,
+      ]);
 
       const response = await contactsCallbackGet(
         new Request(
@@ -112,25 +149,213 @@ describe("contacts OAuth callback (integration)", () => {
       );
       expect(response.status).toBe(302);
 
-      const accounts = await db
-        .prepare(
-          "SELECT id, email, contact_sender_addresses, contact_added_at FROM accounts",
-        )
-        .all<Record<string, unknown>>();
-      const oauthRows = await db
-        .prepare(
-          "SELECT state_hash, account_id, pkce_verifier FROM contacts_oauth_attempts",
-        )
-        .all<Record<string, unknown>>();
-      for (const row of [...(accounts.results ?? []), ...(oauthRows.results ?? [])]) {
-        expect(JSON.stringify(row)).not.toContain("ya29.super-secret-token");
+      for (const call of [...logSpy.mock.calls, ...errorSpy.mock.calls]) {
+        expect(JSON.stringify(call)).not.toContain("ya29.super-secret-token");
       }
+      logSpy.mockRestore();
+      errorSpy.mockRestore();
 
       const accountRow = await db
-        .prepare("SELECT contact_sender_addresses FROM accounts WHERE id = ?")
-        .bind(accountResult.account.id)
-        .first<{ contact_sender_addresses: string }>();
-      expect(accountRow?.contact_sender_addresses).toContain("hello@we-met.link");
+        .prepare("SELECT contact_sender_addresses, contact_added_at FROM accounts")
+        .all<{
+          contact_sender_addresses: string | null;
+          contact_added_at: string | null;
+        }>();
+      for (const row of accountRow.results ?? []) {
+        expect(JSON.stringify(row)).not.toContain("ya29.super-secret-token");
+      }
+    });
+  });
+
+  for (const oauthError of ["access_denied", "admin_enforced"] as const) {
+    it(`sets suppress cookie on ${oauthError} when state matches and session is valid`, async () => {
+      await withIsolatedLocalD1(async (db) => {
+        routeMocks.env.WE_MET_DB = db;
+        const { accountId, sessionToken } = await seedEligibleOwner(db);
+        const state = `decline-${oauthError}`;
+        await createContactsOAuthAttempt(db, {
+          state,
+          accountId,
+          pkceVerifier: "verifier",
+        });
+        setCookieHeader([
+          `${SESSION_COOKIE_NAME}=${sessionToken}`,
+          `${CONTACTS_OAUTH_COOKIE_NAME}=${state}`,
+        ]);
+        const response = await contactsCallbackGet(
+          new Request(
+            `http://localhost:3000/api/auth/google/contacts/callback?error=${oauthError}&state=${state}`,
+          ),
+        );
+        expect(response.status).toBe(302);
+        expect(suppressCookieSet(response)).toBe(true);
+        const attrs = suppressCookieAttributes(response);
+        expect(attrs).toContain("HttpOnly");
+        expect(attrs).toContain("Secure");
+        expect(attrs).toContain("SameSite=Lax");
+        expect(attrs).toContain("Path=/");
+        const row = await db
+          .prepare("SELECT contact_added_at FROM accounts WHERE id = ?")
+          .bind(accountId)
+          .first<{ contact_added_at: string | null }>();
+        expect(row?.contact_added_at).toBeNull();
+      });
+    });
+  }
+
+  it("does not set suppress cookie when decline state does not match cookie", async () => {
+    await withIsolatedLocalD1(async (db) => {
+      routeMocks.env.WE_MET_DB = db;
+      const { sessionToken } = await seedEligibleOwner(db);
+      setCookieHeader([
+        `${SESSION_COOKIE_NAME}=${sessionToken}`,
+        `${CONTACTS_OAUTH_COOKIE_NAME}=other-state`,
+      ]);
+      const response = await contactsCallbackGet(
+        new Request(
+          "http://localhost:3000/api/auth/google/contacts/callback?error=access_denied&state=query-state",
+        ),
+      );
+      expect(suppressCookieSet(response)).toBe(false);
+    });
+  });
+
+  it("declines when contacts OAuth cookie is missing", async () => {
+    await withIsolatedLocalD1(async (db) => {
+      routeMocks.env.WE_MET_DB = db;
+      const { accountId, sessionToken } = await seedEligibleOwner(db);
+      const state = "state-only";
+      await createContactsOAuthAttempt(db, {
+        state,
+        accountId,
+        pkceVerifier: "verifier",
+      });
+      setCookieHeader([`${SESSION_COOKIE_NAME}=${sessionToken}`]);
+      const response = await contactsCallbackGet(
+        new Request(
+          `http://localhost:3000/api/auth/google/contacts/callback?code=abc&state=${state}`,
+        ),
+      );
+      expect(response.headers.get("location")).toContain("contacts_setup=declined");
+      expect(suppressCookieSet(response)).toBe(false);
+    });
+  });
+
+  it("declines when the oauth attempt is expired", async () => {
+    await withIsolatedLocalD1(async (db) => {
+      routeMocks.env.WE_MET_DB = db;
+      const { accountId, sessionToken } = await seedEligibleOwner(db);
+      const state = "expired";
+      const stateHash = await sha256Base64Url(state);
+      await db
+        .prepare(
+          `INSERT INTO contacts_oauth_attempts (state_hash, account_id, pkce_verifier, created_at, expires_at)
+           VALUES (?, ?, 'v', '2020-01-01T00:00:00.000Z', '2020-01-01T00:10:00.000Z')`,
+        )
+        .bind(stateHash, accountId)
+        .run();
+      setCookieHeader([
+        `${SESSION_COOKIE_NAME}=${sessionToken}`,
+        `${CONTACTS_OAUTH_COOKIE_NAME}=${state}`,
+      ]);
+      const response = await contactsCallbackGet(
+        new Request(
+          `http://localhost:3000/api/auth/google/contacts/callback?code=abc&state=${state}`,
+        ),
+      );
+      expect(response.headers.get("location")).toContain("contacts_setup=declined");
+    });
+  });
+
+  it("declines when token exchange fails", async () => {
+    await withIsolatedLocalD1(async (db) => {
+      routeMocks.env.WE_MET_DB = db;
+      const { accountId, sessionToken } = await seedEligibleOwner(db);
+      const state = "exchange-fail";
+      await createContactsOAuthAttempt(db, {
+        state,
+        accountId,
+        pkceVerifier: "verifier",
+      });
+      oauthMocks.exchangeGoogleCodeForContactsAccessToken.mockResolvedValue({
+        error: "token_exchange_failed",
+      });
+      setCookieHeader([
+        `${SESSION_COOKIE_NAME}=${sessionToken}`,
+        `${CONTACTS_OAUTH_COOKIE_NAME}=${state}`,
+      ]);
+      const response = await contactsCallbackGet(
+        new Request(
+          `http://localhost:3000/api/auth/google/contacts/callback?code=abc&state=${state}`,
+        ),
+      );
+      expect(response.headers.get("location")).toContain("contacts_setup=declined");
+      const row = await db
+        .prepare("SELECT contact_added_at FROM accounts WHERE id = ?")
+        .bind(accountId)
+        .first<{ contact_added_at: string | null }>();
+      expect(row?.contact_added_at).toBeNull();
+    });
+  });
+
+  it("declines quietly with suppress when contacts scope is missing from token response", async () => {
+    await withIsolatedLocalD1(async (db) => {
+      routeMocks.env.WE_MET_DB = db;
+      const { accountId, sessionToken } = await seedEligibleOwner(db);
+      const state = "missing-scope";
+      await createContactsOAuthAttempt(db, {
+        state,
+        accountId,
+        pkceVerifier: "verifier",
+      });
+      oauthMocks.exchangeGoogleCodeForContactsAccessToken.mockResolvedValue({
+        error: "missing_contacts_scope",
+      });
+      setCookieHeader([
+        `${SESSION_COOKIE_NAME}=${sessionToken}`,
+        `${CONTACTS_OAUTH_COOKIE_NAME}=${state}`,
+      ]);
+      const response = await contactsCallbackGet(
+        new Request(
+          `http://localhost:3000/api/auth/google/contacts/callback?code=abc&state=${state}`,
+        ),
+      );
+      expect(suppressCookieSet(response)).toBe(true);
+    });
+  });
+
+  it("declines when People API sync fails", async () => {
+    await withIsolatedLocalD1(async (db) => {
+      routeMocks.env.WE_MET_DB = db;
+      const { accountId, sessionToken } = await seedEligibleOwner(db);
+      const state = "people-fail";
+      await createContactsOAuthAttempt(db, {
+        state,
+        accountId,
+        pkceVerifier: "verifier",
+      });
+      oauthMocks.exchangeGoogleCodeForContactsAccessToken.mockResolvedValue({
+        accessToken: "ya29.token",
+      });
+      oauthMocks.syncWeMetGoogleContact.mockResolvedValue({
+        ok: false,
+        reason: "people_api_failed",
+      });
+      setCookieHeader([
+        `${SESSION_COOKIE_NAME}=${sessionToken}`,
+        `${CONTACTS_OAUTH_COOKIE_NAME}=${state}`,
+      ]);
+      const response = await contactsCallbackGet(
+        new Request(
+          `http://localhost:3000/api/auth/google/contacts/callback?code=abc&state=${state}`,
+        ),
+      );
+      expect(response.headers.get("location")).toContain("contacts_setup=declined");
+      const row = await db
+        .prepare("SELECT contact_added_at FROM accounts WHERE id = ?")
+        .bind(accountId)
+        .first<{ contact_added_at: string | null }>();
+      expect(row?.contact_added_at).toBeNull();
     });
   });
 });

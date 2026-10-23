@@ -5,6 +5,7 @@ import {
   parseCookieHeader,
 } from "@/app-auth/cookies";
 import { constantTimeEqual } from "@/app-auth/crypto";
+import { loadContactsCallbackSessionAccount } from "@/app-auth/contacts-callback-auth";
 import { readContactSenderAddresses } from "@/app-auth/contacts-setup-config";
 import { consumeContactsOAuthAttempt } from "@/app-auth/contacts-oauth-attempts";
 import { exchangeGoogleCodeForContactsAccessToken } from "@/app-auth/google-contacts-oauth";
@@ -15,7 +16,6 @@ import {
 import { apiNotFound, clientIp } from "@/app-auth/guards";
 import { redirectResponse } from "@/app-auth/redirect-response";
 import { ensureAppApiHost, readAppAuthBindings } from "@/app-auth/route-context";
-import { loadAccountForSession } from "@/app-auth/sessions";
 import { appSpaPath, resolveAppOrigin } from "@/config/app-api-host";
 import { headers } from "next/headers";
 
@@ -39,6 +39,19 @@ function redirectToApp(
     url.searchParams.set(key, value);
   }
   return redirectResponse(url.toString(), { setCookies });
+}
+
+function declinedRedirect(
+  appOrigin: string,
+  spaPath: string,
+  clearOAuth: string[],
+  withSuppress: boolean,
+): Response {
+  const cookies = [...clearOAuth];
+  if (withSuppress) {
+    cookies.push(contactsSetupSuppressCookieValue());
+  }
+  return redirectToApp(appOrigin, spaPath, { contacts_setup: "declined" }, cookies);
 }
 
 export async function GET(request: Request) {
@@ -72,31 +85,39 @@ export async function GET(request: Request) {
 
   if (oauthError === "access_denied" || oauthError === "admin_enforced") {
     if (state && contactsStatesMatch(cookieState, state)) {
-      await consumeContactsOAuthAttempt(ctx.env.WE_MET_DB, state);
+      const attempt = await consumeContactsOAuthAttempt(ctx.env.WE_MET_DB, state);
+      if (attempt.ok) {
+        const sessionAccount = await loadContactsCallbackSessionAccount(
+          ctx.env.WE_MET_DB,
+          ctx.env,
+          ctx.cookieHeader,
+          attempt.accountId,
+        );
+        if (sessionAccount) {
+          return declinedRedirect(appOrigin, spaPath, clearOAuth, true);
+        }
+      }
     }
-    return redirectToApp(appOrigin, spaPath, { contacts_setup: "declined" }, [
-      ...clearOAuth,
-      contactsSetupSuppressCookieValue(),
-    ]);
+    return declinedRedirect(appOrigin, spaPath, clearOAuth, false);
   }
 
   if (!code || !state || !contactsStatesMatch(cookieState, state)) {
-    return redirectToApp(
-      appOrigin,
-      spaPath,
-      { contacts_setup: "declined" },
-      clearOAuth,
-    );
+    return declinedRedirect(appOrigin, spaPath, clearOAuth, false);
   }
 
   const attempt = await consumeContactsOAuthAttempt(ctx.env.WE_MET_DB, state);
   if (!attempt.ok) {
-    return redirectToApp(
-      appOrigin,
-      spaPath,
-      { contacts_setup: "declined" },
-      clearOAuth,
-    );
+    return declinedRedirect(appOrigin, spaPath, clearOAuth, false);
+  }
+
+  const sessionAccount = await loadContactsCallbackSessionAccount(
+    ctx.env.WE_MET_DB,
+    ctx.env,
+    ctx.cookieHeader,
+    attempt.accountId,
+  );
+  if (!sessionAccount) {
+    return declinedRedirect(appOrigin, spaPath, clearOAuth, false);
   }
 
   const redirectUri = `${appOrigin}/api/auth/google/contacts/callback`;
@@ -108,41 +129,22 @@ export async function GET(request: Request) {
     codeVerifier: attempt.pkceVerifier,
   });
   if ("error" in tokens) {
-    return redirectToApp(
-      appOrigin,
-      spaPath,
-      { contacts_setup: "declined" },
-      clearOAuth,
-    );
+    const withSuppress = tokens.error === "missing_contacts_scope";
+    return declinedRedirect(appOrigin, spaPath, clearOAuth, withSuppress);
   }
 
   const senderAddresses = readContactSenderAddresses(ctx.env);
   const syncResult = await syncWeMetGoogleContact(tokens.accessToken, senderAddresses);
 
   if (!syncResult.ok) {
-    return redirectToApp(
-      appOrigin,
-      spaPath,
-      { contacts_setup: "declined" },
-      clearOAuth,
-    );
-  }
-
-  const account = await loadAccountForSession(ctx.env.WE_MET_DB, attempt.accountId);
-  if (!account) {
-    return redirectToApp(
-      appOrigin,
-      spaPath,
-      { contacts_setup: "declined" },
-      clearOAuth,
-    );
+    return declinedRedirect(appOrigin, spaPath, clearOAuth, false);
   }
 
   await saveContactsSetupCompletion(
     ctx.env.WE_MET_DB,
     attempt.accountId,
     senderAddresses,
-    account.contact_sender_addresses,
+    sessionAccount.contact_sender_addresses,
   );
 
   return redirectToApp(appOrigin, spaPath, { contacts_setup: "success" }, clearOAuth);

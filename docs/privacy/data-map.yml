@@ -104,6 +104,32 @@
   who_can_see: operator
   source: src/app-auth/accounts.ts
   verified: true
+- id: accounts.contact_added_at
+  table: accounts
+  column: contact_added_at
+  whose: card_owner
+  data: Timestamp when contacts setup last completed successfully
+  purpose: hide contacts setup row after success
+  storage: D1
+  processors:
+    - Cloudflare
+  retention: until account tombstone; cleared on account deletion runbook
+  who_can_see: operator
+  source: src/app-auth/google-people-api.ts
+  verified: true
+- id: accounts.contact_sender_addresses
+  table: accounts
+  column: contact_sender_addresses
+  whose: card_owner
+  data: JSON array of We Met sender addresses recorded on the owner account (no Google tokens)
+  purpose: contacts setup reappear when config adds a new sender
+  storage: D1
+  processors:
+    - Cloudflare
+  retention: until account tombstone; cleared on account deletion runbook
+  who_can_see: operator
+  source: src/app-auth/google-people-api.ts
+  verified: true
 - id: sessions.token_hash
   table: sessions
   column: token_hash
@@ -259,6 +285,71 @@
   retention: same as oauth_attempt row
   who_can_see: operator
   source: src/app-auth/sessions.ts
+  verified: true
+- id: contacts_oauth_attempts.state_hash
+  table: contacts_oauth_attempts
+  column: state_hash
+  whose: operational
+  data: SHA-256 base64url hash of contacts OAuth state parameter
+  purpose: CSRF protection for Google contacts incremental auth
+  storage: D1
+  processors:
+    - Cloudflare
+  retention: 10 minutes from created_at; row removed on successful callback consume or when expired rows are purged
+  who_can_see: operator
+  source: src/app-auth/contacts-oauth-attempts.ts
+  verified: true
+- id: contacts_oauth_attempts.account_id
+  table: contacts_oauth_attempts
+  column: account_id
+  whose: operational
+  data: Account UUID bound to the contacts OAuth attempt
+  purpose: tie contacts consent to signed-in owner
+  storage: D1
+  processors:
+    - Cloudflare
+  retention: same as contacts_oauth_attempt row
+  who_can_see: operator
+  source: src/app-auth/contacts-oauth-attempts.ts
+  verified: true
+- id: contacts_oauth_attempts.pkce_verifier
+  table: contacts_oauth_attempts
+  column: pkce_verifier
+  whose: operational
+  data: PKCE code verifier for contacts OAuth
+  purpose: Google OAuth security
+  storage: D1
+  processors:
+    - Cloudflare
+  retention: same as contacts_oauth_attempt row
+  who_can_see: operator
+  source: src/app-auth/contacts-oauth-attempts.ts
+  verified: true
+- id: contacts_oauth_attempts.created_at
+  table: contacts_oauth_attempts
+  column: created_at
+  whose: operational
+  data: Contacts OAuth attempt creation time
+  purpose: audit
+  storage: D1
+  processors:
+    - Cloudflare
+  retention: same as contacts_oauth_attempt row
+  who_can_see: operator
+  source: src/app-auth/contacts-oauth-attempts.ts
+  verified: true
+- id: contacts_oauth_attempts.expires_at
+  table: contacts_oauth_attempts
+  column: expires_at
+  whose: operational
+  data: Contacts OAuth attempt expiry (10 minutes)
+  purpose: limit replay window
+  storage: D1
+  processors:
+    - Cloudflare
+  retention: same as contacts_oauth_attempt row; expired rows deleted on purge
+  who_can_see: operator
+  source: src/app-auth/contacts-oauth-attempts.ts
   verified: true
 - id: card_drafts.account_id
   table: card_drafts

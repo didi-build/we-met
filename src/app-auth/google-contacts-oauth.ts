@@ -23,7 +23,18 @@ export function buildGoogleContactsAuthUrl(input: {
 }
 
 export type GoogleAccessTokenExchangeResult =
-  { accessToken: string } | { error: "token_exchange_failed" };
+  | { accessToken: string }
+  | { error: "token_exchange_failed" | "missing_contacts_scope" };
+
+export function accessTokenResponseIncludesContactsScope(
+  scope: string | undefined,
+): boolean {
+  if (!scope?.trim()) {
+    return false;
+  }
+  const required = contactsOAuthScope();
+  return scope.split(/\s+/).includes(required);
+}
 
 export async function exchangeGoogleCodeForContactsAccessToken(input: {
   code: string;
@@ -60,8 +71,15 @@ export async function exchangeGoogleCodeForContactsAccessToken(input: {
     const json = (await response.json()) as {
       access_token?: string;
       refresh_token?: string;
+      scope?: string;
     };
     if (!json.access_token) {
+      return { error: "token_exchange_failed" };
+    }
+    if (!accessTokenResponseIncludesContactsScope(json.scope)) {
+      return { error: "missing_contacts_scope" };
+    }
+    if (json.refresh_token) {
       return { error: "token_exchange_failed" };
     }
     return { accessToken: json.access_token };

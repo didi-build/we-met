@@ -82,7 +82,6 @@
     "WE_MET_ENV": "production",
     "WE_MET_PREVIEW_HOST_SUFFIX": "",
     "WE_MET_CONTACT_SENDER_ADDRESSES": "hello@we-met.link,hello@mail.we-met.link",
-    "CONTACTS_SETUP_ALLOWLIST": "",
     "CONTACTS_SETUP_ENABLED_FOR_ALL": "false",
   },
   "observability": {
@@ -105,7 +104,6 @@
       "WE_MET_ENV": "preview",
       "WE_MET_PREVIEW_HOST_SUFFIX": "-we-met.diademshoukralla.workers.dev",
       "WE_MET_CONTACT_SENDER_ADDRESSES": "hello@we-met.link,hello@mail.we-met.link",
-      "CONTACTS_SETUP_ALLOWLIST": "",
       "CONTACTS_SETUP_ENABLED_FOR_ALL": "false",
     },
     "d1_databases": [

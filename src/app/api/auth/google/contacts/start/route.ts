@@ -7,7 +7,10 @@ import { randomToken } from "@/app-auth/crypto";
 import { createPkcePair } from "@/app-auth/google-oauth";
 import { buildGoogleContactsAuthUrl } from "@/app-auth/google-contacts-oauth";
 import { isContactsSetupEligible } from "@/app-auth/contacts-setup-config";
-import { createContactsOAuthAttempt } from "@/app-auth/contacts-oauth-attempts";
+import {
+  createContactsOAuthAttempt,
+  purgeExpiredContactsOAuthAttempts,
+} from "@/app-auth/contacts-oauth-attempts";
 import { apiError, apiNotFound, clientIp } from "@/app-auth/guards";
 import { redirectResponse } from "@/app-auth/redirect-response";
 import { ensureAppApiHost, readAppAuthBindings } from "@/app-auth/route-context";
@@ -59,6 +62,8 @@ export async function GET(request: Request) {
   if (!isContactsSetupEligible(ctx.env, account.email)) {
     return apiError("forbidden", 403);
   }
+
+  await purgeExpiredContactsOAuthAttempts(ctx.env.WE_MET_DB);
 
   const state = randomToken(24);
   const { verifier, challenge } = await createPkcePair();

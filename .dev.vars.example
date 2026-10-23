@@ -10,6 +10,10 @@ WE_MET_APP_ORIGIN=http://localhost:3000
 # GOOGLE_CLIENT_ID=
 # GOOGLE_CLIENT_SECRET=
 
+# Contacts setup (DIDI-747): comma-separated owner emails eligible until Google verification.
+# Unset or empty hides the row for everyone (unless CONTACTS_SETUP_ENABLED_FOR_ALL is true).
+# CONTACTS_SETUP_ALLOWLIST=
+
 # Any random string works locally (details-step token signing).
 WE_MET_TOKEN_SECRET=
 

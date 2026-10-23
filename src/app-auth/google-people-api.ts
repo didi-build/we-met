@@ -9,7 +9,7 @@ const PEOPLE_API = "https://people.googleapis.com/v1";
 const CONTACT_DISPLAY_NAME = "We Met";
 const READ_MASK = "names,emailAddresses,etag";
 
-type PersonEmail = { value?: string };
+type PersonEmail = { value?: string; type?: string; formattedType?: string };
 type Person = {
   resourceName?: string;
   etag?: string;
@@ -19,6 +19,9 @@ type Person = {
 
 export type SyncWeMetContactResult =
   { ok: true; addressesAdded: string[] } | { ok: false; reason: "people_api_failed" };
+
+type SearchContactsResult =
+  { ok: true; people: Person[] } | { ok: false; reason: "people_api_failed" };
 
 function normalizeEmail(value: string): string {
   return value.trim().toLowerCase();
@@ -63,13 +66,13 @@ async function warmUpSearchContacts(accessToken: string): Promise<boolean> {
 async function searchContactsByQuery(
   accessToken: string,
   query: string,
-): Promise<Person[]> {
+): Promise<SearchContactsResult> {
   const response = await peopleFetch(accessToken, "/people:searchContacts", {
     method: "POST",
     body: JSON.stringify({ query, readMask: READ_MASK, pageSize: 30 }),
   });
   if (!response.ok) {
-    return [];
+    return { ok: false, reason: "people_api_failed" };
   }
   try {
     const json = (await response.json()) as { results?: { person?: Person }[] };
@@ -79,31 +82,36 @@ async function searchContactsByQuery(
         people.push(result.person);
       }
     }
-    return people;
+    return { ok: true, people };
   } catch {
-    return [];
+    return { ok: false, reason: "people_api_failed" };
   }
 }
 
 async function findMatchingContact(
   accessToken: string,
   senderAddresses: string[],
-): Promise<Person | null> {
+): Promise<
+  { ok: true; person: Person | null } | { ok: false; reason: "people_api_failed" }
+> {
   const seen = new Set<string>();
   for (const address of senderAddresses) {
     const hits = await searchContactsByQuery(accessToken, address);
-    for (const person of hits) {
+    if (!hits.ok) {
+      return { ok: false, reason: "people_api_failed" };
+    }
+    for (const person of hits.people) {
       const key = person.resourceName ?? "";
       if (!key || seen.has(key)) {
         continue;
       }
       seen.add(key);
       if (personMatchesSender(person, senderAddresses)) {
-        return person;
+        return { ok: true, person };
       }
     }
   }
-  return null;
+  return { ok: true, person: null };
 }
 
 async function createWeMetContact(
@@ -130,7 +138,7 @@ async function createWeMetContact(
 async function updateWeMetContactEmails(
   accessToken: string,
   person: Person,
-  mergedEmails: string[],
+  emailAddresses: PersonEmail[],
 ): Promise<boolean> {
   if (!person.resourceName || !person.etag) {
     return false;
@@ -143,11 +151,16 @@ async function updateWeMetContactEmails(
       headers: { "if-match": person.etag },
       body: JSON.stringify({
         etag: person.etag,
-        emailAddresses: mergedEmails.map((value) => ({ value })),
+        emailAddresses,
       }),
     },
   );
   return response.ok;
+}
+
+function missingSenderAddresses(person: Person, senderAddresses: string[]): string[] {
+  const have = personEmails(person);
+  return senderAddresses.filter((address) => !have.has(normalizeEmail(address)));
 }
 
 export async function syncWeMetGoogleContact(
@@ -163,10 +176,14 @@ export async function syncWeMetGoogleContact(
     return { ok: false, reason: "people_api_failed" };
   }
 
-  const existing = await findMatchingContact(accessToken, senderAddresses);
+  const match = await findMatchingContact(accessToken, senderAddresses);
+  if (!match.ok) {
+    return { ok: false, reason: "people_api_failed" };
+  }
+
   const normalizedSenders = senderAddresses.map(normalizeEmail);
 
-  if (!existing) {
+  if (!match.person) {
     const created = await createWeMetContact(accessToken, senderAddresses);
     if (!created) {
       return { ok: false, reason: "people_api_failed" };
@@ -174,18 +191,21 @@ export async function syncWeMetGoogleContact(
     return { ok: true, addressesAdded: normalizedSenders };
   }
 
-  const have = personEmails(existing);
-  const missing = normalizedSenders.filter((address) => !have.has(address));
+  const existing = match.person;
+  const missing = missingSenderAddresses(existing, senderAddresses);
   if (missing.length === 0) {
     return { ok: true, addressesAdded: [] };
   }
 
-  const merged = [...have, ...missing];
-  const updated = await updateWeMetContactEmails(accessToken, existing, [...merged]);
+  const emailAddresses: PersonEmail[] = [
+    ...(existing.emailAddresses ?? []),
+    ...missing.map((value) => ({ value })),
+  ];
+  const updated = await updateWeMetContactEmails(accessToken, existing, emailAddresses);
   if (!updated) {
     return { ok: false, reason: "people_api_failed" };
   }
-  return { ok: true, addressesAdded: missing };
+  return { ok: true, addressesAdded: missing.map(normalizeEmail) };
 }
 
 export async function saveContactsSetupCompletion(

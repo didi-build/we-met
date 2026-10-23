@@ -227,6 +227,16 @@ export function AppCardEditor({
     window.location.assign("/api/auth/google/contacts/start");
   }, []);
 
+  const restorePublishedDialogChrome = useCallback(() => {
+    const slug = published?.slug ?? card.slug;
+    if (!slug) {
+      return;
+    }
+    setPubUrl(`https://we-met.link/hi/${slug}`);
+    setPubTitle("Your card is live");
+    setCopyLabel("Copy link");
+  }, [card.slug, published?.slug]);
+
   useEffect(() => {
     if (typeof window === "undefined") {
       return;
@@ -251,6 +261,7 @@ export function AppCardEditor({
       return;
     }
     if (status === "success") {
+      restorePublishedDialogChrome();
       openDialog("published");
       setContactsSetupPhase("working");
       void (async () => {
@@ -263,7 +274,7 @@ export function AppCardEditor({
         setContactsSetupPhase("success");
       })();
     }
-  }, [api, onSessionRestored, openDialog]);
+  }, [api, onSessionRestored, openDialog, restorePublishedDialogChrome]);
 
   const closeDialog = useCallback(() => {
     if (dialog === "published") {
