@@ -117,24 +117,24 @@ The consumer registers on the queue in **its own** Wrangler config; it is not an
 
 **Consumer logs (debugging live mail):**
 
-| Event                                  | Fields                                                                                                                                                             |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `visitor_followup_attempt_failure`     | `leadId`, `attempt`, `errorCode`, `willRetry`; `secretName` when `errorCode` is `cloudflare_from_email_missing` or `from_display_name_missing`                    |
-| `visitor_followup_permanent_failure`   | `leadId`, `errorCode`; `secretName` when `errorCode` is `cloudflare_from_email_missing` or `from_display_name_missing`                                            |
-| `visitor_followup_malformed`           | `leadId` (may be null)                                                                                                                                             |
-| `visitor_followup_dropped_paused`      | `leadId` (when `lead_email_enabled` is off)                                                                                                                        |
-| `visitor_followup_skipped_owner_relay` | `leadId` (when `visitor_email_mode` is `owner_relay`)                                                                                                              |
-| `followup_unsupported_queue_type`      | `typeLabel`                                                                                                                                                        |
-| `followup_vcard_photo_missing`         | `photoKey`                                                                                                                                                         |
-| `followup_vcard_photo_not_jpeg`        | `photoKey`                                                                                                                                                         |
-| `lead_sink_attempt_failure`            | `leadId`, `sinkId`, `attempt`, `errorCode`, `willRetry`; `secretName` when applicable                                                                              |
-| `lead_sink_permanent_failure`          | `leadId`, `sinkId`, `errorCode`; `secretName` when applicable                                                                                                      |
-| `lead_sink_malformed`                  | `leadId` (may be null)                                                                                                                                             |
-| `lead_sink_append_deferred`            | `leadId`, `sinkId`, `attempt`                                                                                                                                      |
-| `ledger_row_missing`                   | `leadId`, `sinkId`                                                                                                                                                 |
-| `ledger_update_failed`                 | `leadId`, `sinkId`, `errorCode` (includes `external_ref_invalid`)                                                                                                  |
-| `lead_sink_ledger_record_failed`       | `leadId`, `sinkId`, `errorCode`                                                                                                                                    |
-| `lead_sink_ledger_mark_failed`         | `leadId`, `sinkId`, `errorCode`                                                                                                                                    |
+| Event                                  | Fields                                                                                                                                         |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `visitor_followup_attempt_failure`     | `leadId`, `attempt`, `errorCode`, `willRetry`; `secretName` when `errorCode` is `cloudflare_from_email_missing` or `from_display_name_missing` |
+| `visitor_followup_permanent_failure`   | `leadId`, `errorCode`; `secretName` when `errorCode` is `cloudflare_from_email_missing` or `from_display_name_missing`                         |
+| `visitor_followup_malformed`           | `leadId` (may be null)                                                                                                                         |
+| `visitor_followup_dropped_paused`      | `leadId` (when `lead_email_enabled` is off)                                                                                                    |
+| `visitor_followup_skipped_owner_relay` | `leadId` (when `visitor_email_mode` is `owner_relay`)                                                                                          |
+| `followup_unsupported_queue_type`      | `typeLabel`                                                                                                                                    |
+| `followup_vcard_photo_missing`         | `photoKey`                                                                                                                                     |
+| `followup_vcard_photo_not_jpeg`        | `photoKey`                                                                                                                                     |
+| `lead_sink_attempt_failure`            | `leadId`, `sinkId`, `attempt`, `errorCode`, `willRetry`; `secretName` when applicable                                                          |
+| `lead_sink_permanent_failure`          | `leadId`, `sinkId`, `errorCode`; `secretName` when applicable                                                                                  |
+| `lead_sink_malformed`                  | `leadId` (may be null)                                                                                                                         |
+| `lead_sink_append_deferred`            | `leadId`, `sinkId`, `attempt`                                                                                                                  |
+| `ledger_row_missing`                   | `leadId`, `sinkId`                                                                                                                             |
+| `ledger_update_failed`                 | `leadId`, `sinkId`, `errorCode` (includes `external_ref_invalid`)                                                                              |
+| `lead_sink_ledger_record_failed`       | `leadId`, `sinkId`, `errorCode`                                                                                                                |
+| `lead_sink_ledger_mark_failed`         | `leadId`, `sinkId`, `errorCode`                                                                                                                |
 
 **Consumer secrets (follow-up Workers):** `WE_MET_EMAIL_FROM_CLOUDFLARE` and `WE_MET_FROM_DISPLAY_NAME` on **both** consumers; **`WE_MET_TEST_MAIL_TO`** on **non-prod only** (three secret names on non-prod, two on production). CI on merge to `main` checks non-prod names against [deploy-consumer-nonprod.yml](../../.github/workflows/deploy-consumer-nonprod.yml).
 
