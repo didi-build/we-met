@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { cardRowToRecord } from "@/card-data/card-persist";
 import { tryResolveHiCard } from "@/lib/hi-card/resolve-card-route";
 import { HiPageClient } from "@/components/hi/HiPageClient";
-import { toHiPageCard } from "@/lib/hi-card/hi-page-card";
+import { serializePublicHiCard } from "@/lib/hi-card/public-card-payload";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { render, screen } from "@testing-library/react";
 
@@ -150,7 +150,11 @@ describe("hi card route resolver (integration)", () => {
     const record = cardRowToRecord(legacyDidiRow("green"), parseJson);
     render(
       <ThemeProvider>
-        <HiPageClient card={toHiPageCard(record)} photoUrl={null} plan="free" />
+        <HiPageClient
+          card={serializePublicHiCard(record)}
+          photoUrl={null}
+          plan="free"
+        />
       </ThemeProvider>,
     );
     expect(screen.getByText(/I'm Didi/)).toBeTruthy();

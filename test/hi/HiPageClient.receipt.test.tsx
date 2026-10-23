@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { HiPageClient } from "@/components/hi/HiPageClient";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
-import { toHiPageCard } from "@/lib/hi-card/hi-page-card";
+import { serializePublicHiCard } from "@/lib/hi-card/public-card-payload";
 import {
   exchangeCompletedStorageKey,
   exchangeSessionStorageKey,
@@ -78,7 +78,7 @@ describe("HiPageClient visitor receipt (component)", () => {
         phone: "+1 555 9999",
       },
     });
-    const pageCard = toHiPageCard(record);
+    const pageCard = serializePublicHiCard(record);
     render(
       <ThemeProvider>
         <HiPageClient card={pageCard} photoUrl={null} />
@@ -92,7 +92,7 @@ describe("HiPageClient visitor receipt (component)", () => {
   it("shows reload fallback when exchange completed without session", () => {
     const slug = exampleCardRecord().slug;
     window.localStorage.setItem(exchangeCompletedStorageKey(slug), "1");
-    const pageCard = toHiPageCard(exampleCardRecord({ slug }));
+    const pageCard = serializePublicHiCard(exampleCardRecord({ slug }));
     render(
       <ThemeProvider>
         <HiPageClient card={pageCard} photoUrl={null} />
@@ -130,7 +130,7 @@ describe("HiPageClient visitor receipt (component)", () => {
     window.localStorage.setItem(exchangeCompletedStorageKey(slug), "1");
     window.history.replaceState({}, "", `/hi/${slug}?vcard=expired`);
 
-    const pageCard = toHiPageCard(exampleCardRecord({ slug }));
+    const pageCard = serializePublicHiCard(exampleCardRecord({ slug }));
     render(
       <ThemeProvider>
         <HiPageClient card={pageCard} photoUrl={null} />
@@ -178,7 +178,7 @@ describe("HiPageClient visitor receipt (component)", () => {
     window.localStorage.setItem(exchangeCompletedStorageKey(slug), "1");
     window.history.replaceState({}, "", `/hi/${slug}?vcard=limited`);
 
-    const pageCard = toHiPageCard(exampleCardRecord({ slug }));
+    const pageCard = serializePublicHiCard(exampleCardRecord({ slug }));
     render(
       <ThemeProvider>
         <HiPageClient card={pageCard} photoUrl={null} />
@@ -215,7 +215,7 @@ describe("HiPageClient visitor receipt (component)", () => {
     );
     window.localStorage.setItem(exchangeCompletedStorageKey(slug), "1");
 
-    const pageCard = toHiPageCard(exampleCardRecord({ slug }));
+    const pageCard = serializePublicHiCard(exampleCardRecord({ slug }));
     render(
       <ThemeProvider>
         <HiPageClient card={pageCard} photoUrl={null} />
@@ -251,7 +251,7 @@ describe("HiPageClient visitor receipt (component)", () => {
     );
     window.localStorage.setItem(exchangeCompletedStorageKey(slug), "1");
 
-    const pageCard = toHiPageCard(exampleCardRecord({ slug }));
+    const pageCard = serializePublicHiCard(exampleCardRecord({ slug }));
     render(
       <ThemeProvider>
         <HiPageClient card={pageCard} photoUrl={null} />
@@ -299,7 +299,7 @@ describe("HiPageClient visitor receipt (component)", () => {
     );
     window.localStorage.setItem(exchangeCompletedStorageKey(slug), "1");
 
-    const pageCard = toHiPageCard(exampleCardRecord({ slug }));
+    const pageCard = serializePublicHiCard(exampleCardRecord({ slug }));
     render(
       <ThemeProvider>
         <HiPageClient card={pageCard} photoUrl={null} />
@@ -347,7 +347,7 @@ describe("HiPageClient visitor receipt (component)", () => {
     );
     window.localStorage.setItem(exchangeCompletedStorageKey(slug), "1");
 
-    const pageCard = toHiPageCard(exampleCardRecord({ slug }));
+    const pageCard = serializePublicHiCard(exampleCardRecord({ slug }));
     render(
       <ThemeProvider>
         <HiPageClient card={pageCard} photoUrl={null} />

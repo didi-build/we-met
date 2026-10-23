@@ -49,7 +49,7 @@ vi.mock("@marsidev/react-turnstile", () => ({
 import { HiPageClient } from "@/components/hi/HiPageClient";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { createDetailsToken } from "@/exchange/token";
-import { toHiPageCard } from "@/lib/hi-card/hi-page-card";
+import { serializePublicHiCard } from "@/lib/hi-card/public-card-payload";
 import {
   exchangeCompletedStorageKey,
   exchangeSessionStorageKey,
@@ -124,7 +124,7 @@ describe("HiPageClient exchange flow (component)", () => {
       email: "owner-secret@example.com",
       contact: { ...exampleCardRecord().contact, phone: "+1 555 0100" },
     });
-    const pageCard = toHiPageCard(record);
+    const pageCard = serializePublicHiCard(record);
     const leadToken = "exchange-lead-token";
 
     vi.mocked(postHiExchange).mockResolvedValue({
@@ -195,7 +195,7 @@ describe("HiPageClient exchange flow (component)", () => {
 
   it("stores empty owner contact in session only and hides the email/call row after exchange", async () => {
     const record = exampleCardRecord({ slug: "empty-owner-exchange" });
-    const pageCard = toHiPageCard(record);
+    const pageCard = serializePublicHiCard(record);
     const leadToken = "empty-owner-lead-token";
 
     vi.mocked(postHiExchange).mockResolvedValue({
@@ -280,7 +280,7 @@ describe("HiPageClient exchange flow (component)", () => {
     window.localStorage.setItem(exchangeCompletedStorageKey(slug), "1");
     vi.mocked(postHiDetails).mockResolvedValue({ ok: true });
 
-    const pageCard = toHiPageCard(exampleCardRecord({ slug }));
+    const pageCard = serializePublicHiCard(exampleCardRecord({ slug }));
     render(
       <ThemeProvider>
         <HiPageClient card={pageCard} photoUrl={null} />
@@ -330,7 +330,7 @@ describe("HiPageClient exchange flow (component)", () => {
     render(
       <ThemeProvider>
         <HiPageClient
-          card={toHiPageCard(exampleCardRecord({ slug }))}
+          card={serializePublicHiCard(exampleCardRecord({ slug }))}
           photoUrl={null}
         />
       </ThemeProvider>,

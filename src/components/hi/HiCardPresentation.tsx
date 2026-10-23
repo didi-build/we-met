@@ -7,18 +7,19 @@ import { HiWeMetBannerBand, HiWeMetBannerTop } from "@/components/hi/HiWeMetBann
 import { HiWhatIDoChips } from "@/components/hi/HiWhatIDoChips";
 import { DidiBuildLeafIcon, WeMetMarkIcon } from "@/components/hi/icons/HiCardIcons";
 import { Button } from "@/components/ui/Button";
-import type { CardPlan, CardRecord } from "@/card-data/types";
+import type { CardPlan } from "@/card-data/types";
 import {
   cardContentFlags,
   cardGreeting,
   cardInitials,
   cardLinkEntries,
+  type HiCardPresentationModel,
   servicesForChips,
   WE_MET_CARD_HOME_URL,
 } from "@/lib/hi-card/card-content";
 import { HiVisitorReceipt } from "@/components/hi/HiVisitorReceipt";
 import { HI_CONTACT_SENT_BUTTON_LABEL } from "@/lib/hi-card/contact-sent-label";
-import type { HiOwnerContact, HiPageCard } from "@/lib/hi-card/hi-page-card";
+import type { HiOwnerContact } from "@/lib/hi-card/hi-page-card";
 import { ownerFirstName } from "@/lib/hi-card/hi-page-card";
 import { receiptReloadFollowUpLine } from "@/lib/hi-card/visitor-receipt-copy";
 import Image from "next/image";
@@ -41,7 +42,7 @@ export type HiCardCtaMode =
   | { kind: "reload-fallback" };
 
 export type HiCardPresentationProps = {
-  card: CardRecord | HiPageCard;
+  card: HiCardPresentationModel;
   photoUrl: string | null;
   plan?: CardPlan;
   /** No exchange flow (button inert; sheet/sticky live outside this component). */
