@@ -1,7 +1,11 @@
 "use client";
 
 import type { AppApi } from "@/app-api/app-api";
-import type { AppSession } from "@/app-api/types";
+import type { AppSession, ContactsSetupUi } from "@/app-api/types";
+import {
+  PublishedContactsSetup,
+  type ContactsSetupPhase,
+} from "@/components/app/editor/PublishedContactsSetup";
 import {
   CloseIcon,
   CopyIcon,
@@ -46,6 +50,10 @@ type AppEditorDialogsProps = {
   isPreviewEnv: boolean;
   previewSecret: string;
   onPreviewLogin: () => Promise<void>;
+  contactsSetup: ContactsSetupUi;
+  contactsSetupPhase: ContactsSetupPhase | null;
+  onContactsContinueGoogle: () => void;
+  onContactsAddAddress: () => void;
 };
 
 export function AppEditorDialogs({
@@ -74,6 +82,10 @@ export function AppEditorDialogs({
   isPreviewEnv,
   previewSecret,
   onPreviewLogin,
+  contactsSetup,
+  contactsSetupPhase,
+  onContactsContinueGoogle,
+  onContactsAddAddress,
 }: AppEditorDialogsProps) {
   return (
     <>
@@ -236,6 +248,14 @@ export function AppEditorDialogs({
               <span>{copyLabel}</span>
             </button>
           </div>
+          {contactsSetupPhase || contactsSetup?.visible ? (
+            <PublishedContactsSetup
+              setup={contactsSetup}
+              phase={contactsSetupPhase ?? "default"}
+              onContinueGoogle={onContactsContinueGoogle}
+              onAddAddress={onContactsAddAddress}
+            />
+          ) : null}
           <div className="ap-panel-actions">
             <a
               className="ap-btn ap-btn-outline ap-btn-lg"

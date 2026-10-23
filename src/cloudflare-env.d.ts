@@ -30,6 +30,9 @@ declare global {
     WE_MET_APP_ORIGIN?: string;
     WE_MET_PREVIEW_LOGIN_SECRET?: string;
     WE_MET_PREVIEW_LOGIN_EMAIL?: string;
+    WE_MET_CONTACT_SENDER_ADDRESSES?: string;
+    CONTACTS_SETUP_ALLOWLIST?: string;
+    CONTACTS_SETUP_ENABLED_FOR_ALL?: string;
   }
 }
 

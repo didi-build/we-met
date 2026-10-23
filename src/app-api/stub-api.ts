@@ -34,6 +34,7 @@ const SAMPLE_SESSION: AppSession = {
   email: "didi.shoukralla@gmail.com",
   name: "Didi Shoukralla",
   allowed: true,
+  contactsSetup: { visible: false },
 };
 
 const SAMPLE_CARD: EditorCard = {
@@ -252,7 +253,10 @@ export function createStubApi(search = ""): AppApi {
       draft = cloneCard(card);
       published = cloneCard(card);
       updatedAt = new Date().toISOString();
-      return { url: `https://we-met.link/hi/${card.slug}` };
+      return {
+        url: `https://we-met.link/hi/${card.slug}`,
+        contactsSetup: { visible: false },
+      };
     },
   };
 

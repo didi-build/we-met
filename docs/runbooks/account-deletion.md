@@ -4,7 +4,7 @@
 
 **Inventory:** Every personal-information store in [`docs/privacy/data-map.yml`](../privacy/data-map.yml) is covered in the steps below or in [Data map coverage](#data-map-coverage).
 
-**Schema check:** SQL table and column names below were checked against `migrations/0004_mvp_accounts_additive.sql`, `migrations/0005_cards_rebuild_mvp.sql`, `migrations/0006_photo_upload_log.sql`, and `migrations/0001_card_lookup_schema.sql` (`lead_sinks`) on **2026-10-16** (read migrations in repo).
+**Schema check:** SQL table and column names below were checked against `migrations/0004_mvp_accounts_additive.sql`, `migrations/0005_cards_rebuild_mvp.sql`, `migrations/0006_photo_upload_log.sql`, `migrations/0007_contacts_setup.sql`, and `migrations/0001_card_lookup_schema.sql` (`lead_sinks`) on **2026-10-23** (read migrations in repo).
 
 **D1 access:** [Running SQL against D1](./d1-operator-sql.md).
 
@@ -126,6 +126,8 @@ SET
   google_sub = 'deleted:' || id,
   email = '',
   name = '',
+  contact_added_at = NULL,
+  contact_sender_addresses = NULL,
   status = 'deleted',
   updated_at = '<iso8601-utc>'
 WHERE id = '<account_id>';
@@ -154,9 +156,11 @@ Each row in [`data-map.yml`](../privacy/data-map.yml) with `whose: card_owner` o
 | `accounts.id`                                                                                                                                 | **Kept** — tombstone row retains UUID for ledger and counts ([0025](../decisions/0025-we-met-mvp-accounts-sign-in-and-app-backend.md)).                                                                                 |
 | `accounts.google_sub`                                                                                                                         | **Tombstone** — §7 sets `deleted:<id>`.                                                                                                                                                                                 |
 | `accounts.email`, `accounts.name`                                                                                                             | **Blanked** — §7.                                                                                                                                                                                                       |
+| `accounts.contact_added_at`, `accounts.contact_sender_addresses`                                                                              | **Cleared** — §7.                                                                                                                                                                                                       |
 | `accounts.status`, `accounts.created_at`, `accounts.updated_at`, `accounts.last_login_at`                                                     | **Kept** on tombstone — operational lifecycle and audit timestamps.                                                                                                                                                     |
 | `sessions.*`                                                                                                                                  | **Deleted** — §1.                                                                                                                                                                                                       |
 | `oauth_attempts.*`                                                                                                                            | **Not per-account** — short-lived OAuth rows; no deletion step (expire in ~10 minutes; consumed on callback).                                                                                                           |
+| `contacts_oauth_attempts.*`                                                                                                                   | **Not per-account** — short-lived contacts OAuth rows; expire in ~10 minutes; purged when expired or consumed on callback.                                                                                              |
 | `card_drafts.*`                                                                                                                               | **Deleted** — §4 (`draft_json`, `photo_key` cleared with row).                                                                                                                                                          |
 | `cards.id`, `cards.slug`, `cards.status`, `cards.account_id`, `cards.updated_at`                                                              | **Kept** — retired card row; slug reserved.                                                                                                                                                                             |
 | `cards.display_name`, `cards.variant`, `cards.photo_key`, `cards.links_json`, `cards.page_copy_json`, `cards.contact_json`, `cards.copy_json` | **Blanked or nulled** — §6.                                                                                                                                                                                             |

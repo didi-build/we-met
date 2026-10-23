@@ -14,7 +14,10 @@ import { readJsonBodyWithCap } from "@/app-card/read-json-body";
 import { PublishCardError } from "@/app-card/publish-errors";
 import { jsonOk } from "@/app-card/route-auth";
 import { validateEditorCardForPublish } from "@/app-card/validate-editor-card";
+import { isContactsSetupSuppressed, parseCookieHeader } from "@/app-auth/cookies";
+import { computeContactsSetupUi } from "@/app-auth/contacts-setup-visibility";
 import { apiError, apiJson } from "@/app-auth/guards";
+import { loadAccountForSession } from "@/app-auth/sessions";
 import { readLandingBrowseOrigin } from "@/lib/landing/server-config";
 import { CARD_PHOTO_JPEG_CONTENT_TYPE } from "@/assets/card-photo";
 
@@ -88,7 +91,12 @@ export async function POST(request: Request) {
     );
     const browseOrigin = await readLandingBrowseOrigin(ctx.hostConfig);
     const url = `${browseOrigin.replace(/\/$/, "")}${result.path}`;
-    const response = jsonOk({ url });
+    const account = await loadAccountForSession(ctx.env.WE_MET_DB, auth.account.id);
+    const cookies = parseCookieHeader(ctx.cookieHeader);
+    const contactsSetup = account
+      ? computeContactsSetupUi(ctx.env, account, isContactsSetupSuppressed(cookies))
+      : { visible: false as const };
+    const response = jsonOk({ url, contactsSetup });
     return refreshSessionCookie(response, auth);
   } catch (err) {
     if (err instanceof PublishCardError) {

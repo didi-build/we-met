@@ -1,10 +1,12 @@
 import { buildWarmupContent, pickSeedRecipient } from "./content";
 import { parseWarmupSecrets, type WarmupEnv, type WarmupQueueBody } from "./config";
+import { sendToDlqIfAllowed } from "./dlq";
+import { deliverPauseAlertIfPending } from "./pause";
+import { redactEmailForLog } from "./redact-email";
 import { shouldSendThisTick } from "./rate";
 import { checkWarmupSendCap } from "./send-cap";
 import { handleWarmupSendResult } from "./send-outcome";
 import { sendWarmupEmail } from "./send-warmup-email";
-import { deliverPauseAlertIfPending } from "./pause";
 import { checkWarmupSendGate } from "./state";
 
 export type CronRandom = {
@@ -19,7 +21,7 @@ export type CronTickResult =
   | { action: "skipped_send_cap" }
   | { action: "skipped_rate" }
   | { action: "sent"; messageId: string }
-  | { action: "send_failed"; enqueuedRetry: boolean };
+  | { action: "send_failed"; enqueuedRetry: boolean; permanent?: boolean };
 
 export async function runWarmupCronTick(
   env: WarmupEnv,
@@ -61,16 +63,26 @@ export async function runWarmupCronTick(
     return { action: "sent", messageId: sendResult.messageId };
   }
 
-  if (sendResult.code === "send_failed" && env.WARMUP_SEND_QUEUE) {
-    const body: WarmupQueueBody = {
-      to: recipient,
-      subject: content.subject,
-      text: content.text,
-      html: content.html,
-      attempt: 1,
-    };
-    await env.WARMUP_SEND_QUEUE.send(body);
-    return { action: "send_failed", enqueuedRetry: true };
+  if (sendResult.code === "send_failed") {
+    if (sendResult.permanent) {
+      await sendToDlqIfAllowed(env, {
+        reason: "send_failed_permanent",
+        toRedacted: redactEmailForLog(recipient),
+        at: new Date().toISOString(),
+      });
+      return { action: "send_failed", enqueuedRetry: false, permanent: true };
+    }
+    if (env.WARMUP_SEND_QUEUE) {
+      const body: WarmupQueueBody = {
+        to: recipient,
+        subject: content.subject,
+        text: content.text,
+        html: content.html,
+        attempt: 1,
+      };
+      await env.WARMUP_SEND_QUEUE.send(body);
+      return { action: "send_failed", enqueuedRetry: true };
+    }
   }
 
   return { action: "send_failed", enqueuedRetry: false };

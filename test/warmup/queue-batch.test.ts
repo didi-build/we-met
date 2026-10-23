@@ -75,4 +75,30 @@ describe("warmup queue batch (unit)", () => {
     expect(m2.retry).not.toHaveBeenCalled();
     expect(m3.retry).not.toHaveBeenCalled();
   });
+
+  it("acks and DLQs permanent send failures without retry", async () => {
+    const send = vi.fn(async () => {
+      throw new Error(
+        "Incorrect type for the 'name' field on 'EmailAddress': the provided value is not of type 'string'.",
+      );
+    });
+    const dlqSend = vi.fn(async () => ({ id: "dlq-1", metadata: null }));
+    const kv = warmupKvEnabled();
+    const env: WarmupEnv = {
+      ...secretsEnv,
+      EMAIL: { send },
+      WARMUP_STATE: kv,
+      WARMUP_DLQ: { send: dlqSend } as never,
+    };
+
+    const message = queueMessage("perm-1");
+    await processWarmupQueueBatch({ messages: [message] }, env);
+
+    expect(message.ack).toHaveBeenCalledOnce();
+    expect(message.retry).not.toHaveBeenCalled();
+    expect(dlqSend).toHaveBeenCalledOnce();
+    expect(dlqSend).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: "send_failed_permanent" }),
+    );
+  });
 });

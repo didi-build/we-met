@@ -10,6 +10,8 @@ The card editor (`app.we-met.link`, or `/app` on local and previews) talks to th
 | --------------------------------------------- | ------ | ------------------------------------------------ |
 | `/api/auth/google/start?mode=redirect\|popup` | GET    | `signIn` (redirect flow)                         |
 | `/api/auth/google/callback`                   | GET    | `signIn` (OAuth callback)                        |
+| `/api/auth/google/contacts/start`             | GET    | Contacts setup OAuth (session required)          |
+| `/api/auth/google/contacts/callback`          | GET    | Contacts setup OAuth callback (People API sync)  |
 | `/api/auth/preview-login`                     | POST   | Preview test sign-in only (`WE_MET_ENV=preview`) |
 | `/api/auth/logout`                            | POST   | `signOut`                                        |
 | `/api/app/session`                            | GET    | `getSession` (always **200**, body or `null`)    |
@@ -31,7 +33,15 @@ Mutating routes require same-origin `Origin`, matching content type, and `Sec-Fe
 | `signIn(mode?)` | `AppSession`         | `AppApiError`: `canceled`, `closed`, `failed`, `network` |
 | `signOut()`     | `void`               | —                                                        |
 
-`AppSession`: `{ email, name, allowed }`. `allowed: false` means signed in but sign-up closed (**waitlisted**).
+`AppSession`: `{ email, name, allowed, contactsSetup }`. `allowed: false` means signed in but sign-up closed (**waitlisted**).
+
+`contactsSetup` (server-computed visibility for the published dialog row):
+
+- `{ visible: false }` — row hidden (ineligible, complete, declined this session, or admin block)
+- `{ visible: true, variant: "default" }` — first-time **Continue with Google**
+- `{ visible: true, variant: "reappear", newSenderAddress }` — new configured sender not yet saved on the account
+
+Contacts OAuth success redirects to the app with `?contacts_setup=success`; decline or block uses `?contacts_setup=declined` and sets a short-lived session cookie so the row does not loop.
 
 ## Card data
 
@@ -39,7 +49,7 @@ Mutating routes require same-origin `Origin`, matching content type, and `Sec-Fe
 | ------------------- | --------------------------------- | -------------------------------------------------------------------------------------------------- |
 | `getCard()`         | `{ draft, published, updatedAt }` | `unauthorized`, `forbidden` (waitlisted/suspended)                                                 |
 | `saveDraft(card)`   | `{ updatedAt }`                   | `unauthorized`, `forbidden`, `rate-limited`, `invalid-fields`, `network`                           |
-| `publish(card)`     | `{ url }`                         | `unauthorized`, `forbidden`, `rate-limited`, `invalid-fields`, publish validation codes, `network` |
+| `publish(card)`     | `{ url, contactsSetup }`          | `unauthorized`, `forbidden`, `rate-limited`, `invalid-fields`, publish validation codes, `network` |
 | `checkSlug(slug)`   | `SlugCheckResult`                 | `network`                                                                                          |
 | `uploadPhoto(blob)` | `{ url }`                         | `unauthorized`, `forbidden`, `rate-limited`, `invalid-photo`, `unavailable`, `network`             |
 

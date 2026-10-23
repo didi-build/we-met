@@ -1,4 +1,4 @@
-import { sessionCookieValue } from "@/app-auth/cookies";
+import { parseCookieHeader, sessionCookieValue } from "@/app-auth/cookies";
 import { apiError, apiJson, apiNotFound, clientIp } from "@/app-auth/guards";
 import { ensureAppApiHost, readAppAuthBindings } from "@/app-auth/route-context";
 import { buildAppSessionJson } from "@/app-auth/session-response";
@@ -18,7 +18,11 @@ export async function GET() {
     return apiError("rate-limited", 429);
   }
 
-  const built = await buildAppSessionJson(ctx.env.WE_MET_DB, ctx.sessionToken);
+  const cookies = parseCookieHeader(ctx.cookieHeader);
+  const built = await buildAppSessionJson(ctx.env.WE_MET_DB, ctx.sessionToken, {
+    env: ctx.env,
+    cookies,
+  });
   const response = apiJson({ session: built.session }, { status: 200 });
   if (built.session && ctx.sessionToken && built.cookieMaxAgeSeconds !== undefined) {
     response.headers.append(

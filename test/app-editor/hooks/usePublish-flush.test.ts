@@ -16,7 +16,10 @@ function mockApi(): AppApi {
     checkSlug: vi.fn(),
     uploadPhoto: vi.fn(),
     deletePhoto: vi.fn(),
-    publish: vi.fn(async () => ({ url: "https://we-met.link/hi/ada" })),
+    publish: vi.fn(async () => ({
+      url: "https://we-met.link/hi/ada",
+      contactsSetup: { visible: false as const },
+    })),
   };
 }
 

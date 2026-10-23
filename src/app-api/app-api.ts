@@ -1,6 +1,7 @@
 import type {
   AppCardBundle,
   AppSession,
+  ContactsSetupUi,
   EditorCard,
   SlugCheckResult,
 } from "@/app-api/types";
@@ -51,5 +52,5 @@ export interface AppApi {
    * Publishes the draft as the live card.
    * @throws {AppApiError} publish validation codes or `unauthorized` | `network`
    */
-  publish(card: EditorCard): Promise<{ url: string }>;
+  publish(card: EditorCard): Promise<{ url: string; contactsSetup: ContactsSetupUi }>;
 }

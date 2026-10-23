@@ -4,6 +4,26 @@ import type { WarmupEnv } from "../../workers/warmup/lib/config";
 import { warmupKvEnabled } from "./memory-kv";
 
 describe("warmup scheduled handler (unit)", () => {
+  it("logs a result line for every successful cron tick", async () => {
+    const env: WarmupEnv = {
+      WARMUP_SEEDS: "seed@example.com",
+      WARMUP_FROM: "warmup@mail.we-met.link",
+      EMAIL: {
+        send: vi.fn(async () => ({ messageId: "m1" })),
+      },
+      WARMUP_STATE: warmupKvEnabled(),
+    };
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    await handleWarmupScheduled(env, { unit: () => 0 });
+
+    expect(log).toHaveBeenCalledWith(
+      "warmup_scheduled_result",
+      expect.objectContaining({ action: "sent", messageId: "m1" }),
+    );
+    log.mockRestore();
+  });
+
   it("logs and rethrows when the cron tick throws", async () => {
     const env: WarmupEnv = {
       WARMUP_SEEDS: "seed@example.com",

@@ -15,12 +15,33 @@ export async function executeWarmupScheduled(
   return runWarmupCronTick(env, random);
 }
 
+function logWarmupScheduledResult(result: CronTickResult): void {
+  switch (result.action) {
+    case "sent":
+      console.log("warmup_scheduled_result", {
+        action: result.action,
+        messageId: result.messageId,
+      });
+      break;
+    case "send_failed":
+      console.log("warmup_scheduled_result", {
+        action: result.action,
+        enqueuedRetry: result.enqueuedRetry,
+        ...(result.permanent ? { permanent: true } : {}),
+      });
+      break;
+    default:
+      console.log("warmup_scheduled_result", { action: result.action });
+  }
+}
+
 export async function handleWarmupScheduled(
   env: WarmupEnv,
   random: CronRandom = { unit: () => Math.random() },
 ): Promise<void> {
   try {
-    await executeWarmupScheduled(env, random);
+    const result = await executeWarmupScheduled(env, random);
+    logWarmupScheduledResult(result);
   } catch (error) {
     console.error("warmup_scheduled_failed", {
       error: error instanceof Error ? error.message : "unknown",
