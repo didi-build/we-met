@@ -76,7 +76,7 @@ describe("Migrate non-prod workflow structure (unit)", () => {
   });
 
   it("does not pass non-prod D1 id through GitHub variables (log leak)", () => {
-    expect(workflow).not.toContain("vars.WE_MET_D1_DATABASE_ID_NONPROD");
+    expect(findVarsD1DatabaseIdReference(workflow)).toBeNull();
     expect(workflow).toContain("secrets.WE_MET_D1_DATABASE_ID_NONPROD");
   });
 });
