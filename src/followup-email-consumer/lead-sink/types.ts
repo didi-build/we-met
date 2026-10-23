@@ -2,6 +2,7 @@ import type {
   LeadSinkAppendDetailsMessage,
   LeadSinkRecordLeadMessage,
 } from "@/exchange/queue/types";
+import type { VisitorEmailMode } from "@/app-settings/defaults";
 import type { EmailProvider } from "@/email/email-provider";
 
 export type ParsedLeadSinkRecordMessage = LeadSinkRecordLeadMessage;
@@ -15,6 +16,7 @@ export type ParsedExternalRef = Record<string, string | number | boolean | null>
 export type LeadSinkHandlerContext = {
   messageAttempts: number;
   emailProvider: EmailProvider;
+  visitorEmailMode: VisitorEmailMode;
 };
 
 export type LeadSinkAppendContext = LeadSinkHandlerContext & {

@@ -58,6 +58,7 @@ describe("lead email kill switch in consumer (unit)", () => {
         readLeadEmailControls: async () => ({
           leadEmailEnabled: false,
           emailProvider: "gmail",
+          visitorEmailMode: "direct",
           dailyCapGlobal: 150,
           dailyCapPerCard: 50,
         }),
@@ -73,6 +74,7 @@ describe("lead email kill switch in consumer (unit)", () => {
         logVisitorFollowupPermanentFailure: vi.fn(),
         logMalformedVisitorFollowup: vi.fn(),
         logVisitorFollowupDroppedPaused,
+        logVisitorFollowupSkippedOwnerRelay: vi.fn(),
         logUnsupportedType: vi.fn(),
         logMissingPhoto: vi.fn(),
         logNonJpegPhoto: vi.fn(),
@@ -89,6 +91,82 @@ describe("lead email kill switch in consumer (unit)", () => {
     );
 
     expect(logVisitorFollowupDroppedPaused).toHaveBeenCalledWith("lead-1");
+    expect(send).not.toHaveBeenCalled();
+    expect(message.ack).toHaveBeenCalledOnce();
+    expect(message.retry).not.toHaveBeenCalled();
+  });
+
+  it("acks visitor follow-up without send when visitor_email_mode is owner_relay", async () => {
+    const send = vi.fn();
+    const message = createMessage({
+      type: "visitor_followup",
+      lead: {
+        leadId: "lead-relay-1",
+        submittedAt: "2026-10-12T00:00:00.000Z",
+        environment: "preview",
+        isTestLead: true,
+        name: "Alex",
+        email: "visitor@example.com",
+        phone: null,
+      },
+      card: {
+        slug: "demo",
+        displayName: "Demo",
+        email: "owner@example.com",
+        photoKey: null,
+        contact: {
+          name: { full: "Demo", family: "Demo", given: "D", nickname: "D" },
+          org: "",
+          title: "",
+          phone: "",
+          vcardNote: "",
+          urls: [],
+        },
+        pageCopy: { emailFromName: "Demo" },
+      },
+    });
+    const logVisitorFollowupSkippedOwnerRelay = vi.fn();
+
+    await processFollowupQueueBatch(
+      { messages: [message] },
+      {
+        ...leadEmailConsumerEnabled,
+        readLeadEmailControls: async () => ({
+          leadEmailEnabled: true,
+          emailProvider: "gmail",
+          visitorEmailMode: "owner_relay",
+          dailyCapGlobal: 150,
+          dailyCapPerCard: 50,
+        }),
+        weMetEnv: "preview",
+        baseUrl: "https://we-met.link",
+        testMailTo: "inbox@example.com",
+        sendEmail: send,
+        outboundFrom: { ownerFromEmail: "hello@we-met.link" },
+        assets: { get: vi.fn() },
+        ledger: new MemoryConsumerLeadDeliveryLedger(),
+        sinkHandlers: new Map(),
+        logVisitorFollowupAttemptFailure: vi.fn(),
+        logVisitorFollowupPermanentFailure: vi.fn(),
+        logMalformedVisitorFollowup: vi.fn(),
+        logVisitorFollowupDroppedPaused: vi.fn(),
+        logVisitorFollowupSkippedOwnerRelay,
+        logUnsupportedType: vi.fn(),
+        logMissingPhoto: vi.fn(),
+        logNonJpegPhoto: vi.fn(),
+        logLeadSinkAttemptFailure: vi.fn(),
+        logLeadSinkPermanentFailure: vi.fn(),
+        logMalformedLeadSink: vi.fn(),
+        logLedgerRowMissing: vi.fn(),
+        logLedgerUpdateFailed: vi.fn(),
+        logLeadSinkLedgerRecordFailed: vi.fn(),
+        logLeadSinkLedgerMarkFailed: vi.fn(),
+        logLeadSinkAppendDeferred: vi.fn(),
+        now: () => new Date("2026-10-12T12:00:00.000Z"),
+      },
+    );
+
+    expect(logVisitorFollowupSkippedOwnerRelay).toHaveBeenCalledWith("lead-relay-1");
     expect(send).not.toHaveBeenCalled();
     expect(message.ack).toHaveBeenCalledOnce();
     expect(message.retry).not.toHaveBeenCalled();
@@ -122,6 +200,7 @@ describe("lead email kill switch in consumer (unit)", () => {
       readLeadEmailControls: async () => ({
         leadEmailEnabled: false,
         emailProvider: "gmail",
+        visitorEmailMode: "direct",
         dailyCapGlobal: 150,
         dailyCapPerCard: 50,
       }),
@@ -206,6 +285,7 @@ describe("lead email kill switch in consumer (unit)", () => {
           logVisitorFollowupPermanentFailure: vi.fn(),
           logMalformedVisitorFollowup: vi.fn(),
           logVisitorFollowupDroppedPaused: vi.fn(),
+          logVisitorFollowupSkippedOwnerRelay: vi.fn(),
           logUnsupportedType: vi.fn(),
           logMissingPhoto: vi.fn(),
           logNonJpegPhoto: vi.fn(),

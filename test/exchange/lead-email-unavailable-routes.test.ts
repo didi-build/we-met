@@ -9,6 +9,7 @@ import {
 import type { CardRecord } from "@/card-data/types";
 import { MemoryCardRepository } from "@/card-data/memory-repository";
 import { createLeadDeliveryLedgerFromD1 } from "@/lead-delivery-ledger/d1-repository";
+import { readLeadEmailControls } from "@/app-settings/caps";
 import { assertLeadEmailCapacity } from "@/lead-email/availability";
 import { createDetailsToken } from "@/exchange/token";
 import { exampleCardInput } from "../helpers/example-card";
@@ -102,6 +103,10 @@ function buildExchangeDeps(
     baseUrl: "https://we-met.link",
     assertLeadEmailCapacity: (cardId: string, needed: number) =>
       assertLeadEmailCapacity(db, cardId, needed, now()),
+    readVisitorEmailMode: async () => {
+      const controls = await readLeadEmailControls(db);
+      return controls.visitorEmailMode;
+    },
     incrementDailySendCounts: async () => undefined,
   };
 }

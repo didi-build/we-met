@@ -15,8 +15,10 @@ import {
 import { resolveSinkEmailRecipient } from "@/email/recipient";
 import { sanitizeEmailHeaderValue } from "@/email/mime-headers";
 import type { EmailSendResult, OutboundEmail } from "@/email/types";
+import type { VisitorEmailMode } from "@/app-settings/defaults";
 import type {
   LeadSinkHandler,
+  LeadSinkHandlerContext,
   ParsedLeadSinkAppendMessage,
   ParsedLeadSinkRecordMessage,
 } from "@/followup-email-consumer/lead-sink/types";
@@ -31,6 +33,8 @@ export type EmailLeadSinkHandlerDeps = {
     message: OutboundEmail,
   ) => Promise<EmailSendResult>;
   logMalformedLeadSink(leadId: string): void;
+  /** Per-delivery mode from {@link LeadSinkHandlerContext} (DIDI-745 template selection). */
+  visitorEmailModeFromContext?: (ctx: LeadSinkHandlerContext) => VisitorEmailMode;
 };
 
 function gmailExternalRef(
@@ -63,10 +67,15 @@ function externalRefForProvider(
 export function createEmailLeadSinkHandler(
   deps: EmailLeadSinkHandlerDeps,
 ): LeadSinkHandler {
+  const visitorEmailModeFromContext =
+    deps.visitorEmailModeFromContext ?? ((ctx) => ctx.visitorEmailMode);
+
   return {
     appendRequiresRecord: false,
 
     async deliverRecord(message: ParsedLeadSinkRecordMessage, ctx) {
+      const visitorEmailMode = visitorEmailModeFromContext(ctx);
+      void visitorEmailMode;
       const sinkConfig = parseEmailSinkConfig(message.sinkConfig);
       if (!sinkConfig) {
         deps.logMalformedLeadSink(message.lead.leadId);
@@ -119,6 +128,8 @@ export function createEmailLeadSinkHandler(
     },
 
     async deliverAppend(message: ParsedLeadSinkAppendMessage, ctx) {
+      const visitorEmailMode = visitorEmailModeFromContext(ctx);
+      void visitorEmailMode;
       const sinkConfig = parseEmailSinkConfig(message.sinkConfig);
       if (!sinkConfig) {
         deps.logMalformedLeadSink(message.lead.leadId);

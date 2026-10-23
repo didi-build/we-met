@@ -14,6 +14,7 @@
 | `daily_cap_global`   | Max **enqueue** slots per UTC day across all cards (owner + visitor kinds summed). Product default **150**.                                                                                                                                                                                      |
 | `daily_cap_per_card` | Max **enqueue** slots per UTC day for one `card_id` (owner + visitor kinds summed). Product default **50**.                                                                                                                                                                                      |
 | `email_provider`     | `gmail` (default) or `cloudflare` for the follow-up consumer ([DIDI-653](https://linear.app/didi-build/issue/DIDI-653)).                                                                                                                                                                         |
+| `visitor_email_mode` | `owner_relay` (default) or `direct`. **Missing, empty, or unknown** values are **`owner_relay`**: exchange does not enqueue visitor follow-up; caps count owner only. **`direct`** restores visitor follow-up enqueue and send ([0027](../decisions/0027-owner-relay-visitor-follow-up.md)).     |
 
 Missing, non-numeric, or non-positive cap values **fail closed** (same as kill switch off) — new submissions get **503** `lead_email_unavailable`.
 
@@ -57,6 +58,28 @@ SELECT key, value FROM app_settings WHERE key = 'email_provider';
 Set `WE_MET_EMAIL_FROM_CLOUDFLARE` on the consumer **before** flipping to `cloudflare`; with provider `cloudflare` and that secret missing, sends fail closed and retry. A missing or unknown `email_provider` value means Gmail, so rollback takes effect on the next message.
 
 `email_provider` is per environment (non-prod and production use separate D1 databases); run these statements against the database you intend to change.
+
+## Visitor email mode (owner relay vs direct)
+
+Production default is **owner relay** (no visitor follow-up email). To restore direct visitor follow-up:
+
+```sql
+INSERT INTO app_settings (key, value) VALUES ('visitor_email_mode', 'direct')
+  ON CONFLICT(key) DO UPDATE SET value = excluded.value;
+```
+
+Return to owner relay (or delete the row; missing defaults to `owner_relay`):
+
+```sql
+INSERT INTO app_settings (key, value) VALUES ('visitor_email_mode', 'owner_relay')
+  ON CONFLICT(key) DO UPDATE SET value = excluded.value;
+```
+
+Read back:
+
+```sql
+SELECT key, value FROM app_settings WHERE key = 'visitor_email_mode';
+```
 
 ## Turn kill switch off
 

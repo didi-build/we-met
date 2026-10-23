@@ -135,6 +135,7 @@ function createDeps(
     logVisitorFollowupPermanentFailure: vi.fn(),
     logMalformedVisitorFollowup: vi.fn(),
     logVisitorFollowupDroppedPaused: vi.fn(),
+    logVisitorFollowupSkippedOwnerRelay: vi.fn(),
     logUnsupportedType: vi.fn(),
     logMissingPhoto: vi.fn(),
     logNonJpegPhoto: vi.fn(),
@@ -146,6 +147,7 @@ function cloudflareLeadEmailControls() {
   return {
     leadEmailEnabled: true,
     emailProvider: "cloudflare" as const,
+    visitorEmailMode: "direct" as const,
     dailyCapGlobal: 150,
     dailyCapPerCard: 50,
   };
@@ -1222,6 +1224,7 @@ describe("processFollowupQueueBatch (unit)", () => {
         readLeadEmailControls: vi.fn(async () => ({
           leadEmailEnabled: true,
           emailProvider: "cloudflare" as const,
+          visitorEmailMode: "direct" as const,
           dailyCapGlobal: 150,
           dailyCapPerCard: 50,
         })),

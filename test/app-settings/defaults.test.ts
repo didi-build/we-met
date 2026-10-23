@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   leadEmailEnabledFromSettingValue,
   signupsOpenFromSettingValue,
+  visitorEmailModeFromSettingValue,
 } from "@/app-settings/defaults";
 
 describe("app_settings defaults (unit)", () => {
@@ -19,5 +20,15 @@ describe("app_settings defaults (unit)", () => {
     expect(leadEmailEnabledFromSettingValue("")).toBe(true);
     expect(leadEmailEnabledFromSettingValue("0")).toBe(false);
     expect(leadEmailEnabledFromSettingValue("1")).toBe(true);
+  });
+
+  it("defaults visitor_email_mode to owner_relay unless direct", () => {
+    expect(visitorEmailModeFromSettingValue(undefined)).toBe("owner_relay");
+    expect(visitorEmailModeFromSettingValue(null)).toBe("owner_relay");
+    expect(visitorEmailModeFromSettingValue("")).toBe("owner_relay");
+    expect(visitorEmailModeFromSettingValue("unknown")).toBe("owner_relay");
+    expect(visitorEmailModeFromSettingValue("OWNER_RELAY")).toBe("owner_relay");
+    expect(visitorEmailModeFromSettingValue("Direct")).toBe("direct");
+    expect(visitorEmailModeFromSettingValue("direct")).toBe("direct");
   });
 });

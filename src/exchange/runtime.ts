@@ -17,6 +17,7 @@ import type { ProcessDetailsDeps } from "@/exchange/process-details";
 import type { ProcessExchangeDeps } from "@/exchange/process-exchange";
 import type { TurnstileLogger } from "@/exchange/turnstile";
 import { createLeadDeliveryLedgerFromD1 } from "@/lead-delivery-ledger/d1-repository";
+import { readLeadEmailControls } from "@/app-settings/caps";
 import { assertLeadEmailCapacity } from "@/lead-email/availability";
 import {
   incrementDailySendCounts,
@@ -120,6 +121,10 @@ export async function createProcessExchangeDeps(
     baseUrl: hostConfig.baseUrl,
     assertLeadEmailCapacity: (cardId, needed) =>
       assertLeadEmailCapacity(db, cardId, needed, now()),
+    readVisitorEmailMode: async () => {
+      const controls = await readLeadEmailControls(db);
+      return controls.visitorEmailMode;
+    },
     incrementDailySendCounts: (cardId, kinds) =>
       incrementDailySendCounts(db, utcDayFromDate(now()), cardId, kinds),
   };
