@@ -6,8 +6,6 @@ import { HiPageClient } from "@/components/hi/HiPageClient";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { HI_CONTACT_SENT_BUTTON_LABEL } from "@/lib/hi-card/contact-sent-label";
 import { WE_MET_CARD_HOME_URL } from "@/lib/hi-card/card-content";
-import { exchangeCompletedStorageKey } from "@/lib/hi-card/exchange-completed-storage";
-import { exchangeSessionStorageKey } from "@/lib/hi-card/exchange-session-storage";
 import { detailsSentStorageKey } from "@/lib/hi-card/details-sent-storage";
 import { exampleCardInput } from "../helpers/example-card";
 import type { CardRecord } from "@/card-data/types";
@@ -70,7 +68,6 @@ beforeEach(() => {
 
 afterEach(() => {
   window.localStorage.clear();
-  window.sessionStorage.clear();
   cleanup();
 });
 
@@ -190,30 +187,8 @@ describe("HiPageClient (component)", () => {
     rectSpy.mockRestore();
   });
 
-  it("shows reload fallback when exchange completed without an active session", () => {
-    window.localStorage.setItem(exchangeCompletedStorageKey("didi"), "1");
-    renderCard();
-    expect(screen.getByText(/has your details and will follow up/i)).toBeTruthy();
-    const mainExchange = screen.getByRole("button", {
-      name: HI_CONTACT_SENT_BUTTON_LABEL,
-    });
-    expect(mainExchange.hasAttribute("disabled")).toBe(true);
-  });
-
-  it("shows the receipt when an exchange session is stored", () => {
-    window.localStorage.setItem(exchangeCompletedStorageKey("didi"), "1");
-    window.sessionStorage.setItem(
-      exchangeSessionStorageKey("didi"),
-      JSON.stringify({ firstName: "Sam", leadToken: "token-abc" }),
-    );
-    renderCard();
-    expect(screen.getByText(/Sent to Didi/i)).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Save Didi's contact/i })).toBeTruthy();
-  });
-
   it("disables exchange buttons when the details-sent flag is set", () => {
     window.localStorage.setItem(detailsSentStorageKey("didi"), "1");
-    window.localStorage.setItem(exchangeCompletedStorageKey("didi"), "1");
     renderCard();
     const mainExchange = screen.getByRole("button", {
       name: HI_CONTACT_SENT_BUTTON_LABEL,

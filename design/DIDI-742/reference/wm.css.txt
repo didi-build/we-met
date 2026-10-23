@@ -1,0 +1,10 @@
+@import url("https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap");
+.wm-root { font-family: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 17px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+.wm-root *, .wm-root *::before, .wm-root *::after { box-sizing: border-box; }
+.wm-root a { color: var(--ink); text-underline-offset: 3px; text-decoration-thickness: 1px; }
+.wm-root p, .wm-root h1, .wm-root h2, .wm-root h3, .wm-root ul, .wm-root ol { margin: 0; }
+@keyframes wm-fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.wm-fade { animation: wm-fade 0.32s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+@keyframes wm-sheet { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+.wm-sheet { animation: wm-sheet 0.3s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+@media (prefers-reduced-motion: reduce) { .wm-fade, .wm-sheet { animation: none; } }
