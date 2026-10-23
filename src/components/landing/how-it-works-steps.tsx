@@ -3,7 +3,6 @@ import {
   ExchangeFormVignette,
   LeadEmailVignette,
   ShareLinkVignette,
-  VisitorEmailVignette,
 } from "@/components/landing/HowItWorksVignettes";
 
 export type HowItWorksStep = {
@@ -27,12 +26,9 @@ export const HOW_IT_WORKS_STEPS: HowItWorksStep[] = [
     vignettes: [<ExchangeFormVignette key="form" />],
   },
   {
-    title: "You both get an email",
-    body: "You get their details as a lead. They get a follow-up email with your contact card attached.",
+    title: "Follow up from your inbox",
+    body: "The details they share land in your inbox. Reply-To is them so you can follow up.",
     chip: "You get all the lead details",
-    vignettes: [
-      <LeadEmailVignette key="lead" />,
-      <VisitorEmailVignette key="visitor" />,
-    ],
+    vignettes: [<LeadEmailVignette key="lead" />],
   },
 ];
