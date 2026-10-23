@@ -1,16 +1,14 @@
-# DIDI-742: Visitor confirmation screen (Variant C Receipt)
+# Visitor confirmation (Variant C Receipt)
 
-**Developer implementation:** [DIDI-746](https://linear.app/didi-build/issue/DIDI-746)  
-**Design source:** [MagicPath share](https://designs.magicpath.ai/v1/breezily-wave-1846), revision `464207773454995457`  
-**Parent:** [DIDI-739](https://linear.app/didi-build/issue/DIDI-739) relay visitor follow-ups
+**Design source:** [MagicPath share](https://designs.magicpath.ai/v1/breezily-wave-1846), revision `464207773454995457`
 
-## Goal
+## Purpose
 
 On the public card (`/hi/<slug>`), right after a visitor completes **Exchange contact** (step 1), show the owner's contact details on the card without waiting for email: a compact receipt, **Save contact**, and tappable **Email** / **Call**. Optional details (step 2) stay in the existing sheet. After reload or when the exchange session is gone, fall back to today's quiet sent state.
 
 Mobile first at **390px** width (`max-w-[420px]` page shell). **Figtree**, monochrome **mono** palette only (`src/theme/tokens/mono.light.css`, `mono.dark.css`). Pill buttons, **24px** card radius, thin borders, **no shadows** on the receipt block (card shell unchanged). Red only for errors elsewhere.
 
-## Approved variant: C Receipt
+## Variant C Receipt
 
 Replace the post-exchange **disabled "Contact sent"** button and thanks line under the CTA with the receipt stack (see mockups).
 
@@ -22,15 +20,15 @@ Replace the post-exchange **disabled "Contact sent"** button and thanks line und
 | C Receipt (dark) | [mockups/c-dark.png](./mockups/c-dark.png) | Same as before-details, dark theme |
 | After reload | [mockups/after-reload.png](./mockups/after-reload.png) | Baseline-style fallback when session is lost |
 
-Static MagicPath exports (not built by CI): [reference/Didi742.tsx.txt](./reference/Didi742.tsx.txt), [reference/kit.tsx.txt](./reference/kit.tsx.txt), [reference/wm.css.txt](./reference/wm.css.txt).
+Static MagicPath exports (not built by CI): [reference/variant-c-magicpath.tsx.txt](./reference/variant-c-magicpath.tsx.txt), [reference/kit.tsx.txt](./reference/kit.tsx.txt), [reference/wm.css.txt](./reference/wm.css.txt).
 
 ## States and behaviour
 
-### 1. Default (no exchange yet)
+### Default (no exchange yet)
 
 Unchanged: **Exchange contact** primary button with ring animation, optional alternate link, existing card body.
 
-### 2. Receipt (active exchange session)
+### Receipt (active exchange session)
 
 **When:** Step 1 exchange succeeded in this tab and a valid exchange session exists (see persistence). Sheet may still be open for step 2; receipt is visible on the card when the sheet is closed.
 
@@ -57,10 +55,10 @@ Use shared `Button` (`src/components/ui/Button.tsx`):
 - **Busy:** `aria-busy={true}`, 16px spinning ring (`border-2 border-current border-t-transparent`), label **Preparing contact**, ~400ms minimum
 - **Saved:** switch to **outline** variant (`border-[1.5px] border-ink`), check icon 20px, label **Saved, tap to save again**; tap runs save again
 
-**vCard behaviour (Developer):**
+**vCard behaviour:**
 
 - **Ship target:** normal form **POST** returning `text/vcard` attachment, gated by exchange `leadToken` (~2h, same tab). iOS Safari shows Add to Contacts.
-- **Not in this design PR:** public `/hi/<slug>/contact.vcf` remains closed ([DIDI-641](https://linear.app/didi-build/issue/DIDI-641)).
+- Public `/hi/<slug>/contact.vcf` remains closed ([DIDI-641](https://linear.app/didi-build/issue/DIDI-641)).
 - Filename pattern: `{sanitized-full-name}.vcf` (non-alphanumeric stripped, spaces to hyphens, fallback `contact.vcf`).
 
 #### Email and Call (secondary row)
@@ -90,7 +88,7 @@ Use shared `Button` (`src/components/ui/Button.tsx`):
 - Replace link with paragraph: `animate-hi-fade text-center text-[14px] font-medium text-ink-muted`
 - Copy: **Your details were added. Thanks, {visitorFirst}.** (`visitorFirst` from exchange step 1, fallback **there**)
 
-### 3. Reload fallback (exchange completed, no session)
+### Reload fallback (exchange completed, no session)
 
 **When:** `localStorage` records exchange completed for this slug but `sessionStorage` has no session (reload, new tab, or token window ended).
 
@@ -143,7 +141,7 @@ Dark mode: document `data-theme="dark"` on `html` (existing hi card theme switch
 
 Implement inline SVGs (see reference kit): check, mail (envelope), phone, contact card (person on card), note (speech bubble with lines). Sizes as listed per control.
 
-## Persistence (implementation sketch for DIDI-746)
+## Persistence
 
 | Store | Key pattern | Set when | Used for |
 | --- | --- | --- | --- |
@@ -165,7 +163,7 @@ On exchange success: set session + exchange-completed flag, keep `connected` / `
 - Reload: disabled button with `aria-disabled`, follow-up text not duplicated in `aria-live` unless sheet already uses status region.
 - Focus: opening details from receipt should move focus into sheet per existing sheet behaviour.
 
-## Open implementation notes (DIDI-746)
+## Implementation notes
 
 1. **vCard download:** wire Save to token-gated POST (not client-only `buildVCard` blob). Until then, integration tests should not rely on a public vcf URL.
 2. **Token expiry:** receipt should degrade to reload fallback when POST returns 401/403; align with ~2h exchange token TTL.
@@ -174,17 +172,6 @@ On exchange success: set session + exchange-completed flag, keep `connected` / `
 5. **Preview/editor:** `preview` mode keeps static **Exchange contact** (no receipt).
 6. **Tests:** unit tests for copy helpers, receipt states, session vs reload flags; extend `HiPageClient` tests for the three CTA modes.
 
-## File list (this design PR)
+## Changes
 
-```
-design/DIDI-742/README.md
-design/DIDI-742/mockups/baseline.png
-design/DIDI-742/mockups/c.png
-design/DIDI-742/mockups/c-dark.png
-design/DIDI-742/mockups/c-after-details.png
-design/DIDI-742/mockups/after-reload.png
-design/DIDI-742/mockups/mp-c.png
-design/DIDI-742/reference/Didi742.tsx.txt
-design/DIDI-742/reference/kit.tsx.txt
-design/DIDI-742/reference/wm.css.txt
-```
+- 2026-10-22: Initial spec, variant C Receipt ([DIDI-742](https://linear.app/didi-build/issue/DIDI-742)). Built in DIDI-746.
