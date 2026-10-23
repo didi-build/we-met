@@ -2,6 +2,8 @@
 
 **Purpose:** Respond to a **breach of security safeguards** involving personal information under [PIPEDA](https://www.priv.gc.ca/en/privacy-topics/privacy-breaches/). This runbook is for **privacy and security incidents** (unauthorized access, loss, or disclosure of personal information).
 
+**Canonical runbook:** `docs/runbooks/privacy-breach.md` (this file) is the We Met breach response procedure. Do not use nodrift scaffold runbooks for live incidents.
+
 **Not for:** Service outages, bugs without personal-information exposure, or routine security hygiene. Use [incident.md](./incident.md) for outage notes only.
 
 **Data inventory:** [`docs/privacy/data-map.yml`](../privacy/data-map.yml) and [`audit-findings.md`](../privacy/audit-findings.md).
@@ -193,6 +195,7 @@ Closed date:
 
 ## Related
 
+- [breach-record-template.md](../privacy/breach-record-template.md) — breach record copy-per-event form (§6)
 - [account-deletion.md](./account-deletion.md) — privacy erasure requests (not the same as breach response)
 - [incident.md](./incident.md) — outage and severe bug notes
 - [docs/privacy/data-map.yml](../privacy/data-map.yml) — inventory
