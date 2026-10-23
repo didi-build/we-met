@@ -11,8 +11,8 @@ Visitor follow-up email is sent from a cold subdomain (`mail.we-met.link` via Cl
 ## Decision
 
 1. **`app_settings.visitor_email_mode`** controls whether the app enqueues and the consumer sends **visitor follow-up** email.
-2. **Values:** `owner_relay` (default) or `direct`.
-3. **Default:** missing, empty, or unknown values resolve to **`owner_relay`** (`visitorEmailModeFromSettingValue` in `src/app-settings/defaults.ts`). No migration: absent key means owner relay.
+2. **Values:** `owner_relay` (default) or `direct` (exact match, lowercase only).
+3. **Default:** missing, empty, unknown, or mixed-case values resolve to **`owner_relay`** (`visitorEmailModeFromSettingValue` in `src/app-settings/defaults.ts`). Only the trimmed string **`direct`** enables visitor follow-up. No migration: absent key means owner relay.
 4. **`owner_relay`:** exchange does **not** call `enqueueVisitorFollowup`; daily caps reserve **one** slot (owner sink only). Owner lead-sink dispatch and the details token are unchanged. The consumer **acks** any queued `visitor_followup` message without send and logs `visitor_followup_skipped_owner_relay` with `leadId` only.
 5. **`direct`:** preserves pre-0027 behavior (visitor follow-up enqueued and sent when `lead_email_enabled` is on).
 6. **Owner sink templates** may branch on `visitorEmailMode` in the email lead-sink handler context ([DIDI-745](https://linear.app/didi-build/issue/DIDI-745)); this ADR does not change templates.

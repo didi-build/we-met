@@ -59,8 +59,8 @@ export function visitorEmailModeFromSettingValue(
   if (value === undefined || value === null || value.trim() === "") {
     return "owner_relay";
   }
-  const normalized = value.trim().toLowerCase();
-  if (normalized === "direct") {
+  const trimmed = value.trim();
+  if (trimmed === "direct") {
     return "direct";
   }
   return "owner_relay";

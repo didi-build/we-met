@@ -28,7 +28,8 @@ describe("app_settings defaults (unit)", () => {
     expect(visitorEmailModeFromSettingValue("")).toBe("owner_relay");
     expect(visitorEmailModeFromSettingValue("unknown")).toBe("owner_relay");
     expect(visitorEmailModeFromSettingValue("OWNER_RELAY")).toBe("owner_relay");
-    expect(visitorEmailModeFromSettingValue("Direct")).toBe("direct");
+    expect(visitorEmailModeFromSettingValue("Direct")).toBe("owner_relay");
+    expect(visitorEmailModeFromSettingValue("DIRECT")).toBe("owner_relay");
     expect(visitorEmailModeFromSettingValue("direct")).toBe("direct");
   });
 });

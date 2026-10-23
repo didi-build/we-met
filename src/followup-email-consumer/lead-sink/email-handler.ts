@@ -67,15 +67,10 @@ function externalRefForProvider(
 export function createEmailLeadSinkHandler(
   deps: EmailLeadSinkHandlerDeps,
 ): LeadSinkHandler {
-  const visitorEmailModeFromContext =
-    deps.visitorEmailModeFromContext ?? ((ctx) => ctx.visitorEmailMode);
-
   return {
     appendRequiresRecord: false,
 
     async deliverRecord(message: ParsedLeadSinkRecordMessage, ctx) {
-      const visitorEmailMode = visitorEmailModeFromContext(ctx);
-      void visitorEmailMode;
       const sinkConfig = parseEmailSinkConfig(message.sinkConfig);
       if (!sinkConfig) {
         deps.logMalformedLeadSink(message.lead.leadId);
@@ -128,8 +123,6 @@ export function createEmailLeadSinkHandler(
     },
 
     async deliverAppend(message: ParsedLeadSinkAppendMessage, ctx) {
-      const visitorEmailMode = visitorEmailModeFromContext(ctx);
-      void visitorEmailMode;
       const sinkConfig = parseEmailSinkConfig(message.sinkConfig);
       if (!sinkConfig) {
         deps.logMalformedLeadSink(message.lead.leadId);

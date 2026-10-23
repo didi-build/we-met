@@ -69,7 +69,7 @@ sequenceDiagram
   M->>M: Turnstile, honeypot, rate limit, app_settings caps
   M->>D: Dispatch enabled lead sinks
   D->>Q: One message per enabled sink
-  M->>Q: Enqueue visitor_followup (independent)
+  M->>Q: Enqueue visitor_followup only when visitor_email_mode is direct (default owner_relay; [0027](../decisions/0027-owner-relay-visitor-follow-up.md))
   M-->>V: 200 + signed token (2h TTL)
 
   V->>M: POST /api/details (token + fields)
@@ -77,10 +77,10 @@ sequenceDiagram
   M-->>V: 200, or 409 details-already-sent on repeat submit
 
   Q->>C: Deliver jobs (per-message retries)
-  C->>C: Visitor follow-up + email sink delivery via Gmail
+  C->>C: Email sink delivery; visitor follow-up only in direct mode
 ```
 
-The **follow-up email consumer** (`we-met-followup-email-consumer` or `-nonprod`) sends **visitor** follow-up mail and **`email`** lead sink deliveries. **Lead sink delivery** uses **one queue message per sink** so retries and failures are independent ([0018](../decisions/0018-lead-sink.md)). Queue payloads carry a card field snapshot ([0016](../decisions/0016-queue-message-snapshot.md)). A **live** card must have exactly one enabled email sink ([0025](../decisions/0025-we-met-mvp-accounts-sign-in-and-app-backend.md)).
+The **follow-up email consumer** (`we-met-followup-email-consumer` or `-nonprod`) sends **`email`** lead sink deliveries always, and **visitor** follow-up mail only when `app_settings.visitor_email_mode` is **`direct`** (default **`owner_relay`** skips send; [0027](../decisions/0027-owner-relay-visitor-follow-up.md)). **Lead sink delivery** uses **one queue message per sink** so retries and failures are independent ([0018](../decisions/0018-lead-sink.md)). Queue payloads carry a card field snapshot ([0016](../decisions/0016-queue-message-snapshot.md)). A **live** card must have exactly one enabled email sink ([0025](../decisions/0025-we-met-mvp-accounts-sign-in-and-app-backend.md)).
 
 **Failure handling**
 
@@ -90,7 +90,7 @@ The **follow-up email consumer** (`we-met-followup-email-consumer` or `-nonprod`
 | Turnstile fails                               | **403**                                                                  |
 | Rate limited                                  | **429**                                                                  |
 | Kill switch off or daily cap exceeded         | **503** `lead_email_unavailable`; no ledger, enqueue, or counter bump    |
-| Visitor follow-up enqueue fails               | **500**, generic message to client                                       |
+| Visitor follow-up enqueue fails (direct mode) | **500**, generic message to client                                       |
 | Lead sink dispatch enqueue fails (one sink)   | **Does not** fail other sinks or the HTTP response; that message retries |
 | Lead sink delivery fails (consumer, one sink) | Retries for **that message only**; visitor email unaffected              |
 | Visitor email fails after max attempts        | Acknowledged; sink handlers may note delivery failure                    |
