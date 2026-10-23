@@ -29,6 +29,11 @@ export type ProcessVCardResult =
   | { status: "rate_limited" }
   | { status: "server_error" };
 
+/** Separate counter from POST /api/exchange on the same rate-limit binding. */
+export function vcardDownloadRateLimitKey(clientIp: string): string {
+  return `vcard:${clientIp}`;
+}
+
 function vcardPhotoLogger() {
   return {
     logMissingPhoto(key: string) {
@@ -46,7 +51,7 @@ export async function processVCardDownload(
   repo: CardRepository,
   deps: ProcessVCardDeps,
 ): Promise<ProcessVCardResult> {
-  const rate = await deps.rateLimiter.check(deps.clientIp);
+  const rate = await deps.rateLimiter.check(vcardDownloadRateLimitKey(deps.clientIp));
   if (!rate.allowed) {
     return { status: "rate_limited" };
   }

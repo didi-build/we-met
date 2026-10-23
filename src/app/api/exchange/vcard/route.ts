@@ -8,7 +8,7 @@ import { processVCardDownload } from "@/exchange/process-vcard";
 import { createProcessVCardDeps } from "@/exchange/runtime";
 
 export async function GET() {
-  return new Response(null, { status: 405 });
+  return new Response(null, { status: 405, headers: { Allow: "POST" } });
 }
 
 export async function POST(request: Request) {

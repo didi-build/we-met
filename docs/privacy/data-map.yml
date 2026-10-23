@@ -34,7 +34,9 @@
   processors:
     - Cloudflare
   retention: until account tombstone (blanked on delete)
-  who_can_see: operator; visitors who exchange details (via email and vCard, not in D1)
+  who_can_see:
+    operator; visitors who exchange details (follow-up email and vCard attachment, or POST /api/exchange/vcard with a
+    valid details token, including when lead_email_enabled is off; not in D1)
   source: src/app-auth/accounts.ts
   verified: true
 - id: accounts.name
@@ -547,7 +549,9 @@
   processors:
     - Cloudflare
   retention: until card retired
-  who_can_see: operator; visitors after exchange via follow-up email From, signature, body, and vCard attachment
+  who_can_see:
+    operator; visitors after exchange via follow-up email From, signature, body, and vCard attachment, or POST
+    /api/exchange/vcard with a valid details token (including when lead_email_enabled is off)
   source: migrations/0005_cards_rebuild_mvp.sql
   verified: true
 - id: cards.copy_json
@@ -1262,7 +1266,7 @@
   retention: none (no-store response)
   who_can_see: visitor who holds a valid details token within TTL
   source: src/app/api/exchange/vcard/route.ts
-  verified: true
+  verified: false
 - id: browser.local_storage_theme
   whose: visitor
   data: Theme preference (light/dark) under localStorage key card-theme
