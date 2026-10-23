@@ -13,7 +13,7 @@ Three environments share one codebase. Worker name is always **`we-met`**: produ
 | **Follow-up queue** | Optional / mock                                                                                                                 | `we-met-followup-email-nonprod`                                                      | `we-met-followup-email`                                                                                    |
 | **Consumer Worker** | Local stub or skipped                                                                                                           | `we-met-followup-email-consumer-nonprod`                                             | `we-met-followup-email-consumer`                                                                           |
 | **Rate limiter**    | Namespace **2001** (`WE_MET_EXCHANGE_RATE_LIMITER`)                                                                             | Namespace **2001** in preview block                                                  | Namespace **2002**                                                                                         |
-| **Mail delivery**   | Redirect via `WE_MET_TEST_MAIL_TO`                                                                                              | Same                                                                                 | Real **visitor** addresses via Gmail API (step 1)                                                          |
+| **Mail delivery**   | Redirect via `WE_MET_TEST_MAIL_TO`                                                                                              | Same                                                                                 | Real **visitor** addresses via Cloudflare Email Service (follow-up consumer)                               |
 | **Lead sinks**      | `lead_sinks` rows; **email** kind delivered by follow-up consumer ([0023](../decisions/0023-owner-email-lead-sink-consumer.md)) | Same                                                                                 | Same                                                                                                       |
 | **Turnstile**       | Cloudflare **always-pass test** site + secret keys                                                                              | Widget **we-met nonprod** (hostname = account `workers.dev` subdomain only)          | Widget **we-met production** (`we-met.link`, covers `app.we-met.link`)                                     |
 
@@ -61,7 +61,7 @@ Documented for operators; see [kill-switch-and-caps](../runbooks/kill-switch-and
 
 - **Non-prod follow-up consumer deploy:** [Deploy consumer non-prod](../runbooks/deploy.md#non-prod-follow-up-email-consumer-merge-to-main-no-approval) ships `we-met-followup-email-consumer-nonprod` on every push to `main` ([DIDI-652](https://linear.app/didi-build/issue/DIDI-652)). **UNVERIFIED** until the first successful run after merge (maintainer: `workflow_dispatch` and record date on the ticket).
 - **Visitor follow-up vs ledger:** visitor follow-up queue handling does **not** write `lead_delivery_ledger` rows (sink deliveries only).
-- **`daily_send_counts`:** counters increment when exchange/details **enqueue** owner and visitor mail, not when Gmail reports delivery.
+- **`daily_send_counts`:** counters increment when exchange/details **enqueue** owner and visitor mail, not when the email provider reports delivery.
 
 ## Config and secret names
 
@@ -81,10 +81,7 @@ Values live in GitHub Environments, the Cloudflare dashboard, or local `.env`. *
 | `WE_MET_PREVIEW_LOGIN_EMAIL`     | App Worker (preview base)   | Fixed identity email for preview test sign-in                                                                                                                                                                                                                                                                                                                   |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Build time (browser bundle) | Public; only `NEXT_PUBLIC_*` vars reach the client                                                                                                                                                                                                                                                                                                              |
 | `TURNSTILE_SECRET_KEY`           | App Worker                  | Server-side Turnstile verify                                                                                                                                                                                                                                                                                                                                    |
-| `GMAIL_SERVICE_ACCOUNT_JSON`     | Consumer                    | Gmail API credentials (follow-up email)                                                                                                                                                                                                                                                                                                                         |
-| `GMAIL_SENDER`                   | Consumer                    | Gmail API delegated sender (JWT `sub`); not the visible **From** on outbound mail ([0023](../decisions/0023-owner-email-lead-sink-consumer.md))                                                                                                                                                                                                                 |
-| `WE_MET_OWNER_FROM_EMAIL`        | Consumer                    | Visible **From** when `email_provider` is Gmail (default) ([0023](../decisions/0023-owner-email-lead-sink-consumer.md))                                                                                                                                                                                                                                         |
-| `WE_MET_EMAIL_FROM_CLOUDFLARE`   | Consumer                    | Visible **From** when `email_provider` is `cloudflare` (`hello@mail.we-met.link`; [DIDI-653](https://linear.app/didi-build/issue/DIDI-653))                                                                                                                                                                                                                     |
+| `WE_MET_EMAIL_FROM_CLOUDFLARE`   | Consumer                    | Visible **From** on outbound mail (`hello@mail.we-met.link`; Cloudflare Email Service [0023](../decisions/0023-owner-email-lead-sink-consumer.md))                                                                                                                                                                                                              |
 | `WE_MET_FROM_DISPLAY_NAME`       | Consumer                    | Platform **From** display name on owner sink mail and visitor follow-up **fallback**; visitor mail otherwise uses `{Google first name} via We Met` ([0023](../decisions/0023-owner-email-lead-sink-consumer.md), [DIDI-642](https://linear.app/didi-build/issue/DIDI-642))                                                                                      |
 | `WE_MET_TEST_MAIL_TO`            | Consumer                    | **Non-prod only:** all outbound mail redirected here                                                                                                                                                                                                                                                                                                            |
 | `BOOKING_URL`                    | App Worker                  | Public booking link in the card flow                                                                                                                                                                                                                                                                                                                            |
@@ -105,7 +102,7 @@ Lead sink destinations (Linear project IDs, owner email addresses, etc.) live in
 | `WE_MET_APP_RATE_LIMITER`      | Namespace id **2006**     | Namespace id **2005**              |
 | `IMAGES`                       | Cloudflare Images binding | Same (image ingestion)             |
 
-The follow-up email consumer is a **separate Worker** (not the OpenNext `we-met` bundle) with configs under `workers/we-met-followup-email-consumer/` ([0021](../decisions/0021-followup-email-consumer-worker.md)). Each consumer binds **`send_email`** as **`EMAIL`** (`allowed_sender_addresses`: `hello@mail.we-met.link`) for the Cloudflare provider path ([DIDI-653](https://linear.app/didi-build/issue/DIDI-653)).
+The follow-up email consumer is a **separate Worker** (not the OpenNext `we-met` bundle) with configs under `workers/we-met-followup-email-consumer/` ([0021](../decisions/0021-followup-email-consumer-worker.md)). Each consumer binds **`send_email`** as **`EMAIL`** (`allowed_sender_addresses`: `hello@mail.we-met.link`) for Cloudflare Email Service ([0023](../decisions/0023-owner-email-lead-sink-consumer.md)).
 
 | Worker name                              | Queue consumed                  | D1 (`WE_MET_DB`)    | R2 bucket (`WE_MET_ASSETS`) |
 | ---------------------------------------- | ------------------------------- | ------------------- | --------------------------- |
@@ -122,8 +119,8 @@ The consumer registers on the queue in **its own** Wrangler config; it is not an
 
 | Event                                  | Fields                                                                                                                                                             |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `visitor_followup_attempt_failure`     | `leadId`, `attempt`, `errorCode`, `willRetry`; `secretName` when `errorCode` is `gmail_secret_missing`, `owner_from_email_missing`, or `from_display_name_missing` |
-| `visitor_followup_permanent_failure`   | `leadId`, `errorCode`; `secretName` when `errorCode` is `gmail_secret_missing`, `owner_from_email_missing`, or `from_display_name_missing`                         |
+| `visitor_followup_attempt_failure`     | `leadId`, `attempt`, `errorCode`, `willRetry`; `secretName` when `errorCode` is `cloudflare_from_email_missing` or `from_display_name_missing`                    |
+| `visitor_followup_permanent_failure`   | `leadId`, `errorCode`; `secretName` when `errorCode` is `cloudflare_from_email_missing` or `from_display_name_missing`                                            |
 | `visitor_followup_malformed`           | `leadId` (may be null)                                                                                                                                             |
 | `visitor_followup_dropped_paused`      | `leadId` (when `lead_email_enabled` is off)                                                                                                                        |
 | `visitor_followup_skipped_owner_relay` | `leadId` (when `visitor_email_mode` is `owner_relay`)                                                                                                              |
@@ -139,25 +136,11 @@ The consumer registers on the queue in **its own** Wrangler config; it is not an
 | `lead_sink_ledger_record_failed`       | `leadId`, `sinkId`, `errorCode`                                                                                                                                    |
 | `lead_sink_ledger_mark_failed`         | `leadId`, `sinkId`, `errorCode`                                                                                                                                    |
 
-**Consumer secrets (follow-up Workers):** `GMAIL_SERVICE_ACCOUNT_JSON`, `GMAIL_SENDER`, `WE_MET_OWNER_FROM_EMAIL`, `WE_MET_EMAIL_FROM_CLOUDFLARE`, `WE_MET_FROM_DISPLAY_NAME` on **both** consumers; **`WE_MET_TEST_MAIL_TO`** on **non-prod only** (six secret names on non-prod, five on production). Gmail secrets stay required while Gmail remains the fallback provider.
-
-**Email provider switch (`app_settings`):** row `email_provider` = `gmail` (default when missing or unknown) or `cloudflare`. Flip non-prod and production separately:
-
-```sql
-INSERT INTO app_settings (key, value) VALUES ('email_provider', 'cloudflare')
-  ON CONFLICT(key) DO UPDATE SET value = excluded.value;
-```
-
-Rollback to Gmail:
-
-```sql
-INSERT INTO app_settings (key, value) VALUES ('email_provider', 'gmail')
-  ON CONFLICT(key) DO UPDATE SET value = excluded.value;
-```
+**Consumer secrets (follow-up Workers):** `WE_MET_EMAIL_FROM_CLOUDFLARE` and `WE_MET_FROM_DISPLAY_NAME` on **both** consumers; **`WE_MET_TEST_MAIL_TO`** on **non-prod only** (three secret names on non-prod, two on production). CI on merge to `main` checks non-prod names against [deploy-consumer-nonprod.yml](../../.github/workflows/deploy-consumer-nonprod.yml).
 
 **Cloudflare Email Service quota:** account limit **200 messages per day** (dashboard window; UNVERIFIED alignment with UTC). App enqueue caps remain **`daily_cap_global` 150** and **`daily_cap_per_card` 50** (counted at submission, not per provider).
 
-**Consumer `errorCode` values (no raw exception text):** `gmail_secret_missing`, `gmail_invalid_service_account_json`, `gmail_token_http_<status>`, `gmail_token_missing_access_token`, `gmail_send_http_<status>`, `gmail_network_error`, `nonprod_mail_redirect_unset`, `owner_from_email_missing`, `cloudflare_from_email_missing`, `cloudflare_binding_missing`, `cloudflare_<Cloudflare code>` (for example `cloudflare_E_RATE_LIMIT_EXCEEDED`), `from_display_name_missing`, `malformed_sink_email_config`, `record_unavailable`, `invalid_rfc5322_message_id`, `unknown`. Ledger update failures may log `ledger_update_failed` with `external_ref_invalid`. For `gmail_secret_missing`, `owner_from_email_missing`, `cloudflare_from_email_missing`, and `from_display_name_missing`, logs include `secretName` — never a secret value.
+**Consumer `errorCode` values (no raw exception text):** `nonprod_mail_redirect_unset`, `cloudflare_from_email_missing`, `cloudflare_binding_missing`, `cloudflare_<Cloudflare code>` (for example `cloudflare_E_RATE_LIMIT_EXCEEDED`), `from_display_name_missing`, `malformed_sink_email_config`, `record_unavailable`, `invalid_rfc5322_message_id`, `unknown`. Ledger update failures may log `ledger_update_failed` with `external_ref_invalid`. For `cloudflare_from_email_missing` and `from_display_name_missing`, logs include `secretName` — never a secret value.
 
 **Consumer Wrangler `vars` allowlist:** `WE_MET_ENV` only. `WE_MET_TEST_MAIL_TO` must be a **secret**, not a var.
 

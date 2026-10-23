@@ -16,8 +16,8 @@ Start this process when you have **reasonable belief** that personal information
 
 Examples that may trigger this runbook (not exhaustive):
 
-- Leaked **Cloudflare** or **Google** API token, OAuth client secret, or Wrangler/deploy credential with access to production D1, R2, queues, or operator Gmail.
-- Unauthorized access to the **Cloudflare dashboard**, **Google Workspace** mailbox used for outbound mail, or operator laptops with active sessions.
+- Leaked **Cloudflare** API token, **Google** OAuth client secret, **Worker secret** value, or Wrangler/deploy credential with access to production D1, R2, queues, or outbound email configuration.
+- Unauthorized access to the **Cloudflare dashboard** (including Email Service), **Google Workspace** mailboxes that hold lead copies, or operator laptops with active sessions.
 - Suspected exfiltration of **queue messages** (visitor name, email, phone) or **Worker logs/traces** that captured request payloads.
 - Misdirected lead or follow-up **email** containing visitor or card-owner personal information.
 
@@ -168,26 +168,25 @@ Closed date:
 
 ---
 
-## Tabletop walk-through: leaked service-account key
+## Tabletop walk-through: leaked Cloudflare or Worker credential
 
-**Scenario:** A **Google Cloud service account JSON key** (or similar credential) used for Gmail API send was committed to a public fork, exposed in a screenshot, or shared in chat. The key had permission to send mail and read the operator mailbox used for We Met outbound email when `email_provider` is `gmail`.
+**Scenario:** A **Cloudflare API token** with Workers or Email Service access, or a **Worker secret** value (`WE_MET_EMAIL_FROM_CLOUDFLARE`, `WE_MET_FROM_DISPLAY_NAME`, or deploy tokens), was committed to a public fork, exposed in a screenshot, or shared in chat.
 
 **Goal:** Practice containment, scoping, RROSH, and record-keeping without touching production data stores in the exercise.
 
 ### Facilitator script
 
-1. **Inject (0:00):** “A contributor reports that a service account key file appeared in a public GitHub gist titled ‘we-met debug’. The gist was live for about 45 minutes.”
-2. **Contain (0:05):** Participants list immediate actions: revoke key in Google Cloud, rotate secrets, audit GitHub org access, search git history for other leaks. **Do not** run destructive SQL in the exercise.
+1. **Inject (0:00):** “A contributor reports that a Wrangler token export appeared in a public GitHub gist titled ‘we-met debug’. The gist was live for about 45 minutes.”
+2. **Contain (0:05):** Participants list immediate actions: revoke the Cloudflare token, rotate Worker secrets, audit GitHub org access, search git history for other leaks. **Do not** run destructive SQL in the exercise.
 3. **Scope (0:15):**
-   - Could an attacker have **read** the operator Gmail mailbox (`email.operator_mailbox_visibility`)?
-   - Could they have **sent** mail as We Met?
-   - Is **D1** or **R2** in scope for this key? (Typically **no** for Gmail-only SA — state assumptions explicitly.)
-   - Were **queue** messages accessible? (Typically **no** with Gmail key alone.)
-4. **Data map (0:25):** List map entries at risk if mailbox was read: visitor leads and follow-ups in email (`email.owner_lead_record`, `email.owner_lead_append`, `email.visitor_followup`), not D1 lead content.
-5. **RROSH (0:35):** Table debate: visitor emails and phone in mailbox copies; reputational/phishing risk. Decision yes/no and document rationale.
-6. **OPC + notification (0:45):** Who submits OPC form? Draft bullet points for affected visitors if mailbox was read (unknown list → “as feasible” broad notification or log-based count).
+   - Could an attacker have **sent** mail as We Met via Email Service or queue consumers?
+   - Could they have **read** production D1 or R2 with the leaked credential? (State assumptions explicitly.)
+   - Were **queue** messages accessible? (Depends on token scope.)
+4. **Data map (0:25):** List map entries at risk if mail was sent or logs were read: visitor leads in transit (`queue.*`), email copies (`email.owner_lead_record`, `email.owner_lead_append`, `email.visitor_followup`), Cloudflare Email Service logs (`logs.cloudflare_email_sending_*`).
+5. **RROSH (0:35):** Table debate: misdirected or phishing mail; reputational risk. Decision yes/no and document rationale.
+6. **OPC + notification (0:45):** Who submits OPC form? Draft bullet points for affected visitors if send or log access is confirmed.
 7. **Record (0:55):** Fill a blank breach record template with fictional dates; assign follow-up ticket for secret scanning in CI.
-8. **Debrief:** Gaps: CSP/headers unrelated; **credential storage**, **log retention**, and **email provider** cutover (DIDI-699) as separate tickets.
+8. **Debrief:** Gaps: **credential storage**, **log retention**, and **secret rotation** runbooks.
 
 **Success criteria:** Team agrees on RROSH decision path, knows OPC and notification timing, and produces a completed breach record template in the exercise.
 
@@ -195,8 +194,8 @@ Closed date:
 
 ## Related
 
-- [breach-record-template.md](../privacy/breach-record-template.md) — breach record copy-per-event form (§6)
-- [account-deletion.md](./account-deletion.md) — privacy erasure requests (not the same as breach response)
-- [incident.md](./incident.md) — outage and severe bug notes
-- [docs/privacy/data-map.yml](../privacy/data-map.yml) — inventory
-- ADR [0025 §7](../decisions/0025-we-met-mvp-accounts-sign-in-and-app-backend.md) — deletion and retained ledger
+- [breach-record-template.md](../privacy/breach-record-template.md): breach record copy-per-event form (§6)
+- [account-deletion.md](./account-deletion.md): privacy erasure requests (not the same as breach response)
+- [incident.md](./incident.md): outage and severe bug notes
+- [docs/privacy/data-map.yml](../privacy/data-map.yml): inventory
+- ADR [0025 §7](../decisions/0025-we-met-mvp-accounts-sign-in-and-app-backend.md): deletion and retained ledger

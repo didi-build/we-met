@@ -99,7 +99,7 @@ d1_tables:
       verified: true
     columns:
       key:
-        data: Setting name (e.g. signups_open, lead_email_enabled, email_provider)
+        data: Setting name (e.g. signups_open, lead_email_enabled, visitor_email_mode)
         retention: indefinite (no purge job in repo)
       value:
         data: Setting value string
@@ -341,14 +341,14 @@ d1_tables:
         purpose: record-to-append threading handoff and operator correlation
         source: src/followup-email-consumer/lead-sink/email-handler.ts
       gmail_message_id:
-        data: Legacy Gmail API message id column (schema from migration 0002; consumer
-          markSent does not write it at HEAD)
-        purpose: reserved; correlation lives in external_ref
+        data: Legacy Gmail API message id column (schema from migration 0002; unused
+          at HEAD; always null in production as of 2026-10-23)
+        purpose: legacy schema only; correlation lives in external_ref
         source: src/followup-email-consumer/lead-delivery-ledger.ts
       gmail_thread_id:
-        data: Legacy Gmail API thread id column (schema from migration 0002; consumer
-          markSent does not write it at HEAD)
-        purpose: reserved; correlation lives in external_ref
+        data: Legacy Gmail API thread id column (schema from migration 0002; unused
+          at HEAD; always null in production as of 2026-10-23)
+        purpose: legacy schema only; correlation lives in external_ref
         source: src/followup-email-consumer/lead-delivery-ledger.ts
       id:
         data: Ledger row UUID
@@ -617,12 +617,10 @@ other_items:
   - id: binding.consumer_send_email
     whose: operational
     data: Cloudflare Workers send_email binding EMAIL on follow-up consumer Workers;
-      carries outbound MIME (visitor and card owner PII in message bodies) when
-      email_provider is cloudflare
+      carries outbound MIME (visitor and card owner PII in message bodies)
     purpose: Cloudflare Email Service delivery from hello@mail.we-met.link
     storage: Cloudflare Email Service (in-transit send and delivery); post-delivery
-      vendor logging in logs.cloudflare_email_sending_* rows when email_provider
-      is cloudflare
+      vendor logging in logs.cloudflare_email_sending_* rows
     processors:
       - Cloudflare
       - Cloudflare Email Service
@@ -748,17 +746,6 @@ other_items:
     who_can_see: visitor device only
     source: src/lib/theme-storage-key.ts
     verified: true
-  - id: config.app_settings.email_provider
-    whose: operational
-    data: D1 app_settings row email_provider; production outbound uses cloudflare
-    purpose: outbound email adapter in follow-up consumer (Cloudflare Email Service)
-    storage: D1 app_settings (key and value columns)
-    processors:
-      - Cloudflare
-    retention: indefinite (no purge job in repo)
-    who_can_see: operator
-    source: src/app-settings/defaults.ts
-    verified: true
   - id: config.app_settings.visitor_email_mode
     whose: operational
     data: D1 app_settings row visitor_email_mode = owner_relay (default when missing
@@ -851,8 +838,8 @@ other_items:
     verified: false
   - id: logs.cloudflare_email_sending_activity
     whose: visitor
-    data: When email_provider is cloudflare, per outbound send — Email Service
-      Activity log and emailSendingAdaptive GraphQL events with from, to,
+    data: Per outbound send — Email Service Activity log and emailSendingAdaptive
+      GraphQL events with from, to,
       subject, messageId, sessionId, status, delivery and authentication fields,
       and errorDetail (visitor and card-owner addresses and subject lines; not
       full bodies unless preview row applies)
@@ -872,8 +859,8 @@ other_items:
     verified: true
   - id: logs.cloudflare_email_sending_preview
     whose: visitor
-    data: When email_provider is cloudflare and domain Email preview is enabled,
-      full sent message HTML, plain text, headers, attachments, and raw RFC 5322
+    data: When domain Email preview is enabled, full sent message HTML, plain text,
+      headers, attachments, and raw RFC 5322
       source in Activity log Preview (includes visitor lead and card-owner PII
       from bodies and vCard attachments)
     purpose: Cloudflare Email Service message inspection (vendor debugging feature)

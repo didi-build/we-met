@@ -210,9 +210,6 @@ npx wrangler deploy --config workers/we-met-followup-email-consumer/wrangler.non
 **UNVERIFIED:** whether `wrangler secret put` against a Worker name that has never been deployed creates the Worker or fails until the first deploy.
 
 ```bash
-npx wrangler secret put GMAIL_SERVICE_ACCOUNT_JSON --name we-met-followup-email-consumer-nonprod < /path/to/key.json
-npx wrangler secret put GMAIL_SENDER --name we-met-followup-email-consumer-nonprod
-npx wrangler secret put WE_MET_OWNER_FROM_EMAIL --name we-met-followup-email-consumer-nonprod
 npx wrangler secret put WE_MET_EMAIL_FROM_CLOUDFLARE --name we-met-followup-email-consumer-nonprod
 npx wrangler secret put WE_MET_FROM_DISPLAY_NAME --name we-met-followup-email-consumer-nonprod
 npx wrangler secret put WE_MET_TEST_MAIL_TO --name we-met-followup-email-consumer-nonprod
@@ -220,43 +217,37 @@ npx wrangler secret put WE_MET_TEST_MAIL_TO --name we-met-followup-email-consume
 
 **Deploy order (`WE_MET_FROM_DISPLAY_NAME`):** set `WE_MET_FROM_DISPLAY_NAME` on **both** consumers (`we-met-followup-email-consumer-nonprod` and `we-met-followup-email-consumer`) **before** deploying consumer code that requires it. A missing or invalid value fails closed; visitor follow-ups and owner sink mail retry until the secret is set or attempts are exhausted.
 
-Use the **file redirect** for `GMAIL_SERVICE_ACCOUNT_JSON` so a multi-line private key is never pasted into the terminal (Git Bash example above). **Never** commit or paste the JSON key into chat or the repo.
-
 `WE_MET_TEST_MAIL_TO` is **non-prod only** (never on the production consumer). Confirm binding names with `npx wrangler versions view <version-id> --name we-met-followup-email-consumer-nonprod`.
 
-**Retries:** visitor follow-up uses `max_retries: 30` with exponential backoff capped at 30 minutes (~**12 hours** worst-case delay before permanent failure — see [environments.md](../architecture/environments.md)). Unsupported queue types retry on the same schedule until Cloudflare deletes them at the limit. A longer Gmail outage or a missing secret drops the visitor email with only log lines (`visitor_followup_attempt_failure` / `visitor_followup_permanent_failure`).
+After setup, `npx wrangler secret list --name we-met-followup-email-consumer-nonprod` must show **exactly** `WE_MET_EMAIL_FROM_CLOUDFLARE`, `WE_MET_FROM_DISPLAY_NAME`, and `WE_MET_TEST_MAIL_TO` (matches [Deploy consumer non-prod](../../.github/workflows/deploy-consumer-nonprod.yml)).
+
+**Retries:** visitor follow-up uses `max_retries: 30` with exponential backoff capped at 30 minutes (~**12 hours** worst-case delay before permanent failure — see [environments.md](../architecture/environments.md)). Unsupported queue types retry on the same schedule until Cloudflare deletes them at the limit. A missing mail secret or provider outage drops the visitor email with only log lines (`visitor_followup_attempt_failure` / `visitor_followup_permanent_failure`).
 
 ### Production follow-up email consumer (first deploy, DIDI-599)
 
 A Worker-scoped **`we-met-ci-consumer-production`** token cannot be created until Worker **`we-met-followup-email-consumer`** exists. **Hand-deploy the production consumer once** on `main` before creating that token or approving the first post-merge **Deploy production** run that includes the consumer CI step.
 
-The first deploy **attaches the consumer to the production queue** and **starts draining** it (messages from the last **24 hours** may be processed). Set Gmail secrets **immediately** after that deploy; without them, sends fail and retry for about **12 hours**.
+The first deploy **attaches the consumer to the production queue** and **starts draining** it (messages from the last **24 hours** may be processed). Set consumer mail secrets **immediately** after that deploy; without them, sends fail and retry for about **12 hours**.
 
 **Maintainer checklist (names only, in order):**
 
 1. Merge PR #18; **Deploy production** on `main` starts and waits at approval — **do not approve yet**.
 2. On `main`, export **`WE_MET_D1_DATABASE_ID_PRODUCTION`** (never **`WE_MET_D1_DATABASE_ID_NONPROD`** in this shell). Run `node scripts/prepare-wrangler-config.mjs --target consumer-production --output workers/we-met-followup-email-consumer/wrangler.production.ci.jsonc`, then `node scripts/check-deploy-guards.mjs --target consumer-production --config workers/we-met-followup-email-consumer/wrangler.production.ci.jsonc`, then `npx wrangler login`, then `npx wrangler deploy --config workers/we-met-followup-email-consumer/wrangler.production.ci.jsonc`.
-3. Immediately `npx wrangler secret put GMAIL_SERVICE_ACCOUNT_JSON`, `npx wrangler secret put GMAIL_SENDER`, `npx wrangler secret put WE_MET_OWNER_FROM_EMAIL`, and `npx wrangler secret put WE_MET_FROM_DISPLAY_NAME` with `--name we-met-followup-email-consumer`; then `npx wrangler secret list --name we-met-followup-email-consumer` must show **exactly** those four names and **never** `WE_MET_TEST_MAIL_TO`.
+3. Immediately `npx wrangler secret put WE_MET_EMAIL_FROM_CLOUDFLARE` and `npx wrangler secret put WE_MET_FROM_DISPLAY_NAME` with `--name we-met-followup-email-consumer`; then `npx wrangler secret list --name we-met-followup-email-consumer` must show **exactly** those two names and **never** `WE_MET_TEST_MAIL_TO`.
 4. Create dashboard token **`we-met-ci-consumer-production`** with **Workers Editor** on Worker **`we-met-followup-email-consumer`** only and account-level **Queues Edit**; add GitHub secret **`CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION`** on the **`production`** environment.
 5. Approve the waiting **Deploy production** run.
 6. One dated test submission to the maintainer's own address ([test-leads.md](./test-leads.md)).
 
 **Recovery:** if the consumer deploy step fails after the app deploy succeeded, re-run the **full** Deploy production job after fixing the error ([deploy.md](./deploy.md)).
 
-**Verified (2026-10-14):** production consumer Worker secrets (`GMAIL_SERVICE_ACCOUNT_JSON`, `GMAIL_SENDER`) **survive** a CI redeploy (both names still present after a successful consumer deploy step).
+**Verified (2026-10-14):** production consumer Worker secrets **survive** a CI redeploy (secret names still present after a successful consumer deploy step). Gmail-era secret names were removed in [DIDI-795](https://linear.app/didi-build/issue/DIDI-795); the [first-deploy checklist](#production-follow-up-email-consumer-first-deploy-didi-599) step 3 above reflects the current two production names.
 
-### Cloudflare email provider secret ([DIDI-653](https://linear.app/didi-build/issue/DIDI-653/we-met-send-email-through-cloudflare-email-service-adapter-provider))
-
-When using the Cloudflare Email Service adapter (`email_provider` = `cloudflare` in D1), set the sending address on the onboarded subdomain (for example `hello@mail.we-met.link`):
+Production consumer secrets (same two names as step 3):
 
 ```bash
-npx wrangler secret put WE_MET_EMAIL_FROM_CLOUDFLARE --name we-met-followup-email-consumer-nonprod
 npx wrangler secret put WE_MET_EMAIL_FROM_CLOUDFLARE --name we-met-followup-email-consumer
+npx wrangler secret put WE_MET_FROM_DISPLAY_NAME --name we-met-followup-email-consumer
 ```
-
-After setup, `npx wrangler secret list --name we-met-followup-email-consumer` shows **five** secret names on production and `npx wrangler secret list --name we-met-followup-email-consumer-nonprod` shows **six** (non-prod includes `WE_MET_TEST_MAIL_TO`). The [first-deploy checklist](#production-follow-up-email-consumer-first-deploy-didi-599) above is a historical record of the original four Gmail secrets; Cloudflare From was added in [DIDI-653](https://linear.app/didi-build/issue/DIDI-653).
-
-To flip `email_provider` or roll back, use the SQL in [kill-switch-and-caps.md](./kill-switch-and-caps.md) instead of repeating it here.
 
 Smoke test: [test-leads.md](./test-leads.md) (exchange on a PR preview → mail at `WE_MET_TEST_MAIL_TO`).
 
@@ -274,7 +265,7 @@ After PR #3 merged (**2026-10-11**), the first GitHub Actions runs (Wrangler **4
 After the production follow-up email consumer shipped (**2026-10-14**), the first **Deploy production** run that included the consumer CI step showed:
 
 7. **Production consumer deploy (first attempt failed):** `wrangler deploy` for **`we-met-followup-email-consumer`** failed listing queues with `Authentication error [code: 10000]` — token **`we-met-ci-consumer-production`** had **Workers Editor** on the consumer only, no queue permission.
-8. **Production consumer deploy (after token fix):** adding account-level **Queues Edit** to the same dashboard token and re-running the job succeeded. **D1 Edit** was not required for this deploy despite a D1 binding on the consumer config. Gmail secrets set right after the hand deploy were still present after the CI redeploy.
+8. **Production consumer deploy (after token fix):** adding account-level **Queues Edit** to the same dashboard token and re-running the job succeeded. **D1 Edit** was not required for this deploy despite a D1 binding on the consumer config. Consumer secrets set right after the hand deploy were still present after the CI redeploy.
 
 ## 3. GitHub secrets and variables
 
