@@ -27,7 +27,7 @@ jobs:
       - run: npm ci
       - name: Prepare follow-up email consumer Wrangler config (non-prod D1 ID)
         env:
-          WE_MET_D1_DATABASE_ID_NONPROD: ${{ vars.WE_MET_D1_DATABASE_ID_NONPROD }}
+          WE_MET_D1_DATABASE_ID_NONPROD: ${{ secrets.WE_MET_D1_DATABASE_ID_NONPROD }}
         run: |
           set -euo pipefail
           node scripts/prepare-wrangler-config.mjs \
