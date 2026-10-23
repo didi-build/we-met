@@ -1,0 +1,287 @@
+import { useEffect, useState, type ReactNode } from "react";
+import {
+  ThemeRoot, Switcher, Seg, param, btnPrimary, btnOutline, type Mode,
+  CheckIcon, CloseIcon, CopyIcon, ExternalIcon, ContactIcon, WeMetMark,
+} from "./kit";
+
+/* DIDI-744 v3: direction B, one row in the "Your card is live" dialog.
+   Adding the contact happens through Google (People API contacts scope, incremental auth on tap).
+   The server creates ONE "We Met" contact holding every sender address (or adds a missing one).
+   Until Google verification only test users see the row; everyone else gets the dialog without it.
+   If consent is declined or blocked by a Workspace admin, the row hides quietly (no error, no fallback).
+   Sender addresses are served by the app; never hardcode them in product code. */
+
+type State = "baseline" | "default" | "working" | "success" | "hidden" | "reappear";
+
+const NEW_ADDRESS = "hello@send.we-met.link"; // example of a sender added later, server side
+const CARD_URL = "we-met.link/hi/maya-chen";
+
+const STATES: { id: State; label: string; desc: string }[] = [
+  { id: "baseline", label: "Baseline", desc: "Today: Your card is live with the link, Copy and Open card. No contacts step." },
+  { id: "default", label: "Default", desc: "Google test users only until verification: one row with a Continue with Google button. Google's consent screen opens on tap (incremental authorization, contacts scope)." },
+  { id: "working", label: "Working", desc: "Back from Google: the server finds or creates one We Met contact with both addresses." },
+  { id: "success", label: "Success", desc: "You're all set. Close and reopen the dialog to see the next open." },
+  { id: "hidden", label: "Next open", desc: "No row. Shown after success, after consent is declined or blocked by a Workspace admin (the row hides quietly), and to everyone who is not a Google test user until verification. The row only returns if a new sender address is added server side." },
+  { id: "reappear", label: "Reappear", desc: "A new sender address was added server side. The row returns with one button to add just that address to the We Met contact." },
+];
+
+/* ---------- Small parts ---------- */
+
+function useCopy() {
+  const [copied, setCopied] = useState(false);
+  return {
+    copied,
+    copy: (v: string) => {
+      try { void navigator.clipboard?.writeText(v); } catch { /* preview only */ }
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    },
+  };
+}
+
+function LinkCopyRow({ value }: { value: string }) {
+  const c = useCopy();
+  return (
+    <div className="flex min-h-[52px] items-center gap-2 rounded-[12px] bg-[var(--surface-2)] py-1 pl-4 pr-1.5 text-[16px] font-medium leading-tight">
+      <span className="min-w-0 flex-1 truncate">{value}</span>
+      <button type="button" onClick={() => c.copy(value)} className={`${btnPrimary} min-h-11 px-[18px] text-[15px]`}>
+        {c.copied ? <CheckIcon size={18} /> : <CopyIcon size={18} />}
+        <span>{c.copied ? "Copied" : "Copy"}</span>
+      </button>
+    </div>
+  );
+}
+
+function GoogleG() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden>
+      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+    </svg>
+  );
+}
+
+/* Plain "Continue with Google" button per Google's sign-in button guidelines:
+   standard G mark, Roboto Medium 14px, pill shape, light #FFF/#747775/#1F1F1F, dark #131314/#8E918F/#E3E3E3. */
+function GoogleButton({ mode, onClick }: { mode: Mode; onClick: () => void }) {
+  const c = mode === "dark" ? { bg: "#131314", border: "#8E918F", text: "#E3E3E3" } : { bg: "#FFFFFF", border: "#747775", text: "#1F1F1F" };
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group relative inline-flex h-10 w-full items-center justify-center gap-2.5 overflow-hidden rounded-full border px-3 text-[14px] font-medium leading-5 tracking-[0.25px] focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-[3px] focus-visible:outline-[var(--accent)]"
+      style={{ background: c.bg, borderColor: c.border, color: c.text, fontFamily: '"Roboto", "Figtree", system-ui, sans-serif' }}
+    >
+      <span aria-hidden className="pointer-events-none absolute inset-0 bg-current opacity-0 transition-opacity group-hover:opacity-[0.08] group-active:opacity-[0.12]" />
+      <GoogleG />
+      <span className="relative">Continue with Google</span>
+    </button>
+  );
+}
+
+function Spinner() {
+  return <span aria-hidden className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--line)] border-t-[var(--ink)] motion-reduce:animate-none" />;
+}
+
+function RowHead({ icon, title, text, filled }: { icon: ReactNode; title: string; text: ReactNode; filled?: boolean }) {
+  return (
+    <div className="flex items-start gap-3">
+      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${filled ? "bg-[var(--accent)] text-[var(--accent-ink)]" : "bg-[var(--surface-2)] text-[var(--ink)]"}`}>{icon}</span>
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5 pt-0.5">
+        <h3 className="text-[16px] font-semibold leading-snug">{title}</h3>
+        <p className="text-[14px] leading-[1.45] text-[var(--ink-muted)] [&_b]:font-medium [&_b]:text-[var(--ink)]">{text}</p>
+      </div>
+    </div>
+  );
+}
+
+function Card({ children, live }: { children: ReactNode; live?: boolean }) {
+  return (
+    <section
+      aria-label="Add We Met to my contacts"
+      aria-live={live ? "polite" : undefined}
+      className="wm-fade flex flex-col gap-3.5 rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-4"
+    >
+      {children}
+    </section>
+  );
+}
+
+/* ---------- The row, by state ---------- */
+
+type RowProps = { state: State; mode: Mode; onGoogle: () => void };
+
+function ContactsRow({ state, mode, onGoogle }: RowProps) {
+  if (state === "default") {
+    return (
+      <Card>
+        <RowHead icon={<ContactIcon size={20} />} title="Add We Met to my contacts" text="Follow-ups from people you meet come from We Met. Saving us as one contact keeps them out of Spam." />
+        <GoogleButton mode={mode} onClick={onGoogle} />
+        <p className="-mt-1 text-center text-[12px] leading-[1.45] text-[var(--ink-muted)]">Google asks once. We only create or update the We Met contact.</p>
+      </Card>
+    );
+  }
+  if (state === "working") {
+    return (
+      <Card live>
+        <div role="status" className="flex items-start gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)]"><Spinner /></span>
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5 pt-0.5">
+            <h3 className="text-[16px] font-semibold leading-snug">Adding We Met to your contacts</h3>
+            <p className="text-[14px] leading-[1.45] text-[var(--ink-muted)]">Saving both sending addresses to one contact. This takes a few seconds.</p>
+          </div>
+        </div>
+        <div aria-hidden className="h-1 overflow-hidden rounded-full bg-[var(--surface-2)]">
+          <div className="wm-progress h-full w-1/3 rounded-full bg-[var(--ink)]" />
+        </div>
+      </Card>
+    );
+  }
+  if (state === "success") {
+    return (
+      <Card live>
+        <div role="status">
+          <RowHead
+            filled
+            icon={<CheckIcon size={20} />}
+            title="You're all set"
+            text="We Met is in your Google Contacts with both addresses. This step won't show again."
+          />
+        </div>
+      </Card>
+    );
+  }
+  if (state === "reappear") {
+    return (
+      <Card>
+        <RowHead
+          icon={<ContactIcon size={20} />}
+          title="We added a new sending address"
+          text={<>Follow-ups can now also come from <b>{NEW_ADDRESS}</b>. Add it to your We Met contact.</>}
+        />
+        <button type="button" onClick={onGoogle} className={`${btnPrimary} min-h-11 w-full text-[15px]`}>Add to my We Met contact</button>
+      </Card>
+    );
+  }
+  return null;
+}
+
+/* ---------- Editor backdrop (faithful to AppCardEditor) ---------- */
+
+function EditorShell({ onLive }: { onLive: () => void }) {
+  return (
+    <div className="relative min-h-[844px] pb-[120px]">
+      <header className="sticky top-0 z-20 flex h-16 items-center justify-between bg-[var(--bg)] px-5">
+        <span className="inline-flex items-center gap-2 text-[17px] font-semibold"><WeMetMark size={18} />We Met</span>
+        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--surface-2)] text-[13px] font-semibold">MC</span>
+      </header>
+      <div className="px-5 py-3 min-[900px]:hidden">
+        <div className="flex rounded-full bg-[var(--surface-2)] p-1 text-[15px] font-semibold">
+          <span className="flex-1 rounded-full bg-[var(--surface)] py-2 text-center">Edit</span>
+          <span className="flex-1 py-2 text-center text-[var(--ink-muted)]">Preview</span>
+        </div>
+      </div>
+      <form className="mx-auto flex max-w-[560px] flex-col gap-4 px-5" onSubmit={(e) => e.preventDefault()}>
+        <div className="flex flex-col gap-1.5 px-1 pb-1 pt-2">
+          <h1 className="text-[24px] font-semibold leading-[1.2] tracking-[-0.02em]">Your card</h1>
+          <p className="text-[15px] leading-[1.5] text-[var(--ink-muted)]">Changes save as you type. Your public card only changes when you publish.</p>
+        </div>
+        <section className="flex flex-col gap-4 rounded-[24px] border border-[var(--line)] bg-[var(--surface)] px-5 py-6">
+          <h2 className="text-[18px] font-semibold leading-[1.3] tracking-[-0.01em]">Your link</h2>
+          <div className="flex flex-col gap-0.5 rounded-[12px] border border-[var(--line)] px-4 pb-[11px] pt-2.5">
+            <span className="text-[13px] font-medium text-[var(--ink-muted)]">Card address</span>
+            <span className="text-[17px]"><span className="text-[var(--ink-muted)]">we-met.link/hi/</span>maya-chen</span>
+          </div>
+        </section>
+        <section className="flex flex-col gap-4 rounded-[24px] border border-[var(--line)] bg-[var(--surface)] px-5 py-6">
+          <h2 className="text-[18px] font-semibold leading-[1.3] tracking-[-0.01em]">Profile</h2>
+          {["Name", "Role"].map((l, i) => (
+            <div key={l} className="flex flex-col gap-0.5 rounded-[12px] border border-transparent bg-[var(--surface-2)] px-4 pb-[11px] pt-2.5">
+              <span className="text-[13px] font-medium text-[var(--ink-muted)]">{l}</span>
+              <span className="text-[17px]">{i === 0 ? "Maya Chen" : "Product designer, Northwind Studio"}</span>
+            </div>
+          ))}
+        </section>
+      </form>
+      <div className="fixed inset-x-0 bottom-0 z-[25] border-t border-[var(--line)] bg-[var(--bg)]">
+        <div className="mx-auto flex max-w-[1028px] items-center justify-between gap-3 px-5 py-3">
+          <span className="inline-flex items-center gap-1.5 text-[14px] font-medium text-[var(--ink-muted)]"><CheckIcon size={14} />Saved</span>
+          <div className="flex items-center gap-2">
+            <button type="button" className={`${btnOutline} min-h-11 px-[18px] text-[15px]`}>Share</button>
+            <button type="button" onClick={onLive} aria-label="Live, open the published dialog" className={`${btnPrimary} min-h-11 bg-[var(--accent-soft)] px-[18px] text-[15px] !text-[var(--ink)] hover:bg-[var(--surface-2)]`}>
+              <span className="h-2 w-2 rounded-full bg-current" />Live
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Dialog (faithful to .ap-dialog / .ap-panel) ---------- */
+
+function Dialog({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-end pt-6 min-[900px]:justify-center min-[900px]:p-6">
+      <div className="wm-fade absolute inset-0 bg-[var(--scrim)]" onClick={onClose} />
+      <div role="dialog" aria-modal="true" aria-labelledby="pub-title" className="wm-sheet relative flex max-h-full w-full max-w-[520px] flex-col gap-4 overflow-y-auto rounded-t-[24px] bg-[var(--bg)] px-6 pb-7 pt-2 min-[900px]:max-w-[480px] min-[900px]:rounded-[24px] min-[900px]:px-7 min-[900px]:pb-7 min-[900px]:pt-6">
+        <div className="flex items-center justify-between gap-3 pt-2">
+          <h2 id="pub-title" className="text-[22px] font-semibold leading-[1.2] tracking-[-0.02em] text-balance">{title}</h2>
+          <button type="button" aria-label="Close" onClick={onClose} className="-mr-2.5 flex h-11 w-11 items-center justify-center rounded-full hover:bg-[var(--surface-2)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)]">
+            <CloseIcon />
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Root ---------- */
+
+export default function Didi744() {
+  const [state, setState] = useState<State>(param("s", "default") as State);
+  const [mode, setMode] = useState<Mode>(param("theme", "light") as Mode);
+  const [auto, setAuto] = useState(false);
+  const [open, setOpen] = useState(true);
+  const capture = param("capture", "0") === "1";
+  const current = STATES.find((s) => s.id === state) ?? STATES[1];
+
+  // Prototype only: after "returning from consent", Working resolves to Success.
+  useEffect(() => {
+    if (state !== "working" || !auto) return;
+    const t = window.setTimeout(() => { setAuto(false); setState("success"); }, 1800);
+    return () => window.clearTimeout(t);
+  }, [state, auto]);
+
+  const pick = (s: State) => { setAuto(false); setOpen(true); setState(s); };
+  const onGoogle = () => { setAuto(true); setState("working"); };
+  const onClose = () => { setOpen(false); if (state === "success") setState("hidden"); };
+
+  return (
+    <ThemeRoot mode={mode}>
+      <Switcher title="DIDI-744 v3" hidden={capture}>
+        <div data-switcher className="contents">
+          <Seg label="State" value={state} onChange={pick} options={STATES.map((s) => ({ id: s.id, label: s.label }))} />
+          <Seg label="Theme" value={mode} onChange={setMode} options={[{ id: "light", label: "Light" }, { id: "dark", label: "Dark" }]} />
+          <p className="basis-full text-[12px] leading-snug text-[var(--ink-muted)]">{current.desc} Past 900px wide the sheet becomes a centered modal.</p>
+        </div>
+      </Switcher>
+      <EditorShell onLive={() => setOpen(true)} />
+      {open && (
+        <Dialog title="Your card is live" onClose={onClose}>
+          <p className="text-[16px] leading-[1.55] text-[var(--ink-muted)]">Share this link, or open your card to show its QR code.</p>
+          <LinkCopyRow value={CARD_URL} />
+          <ContactsRow key={state} state={state} mode={mode} onGoogle={onGoogle} />
+          <div className="mt-1 flex flex-col gap-2.5">
+            <a href="#" onClick={(e) => e.preventDefault()} className={`${btnOutline} min-h-14 w-full text-[17px] no-underline`}>
+              <ExternalIcon />Open card
+            </a>
+          </div>
+        </Dialog>
+      )}
+    </ThemeRoot>
+  );
+}

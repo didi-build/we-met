@@ -1,0 +1,24 @@
+import { Theme } from './settings/types';
+import { DIDI744ContactsSetupStepBaselineABC } from './components/generated/DIDI744ContactsSetupStepBaselineABC';
+
+let theme: Theme = 'light';
+
+function App() {
+  function setTheme(theme: Theme) {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }
+
+  setTheme(theme);
+
+  return (
+    <>
+      <DIDI744ContactsSetupStepBaselineABC />
+    </>
+  ); // %EXPORT_STATEMENT%
+}
+
+export default App;
