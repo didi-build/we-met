@@ -5,6 +5,7 @@ import type { HiCardCtaMode } from "@/components/hi/HiCardPresentation";
 import { HiExchangeSheet } from "@/components/hi/HiExchangeSheet";
 import { HiStickyExchangeBar } from "@/components/hi/HiStickyExchangeBar";
 import type { CardPlan } from "@/card-data/types";
+import type { PublicHiCardPayload } from "@/lib/hi-card/public-card-payload";
 import { cardInitials } from "@/lib/hi-card/card-content";
 import { isDetailsTokenExpired } from "@/lib/hi-card/details-token-client";
 import {
@@ -19,7 +20,7 @@ import {
   writeExchangeSession,
 } from "@/lib/hi-card/exchange-session-storage";
 import { captureSheetOpener, restoreSheetFocus } from "@/lib/hi-card/sheet-focus";
-import type { HiOwnerContact, HiPageCard } from "@/lib/hi-card/hi-page-card";
+import type { HiOwnerContact } from "@/lib/hi-card/hi-page-card";
 import type { HiExchangeOwnerContact } from "@/components/hi/hi-exchange-api";
 import {
   parseVcardReturnReason,
@@ -29,7 +30,7 @@ import type { MouseEvent } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type HiPageClientProps = {
-  card: HiPageCard;
+  card: PublicHiCardPayload;
   photoUrl: string | null;
   plan?: CardPlan;
 };

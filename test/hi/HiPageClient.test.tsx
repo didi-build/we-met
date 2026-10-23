@@ -8,8 +8,8 @@ import { HI_CONTACT_SENT_BUTTON_LABEL } from "@/lib/hi-card/contact-sent-label";
 import { WE_MET_CARD_HOME_URL } from "@/lib/hi-card/card-content";
 import { detailsSentStorageKey } from "@/lib/hi-card/details-sent-storage";
 import { exampleCardInput } from "../helpers/example-card";
-import { toHiPageCard } from "@/lib/hi-card/hi-page-card";
 import type { CardRecord } from "@/card-data/types";
+import { serializePublicHiCard } from "@/lib/hi-card/public-card-payload";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -82,7 +82,7 @@ function renderCard(overrides: Partial<CardRecord> = {}, plan = "free" as const)
   };
   return render(
     <ThemeProvider>
-      <HiPageClient card={toHiPageCard(card)} photoUrl={null} plan={plan} />
+      <HiPageClient card={serializePublicHiCard(card)} photoUrl={null} plan={plan} />
     </ThemeProvider>,
   );
 }

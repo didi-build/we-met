@@ -49,7 +49,7 @@ vi.mock("@marsidev/react-turnstile", () => ({
 import { HiPageClient } from "@/components/hi/HiPageClient";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { createDetailsToken } from "@/exchange/token";
-import { toHiPageCard } from "@/lib/hi-card/hi-page-card";
+import { serializePublicHiCard } from "@/lib/hi-card/public-card-payload";
 import {
   exchangeCompletedStorageKey,
   exchangeSessionStorageKey,
@@ -122,7 +122,7 @@ describe("HiPageClient exchange flow (component)", () => {
       email: "owner-secret@example.com",
       contact: { ...exampleCardRecord().contact, phone: "+1 555 0100" },
     });
-    const pageCard = toHiPageCard(record);
+    const pageCard = serializePublicHiCard(record);
     const leadToken = "exchange-lead-token";
 
     vi.mocked(postHiExchange).mockResolvedValue({
@@ -220,7 +220,7 @@ describe("HiPageClient exchange flow (component)", () => {
     render(
       <ThemeProvider>
         <HiPageClient
-          card={toHiPageCard(exampleCardRecord({ slug }))}
+          card={serializePublicHiCard(exampleCardRecord({ slug }))}
           photoUrl={null}
         />
       </ThemeProvider>,
