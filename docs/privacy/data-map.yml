@@ -35,8 +35,9 @@
     - Cloudflare
   retention: until account tombstone (blanked on delete)
   who_can_see:
-    operator; visitors who exchange details (follow-up email and vCard attachment, or POST /api/exchange/vcard with a
-    valid details token, including when lead_email_enabled is off; not in D1)
+    operator; visitors who exchange details (follow-up email and vCard attachment, POST /api/exchange success JSON
+    ownerEmail, or POST /api/exchange/vcard with a valid details token, including when lead_email_enabled is off; not on
+    the public /hi page payload before exchange)
   source: src/app-auth/accounts.ts
   verified: true
 - id: accounts.name
@@ -641,8 +642,9 @@
     - Cloudflare
   retention: until card retired
   who_can_see:
-    operator; visitors after exchange via follow-up email From, signature, body, and vCard attachment, or POST
-    /api/exchange/vcard with a valid details token (including when lead_email_enabled is off)
+    operator; public /hi visitors see contact fields except owner phone before exchange; visitors after exchange via
+    follow-up email From, signature, body, and vCard attachment, POST /api/exchange success JSON ownerPhone when present,
+    or POST /api/exchange/vcard with a valid details token (including when lead_email_enabled is off)
   source: migrations/0005_cards_rebuild_mvp.sql
   verified: true
 - id: cards.copy_json
@@ -1341,15 +1343,34 @@
   verified: true
 - id: browser.details_exchange_token
   whose: visitor
-  data: Signed details token with visitor name, email, lead and card ids (2h TTL)
-  purpose: second-step details form authorization and token-gated owner vCard download (POST /api/exchange/vcard)
-  storage: visitor browser (JSON response field, client-held)
+  data:
+    Signed details token (leadToken) with visitor name and email, lead and card ids in the token payload (2h TTL);
+    stored in sessionStorage JSON we-met-hi-exchange-session:<slug> alongside visitor firstName and visitorEmail,
+    and ownerEmail / ownerPhone from the exchange response (for receipt Email/Call after redirect)
+  purpose: receipt UI, second-step details form authorization, and token-gated owner vCard download (POST /api/exchange/vcard)
+  storage:
+    visitor browser sessionStorage only (single JSON key we-met-hi-exchange-session:<slug>; owner contact
+    fields are not written to localStorage, the URL, logs, or analytics; cleared on expiry, ?vcard=expired,
+    or explicit clear)
   processors:
     - Cloudflare
-  retention: 2 hours or until used/expired (src/exchange/token.ts); not stored server-side after issue
-  who_can_see: visitor browser
-  source: src/exchange/token.ts
-  verified: true
+  retention: 2 hours or until cleared (src/exchange/token.ts); not stored server-side after issue
+  who_can_see: visitor browser in the same tab
+  source: src/lib/hi-card/exchange-session-storage.ts
+  verified: false
+- id: api.exchange_post_success_body
+  whose: card_owner
+  data:
+    JSON fields ownerEmail (accounts.email) and optional ownerPhone (contact_json.phone) returned with the details
+    token after POST /api/exchange
+  purpose: show owner contact on the visitor receipt without putting inbox or phone in the public page payload
+  storage: not persisted; JSON response only
+  processors:
+    - Cloudflare
+  retention: none
+  who_can_see: visitor who completed exchange step 1 in that tab
+  source: src/exchange/process-exchange.ts
+  verified: false
 - id: api.exchange_vcard_response
   whose: card_owner
   data: Owner vCard (name, org, title, work email, optional phone, URLs, note, optional JPEG photo) returned after valid exchange details token
@@ -1401,3 +1422,13 @@
   who_can_see: visitor device only
   source: src/lib/hi-card/details-sent-storage.ts
   verified: true
+- id: browser.local_storage_exchange_completed
+  whose: visitor
+  data: Per-slug flag we-met-hi-exchange-completed:<slug> = 1 after exchange step 1 (no token or owner contact)
+  purpose: reload fallback when sessionStorage exchange session is missing or expired (DIDI-746)
+  storage: visitor browser localStorage
+  processors: []
+  retention: until user clears site data
+  who_can_see: visitor device only
+  source: src/lib/hi-card/exchange-session-storage.ts
+  verified: false

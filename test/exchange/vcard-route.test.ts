@@ -158,6 +158,112 @@ describe("POST /api/exchange/vcard", () => {
     expect(body).not.toContain("BEGIN:VCARD");
   });
 
+  it("returns 303 to / for missing form token without a safe slug", async () => {
+    const response = await postVcard({
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ slug: "https://evil.test" }).toString(),
+    });
+    expect(response.status).toBe(303);
+    expect(response.headers.get("Location")).toBe("/");
+  });
+
+  it("returns 303 with expired for form invalid_token using slug from token", async () => {
+    const token = validToken("test-token-secret", card, 1_000_000);
+    const response = await postVcard({
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ token, slug: card.slug }).toString(),
+    });
+    expect(response.status).toBe(303);
+    expect(response.headers.get("Location")).toBe(`/hi/${card.slug}?vcard=expired`);
+    expect(await response.text()).toBe("");
+  });
+
+  it("returns 303 with limited for form rate_limited", async () => {
+    routeMocks.vcardDeps = defaultVcardDeps({
+      rateLimiter: { check: async () => ({ allowed: false }) },
+    });
+    const token = validToken("test-token-secret", card);
+    const response = await postVcard({
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ token, slug: card.slug }).toString(),
+    });
+    expect(response.status).toBe(303);
+    expect(response.headers.get("Location")).toBe(`/hi/${card.slug}?vcard=limited`);
+  });
+
+  it("returns 303 with expired for form card_not_found", async () => {
+    const repo = new MemoryCardRepository();
+    const suspended = await repo.upsertCard({
+      ...exampleCardInput(),
+      slug: "suspended-form",
+      status: "suspended",
+    });
+    routeMocks.repo = repo;
+    const token = validToken("test-token-secret", suspended);
+    const response = await postVcard({
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ token }).toString(),
+    });
+    expect(response.status).toBe(303);
+    expect(response.headers.get("Location")).toBe("/hi/suspended-form?vcard=expired");
+  });
+
+  it("returns 303 with limited for form server_error", async () => {
+    routeMocks.vcardDeps = defaultVcardDeps({
+      assets: {
+        get: async () => {
+          throw new Error("r2 down");
+        },
+      },
+    });
+    const token = validToken("test-token-secret", card);
+    const response = await postVcard({
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ token }).toString(),
+    });
+    expect(response.status).toBe(303);
+    expect(response.headers.get("Location")).toBe(`/hi/${card.slug}?vcard=limited`);
+  });
+
+  it("keeps JSON errors for the same failure modes", async () => {
+    const expiredToken = validToken("test-token-secret", card, 1_000_000);
+    const jsonExpired = await postVcard({
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: expiredToken }),
+    });
+    expect(jsonExpired.status).toBe(401);
+    expect(await jsonExpired.json()).toEqual({ error: "invalid_token" });
+
+    routeMocks.vcardDeps = defaultVcardDeps({
+      rateLimiter: { check: async () => ({ allowed: false }) },
+    });
+    const token = validToken("test-token-secret", card);
+    const jsonLimited = await postVcard({
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    });
+    expect(jsonLimited.status).toBe(429);
+    expect(await jsonLimited.json()).toEqual({ error: "rate_limited" });
+  });
+
+  it("redirects to / when form slug is an open-redirect pattern", async () => {
+    const token = validToken("test-token-secret", card, 1_000_000);
+    const cases = [
+      { slug: "https://evil.test" },
+      { slug: "//evil.test" },
+      { slug: "%2Fevil" },
+      { slug: "not-a-valid-slug!" },
+    ];
+    for (const { slug } of cases) {
+      const response = await postVcard({
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ token, slug }).toString(),
+      });
+      expect(response.status).toBe(303);
+      expect(response.headers.get("Location")).toBe("/");
+    }
+  });
+
   it("returns 400 invalid_input for unsupported Content-Type", async () => {
     const token = validToken("test-token-secret", card);
     const response = await postVcard({

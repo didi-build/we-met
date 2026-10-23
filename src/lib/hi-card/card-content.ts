@@ -65,7 +65,12 @@ export type CardContentFlags = {
   hasLinks: boolean;
 };
 
-export function cardContentFlags(card: CardRecord): CardContentFlags {
+export function cardContentFlags(
+  card: Pick<
+    CardRecord,
+    "photoKey" | "role" | "alternate" | "about" | "services" | "links"
+  >,
+): CardContentFlags {
   const paragraphs = card.about?.paragraphs?.filter((p) => p.trim()) ?? [];
   const serviceItems = card.services?.items?.filter((s) => s.title?.trim()) ?? [];
   const linkEntries = cardLinkEntries(card.links);

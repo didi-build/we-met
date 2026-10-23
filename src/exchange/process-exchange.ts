@@ -159,5 +159,14 @@ export async function processExchange(
     Math.floor(deps.now().getTime() / 1000),
   );
 
-  return { status: "success", body: { token } };
+  const body: ExchangeSuccessResponse = {
+    token,
+    ownerEmail: card.email,
+  };
+  const ownerPhone = card.contact.phone.trim();
+  if (ownerPhone) {
+    body.ownerPhone = ownerPhone;
+  }
+
+  return { status: "success", body };
 }

@@ -26,9 +26,18 @@ async function readJsonResponse(response: Response): Promise<unknown> {
   }
 }
 
-export async function postHiExchange(
-  payload: HiExchangePayload,
-): Promise<{ ok: true; token: string } | { ok: false; kind: HiExchangeFailureKind }> {
+export type HiExchangeOwnerContact = {
+  email: string;
+  phone: string;
+};
+
+export async function postHiExchange(payload: HiExchangePayload): Promise<
+  | { ok: true; token: string; owner: HiExchangeOwnerContact }
+  | {
+      ok: false;
+      kind: HiExchangeFailureKind;
+    }
+> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), HI_EXCHANGE_REQUEST_TIMEOUT_MS);
 
@@ -42,13 +51,22 @@ export async function postHiExchange(
     const data = (await readJsonResponse(response)) as {
       ok?: boolean;
       token?: string;
+      ownerEmail?: string;
+      ownerPhone?: string;
       error?: string;
     } | null;
 
     if (!response.ok) {
       return { ok: false, kind: "server" };
     }
-    return { ok: true, token: data?.token ?? "" };
+    return {
+      ok: true,
+      token: data?.token ?? "",
+      owner: {
+        email: data?.ownerEmail ?? "",
+        phone: typeof data?.ownerPhone === "string" ? data.ownerPhone : "",
+      },
+    };
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
       return { ok: false, kind: "timeout" };

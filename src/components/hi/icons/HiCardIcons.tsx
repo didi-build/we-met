@@ -121,6 +121,107 @@ export function GitHubIcon({ size, className }: IconProps) {
   );
 }
 
+const RECEIPT_STROKE = 1.8;
+
+export function HiReceiptCheckIcon({ size, className }: IconProps) {
+  return (
+    <svg
+      aria-hidden
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={RECEIPT_STROKE}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  );
+}
+
+export function HiReceiptMailIcon({ size, className }: IconProps) {
+  return (
+    <svg
+      aria-hidden
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={RECEIPT_STROKE}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M4 6h16v12H4z" />
+      <path d="m4 7 8 6 8-6" />
+    </svg>
+  );
+}
+
+export function HiReceiptPhoneIcon({ size, className }: IconProps) {
+  return (
+    <svg
+      aria-hidden
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={RECEIPT_STROKE}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M6.5 4h3l1.5 5-2 1.5a11 11 0 005 5L17.5 14l5 1.5v3a2 2 0 01-2 2A15 15 0 014 6.5a2 2 0 012-2.5z" />
+    </svg>
+  );
+}
+
+export function HiReceiptContactIcon({ size, className }: IconProps) {
+  return (
+    <svg
+      aria-hidden
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={RECEIPT_STROKE}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M5 8h14v12H5z" />
+      <circle cx="12" cy="13" r="2.5" />
+      <path d="M8 5h8v3H8z" />
+    </svg>
+  );
+}
+
+export function HiReceiptNoteIcon({ size, className }: IconProps) {
+  return (
+    <svg
+      aria-hidden
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={RECEIPT_STROKE}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M7 6h12v14H7z" />
+      <path d="M10 10h6M10 14h4" />
+    </svg>
+  );
+}
+
 export function InstagramIcon({ size, className }: IconProps) {
   return (
     <svg

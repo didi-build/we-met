@@ -1,6 +1,13 @@
+import { normalizeVcardFormSlug } from "@/exchange/vcard-form-redirect";
+
 export type ValidatedVCardTokenInput = {
   token: string;
+  formSlug?: string;
 };
+
+export type VCardRequestReadResult =
+  | { ok: true; value: ValidatedVCardTokenInput; isFormEncoded: boolean }
+  | { ok: false; isFormEncoded: boolean; formSlug?: string };
 
 function readTokenString(body: Record<string, unknown>): string | null {
   const raw = body.token;
@@ -30,9 +37,14 @@ export function parseVCardTokenBody(
   return { ok: true, value: { token } };
 }
 
+function readFormSlug(params: URLSearchParams): string | undefined {
+  const raw = params.get("slug");
+  return raw === null ? undefined : normalizeVcardFormSlug(raw);
+}
+
 export async function readVCardRequestBody(
   request: Request,
-): Promise<{ ok: true; value: ValidatedVCardTokenInput } | { ok: false }> {
+): Promise<VCardRequestReadResult> {
   const contentType = request.headers.get("content-type") ?? "";
   const mediaType = contentType.split(";")[0]?.trim().toLowerCase() ?? "";
 
@@ -41,9 +53,13 @@ export async function readVCardRequestBody(
     try {
       body = await request.json();
     } catch {
-      return { ok: false };
+      return { ok: false, isFormEncoded: false };
     }
-    return parseVCardTokenBody(body);
+    const parsed = parseVCardTokenBody(body);
+    if (!parsed.ok) {
+      return { ok: false, isFormEncoded: false };
+    }
+    return { ok: true, value: parsed.value, isFormEncoded: false };
   }
 
   if (mediaType === "application/x-www-form-urlencoded") {
@@ -51,15 +67,20 @@ export async function readVCardRequestBody(
     try {
       text = await request.text();
     } catch {
-      return { ok: false };
+      return { ok: false, isFormEncoded: true };
     }
     const params = new URLSearchParams(text);
+    const formSlug = readFormSlug(params);
     const token = params.get("token")?.trim() ?? "";
     if (!token || token.length > 4096) {
-      return { ok: false };
+      return { ok: false, isFormEncoded: true, formSlug };
     }
-    return { ok: true, value: { token } };
+    return {
+      ok: true,
+      value: { token, formSlug },
+      isFormEncoded: true,
+    };
   }
 
-  return { ok: false };
+  return { ok: false, isFormEncoded: false };
 }
