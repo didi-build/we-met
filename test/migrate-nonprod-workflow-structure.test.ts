@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { findVarsD1DatabaseIdReference } from "../scripts/check-workflow-d1-id-secrets.mjs";
 
 describe("Migrate non-prod workflow structure (unit)", () => {
   const workflow = readFileSync(".github/workflows/migrate-nonprod.yml", "utf8");

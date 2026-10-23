@@ -35,7 +35,7 @@ PR previews deploy via a **GitHub Actions** workflow that runs `wrangler preview
 
 Preview deployments receive **ASSETS**, **IMAGES** (when `previews.images` is set), **WE_MET_ASSETS**, **WE_MET_BASE_URL**, **WE_MET_DB** (non-prod D1), **WE_MET_ENV** = `preview`, **WE_MET_EXCHANGE_RATE_LIMITER** (namespace **2001**), and **WE_MET_FOLLOWUP_EMAIL_QUEUE** (non-prod queue); they do **not** receive **WORKER_SELF_REFERENCE** (production does). Details: [0019 § Proof deploy findings](../decisions/0019-pr-preview-github-action.md#proof-deploy-findings) (verified **2026-10-11**).
 
-**D1 `database_id` values** in `wrangler.jsonc` are **placeholders** (real IDs stay out of the public repo). CI injects the real IDs from GitHub environment variables at deploy time ([0020](../decisions/0020-d1-database-id-injection.md)).
+**D1 `database_id` values** in `wrangler.jsonc` are **placeholders** (real IDs stay out of the public repo). CI injects the real IDs from GitHub environment **secrets** at deploy time ([0020](../decisions/0020-d1-database-id-injection.md)).
 
 **Non-prod D1 contents:** `we-met-db-nonprod` is not limited to synthetic test cards. Diadem’s real card (`slug` `didi`) is loaded there so PR previews show the live card. Step 1 safety relies on that card having **zero enabled lead sinks** and on the non-prod consumer’s hardwired mail redirect — not on the database holding only test data. **Never** add a sink row that points at a real destination to any card in non-prod D1.
 

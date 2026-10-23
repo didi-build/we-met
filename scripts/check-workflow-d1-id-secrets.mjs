@@ -12,7 +12,7 @@ const WORKFLOWS_DIR = resolve(
 
 /** @type {RegExp} */
 export const VARS_D1_DATABASE_ID_PATTERN =
-  /vars\s*(?:\.\s*|\[\s*['"])WE_MET_D1_DATABASE_ID_[A-Z0-9_]*/;
+  /vars\s*(?:\.\s*|\[\s*['"])WE_MET_D1_DATABASE_ID_[A-Za-z0-9_]*/i;
 
 function fail(message) {
   console.error(`workflow D1 id masking failed: ${message}`);

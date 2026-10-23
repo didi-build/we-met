@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { findVarsD1DatabaseIdReference } from "../scripts/check-workflow-d1-id-secrets.mjs";
 
 const WORKFLOWS_DIR = ".github/workflows";
 
@@ -107,6 +108,39 @@ const WARMUP_GUARDS_STEP_NAME = "Deploy-time guards (production warmup)";
 const MIGRATIONS_STEP_NAME = "Apply production D1 migrations";
 const APP_DEPLOY_STEP_NAME = "Deploy Worker to production";
 
+const CONSUMER_PREPARE_ALLOWED_SECRET = "SECRETS.WE_MET_D1_DATABASE_ID_PRODUCTION";
+
+/**
+ * Consumer prepare may only reference the production D1 id secret (dot syntax).
+ * @throws if bracket secrets, toJSON(secrets), or other secret names appear.
+ */
+export function assertConsumerPrepareSecretIsolation(
+  block: string,
+  stepName: string,
+): void {
+  if (/secrets\s*\[/i.test(block)) {
+    throw new Error(`${stepName} must not use secrets[...] bracket syntax`);
+  }
+  if (/toJSON\s*\(\s*secrets/i.test(block)) {
+    throw new Error(`${stepName} must not use toJSON(secrets...)`);
+  }
+  const secretRefs = block.match(/secrets\s*\.\s*[A-Za-z0-9_]+/gi) ?? [];
+  for (const ref of secretRefs) {
+    const normalized = ref.replace(/\s+/g, "").toUpperCase();
+    if (normalized !== CONSUMER_PREPARE_ALLOWED_SECRET) {
+      throw new Error(
+        `${stepName} must only reference secrets.WE_MET_D1_DATABASE_ID_PRODUCTION (found ${ref})`,
+      );
+    }
+  }
+  if (!block.includes("secrets.WE_MET_D1_DATABASE_ID_PRODUCTION")) {
+    throw new Error(`${stepName} must use secrets.WE_MET_D1_DATABASE_ID_PRODUCTION`);
+  }
+  if (findVarsD1DatabaseIdReference(block)) {
+    throw new Error(`${stepName} must not use vars for production D1 id (log leak)`);
+  }
+}
+
 /**
  * Asserts Cloudflare token secrets are wired to the correct deploy job steps.
  * @throws if any assertion fails (Vitest expect errors).
@@ -203,28 +237,12 @@ function assertDeployJobCloudflareTokenIsolation(deploySection: string): void {
 
   const consumerPrepare = deployStepByName(steps, CONSUMER_PREPARE_STEP_NAME);
   const consumerGuards = deployStepByName(steps, CONSUMER_GUARDS_STEP_NAME);
-  const allowedConsumerPrepareSecrets = ["secrets.WE_MET_D1_DATABASE_ID_PRODUCTION"];
-  const consumerPrepareSecretRefs =
-    consumerPrepare.block.match(/secrets\.[A-Z0-9_]+/g) ?? [];
-  for (const ref of consumerPrepareSecretRefs) {
-    if (!allowedConsumerPrepareSecrets.includes(ref)) {
-      throw new Error(
-        `${CONSUMER_PREPARE_STEP_NAME} must only reference ${allowedConsumerPrepareSecrets.join(", ")} (found ${ref})`,
-      );
-    }
-  }
+  assertConsumerPrepareSecretIsolation(
+    consumerPrepare.block,
+    CONSUMER_PREPARE_STEP_NAME,
+  );
   if (consumerGuards.block.includes("secrets.")) {
     throw new Error(`${CONSUMER_GUARDS_STEP_NAME} must not reference secrets.*`);
-  }
-  if (!consumerPrepare.block.includes("secrets.WE_MET_D1_DATABASE_ID_PRODUCTION")) {
-    throw new Error(
-      `${CONSUMER_PREPARE_STEP_NAME} must use secrets.WE_MET_D1_DATABASE_ID_PRODUCTION`,
-    );
-  }
-  if (consumerPrepare.block.includes("vars.WE_MET_D1_DATABASE_ID_PRODUCTION")) {
-    throw new Error(
-      `${CONSUMER_PREPARE_STEP_NAME} must not use vars for production D1 id (log leak)`,
-    );
   }
 }
 
@@ -459,12 +477,43 @@ describe("Deploy production workflow structure (unit)", () => {
 
   it("does not pass production D1 id through GitHub variables (log leak)", () => {
     const deploySection = extractDeployJobSection(workflow);
-    expect(deploySection).not.toContain("vars.WE_MET_D1_DATABASE_ID_PRODUCTION");
+    expect(findVarsD1DatabaseIdReference(deploySection)).toBeNull();
     expect(deploySection).toContain("secrets.WE_MET_D1_DATABASE_ID_PRODUCTION");
   });
 
   it("isolates Cloudflare API tokens across deploy job steps", () => {
     assertDeployJobCloudflareTokenIsolation(extractDeployJobSection(workflow));
+  });
+
+  it("consumer prepare secret isolation rejects disguised Cloudflare secret references", () => {
+    const steps = splitDeployJobSteps(extractDeployJobSection(workflow));
+    const prepare = deployStepByName(steps, CONSUMER_PREPARE_STEP_NAME);
+    const withLowercaseToken = prepare.block.replace(
+      "WE_MET_PROVISION_D1_IDS_FILE: provision-d1-ids.json",
+      "EXTRA: ${{ secrets.cloudflare_api_token_production }}",
+    );
+    expect(() =>
+      assertConsumerPrepareSecretIsolation(
+        withLowercaseToken,
+        CONSUMER_PREPARE_STEP_NAME,
+      ),
+    ).toThrow(/cloudflare/i);
+
+    const withBracketToken = prepare.block.replace(
+      "secrets.WE_MET_D1_DATABASE_ID_PRODUCTION",
+      "secrets['CLOUDFLARE_API_TOKEN_PRODUCTION']",
+    );
+    expect(() =>
+      assertConsumerPrepareSecretIsolation(
+        withBracketToken,
+        CONSUMER_PREPARE_STEP_NAME,
+      ),
+    ).toThrow(/bracket/i);
+
+    const withToJson = `${prepare.block}\n          FOO: \${{ toJSON(secrets) }}`;
+    expect(() =>
+      assertConsumerPrepareSecretIsolation(withToJson, CONSUMER_PREPARE_STEP_NAME),
+    ).toThrow(/toJSON/i);
   });
 
   it("token isolation self-check rejects consumer token on the app deploy step", () => {

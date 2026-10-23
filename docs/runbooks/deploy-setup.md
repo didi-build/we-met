@@ -6,7 +6,7 @@ Complete these steps **before** relying on CI previews or production deploys. Ho
 
 Run this **first** as the maintainer. Use **`npx wrangler login`** (OAuth) for all Cloudflare commands in this section — **no** `CLOUDFLARE_API_TOKEN` environment variables.
 
-Use the same **generated config** as CI: `node scripts/prepare-wrangler-config.mjs` → gitignored **`wrangler.ci.jsonc`** at the repo root, with real D1 IDs from environment variables (not a hand-copied `wrangler.local.jsonc`).
+Use the same **generated config** as CI: `node scripts/prepare-wrangler-config.mjs` → gitignored **`wrangler.ci.jsonc`** at the repo root, with real D1 IDs from your shell `export` (same env var names as CI secrets; not a hand-copied `wrangler.local.jsonc`).
 
 `NEXT_PUBLIC_TURNSTILE_SITE_KEY` is inlined at **build time**, so **production and preview each need their own `npm run build`** with the matching widget site key before deploy or preview.
 
