@@ -54,10 +54,14 @@ describe("check-secret-usage (unit)", () => {
     expect(findConsumerProductionCredentialViolations(dir)).toEqual(["leak.yml"]);
   });
 
-  it("allows migrate-nonprod secret only in migrate-nonprod.yml", () => {
+  it("allows migrate-nonprod secret only in migrate-nonprod.yml and provision-nonprod-main.yml", () => {
     const dir = mkdtempSync(join(tmpdir(), "secret-usage-migrate-"));
     writeFileSync(
       join(dir, "migrate-nonprod.yml"),
+      "environment: migrate-nonprod\nsecrets.CLOUDFLARE_API_TOKEN_MIGRATE_NONPROD\n",
+    );
+    writeFileSync(
+      join(dir, "provision-nonprod-main.yml"),
       "environment: migrate-nonprod\nsecrets.CLOUDFLARE_API_TOKEN_MIGRATE_NONPROD\n",
     );
     writeFileSync(join(dir, "ci.yml"), "name: CI\n");
