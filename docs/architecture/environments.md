@@ -49,6 +49,9 @@ Preview deployments receive **ASSETS**, **IMAGES** (when `previews.images` is se
 - Preview and top-level `database_id` values are identical (including after CI substitution).
 - Production `routes` includes custom domain **`app.we-met.link`**; the `previews` block must not define that route.
 - `config/nonprod-mail-safety.json` is missing, invalid, or does not **fail closed** when `WE_MET_TEST_MAIL_TO` is unset (spec mirrored by the non-prod consumer Worker in [DIDI-577](https://linear.app/didi-build/issue/DIDI-577)).
+- Each top-level **D1** and **R2** binding has a **previews** counterpart with the **same binding name** and a resource name of `<production-name>-nonprod` (and the reverse).
+
+**Provision (CI):** `scripts/provision-resources.mjs` creates missing D1 databases and R2 buckets declared in Wrangler before deploy ([0020 amendment](../decisions/0020-d1-database-id-injection.md#amendment-2026-10-23-didi-683-create-if-missing-d1r2-and-env-validation), [deploy runbook](../runbooks/deploy.md#add-a-d1-database-or-r2-bucket-pr-only)).
 
 Production deploys use the GitHub **`production`** environment (required reviewers); that gate is enforced by workflow structure tests, not by this script.
 

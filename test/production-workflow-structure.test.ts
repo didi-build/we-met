@@ -224,6 +224,16 @@ const EXPECTED_DEPLOY_STEPS_BLOCK = `    steps:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - name: Provision D1 and R2 (production)
+        env:
+          CLOUDFLARE_API_TOKEN: \${{ secrets.CLOUDFLARE_API_TOKEN_PRODUCTION }}
+          CLOUDFLARE_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WE_MET_D1_DATABASE_ID_PRODUCTION: \${{ vars.WE_MET_D1_DATABASE_ID_PRODUCTION }}
+        run: |
+          set -euo pipefail
+          node scripts/provision-resources.mjs \\
+            --target production \\
+            --config wrangler.jsonc
       - name: Prepare Wrangler config (production D1 IDs)
         env:
           WE_MET_D1_DATABASE_ID_PRODUCTION: \${{ vars.WE_MET_D1_DATABASE_ID_PRODUCTION }}

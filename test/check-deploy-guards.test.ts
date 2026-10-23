@@ -139,6 +139,19 @@ describe("check-deploy-guards (unit)", () => {
     expect(result.stderr).toContain("preview queue");
   });
 
+  it("fails when preview D1 binding name is not paired with production", () => {
+    const { path } = writeTempConfig((config) => {
+      const previews = config.previews as Record<string, unknown>;
+      const previewD1 = previews.d1_databases as { binding: string }[];
+      previewD1[0].binding = "WE_MET_DB_OTHER";
+    });
+    const result = runGuards("production", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(
+      /production missing D1 binding "WE_MET_DB_OTHER"|previews missing D1 binding "WE_MET_DB"/,
+    );
+  });
+
   it("fails when preview D1 database_name is production", () => {
     const { path } = writeTempConfig((config) => {
       const previews = config.previews as Record<string, unknown>;

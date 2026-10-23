@@ -24,3 +24,10 @@
 
 - Maintainer proof deploys use `prepare-wrangler-config.mjs` → gitignored `wrangler.ci.jsonc` with D1 IDs in env vars ([deploy-setup.md](../runbooks/deploy-setup.md)).
 - `npm run db:migrate:remote` uses a minimal generated config (`--target d1-migrate-nonprod`) because `wrangler d1 migrations apply` does not read the `previews` block for remote applies.
+
+## Amendment (2026-10-23, DIDI-683): create-if-missing D1/R2 and env validation
+
+- **`scripts/provision-resources.mjs`** runs in deploy workflows before `prepare-wrangler-config.mjs`. It reads declared `d1_databases` and `r2_buckets` for the target (top-level for production, `previews` for non-prod, plus the matching follow-up consumer config), creates missing Cloudflare resources with Wrangler, and is idempotent on re-run.
+- **D1 ID strategy (unchanged for operators):** keep GitHub environment variables `WE_MET_D1_DATABASE_ID_PRODUCTION` and `WE_MET_D1_DATABASE_ID_NONPROD` for the primary `WE_MET_DB` bindings. After provisioning, the script **validates** that each resolved D1 `database_name` has a matching env var and that the value equals the live Cloudflare id. If a new D1 is declared in Wrangler but no variable exists yet, the provision step **fails with a clear message** to add the variable (name pattern `WE_MET_D1_DATABASE_ID_<DATABASE_NAME_SLUG>_PRODUCTION` or `_NONPROD` for additional databases). `prepare-wrangler-config.mjs` is unchanged; it still substitutes placeholders from those variables.
+- **Non-prod ids in logs** are masked in provision stdout; validation still uses the real env var value.
+- **R2 buckets** have no GitHub variables; provision only ensures the bucket exists. Pairing of prod vs `-nonprod` names is enforced by deploy-time guards.
