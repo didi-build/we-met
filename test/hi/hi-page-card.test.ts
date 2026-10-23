@@ -1,6 +1,27 @@
 import { describe, expect, it } from "vitest";
-import { toHiPageCard } from "@/lib/hi-card/hi-page-card";
+import {
+  ownerContactFromSessionFields,
+  toHiPageCard,
+} from "@/lib/hi-card/hi-page-card";
 import { exampleCardRecord } from "../helpers/example-card";
+
+describe("ownerContactFromSessionFields (unit)", () => {
+  it("returns null when both owner email and phone are empty", () => {
+    expect(ownerContactFromSessionFields("", "")).toBeNull();
+    expect(ownerContactFromSessionFields("  ", "\t")).toBeNull();
+  });
+
+  it("returns trimmed contact when either field is present", () => {
+    expect(ownerContactFromSessionFields("  owner@example.com  ", "")).toEqual({
+      email: "owner@example.com",
+      phone: "",
+    });
+    expect(ownerContactFromSessionFields("", " +1 555 0100 ")).toEqual({
+      email: "",
+      phone: "+1 555 0100",
+    });
+  });
+});
 
 describe("toHiPageCard (unit)", () => {
   it("removes owner email and phone from the public page card", () => {

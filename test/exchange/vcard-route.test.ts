@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GET, POST } from "@/app/api/exchange/vcard/route";
 import {
   APP_SETTING_DAILY_CAP_GLOBAL,
@@ -104,6 +104,10 @@ describe("POST /api/exchange/vcard", () => {
     routeMocks.vcardDeps = defaultVcardDeps();
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("returns 405 for GET with Allow: POST", async () => {
     const response = await GET();
     expect(response.status).toBe(405);
@@ -176,6 +180,31 @@ describe("POST /api/exchange/vcard", () => {
     expect(response.status).toBe(303);
     expect(response.headers.get("Location")).toBe(`/hi/${card.slug}?vcard=expired`);
     expect(await response.text()).toBe("");
+  });
+
+  it("uses injected clock for invalid_token form redirect slug fallback", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-10-16T13:00:00.000Z"));
+      const depsNow = new Date("2026-10-16T14:00:00.000Z");
+      routeMocks.vcardDeps = defaultVcardDeps({
+        now: () => depsNow,
+      });
+      const iatSeconds = Math.floor(
+        new Date("2026-10-16T12:00:00.000Z").getTime() / 1000,
+      );
+      const token = validToken("test-token-secret", card, iatSeconds);
+      const response = await postVcard({
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ token, slug: "redirect-fallback" }).toString(),
+      });
+      expect(response.status).toBe(303);
+      expect(response.headers.get("Location")).toBe(
+        "/hi/redirect-fallback?vcard=expired",
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("returns 303 with limited for form rate_limited", async () => {

@@ -4,6 +4,12 @@ import { HiVisitorReceipt } from "@/components/hi/HiVisitorReceipt";
 import { createDetailsToken } from "@/exchange/token";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  expectNoVisitorReceiptContactRow,
+  isReceiptContactPlaceholder,
+  receiptContactPlaceholders,
+  visitorReceiptContactGrid,
+} from "./receipt-contact-test-helpers";
 
 afterEach(() => {
   cleanup();
@@ -147,8 +153,30 @@ describe("HiVisitorReceipt (component)", () => {
 
   it("hides the email and call row when owner contact is unknown after reload", () => {
     render(<HiVisitorReceipt {...baseProps} ownerContact={null} />);
+    expectNoVisitorReceiptContactRow();
+  });
+
+  it("omits the email button and shows an email-slot placeholder when email is missing", () => {
+    render(
+      <HiVisitorReceipt
+        {...baseProps}
+        ownerContact={{ email: "", phone: "+1 416 555 0142" }}
+      />,
+    );
     expect(screen.queryByRole("link", { name: /Email/i })).toBeNull();
-    expect(screen.queryByRole("link", { name: /Call/i })).toBeNull();
+    expect(document.querySelector('a[href^="mailto:"]')).toBeNull();
+    expect(screen.getByRole("link", { name: /Call/i }).getAttribute("href")).toMatch(
+      /^tel:/,
+    );
+    expect(receiptContactPlaceholders()).toHaveLength(1);
+
+    const grid = visitorReceiptContactGrid();
+    expect(grid).toBeTruthy();
+    const cells = Array.from(grid!.children);
+    expect(cells).toHaveLength(2);
+    expect(isReceiptContactPlaceholder(cells[0]!)).toBe(true);
+    expect(cells[1]?.tagName).toBe("A");
+    expect(cells[1]?.getAttribute("href")).toMatch(/^tel:/);
   });
 
   it("shows after-details copy when details were sent", () => {

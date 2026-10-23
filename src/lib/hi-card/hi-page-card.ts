@@ -10,6 +10,19 @@ export type HiOwnerContact = {
   phone: string;
 };
 
+/** Null when a restored session has no owner inbox or phone to show on the receipt. */
+export function ownerContactFromSessionFields(
+  ownerEmail: string,
+  ownerPhone: string,
+): HiOwnerContact | null {
+  const email = ownerEmail.trim();
+  const phone = ownerPhone.trim();
+  if (!email && !phone) {
+    return null;
+  }
+  return { email, phone };
+}
+
 export function toHiPageCard(card: CardRecord): HiPageCard {
   const { email: _ownerEmail, contact, ...rest } = card;
   const { phone: _phone, ...contactPublic } = contact;
