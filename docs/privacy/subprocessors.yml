@@ -1,0 +1,18 @@
+schema_version: 1
+subprocessors:
+  - name: Cloudflare
+    purpose: Hosts the app and consumer Workers; D1, R2, Queues, Turnstile, rate limiting, Workers Observability logs/traces
+    data: Data described under processors Cloudflare in data-map.yml (account and card data in D1/R2, queue payloads with visitor leads, technical data such as IP for abuse protection, etc.)
+    verified: true
+  - name: Cloudflare Email Service
+    purpose: Sends all contact-exchange and related outbound mail
+    data: For each outbound message, recipient address, sender address and display name, optional reply-to, subject, plain-text and HTML bodies, and attachments (including contact cards when visitor follow-up is on). Owner lead notifications always (visitor name, email, phone; append with job title, company, note; Reply-To visitor). Visitor follow-up only when visitor_email_mode is direct (card owner names, role, photo URL in body, vCard with owner email and name).
+    verified: true
+  - name: Google
+    purpose: Google sign-in (OAuth ID token)
+    data: Google account subject, email, name, and email-verified flag during sign-in; we persist sub, email, and name only
+    verified: true
+  - name: Google (People API)
+    purpose: Optional one-time contacts setup when the owner chooses Add We Met to my contacts
+    data: Google Contacts scope (see, edit, download, delete contacts). During setup only, searchContacts for our sending addresses and create or update one We Met contact in the owner Google Contacts until they delete it; we do not persist Google OAuth tokens
+    verified: true
