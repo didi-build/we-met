@@ -9,7 +9,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "check": "npm run format:check && npm run lint && npm run typecheck && npm run email-templates:check && npm run test && npm run theme-colors && npm run build && npm run worker:dry-run && npm run worker:dry-run:generated && npm run worker:consumer-dry-run:nonprod && npm run worker:consumer-dry-run:production && npm run worker:warmup-dry-run && npm run warmup-no-emails && npm run consumer-email-bundle:check && npm run deploy:guards && npm run secrets && npm run secret-usage && npm run actions-policy-workflows && npm run placeholders && npm run attribution",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run email-templates:check && npm run test && npm run theme-colors && npm run build && npm run worker:dry-run && npm run worker:dry-run:generated && npm run worker:consumer-dry-run:nonprod && npm run worker:consumer-dry-run:production && npm run worker:warmup-dry-run && npm run warmup-no-emails && npm run consumer-email-bundle:check && npm run deploy:guards && npm run workflow-provision-policy && npm run secrets && npm run secret-usage && npm run actions-policy-workflows && npm run placeholders && npm run attribution",
     "email-templates:generate": "node scripts/generate-email-templates.mjs",
     "email-templates:check": "node scripts/check-email-templates-generated.mjs",
     "consumer-email-bundle:check": "node scripts/check-consumer-email-bundle.mjs",
@@ -24,6 +24,7 @@
     "worker:warmup-dry-run": "wrangler deploy --dry-run --config workers/warmup/wrangler.jsonc",
     "warmup-no-emails": "node scripts/check-warmup-no-emails.mjs",
     "deploy:guards": "node scripts/check-deploy-guards.mjs --target preview --config wrangler.jsonc && node scripts/check-deploy-guards.mjs --target production --config wrangler.jsonc && node scripts/check-deploy-guards.mjs --target consumer-nonprod --config workers/we-met-followup-email-consumer/wrangler.nonprod.jsonc && node scripts/check-deploy-guards.mjs --target consumer-production --config workers/we-met-followup-email-consumer/wrangler.production.jsonc && node scripts/check-deploy-guards.mjs --target warmup-production --config workers/warmup/wrangler.jsonc",
+    "workflow-provision-policy": "node scripts/check-workflow-provision-policy.mjs",
     "db:migrate": "node scripts/apply-migrations.mjs --local",
     "db:migrate:remote": "node scripts/apply-migrations.mjs --remote we-met-db-nonprod",
     "cards:load": "tsx scripts/load-cards.ts",

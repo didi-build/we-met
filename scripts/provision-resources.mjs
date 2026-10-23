@@ -2,31 +2,21 @@
 /**
  * Create-if-missing Cloudflare D1 databases and R2 buckets declared in Wrangler config.
  *
- * Usage:
- *   node scripts/provision-resources.mjs --target production --config wrangler.jsonc
- *   node scripts/provision-resources.mjs --target nonprod --config wrangler.jsonc
- *
- * Environment:
- *   CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID — required for live Wrangler calls
- *   WE_MET_D1_DATABASE_ID_PRODUCTION — validated against Cloudflare for production D1
- *   WE_MET_D1_DATABASE_ID_NONPROD — validated for non-prod D1 (logs masked)
+ * Uses the Cloudflare REST API (fetch) for exact-name lookups and creates.
+ * D1 ids are written to --output JSON only; they are never printed.
  */
-import { execFile as execFileCb } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { promisify } from "node:util";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { createCloudflareProvisionClient } from "./lib/cloudflare-provision-api.mjs";
 import { parseJsonc } from "./lib/parse-jsonc.mjs";
+import { runProvisionForDeclared } from "./lib/provision-run.mjs";
 import {
-  buildProvisionPlan,
   collectDeclaredResources,
-  createWranglerRunner,
-  d1EnvVarForDatabaseName,
-  executeProvisionPlan,
-  maskIdForLog,
+  DEFAULT_PROVISION_D1_IDS_FILE,
+  validateConsumerMatchesApp,
   validateDeclaredNames,
-  validateD1IdsAgainstEnv,
 } from "./lib/provision-resources.mjs";
-
-const execFile = promisify(execFileCb);
 
 const CONSUMER_DIR = "workers/we-met-followup-email-consumer";
 const CONSUMER_PRODUCTION = `${CONSUMER_DIR}/wrangler.production.jsonc`;
@@ -34,7 +24,7 @@ const CONSUMER_NONPROD = `${CONSUMER_DIR}/wrangler.nonprod.jsonc`;
 
 function usage() {
   console.error(
-    "Usage: provision-resources.mjs --target <production|nonprod> --config <wrangler.jsonc> [--resources d1,r2]",
+    "Usage: provision-resources.mjs --target <production|nonprod> --config <wrangler.jsonc> [--resources d1,r2] [--output <provision-d1-ids.json>]",
   );
   process.exit(1);
 }
@@ -58,10 +48,12 @@ function parseArgs(argv) {
   let configPath = "wrangler.jsonc";
   let includeD1 = true;
   let includeR2 = true;
+  let outputPath = DEFAULT_PROVISION_D1_IDS_FILE;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--target") target = argv[++i];
     else if (arg === "--config") configPath = argv[++i];
+    else if (arg === "--output") outputPath = argv[++i];
     else if (arg === "--resources") {
       const parsed = parseResourcesFlag(argv[++i] ?? "");
       includeD1 = parsed.includeD1;
@@ -73,7 +65,7 @@ function parseArgs(argv) {
     }
   }
   if (target !== "production" && target !== "nonprod") usage();
-  return { target, configPath, includeD1, includeR2 };
+  return { target, configPath, includeD1, includeR2, outputPath: resolve(outputPath) };
 }
 
 function loadConsumerConfig(target) {
@@ -87,45 +79,48 @@ function fail(message) {
 }
 
 async function main() {
-  const { target, configPath, includeD1, includeR2 } = parseArgs(process.argv.slice(2));
+  const { target, configPath, includeD1, includeR2, outputPath } = parseArgs(
+    process.argv.slice(2),
+  );
   const mainConfig = parseJsonc(readFileSync(configPath, "utf8"));
   const consumerConfig = loadConsumerConfig(target);
+  const resourceOptions = { includeD1, includeR2 };
 
-  const { d1, r2 } = collectDeclaredResources(mainConfig, consumerConfig, target, {
-    includeD1,
-    includeR2,
-  });
+  const consumerErrors = validateConsumerMatchesApp(
+    mainConfig,
+    consumerConfig,
+    target,
+    resourceOptions,
+  );
+  if (consumerErrors.length > 0) {
+    for (const err of consumerErrors) fail(err);
+  }
+
+  const { d1, r2 } = collectDeclaredResources(
+    mainConfig,
+    consumerConfig,
+    target,
+    resourceOptions,
+  );
   const nameErrors = validateDeclaredNames(d1, r2, target);
   if (nameErrors.length > 0) {
     for (const err of nameErrors) fail(err);
   }
 
-  if (!process.env.CLOUDFLARE_API_TOKEN?.trim()) {
-    fail("CLOUDFLARE_API_TOKEN is required");
-  }
-
-  const wrangler = createWranglerRunner(execFile, {
-    accountId: process.env.CLOUDFLARE_ACCOUNT_ID,
+  const api = createCloudflareProvisionClient(fetch, {
+    accountId: process.env.CLOUDFLARE_ACCOUNT_ID ?? "",
+    apiToken: process.env.CLOUDFLARE_API_TOKEN ?? "",
   });
 
-  const existingD1 = await wrangler.listD1Databases();
-  const existingR2 = await wrangler.listR2Buckets();
-  const plan = buildProvisionPlan(d1, r2, existingD1, existingR2);
+  const { envErrors } = await runProvisionForDeclared({
+    target,
+    d1,
+    r2,
+    api,
+    env: process.env,
+    outputPath,
+  });
 
-  const { log, resolvedD1Ids } = await executeProvisionPlan(plan, wrangler, existingD1);
-
-  for (const entry of log) {
-    console.log(`provision: ${entry.message}`);
-  }
-
-  for (const [databaseName, id] of Object.entries(resolvedD1Ids)) {
-    const envName = d1EnvVarForDatabaseName(databaseName, target);
-    console.log(
-      `provision: D1 ${databaseName} id=${maskIdForLog(id, target)} (${envName})`,
-    );
-  }
-
-  const envErrors = validateD1IdsAgainstEnv(resolvedD1Ids, target, process.env);
   if (envErrors.length > 0) {
     for (const err of envErrors) fail(err);
   }
@@ -133,7 +128,9 @@ async function main() {
   console.log(`provision: complete (${target})`);
 }
 
-main().catch((err) => {
-  console.error(err instanceof Error ? err.message : String(err));
-  process.exit(1);
-});
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch((err) => {
+    console.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  });
+}

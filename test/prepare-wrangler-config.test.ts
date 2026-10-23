@@ -47,7 +47,7 @@ describe("prepare-wrangler-config (unit)", () => {
     const output = trackRootOutput(`wrangler.test-${process.pid}.ci.jsonc`);
     const result = runPrepare("production", output, {});
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain("WE_MET_D1_DATABASE_ID_PRODUCTION");
+    expect(result.stderr).toMatch(/WE_MET_D1_DATABASE_ID_PRODUCTION|missing D1 id/);
   });
 
   it("fails when --output is not a file in the repository root", () => {

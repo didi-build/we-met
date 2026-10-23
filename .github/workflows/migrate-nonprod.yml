@@ -67,13 +67,14 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
+          ref: main
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - name: Provision D1 and R2 (non-prod)
+      - name: Provision D1 and R2 (non-prod, main only)
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_MIGRATE_NONPROD }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -83,13 +84,7 @@ jobs:
           node scripts/provision-resources.mjs \
             --target nonprod \
             --config wrangler.jsonc \
-            --resources d1
-      - name: Mask non-prod D1 database id
-        env:
-          WE_MET_D1_DATABASE_ID_NONPROD: ${{ vars.WE_MET_D1_DATABASE_ID_NONPROD }}
-        run: |
-          set -euo pipefail
-          echo "::add-mask::${WE_MET_D1_DATABASE_ID_NONPROD}"
+            --output provision-d1-ids.json
       - name: Download migration artifact
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:

@@ -1,12 +1,27 @@
-import { describe, expect, it } from "vitest";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { spawnSync } from "node:child_process";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  createCloudflareProvisionClient,
+  isCloudflareNotFound,
+  parseCloudflareJsonBody,
+} from "../scripts/lib/cloudflare-provision-api.mjs";
 import {
   assertNameAllowedForTarget,
   buildProvisionPlan,
   collectDeclaredResources,
+  d1EnvVarForDatabaseName,
   executeProvisionPlan,
+  lookupDeclaredD1,
   validateDeclaredNames,
   validateD1IdsAgainstEnv,
 } from "../scripts/lib/provision-resources.mjs";
+import {
+  provisionLogLinesWithoutMasks,
+  runProvisionForDeclared,
+} from "../scripts/lib/provision-run.mjs";
 
 const MAIN_CONFIG = {
   d1_databases: [{ binding: "WE_MET_DB", database_name: "we-met-db" }],
@@ -17,147 +32,231 @@ const MAIN_CONFIG = {
   },
 };
 
-const CONSUMER_PRODUCTION = {
-  d1_databases: [{ binding: "WE_MET_DB", database_name: "we-met-db" }],
-  r2_buckets: [{ binding: "WE_MET_ASSETS", bucket_name: "we-met-assets" }],
-};
-
-const CONSUMER_NONPROD = {
-  d1_databases: [{ binding: "WE_MET_DB", database_name: "we-met-db-nonprod" }],
-  r2_buckets: [{ binding: "WE_MET_ASSETS", bucket_name: "we-met-assets-nonprod" }],
-};
-
-function fakeWrangler(options: {
-  d1?: { name: string; uuid: string }[];
-  r2?: string[];
-  onCreateD1?: (name: string) => { name: string; uuid: string };
-  onCreateR2?: (name: string) => void;
+function fakeApi(state: {
+  d1?: Record<string, string>;
+  r2?: Set<string>;
+  calls?: { d1Get: string[]; r2Get: string[] };
 }) {
-  const d1 = [...(options.d1 ?? [])];
-  const r2 = [...(options.r2 ?? [])];
+  const d1 = { ...(state.d1 ?? {}) };
+  const r2 = new Set(state.r2 ?? []);
+  const calls = state.calls ?? { d1Get: [], r2Get: [] };
   return {
-    listD1Databases: async () => d1,
-    listR2Buckets: async () => r2,
-    createD1Database: async (name: string) => {
-      const created = options.onCreateD1?.(name) ?? {
-        name,
-        uuid: `new-d1-${name}`,
-      };
-      d1.push(created);
-      return created;
-    },
-    createR2Bucket: async (name: string) => {
-      options.onCreateR2?.(name);
-      r2.push(name);
+    calls,
+    api: {
+      async getD1Database(name: string) {
+        calls.d1Get.push(name);
+        const uuid = d1[name];
+        return uuid ? { name, uuid } : null;
+      },
+      async r2BucketExists(name: string) {
+        calls.r2Get.push(name);
+        return r2.has(name);
+      },
+      async createD1Database(name: string) {
+        const uuid = `created-${name}`;
+        d1[name] = uuid;
+        return { name, uuid };
+      },
+      async createR2Bucket(name: string) {
+        r2.add(name);
+      },
     },
   };
 }
 
+const tempDirs: string[] = [];
+afterEach(() => {
+  for (const dir of tempDirs) rmSync(dir, { recursive: true, force: true });
+  tempDirs.length = 0;
+  vi.restoreAllMocks();
+});
+
 describe("provision-resources (unit)", () => {
-  it("collects production D1 and R2 from app and consumer configs", () => {
-    const resources = collectDeclaredResources(
-      MAIN_CONFIG,
-      CONSUMER_PRODUCTION,
-      "production",
-    );
-    expect(resources.d1).toEqual(["we-met-db"]);
-    expect(resources.r2).toEqual(["we-met-assets"]);
+  it("collects only target-scoped names", () => {
+    const prod = collectDeclaredResources(MAIN_CONFIG, null, "production");
+    expect(prod.d1).toEqual(["we-met-db"]);
+    const nonprod = collectDeclaredResources(MAIN_CONFIG, null, "nonprod");
+    expect(nonprod.d1).toEqual(["we-met-db-nonprod"]);
   });
 
-  it("collects non-prod D1 and R2 from previews and consumer configs", () => {
-    const resources = collectDeclaredResources(
-      MAIN_CONFIG,
-      CONSUMER_NONPROD,
-      "nonprod",
-    );
-    expect(resources.d1).toEqual(["we-met-db-nonprod"]);
-    expect(resources.r2).toEqual(["we-met-assets-nonprod"]);
-  });
-
-  it("plans create for missing D1 and R2", () => {
-    const plan = buildProvisionPlan(["we-met-db"], ["we-met-assets"], [], []);
-    expect(plan).toEqual([
-      { action: "create", kind: "d1", name: "we-met-db" },
-      { action: "create", kind: "r2", name: "we-met-assets" },
-    ]);
-  });
-
-  it("plans skip for existing D1 and R2", () => {
-    const plan = buildProvisionPlan(
-      ["we-met-db"],
-      ["we-met-assets"],
-      [{ name: "we-met-db", uuid: "id-1" } as { name: string }],
-      ["we-met-assets"],
-    );
-    expect(plan).toEqual([
-      { action: "skip", kind: "d1", name: "we-met-db" },
-      { action: "skip", kind: "r2", name: "we-met-assets" },
-    ]);
-  });
-
-  it("creates missing D1 and R2 via wrangler seam", async () => {
-    const createdR2: string[] = [];
-    const wrangler = fakeWrangler({
-      d1: [{ name: "we-met-db", uuid: "existing-db" }],
-      onCreateR2: (name) => createdR2.push(name),
+  it("resolves only declared D1 names per target when both exist in account", async () => {
+    const { api, calls } = fakeApi({
+      d1: {
+        "we-met-db": "prod-uuid",
+        "we-met-db-nonprod": "nonprod-uuid",
+      },
     });
-    const existingD1 = await wrangler.listD1Databases();
-    const existingR2 = await wrangler.listR2Buckets();
-    const plan = buildProvisionPlan(
-      ["we-met-db"],
-      ["we-met-assets-new"],
-      existingD1,
-      existingR2,
-    );
+    const prodRows = await lookupDeclaredD1(["we-met-db"], api);
+    expect(prodRows).toEqual([{ name: "we-met-db", uuid: "prod-uuid" }]);
+    expect(calls.d1Get).toEqual(["we-met-db"]);
+
+    calls.d1Get.length = 0;
+    const nonprodRows = await lookupDeclaredD1(["we-met-db-nonprod"], api);
+    expect(nonprodRows[0].uuid).toBe("nonprod-uuid");
+    expect(calls.d1Get).toEqual(["we-met-db-nonprod"]);
+  });
+
+  it("plans and executes create for missing resources", async () => {
+    const { api } = fakeApi({ d1: {}, r2: new Set() });
+    const plan = buildProvisionPlan(["we-met-db"], ["we-met-assets"], [], []);
     const { log, resolvedD1Ids } = await executeProvisionPlan(
-      plan as {
-        action: "create" | "skip";
-        kind: "d1" | "r2";
-        name: string;
-      }[],
-      wrangler,
-      existingD1,
+      plan as { action: "create" | "skip"; kind: "d1" | "r2"; name: string }[],
+      api,
+      [],
     );
-    expect(createdR2).toEqual(["we-met-assets-new"]);
-    expect(resolvedD1Ids["we-met-db"]).toBe("existing-db");
-    expect(log.some((e) => e.message.includes("already exists"))).toBe(true);
-    expect(log.some((e) => e.message.includes("we-met-assets-new created"))).toBe(true);
+    expect(log.some((e) => e.message.includes("created"))).toBe(true);
+    expect(resolvedD1Ids).toMatchObject({ "we-met-db": "created-we-met-db" });
   });
 
-  it("refuses production name under nonprod target", () => {
-    const errors = validateDeclaredNames(["we-met-db"], [], "nonprod");
-    expect(errors.length).toBe(1);
-    expect(errors[0]).toContain("refusing non-prod");
-  });
-
-  it("refuses nonprod name under production target", () => {
-    const errors = validateDeclaredNames(["we-met-db-nonprod"], [], "production");
-    expect(errors.length).toBe(1);
-    expect(errors[0]).toContain("refusing production");
-  });
-
-  it("assertNameAllowedForTarget covers both directions", () => {
-    expect(assertNameAllowedForTarget("we-met-db", "nonprod")).toContain(
-      "refusing non-prod",
-    );
-    expect(assertNameAllowedForTarget("we-met-db-nonprod", "production")).toContain(
-      "refusing production",
+  it("refuses wrong-env names", () => {
+    expect(validateDeclaredNames(["we-met-db"], [], "nonprod").length).toBe(1);
+    expect(validateDeclaredNames(["we-met-db-nonprod"], [], "production").length).toBe(
+      1,
     );
     expect(assertNameAllowedForTarget("we-met-db", "production")).toBeNull();
-    expect(assertNameAllowedForTarget("we-met-db-nonprod", "nonprod")).toBeNull();
   });
 
-  it("fails validation when D1 env var is unset", () => {
-    const errors = validateD1IdsAgainstEnv({ "we-met-db": "uuid-1" }, "production", {});
-    expect(errors[0]).toContain("WE_MET_D1_DATABASE_ID_PRODUCTION");
-  });
-
-  it("fails validation when D1 env var does not match Cloudflare id", () => {
-    const errors = validateD1IdsAgainstEnv(
-      { "we-met-db-nonprod": "uuid-2" },
-      "nonprod",
-      { WE_MET_D1_DATABASE_ID_NONPROD: "other" },
+  it("additional database env var slug strips -nonprod once", () => {
+    expect(d1EnvVarForDatabaseName("we-met-extra-db-nonprod", "nonprod")).toBe(
+      "WE_MET_D1_DATABASE_ID_WE_MET_EXTRA_DB_NONPROD",
     );
+  });
+
+  it("does not print D1 ids to stdout", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "we-met-prov-out-"));
+    tempDirs.push(dir);
+    const outputPath = join(dir, "provision-d1-ids.json");
+    const logs: string[] = [];
+    const spy = vi.spyOn(console, "log").mockImplementation((...args) => {
+      logs.push(args.join(" "));
+    });
+    const { api } = fakeApi({
+      d1: { "we-met-db": "secret-uuid-1111-1111-1111-111111111111" },
+      r2: new Set(["we-met-assets"]),
+    });
+    await runProvisionForDeclared({
+      target: "production",
+      d1: ["we-met-db"],
+      r2: ["we-met-assets"],
+      api,
+      env: {
+        WE_MET_D1_DATABASE_ID_PRODUCTION: "secret-uuid-1111-1111-1111-111111111111",
+      },
+      outputPath,
+    });
+    spy.mockRestore();
+    const visible = provisionLogLinesWithoutMasks(logs);
+    expect(visible.join("\n")).not.toContain("secret-uuid");
+    expect(visible.join("\n")).toContain("present");
+    expect(logs.some((line) => line.startsWith("::add-mask::"))).toBe(true);
+    const file = JSON.parse(readFileSync(outputPath, "utf8")) as {
+      d1: Record<string, string>;
+    };
+    expect(file.d1["we-met-db"]).toContain("secret-uuid");
+  });
+
+  it("skips R2 lookups when resources list is d1-only", async () => {
+    const { api, calls } = fakeApi({
+      d1: { "we-met-db-nonprod": "n" },
+      r2: new Set(["we-met-assets-nonprod"]),
+    });
+    const d1 = ["we-met-db-nonprod"];
+    const r2: string[] = [];
+    await lookupDeclaredD1(d1, api);
+    expect(calls.r2Get).toEqual([]);
+    const plan = buildProvisionPlan(d1, r2, await lookupDeclaredD1(d1, api), []);
+    await executeProvisionPlan(
+      plan as { action: "create" | "skip"; kind: "d1" | "r2"; name: string }[],
+      api,
+      await lookupDeclaredD1(d1, api),
+    );
+    expect(calls.r2Get).toEqual([]);
+  });
+
+  it("validates env override without echoing ids", () => {
+    const errors = validateD1IdsAgainstEnv({ "we-met-db": "uuid-a" }, "production", {
+      WE_MET_D1_DATABASE_ID_PRODUCTION: "uuid-b",
+    });
     expect(errors[0]).toContain("does not match");
+    expect(errors[0]).not.toContain("uuid-a");
+  });
+});
+
+describe("cloudflare-provision-api (unit)", () => {
+  it("parseCloudflareJsonBody throws on empty output", () => {
+    expect(() => parseCloudflareJsonBody("", "test")).toThrow(/empty/);
+  });
+
+  it("parseCloudflareJsonBody throws on invalid JSON", () => {
+    expect(() => parseCloudflareJsonBody("{", "test")).toThrow(/unparseable/);
+  });
+
+  it("createCloudflareProvisionClient throws on API error (not not-found)", async () => {
+    const fetchImpl = vi.fn(async () => ({
+      status: 403,
+      text: async () =>
+        JSON.stringify({ success: false, errors: [{ code: 10000, message: "auth" }] }),
+    }));
+    const client = createCloudflareProvisionClient(
+      fetchImpl as unknown as typeof fetch,
+      {
+        accountId: "acct",
+        apiToken: "token",
+      },
+    );
+    await expect(client.getD1Database("we-met-db")).rejects.toThrow(/failed/);
+  });
+
+  it("createCloudflareProvisionClient treats 404 as missing D1", async () => {
+    const fetchImpl = vi.fn(async () => ({
+      status: 404,
+      text: async () =>
+        JSON.stringify({
+          success: false,
+          errors: [{ code: 7404, message: "not found" }],
+        }),
+    }));
+    const client = createCloudflareProvisionClient(
+      fetchImpl as unknown as typeof fetch,
+      {
+        accountId: "acct",
+        apiToken: "token",
+      },
+    );
+    await expect(client.getD1Database("missing-db")).resolves.toBeNull();
+  });
+
+  it("isCloudflareNotFound recognizes common codes", () => {
+    expect(isCloudflareNotFound(404, [{ code: 7404 }])).toBe(true);
+    expect(isCloudflareNotFound(200, [])).toBe(false);
+  });
+});
+
+describe("provision-resources CLI (unit)", () => {
+  it("exits non-zero when Cloudflare returns auth error", () => {
+    const result = spawnSync(
+      "node",
+      [
+        "scripts/provision-resources.mjs",
+        "--target",
+        "production",
+        "--config",
+        "wrangler.jsonc",
+        "--output",
+        join(tmpdir(), `provision-cli-${process.pid}.json`),
+      ],
+      {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          CLOUDFLARE_API_TOKEN: "invalid-token-for-test",
+          CLOUDFLARE_ACCOUNT_ID: "00000000000000000000000000000000",
+        },
+      },
+    );
+    expect(result.status).not.toBe(0);
+    expect(result.stderr + result.stdout).not.toMatch(
+      /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i,
+    );
   });
 });

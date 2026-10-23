@@ -94,7 +94,15 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - name: Deploy-time guards (production, committed config)
+        run: node scripts/check-deploy-guards.mjs --target production --config wrangler.jsonc
+      - name: Deploy-time guards (production consumer, committed config)
+        run: |
+          node scripts/check-deploy-guards.mjs \
+            --target consumer-production \
+            --config workers/we-met-followup-email-consumer/wrangler.production.jsonc
       - name: Provision D1 and R2 (production)
+        id: provision
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_PRODUCTION }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -103,10 +111,12 @@ jobs:
           set -euo pipefail
           node scripts/provision-resources.mjs \
             --target production \
-            --config wrangler.jsonc
+            --config wrangler.jsonc \
+            --output provision-d1-ids.json
       - name: Prepare Wrangler config (production D1 IDs)
         env:
           WE_MET_D1_DATABASE_ID_PRODUCTION: ${{ vars.WE_MET_D1_DATABASE_ID_PRODUCTION }}
+          WE_MET_PROVISION_D1_IDS_FILE: provision-d1-ids.json
         run: |
           set -euo pipefail
           node scripts/prepare-wrangler-config.mjs \
@@ -117,6 +127,7 @@ jobs:
       - name: Prepare follow-up email consumer Wrangler config (production D1 ID)
         env:
           WE_MET_D1_DATABASE_ID_PRODUCTION: ${{ vars.WE_MET_D1_DATABASE_ID_PRODUCTION }}
+          WE_MET_PROVISION_D1_IDS_FILE: provision-d1-ids.json
         run: |
           set -euo pipefail
           node scripts/prepare-wrangler-config.mjs \

@@ -8,6 +8,7 @@ build/
 .open-next/
 .wrangler/
 wrangler*.ci.jsonc
+provision-d1-ids.json
 load-*.sql
 wrangler.local.jsonc
 out/

@@ -30,6 +30,10 @@ describe("Preview workflow structure (unit)", () => {
     expect(preview).toContain("preview-comment-body.mjs");
   });
 
+  it("does not run provision-resources (non-prod provision is main-branch only)", () => {
+    expect(preview).not.toContain("provision-resources.mjs");
+  });
+
   it("parses wrangler preview JSON via parse-wrangler-preview-json.mjs", () => {
     expect(preview).toContain("parse-wrangler-preview-json.mjs");
     expect(preview).not.toMatch(/\|\s*jq\b/);

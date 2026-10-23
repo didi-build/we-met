@@ -1,24 +1,14 @@
 /**
  * Plan and apply Cloudflare D1 / R2 resources declared in Wrangler config.
- * Wrangler CLI calls are injectable for unit tests.
  */
 
 export const NONPROD_NAME_SUFFIX = "-nonprod";
+export const DEFAULT_PROVISION_D1_IDS_FILE = "provision-d1-ids.json";
 
 /** @typedef {'production' | 'nonprod'} ProvisionTarget */
 
 /**
- * @typedef {object} WranglerRunner
- * @property {() => Promise<{ name: string, uuid: string }[]>} listD1Databases
- * @property {() => Promise<string[]>} listR2Buckets
- * @property {(name: string) => Promise<{ name: string, uuid: string }>} createD1Database
- * @property {(name: string) => Promise<void>} createR2Bucket
- */
-
-/**
- * @typedef {object} ProvisionResource
- * @property {'d1' | 'r2'} kind
- * @property {string} name
+ * @typedef {import('./cloudflare-provision-api.mjs').CloudflareApiClient} ProvisionApiClient
  */
 
 /**
@@ -40,7 +30,11 @@ const KNOWN_D1_ENV_BY_TARGET = {
 export function d1EnvVarForDatabaseName(databaseName, target) {
   const known = KNOWN_D1_ENV_BY_TARGET[target]?.[databaseName];
   if (known) return known;
-  const slug = databaseName.replace(/-/g, "_").toUpperCase();
+  let baseName = databaseName;
+  if (target === "nonprod" && baseName.endsWith(NONPROD_NAME_SUFFIX)) {
+    baseName = baseName.slice(0, -NONPROD_NAME_SUFFIX.length);
+  }
+  const slug = baseName.replace(/-/g, "_").toUpperCase();
   const suffix = target === "production" ? "PRODUCTION" : "NONPROD";
   return `WE_MET_D1_DATABASE_ID_${slug}_${suffix}`;
 }
@@ -56,11 +50,6 @@ export function assertNameAllowedForTarget(name, target) {
   return null;
 }
 
-/**
- * @param {Record<string, unknown>} mainConfig
- * @param {Record<string, unknown> | null} consumerConfig
- * @param {ProvisionTarget} target
- */
 /**
  * @param {Record<string, unknown>} mainConfig
  * @param {Record<string, unknown> | null} consumerConfig
@@ -111,10 +100,37 @@ export function collectDeclaredResources(
 }
 
 /**
- * @param {string[]} declaredD1
- * @param {string[]} declaredR2
+ * @param {Record<string, unknown>} mainConfig
+ * @param {Record<string, unknown>} consumerConfig
  * @param {ProvisionTarget} target
+ * @param {{ includeD1?: boolean, includeR2?: boolean }} [options]
  */
+export function validateConsumerMatchesApp(
+  mainConfig,
+  consumerConfig,
+  target,
+  options = {},
+) {
+  const app = collectDeclaredResources(mainConfig, null, target, options);
+  const combined = collectDeclaredResources(
+    mainConfig,
+    consumerConfig,
+    target,
+    options,
+  );
+  const errors = [];
+  for (const kind of ["d1", "r2"]) {
+    const appNames = [...app[kind]].sort();
+    const combinedNames = [...combined[kind]].sort();
+    if (appNames.join(",") !== combinedNames.join(",")) {
+      errors.push(
+        `follow-up consumer ${kind} names for ${target} must match the app Worker (${appNames.join(", ") || "none"} vs ${combinedNames.join(", ") || "none"})`,
+      );
+    }
+  }
+  return errors;
+}
+
 export function validateDeclaredNames(declaredD1, declaredR2, target) {
   const errors = [];
   for (const name of [...declaredD1, ...declaredR2]) {
@@ -124,12 +140,6 @@ export function validateDeclaredNames(declaredD1, declaredR2, target) {
   return errors;
 }
 
-/**
- * @param {string[]} declaredD1
- * @param {string[]} declaredR2
- * @param {{ name: string }[]} existingD1
- * @param {string[]} existingR2
- */
 export function buildProvisionPlan(declaredD1, declaredR2, existingD1, existingR2) {
   const d1Set = new Set(existingD1.map((row) => row.name));
   const r2Set = new Set(existingR2);
@@ -153,60 +163,90 @@ export function buildProvisionPlan(declaredD1, declaredR2, existingD1, existingR
 }
 
 /**
- * @param {Record<string, string>} resolvedD1Ids database_name -> uuid
+ * @param {string[]} declaredNames
+ * @param {ProvisionApiClient} api
+ */
+export async function lookupDeclaredD1(declaredNames, api) {
+  const rows = [];
+  for (const name of declaredNames) {
+    const row = await api.getD1Database(name);
+    if (row) rows.push(row);
+  }
+  return rows;
+}
+
+/**
+ * @param {string[]} declaredNames
+ * @param {ProvisionApiClient} api
+ */
+export async function lookupDeclaredR2(declaredNames, api) {
+  const names = [];
+  for (const name of declaredNames) {
+    if (await api.r2BucketExists(name)) names.push(name);
+  }
+  return names;
+}
+
+/**
+ * @param {Record<string, string>} resolvedD1Ids
  * @param {ProvisionTarget} target
  * @param {Record<string, string | undefined>} env
  */
 export function validateD1IdsAgainstEnv(resolvedD1Ids, target, env) {
   const errors = [];
-  for (const [databaseName, cloudflareId] of Object.entries(resolvedD1Ids)) {
+  for (const databaseName of Object.keys(resolvedD1Ids)) {
+    const cloudflareId = resolvedD1Ids[databaseName];
     const envName = d1EnvVarForDatabaseName(databaseName, target);
     const expected = env[envName]?.trim();
     if (!expected) {
-      errors.push(
-        `D1 "${databaseName}" resolved to ${maskIdForLog(cloudflareId, target)} but ${envName} is unset; add the GitHub environment variable with that id before deploy`,
-      );
       continue;
     }
     if (expected !== cloudflareId) {
       errors.push(
-        `D1 "${databaseName}" id from Cloudflare (${maskIdForLog(cloudflareId, target)}) does not match ${envName}`,
+        `D1 "${databaseName}" id from Cloudflare does not match ${envName}; update the variable or provision file`,
       );
     }
   }
   return errors;
 }
 
-export function maskIdForLog(id, target) {
-  if (target === "nonprod") return "***";
-  return id;
+/**
+ * @param {Record<string, string>} resolvedD1Ids
+ * @param {(id: string) => void} maskId
+ */
+export function maskResolvedD1Ids(resolvedD1Ids, maskId) {
+  for (const id of Object.values(resolvedD1Ids)) {
+    if (id?.trim()) maskId(id.trim());
+  }
 }
 
 /**
  * @param {ProvisionPlanAction[]} plan
- * @param {WranglerRunner} wrangler
+ * @param {ProvisionApiClient} api
  * @param {{ name: string, uuid: string }[]} existingD1
  */
-export async function executeProvisionPlan(plan, wrangler, existingD1) {
+export async function executeProvisionPlan(plan, api, existingD1) {
   const d1ByName = new Map(existingD1.map((row) => [row.name, row.uuid]));
   const log = [];
-  const resolvedD1Ids = { ...Object.fromEntries(d1ByName) };
+  const resolvedD1Ids = {};
 
   for (const step of plan) {
     if (step.action === "skip") {
       if (step.kind === "d1") {
-        log.push({ level: "info", message: `D1 ${step.name} already exists` });
+        const uuid = d1ByName.get(step.name);
+        if (uuid) resolvedD1Ids[step.name] = uuid;
+        log.push({ level: "info", message: `D1 ${step.name} present` });
       } else {
-        log.push({ level: "info", message: `R2 ${step.name} already exists` });
+        log.push({ level: "info", message: `R2 ${step.name} present` });
       }
       continue;
     }
     if (step.kind === "d1") {
-      const created = await wrangler.createD1Database(step.name);
+      const created = await api.createD1Database(step.name);
       resolvedD1Ids[step.name] = created.uuid;
       log.push({ level: "info", message: `D1 ${step.name} created` });
     } else {
-      await wrangler.createR2Bucket(step.name);
+      await api.createR2Bucket(step.name);
       log.push({ level: "info", message: `R2 ${step.name} created` });
     }
   }
@@ -215,66 +255,8 @@ export async function executeProvisionPlan(plan, wrangler, existingD1) {
 }
 
 /**
- * @param {import('node:child_process').execFile} execFile
- * @param {{ accountId?: string }} options
- * @returns {WranglerRunner}
+ * @param {Record<string, string>} resolvedD1Ids
  */
-export function createWranglerRunner(execFile, options = {}) {
-  const env = { ...process.env };
-  if (options.accountId) {
-    env.CLOUDFLARE_ACCOUNT_ID = options.accountId;
-  }
-
-  async function runWranglerJson(args) {
-    const { stdout, stderr, error } = await new Promise((resolve) => {
-      execFile(
-        "npx",
-        ["wrangler", ...args, "--json"],
-        { env, encoding: "utf8" },
-        resolve,
-      );
-    });
-    if (error) {
-      const detail = stderr?.trim() || stdout?.trim() || error.message;
-      throw new Error(`wrangler ${args.join(" ")} failed: ${detail}`);
-    }
-    const text = stdout.trim();
-    if (!text) return null;
-    return JSON.parse(text);
-  }
-
-  return {
-    async listD1Databases() {
-      const data = await runWranglerJson(["d1", "list"]);
-      const rows = Array.isArray(data) ? data : (data?.result ?? []);
-      return rows.map((row) => ({
-        name: row.name,
-        uuid: row.uuid ?? row.database_id ?? row.id,
-      }));
-    },
-    async listR2Buckets() {
-      const data = await runWranglerJson(["r2", "bucket", "list"]);
-      const rows = Array.isArray(data)
-        ? data
-        : (data?.result?.buckets ?? data?.buckets ?? []);
-      return rows
-        .map((row) => (typeof row === "string" ? row : row.name))
-        .filter(Boolean);
-    },
-    async createD1Database(name) {
-      const data = await runWranglerJson(["d1", "create", name]);
-      const uuid =
-        data?.uuid ??
-        data?.database_id ??
-        data?.result?.uuid ??
-        data?.result?.database_id;
-      if (!uuid) {
-        throw new Error(`wrangler d1 create ${name} did not return a database id`);
-      }
-      return { name, uuid };
-    },
-    async createR2Bucket(name) {
-      await runWranglerJson(["r2", "bucket", "create", name]);
-    },
-  };
+export function formatProvisionD1IdsFile(resolvedD1Ids) {
+  return `${JSON.stringify({ d1: resolvedD1Ids }, null, 2)}\n`;
 }

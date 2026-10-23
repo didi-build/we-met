@@ -2,29 +2,21 @@
 /**
  * Substitute D1 database_id placeholders and write a deploy-ready Wrangler config.
  *
- * Usage:
- *   node scripts/prepare-wrangler-config.mjs --target production --output wrangler.ci.jsonc
- *   node scripts/prepare-wrangler-config.mjs --target preview --output wrangler.ci.jsonc
- *   node scripts/prepare-wrangler-config.mjs --target d1-migrate-nonprod --output wrangler.d1-nonprod.ci.jsonc
- *   node scripts/prepare-wrangler-config.mjs --target consumer-production --output workers/we-met-followup-email-consumer/wrangler.production.ci.jsonc
- *   node scripts/prepare-wrangler-config.mjs --target consumer-nonprod --output workers/we-met-followup-email-consumer/wrangler.nonprod.ci.jsonc
- *
- * App/preview output must be a file in the repository root (see assertOutputInRepoRoot).
- * Consumer outputs are written next to the source config under workers/we-met-followup-email-consumer/.
- *
  * Environment:
- *   WE_MET_D1_DATABASE_ID_PRODUCTION — required for --target production
- *   WE_MET_D1_DATABASE_ID_NONPROD — required for --target preview and d1-migrate-nonprod;
- *     optional for production (non-prod placeholder may remain in previews block)
+ *   WE_MET_D1_DATABASE_ID_PRODUCTION / WE_MET_D1_DATABASE_ID_NONPROD — optional when
+ *     WE_MET_PROVISION_D1_IDS_FILE (or provision-d1-ids.json) is present from provision step
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { assertOutputInRepoRoot } from "./lib/assert-repo-root-output.mjs";
-import { parseJsonc } from "./lib/parse-jsonc.mjs";
 import {
+  assertNoPlaceholderLeft,
   D1_PLACEHOLDER_NONPROD,
   D1_PLACEHOLDER_PRODUCTION,
-} from "./lib/wrangler-placeholders.mjs";
+  loadProvisionD1IdsFile,
+  resolveD1IdsForPrepareTarget,
+} from "./lib/d1-id-resolution.mjs";
+import { parseJsonc } from "./lib/parse-jsonc.mjs";
 
 const SOURCE = resolve("wrangler.jsonc");
 const CONSUMER_DIR = resolve("workers/we-met-followup-email-consumer");
@@ -60,15 +52,6 @@ function parseArgs(argv) {
   }
   if (!target || !output) usage();
   return { target, output: resolve(output) };
-}
-
-function requireEnv(name) {
-  const value = process.env[name]?.trim();
-  if (!value) {
-    console.error(`Missing required environment variable: ${name}`);
-    process.exit(1);
-  }
-  return value;
 }
 
 function replaceD1Ids(text, { productionId, nonprodId }) {
@@ -107,15 +90,27 @@ function prepareConsumerConfig(sourcePath, outputPath, { productionId, nonprodId
   assertConsumerOutputBesideSource(outputPath, sourcePath);
   const sourceText = readFileSync(sourcePath, "utf8");
   const text = replaceD1Ids(sourceText, { productionId, nonprodId });
-  if (productionId && text.includes(D1_PLACEHOLDER_PRODUCTION)) {
-    console.error("Failed to substitute production D1 database_id in consumer config.");
+  const prodErr = productionId
+    ? assertNoPlaceholderLeft(text, D1_PLACEHOLDER_PRODUCTION, "production")
+    : null;
+  if (prodErr) {
+    console.error(prodErr);
     process.exit(1);
   }
-  if (nonprodId && text.includes(D1_PLACEHOLDER_NONPROD)) {
-    console.error("Failed to substitute non-prod D1 database_id in consumer config.");
+  const nonprodErr = nonprodId
+    ? assertNoPlaceholderLeft(text, D1_PLACEHOLDER_NONPROD, "non-prod")
+    : null;
+  if (nonprodErr) {
+    console.error(nonprodErr);
     process.exit(1);
   }
   writeFileSync(outputPath, text, "utf8");
+}
+
+function loadProvisionFileFromEnv() {
+  const path = process.env.WE_MET_PROVISION_D1_IDS_FILE?.trim();
+  if (!path) return loadProvisionD1IdsFile(undefined);
+  return loadProvisionD1IdsFile(path);
 }
 
 function main() {
@@ -127,17 +122,19 @@ function main() {
   }
   const sourceText = readFileSync(SOURCE, "utf8");
   const config = parseJsonc(sourceText);
+  const provisionFile = loadProvisionFileFromEnv();
+  const resolved = resolveD1IdsForPrepareTarget(target, process.env, provisionFile);
+  if (resolved.error) {
+    console.error(resolved.error);
+    process.exit(1);
+  }
 
   if (target === "production") {
-    const productionId = requireEnv("WE_MET_D1_DATABASE_ID_PRODUCTION");
+    const productionId = resolved.productionId;
     const text = replaceD1Ids(sourceText, { productionId });
-    if (!process.env.WE_MET_D1_DATABASE_ID_NONPROD?.trim()) {
-      console.error(
-        "Warning: WE_MET_D1_DATABASE_ID_NONPROD unset; non-prod placeholder left in file (production deploy uses top-level bindings only).",
-      );
-    }
-    if (text.includes(D1_PLACEHOLDER_PRODUCTION)) {
-      console.error("Failed to substitute production D1 database_id.");
+    const err = assertNoPlaceholderLeft(text, D1_PLACEHOLDER_PRODUCTION, "production");
+    if (err) {
+      console.error(err);
       process.exit(1);
     }
     writeFileSync(output, text, "utf8");
@@ -145,7 +142,7 @@ function main() {
   }
 
   if (target === "preview") {
-    const nonprodId = requireEnv("WE_MET_D1_DATABASE_ID_NONPROD");
+    const nonprodId = resolved.nonprodId;
     const productionId = process.env.WE_MET_D1_DATABASE_ID_PRODUCTION?.trim();
     let text = replaceD1Ids(sourceText, {
       productionId: productionId || D1_PLACEHOLDER_PRODUCTION,
@@ -156,8 +153,9 @@ function main() {
         "Warning: WE_MET_D1_DATABASE_ID_PRODUCTION unset; production placeholder left in file (preview deploy uses previews block only).",
       );
     }
-    if (text.includes(D1_PLACEHOLDER_NONPROD)) {
-      console.error("Failed to substitute non-prod D1 database_id.");
+    const err = assertNoPlaceholderLeft(text, D1_PLACEHOLDER_NONPROD, "non-prod");
+    if (err) {
+      console.error(err);
       process.exit(1);
     }
     writeFileSync(output, text, "utf8");
@@ -165,21 +163,23 @@ function main() {
   }
 
   if (target === "d1-migrate-nonprod") {
-    const nonprodId = requireEnv("WE_MET_D1_DATABASE_ID_NONPROD");
+    const nonprodId = resolved.nonprodId;
     const minimal = buildD1MigrateNonprodConfig(config, nonprodId);
     writeFileSync(output, `${JSON.stringify(minimal, null, 2)}\n`, "utf8");
     return;
   }
 
   if (target === "consumer-production") {
-    const productionId = requireEnv("WE_MET_D1_DATABASE_ID_PRODUCTION");
-    prepareConsumerConfig(CONSUMER_SOURCE_PRODUCTION, output, { productionId });
+    prepareConsumerConfig(CONSUMER_SOURCE_PRODUCTION, output, {
+      productionId: resolved.productionId,
+    });
     return;
   }
 
   if (target === "consumer-nonprod") {
-    const nonprodId = requireEnv("WE_MET_D1_DATABASE_ID_NONPROD");
-    prepareConsumerConfig(CONSUMER_SOURCE_NONPROD, output, { nonprodId });
+    prepareConsumerConfig(CONSUMER_SOURCE_NONPROD, output, {
+      nonprodId: resolved.nonprodId,
+    });
     return;
   }
 
