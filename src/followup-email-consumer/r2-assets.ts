@@ -1,22 +1,10 @@
 import type { R2Bucket } from "@cloudflare/workers-types";
-import { createR2AssetStorage } from "@/assets/r2-asset-storage";
-import type { ReadOnlyR2Assets } from "@/followup-email-consumer/load-vcard-photo";
+import { createReadOnlyR2Assets } from "@/assets/read-only-r2-assets";
+import type { ReadOnlyR2Assets } from "@/lib/hi/build-owner-vcard";
 
 /**
  * Consumer R2 binding: read-only in code — only `get` is exposed (via asset storage).
  */
 export function createReadOnlyConsumerAssets(bucket: R2Bucket): ReadOnlyR2Assets {
-  const storage = createR2AssetStorage(bucket);
-  return {
-    async get(key: string) {
-      const asset = await storage.getObject(key);
-      if (!asset) {
-        return null;
-      }
-      return {
-        body: asset.body,
-        contentType: asset.contentType,
-      };
-    },
-  };
+  return createReadOnlyR2Assets(bucket);
 }

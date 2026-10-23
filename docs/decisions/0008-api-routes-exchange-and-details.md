@@ -12,6 +12,7 @@ Public card URLs move to `/hi/<slug>` (see [0003](./0003-urls-and-lookup.md)). T
 
 - **`POST /api/exchange`** — exchange submit (Turnstile, honeypot, rate limit, then `app_settings` kill switch and daily caps, then dispatch lead sinks and enqueue follow-up email). When lead email is paused or capped, **503** `lead_email_unavailable` with no ledger row or enqueue ([0025](./0025-we-met-mvp-accounts-sign-in-and-app-backend.md) phase 4).
 - **`POST /api/details`** — optional details step (signed token); same kill switch and cap gate (**503** `lead_email_unavailable`) before append dispatch. Details are accepted **once per lead**: a second valid submit returns **409** `{ "error": "details-already-sent" }` with no ledger row, queue message, or stored lead data change.
+- **`POST /api/exchange/vcard`** — token-gated owner vCard download for visitors after exchange (DIDI-743); details token in the POST body only; not gated on `lead_email_enabled`. **GET** returns **405** with `Allow: POST`.
 
 No `/api/hi/*` routes in this app.
 
@@ -22,5 +23,5 @@ No `/api/hi/*` routes in this app.
 
 ## Consequences
 
-- Documentation, runbooks, and agents use `/api/exchange` and `/api/details` only.
+- Documentation, runbooks, and agents use `/api/exchange`, `/api/details`, and `/api/exchange/vcard` for the public exchange API.
 - Porting from `didi-build/web` maps old handlers to these routes in [DIDI-574](https://linear.app/didi-build/issue/DIDI-574).

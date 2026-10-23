@@ -15,6 +15,9 @@ import {
 } from "@/exchange/queue/producer";
 import type { ProcessDetailsDeps } from "@/exchange/process-details";
 import type { ProcessExchangeDeps } from "@/exchange/process-exchange";
+import type { ProcessVCardDeps } from "@/exchange/process-vcard";
+import { createReadOnlyR2Assets } from "@/assets/read-only-r2-assets";
+import type { R2Bucket } from "@cloudflare/workers-types";
 import type { TurnstileLogger } from "@/exchange/turnstile";
 import { createLeadDeliveryLedgerFromD1 } from "@/lead-delivery-ledger/d1-repository";
 import { assertLeadEmailCapacity } from "@/lead-email/availability";
@@ -26,6 +29,7 @@ import {
 type ExchangeBindings = {
   WE_MET_FOLLOWUP_EMAIL_QUEUE?: CloudflareQueueBinding;
   WE_MET_EXCHANGE_RATE_LIMITER?: CloudflareRateLimitBinding;
+  WE_MET_ASSETS?: R2Bucket;
   TURNSTILE_SECRET_KEY?: string;
   WE_MET_TOKEN_SECRET?: string;
   WE_MET_ENV?: string;
@@ -122,6 +126,38 @@ export async function createProcessExchangeDeps(
       assertLeadEmailCapacity(db, cardId, needed, now()),
     incrementDailySendCounts: (cardId, kinds) =>
       incrementDailySendCounts(db, utcDayFromDate(now()), cardId, kinds),
+  };
+}
+
+export async function createProcessVCardDeps(
+  clientIp: string,
+): Promise<ProcessVCardDeps> {
+  const { env } = await getCloudflareContext({ async: true });
+  const bindings = env as ExchangeBindings;
+  const hostConfig = readWeMetHostConfig(env);
+
+  const rateLimiter = selectExchangeRateLimiter(
+    hostConfig.weMetEnv,
+    bindings.WE_MET_EXCHANGE_RATE_LIMITER,
+  );
+
+  const tokenSecret = requireSecret(
+    "WE_MET_TOKEN_SECRET",
+    bindings.WE_MET_TOKEN_SECRET,
+  );
+
+  if (!bindings.WE_MET_ASSETS) {
+    throw new Error("WE_MET_ASSETS binding is not configured");
+  }
+
+  const now = () => new Date();
+
+  return {
+    tokenSecret,
+    rateLimiter,
+    clientIp,
+    assets: createReadOnlyR2Assets(bindings.WE_MET_ASSETS),
+    now,
   };
 }
 
