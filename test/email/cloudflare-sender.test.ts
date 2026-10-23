@@ -5,6 +5,7 @@ import {
   type CloudflareSendEmailBinding,
 } from "@/email/cloudflare-sender";
 import { FollowupEmailError } from "@/email/followup-email-error";
+import { CLOUDFLARE_FROM_DISPLAY_NAME_FALLBACK } from "@/email/from-display-name";
 
 function decodeBase64Utf8(base64: string): string {
   const binary = atob(base64);
@@ -61,6 +62,38 @@ describe("createCloudflareEmailSender (unit)", () => {
     expect(decodeBase64Utf8(payload.attachments![0]!.content)).toBe(vcardBody);
     expect(payload.attachments?.[0]?.disposition).toBe("attachment");
   });
+
+  it.each([
+    ["missing", undefined, CLOUDFLARE_FROM_DISPLAY_NAME_FALLBACK],
+    ["empty", "", CLOUDFLARE_FROM_DISPLAY_NAME_FALLBACK],
+    ["whitespace", "  \t ", CLOUDFLARE_FROM_DISPLAY_NAME_FALLBACK],
+    ["set", "  Custom Name  ", "Custom Name"],
+  ])(
+    "always sends a string from.name when display name is %s",
+    async (_label, fromDisplayName, expectedName) => {
+      const send = vi.fn(async (_message: CloudflareOutboundMessage) => ({
+        messageId: "<n@mail.we-met.link>",
+      }));
+      const sender = createCloudflareEmailSender({
+        send: send as CloudflareSendEmailBinding["send"],
+      });
+
+      await sender.send({
+        from: "hello@mail.we-met.link",
+        ...(fromDisplayName !== undefined ? { fromDisplayName } : {}),
+        to: "visitor@example.com",
+        subject: "Hi",
+        textPlain: "plain",
+        textHtml: "<p>html</p>",
+      });
+
+      expect(send).toHaveBeenCalledOnce();
+      const from = send.mock.calls[0]![0]!.from;
+      expect(from.name).toBe(expectedName);
+      expect(typeof from.name).toBe("string");
+      expect(from.name.length).toBeGreaterThan(0);
+    },
+  );
 
   it("sets In-Reply-To and References only when both are present", async () => {
     const send = vi.fn(async (_message: CloudflareOutboundMessage) => ({
@@ -157,6 +190,31 @@ describe("createCloudflareEmailSender (unit)", () => {
     ).rejects.toMatchObject({ code: "unknown" });
   });
 
+  it("maps Cloudflare send validation errors to a non-retryable code", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const send = vi.fn(async () => {
+      throw new Error(
+        "Incorrect type for the 'name' field on 'EmailAddress': the provided value is not of type 'string'.",
+      );
+    });
+    const sender = createCloudflareEmailSender({ send });
+
+    await expect(
+      sender.send({
+        from: "hello@mail.we-met.link",
+        to: "visitor@example.com",
+        subject: "Hi",
+        textPlain: "plain",
+        textHtml: "<p>html</p>",
+      }),
+    ).rejects.toMatchObject({ code: "cloudflare_send_validation_failed" });
+
+    expect(consoleError).toHaveBeenCalledWith("cloudflare_send_permanent_failure", {
+      reason: "send_validation",
+    });
+    consoleError.mockRestore();
+  });
+
   it("re-throws FollowupEmailError from the binding unchanged", async () => {
     const send = vi.fn(async () => {
       throw new FollowupEmailError("cloudflare_binding_missing");
@@ -195,5 +253,10 @@ describe("isRetryableFollowupEmailError (unit)", () => {
     expect(isRetryableFollowupEmailError("cloudflare_E_DELIVERY_FAILED")).toBe(true);
     expect(isRetryableFollowupEmailError("unknown")).toBe(true);
     expect(isRetryableFollowupEmailError("malformed_sink_email_config")).toBe(false);
+    expect(isRetryableFollowupEmailError("cloudflare_send_validation_failed")).toBe(
+      false,
+    );
+    expect(isRetryableFollowupEmailError("cloudflare_E_VALIDATION_ERROR")).toBe(false);
+    expect(isRetryableFollowupEmailError("cloudflare_E_FIELD_MISSING")).toBe(false);
   });
 });
