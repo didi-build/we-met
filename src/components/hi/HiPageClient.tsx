@@ -7,6 +7,14 @@ import type { CardPlan, CardRecord } from "@/card-data/types";
 import { cardInitials } from "@/lib/hi-card/card-content";
 import { substituteFirstName } from "@/lib/copy/substitute-first-name";
 import {
+  readExchangeCompletedFlag,
+  writeExchangeCompletedFlag,
+} from "@/lib/hi-card/exchange-completed-storage";
+import {
+  readExchangeSession,
+  writeExchangeSession,
+} from "@/lib/hi-card/exchange-session-storage";
+import {
   readDetailsSentFlag,
   writeDetailsSentFlag,
 } from "@/lib/hi-card/details-sent-storage";
@@ -35,10 +43,23 @@ export function HiPageClient({ card, photoUrl, plan = "free" }: HiPageClientProp
   const [leadToken, setLeadToken] = useState("");
   const [stickyVisible, setStickyVisible] = useState(false);
   const [contactSent, setContactSent] = useState(false);
+  const [exchangeCompletedPersisted, setExchangeCompletedPersisted] = useState(false);
 
   useEffect(() => {
     setContactSent(readDetailsSentFlag(card.slug));
+    setExchangeCompletedPersisted(readExchangeCompletedFlag(card.slug));
+    const session = readExchangeSession(card.slug);
+    if (session) {
+      setConnected(true);
+      setFirstName(session.firstName);
+      setLeadToken(session.leadToken);
+    }
   }, [card.slug]);
+
+  const hasActiveExchangeSession = Boolean(leadToken);
+  const showVisitorReceipt = hasActiveExchangeSession && connected;
+  const showVisitorReloadFallback =
+    exchangeCompletedPersisted && !hasActiveExchangeSession;
 
   const markContactSent = useCallback(() => {
     writeDetailsSentFlag(card.slug);
@@ -55,15 +76,23 @@ export function HiPageClient({ card, photoUrl, plan = "free" }: HiPageClientProp
 
   const openSheet = useCallback(
     (event: MouseEvent<HTMLButtonElement>) => {
-      if (contactSent) {
+      if (contactSent || showVisitorReloadFallback) {
         return;
       }
       sheetOpenerRef.current = captureSheetOpener(event.currentTarget);
       pendingSheetFocusRestoreRef.current = true;
       setSheetOpen(true);
     },
-    [contactSent],
+    [contactSent, showVisitorReloadFallback],
   );
+
+  const openDetailsFromReceipt = useCallback(() => {
+    if (contactSent || showVisitorReloadFallback) {
+      return;
+    }
+    pendingSheetFocusRestoreRef.current = true;
+    setSheetOpen(true);
+  }, [contactSent, showVisitorReloadFallback]);
 
   const closeSheet = useCallback(() => {
     updateStickyFromScroll();
@@ -103,14 +132,19 @@ export function HiPageClient({ card, photoUrl, plan = "free" }: HiPageClientProp
   }, [sheetOpen, updateStickyFromScroll]);
 
   const thanksLine =
-    connected && !sheetOpen
+    connected && !sheetOpen && !showVisitorReceipt
       ? substituteFirstName(copy.thanksMessage, firstName || "there")
       : null;
 
   return (
     <>
       <HiStickyExchangeBar
-        visible={stickyVisible && !sheetOpen}
+        visible={
+          stickyVisible &&
+          !sheetOpen &&
+          !showVisitorReceipt &&
+          !showVisitorReloadFallback
+        }
         name={card.name}
         role={card.role}
         initials={initials}
@@ -130,6 +164,10 @@ export function HiPageClient({ card, photoUrl, plan = "free" }: HiPageClientProp
         onOpenExchange={openSheet}
         thanksLine={thanksLine}
         contactSent={contactSent}
+        showVisitorReceipt={showVisitorReceipt}
+        showVisitorReloadFallback={showVisitorReloadFallback}
+        visitorFirstName={firstName}
+        onTellOwnerMore={openDetailsFromReceipt}
       />
 
       <HiExchangeSheet
@@ -144,6 +182,12 @@ export function HiPageClient({ card, photoUrl, plan = "free" }: HiPageClientProp
           setConnected(true);
           setFirstName(nextFirstName);
           setLeadToken(token);
+          writeExchangeSession(card.slug, {
+            firstName: nextFirstName,
+            leadToken: token,
+          });
+          writeExchangeCompletedFlag(card.slug);
+          setExchangeCompletedPersisted(true);
         }}
         onDetailsSuccess={markContactSent}
       />

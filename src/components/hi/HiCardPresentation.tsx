@@ -16,7 +16,10 @@ import {
   servicesForChips,
   WE_MET_CARD_HOME_URL,
 } from "@/lib/hi-card/card-content";
+import { HiVisitorConfirmationReceipt } from "@/components/hi/HiVisitorConfirmationReceipt";
+import { HiVisitorReloadFallback } from "@/components/hi/HiVisitorReloadFallback";
 import { HI_CONTACT_SENT_BUTTON_LABEL } from "@/lib/hi-card/contact-sent-label";
+import { downloadOwnerVCard } from "@/lib/hi-card/download-owner-vcard";
 import Image from "next/image";
 import type { MouseEvent, Ref } from "react";
 import { useEffect, useState } from "react";
@@ -39,6 +42,12 @@ export type HiCardPresentationProps = {
   thanksLine?: string | null;
   /** After details were sent on this device; exchange sheet cannot open. */
   contactSent?: boolean;
+  /** Active exchange session in this tab (receipt UI). */
+  showVisitorReceipt?: boolean;
+  /** Post-reload fallback when exchange completed but session token is gone. */
+  showVisitorReloadFallback?: boolean;
+  visitorFirstName?: string;
+  onTellOwnerMore?: () => void;
 };
 
 function ExchangeRing({ small }: { small?: boolean }) {
@@ -66,6 +75,10 @@ export function HiCardPresentation({
   thanksLine,
   greetingOverride,
   contactSent = false,
+  showVisitorReceipt = false,
+  showVisitorReloadFallback = false,
+  visitorFirstName = "",
+  onTellOwnerMore,
 }: HiCardPresentationProps) {
   const { copy, pageCopy } = card;
   const flags = cardContentFlags(card);
@@ -151,52 +164,70 @@ export function HiCardPresentation({
                 aria-label={copy.exchangeAriaLabel}
                 className="-mt-1 flex flex-col gap-1"
               >
-                <div className="relative isolate flex">
-                  {!contactSent && <ExchangeRing />}
-                  {preview ? (
-                    <Button
-                      type="button"
-                      tabIndex={-1}
-                      className="min-h-14 w-full text-[17px] font-semibold"
-                    >
-                      Exchange contact
-                    </Button>
-                  ) : (
-                    <Button
-                      ref={exchangeButtonRef}
-                      type="button"
-                      onClick={onOpenExchange}
-                      disabled={contactSent}
-                      aria-disabled={contactSent}
-                      className="min-h-14 w-full text-[17px] font-semibold"
-                    >
-                      {contactSent ? HI_CONTACT_SENT_BUTTON_LABEL : "Exchange contact"}
-                    </Button>
-                  )}
-                </div>
-                {flags.hasAlternate &&
-                  card.alternate &&
-                  (!interactive ? (
-                    <span className="hi-link-alternate inline-flex min-h-11 items-center self-center px-2 text-[15px] font-medium">
-                      {card.alternate.label}
-                    </span>
-                  ) : (
-                    <a
-                      href={card.alternate.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="hi-link-alternate inline-flex min-h-11 items-center self-center px-2 text-[15px] font-medium"
-                    >
-                      {card.alternate.label}
-                    </a>
-                  ))}
-                {thanksLine && (
-                  <p
-                    role="status"
-                    className="m-0 mt-1 animate-hi-fade text-center text-[15px] font-medium leading-normal text-ink"
-                  >
-                    {thanksLine}
-                  </p>
+                {showVisitorReloadFallback ? (
+                  <HiVisitorReloadFallback ownerName={card.name} />
+                ) : showVisitorReceipt ? (
+                  <HiVisitorConfirmationReceipt
+                    ownerName={card.name}
+                    ownerEmail={card.email}
+                    ownerPhone={card.contact.phone}
+                    visitorFirstName={visitorFirstName}
+                    detailsAdded={contactSent}
+                    onTellMore={() => onTellOwnerMore?.()}
+                    onSaveContact={() => downloadOwnerVCard(card)}
+                  />
+                ) : (
+                  <>
+                    <div className="relative isolate flex">
+                      {!contactSent && <ExchangeRing />}
+                      {preview ? (
+                        <Button
+                          type="button"
+                          tabIndex={-1}
+                          className="min-h-14 w-full text-[17px] font-semibold"
+                        >
+                          Exchange contact
+                        </Button>
+                      ) : (
+                        <Button
+                          ref={exchangeButtonRef}
+                          type="button"
+                          onClick={onOpenExchange}
+                          disabled={contactSent}
+                          aria-disabled={contactSent}
+                          className="min-h-14 w-full text-[17px] font-semibold"
+                        >
+                          {contactSent
+                            ? HI_CONTACT_SENT_BUTTON_LABEL
+                            : "Exchange contact"}
+                        </Button>
+                      )}
+                    </div>
+                    {flags.hasAlternate &&
+                      card.alternate &&
+                      (!interactive ? (
+                        <span className="hi-link-alternate inline-flex min-h-11 items-center self-center px-2 text-[15px] font-medium">
+                          {card.alternate.label}
+                        </span>
+                      ) : (
+                        <a
+                          href={card.alternate.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="hi-link-alternate inline-flex min-h-11 items-center self-center px-2 text-[15px] font-medium"
+                        >
+                          {card.alternate.label}
+                        </a>
+                      ))}
+                    {thanksLine && (
+                      <p
+                        role="status"
+                        className="m-0 mt-1 animate-hi-fade text-center text-[15px] font-medium leading-normal text-ink"
+                      >
+                        {thanksLine}
+                      </p>
+                    )}
+                  </>
                 )}
               </section>
 
