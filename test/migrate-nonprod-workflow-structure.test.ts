@@ -59,6 +59,13 @@ describe("Migrate non-prod workflow structure (unit)", () => {
     expect(matches.length).toBeGreaterThanOrEqual(2);
   });
 
+  it("apply job checks out main and provisions non-prod resources from main only", () => {
+    const applySection = workflow.match(/^  apply:[\s\S]*$/m)?.[0] ?? "";
+    expect(applySection).toContain("ref: main");
+    expect(applySection).toContain("provision-resources.mjs");
+    expect(applySection).toContain("--target nonprod");
+  });
+
   it("apply uses allowlisted apply-migrations script", () => {
     expect(workflow).toContain("migrate-nonprod/apply.ts");
     expect(workflow).toContain("WE_MET_D1_DATABASE_ID_NONPROD");

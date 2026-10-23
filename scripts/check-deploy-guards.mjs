@@ -195,6 +195,93 @@ function checkWranglerDomainSettings(config) {
   }
 }
 
+function expectedNonprodStorageName(productionName) {
+  return `${productionName}-nonprod`;
+}
+
+function checkProdPreviewD1R2BindingPairs(config) {
+  const prodD1 = config.d1_databases ?? [];
+  const previewD1 = config.previews?.d1_databases ?? [];
+  const prodR2 = config.r2_buckets ?? [];
+  const previewR2 = config.previews?.r2_buckets ?? [];
+
+  for (const prod of prodD1) {
+    const binding = prod.binding;
+    if (!binding) fail("production D1 binding name is required");
+    const prodName = prod.database_name;
+    if (typeof prodName !== "string" || !prodName.trim()) {
+      fail(`production D1 binding "${binding}" database_name is required`);
+    }
+    const preview = previewD1.find((row) => row.binding === binding);
+    if (!preview) {
+      fail(`previews missing D1 binding "${binding}" (paired with production)`);
+    }
+    const expectedName = expectedNonprodStorageName(prodName);
+    if (preview.database_name !== expectedName) {
+      fail(`previews D1 binding "${binding}" must use database_name "${expectedName}"`);
+    }
+  }
+
+  for (const preview of previewD1) {
+    const binding = preview.binding;
+    if (!binding) fail("previews D1 binding name is required");
+    const previewName = preview.database_name;
+    if (typeof previewName !== "string" || !previewName.trim()) {
+      fail(`previews D1 binding "${binding}" database_name is required`);
+    }
+    const prod = prodD1.find((row) => row.binding === binding);
+    if (!prod) {
+      fail(`production missing D1 binding "${binding}" (paired with previews)`);
+    }
+    if (!previewName.endsWith("-nonprod")) {
+      fail(`previews D1 binding "${binding}" database_name must end with "-nonprod"`);
+    }
+    const expectedProd = previewName.slice(0, -"-nonprod".length);
+    if (prod.database_name !== expectedProd) {
+      fail(
+        `production D1 binding "${binding}" must use database_name "${expectedProd}"`,
+      );
+    }
+  }
+
+  for (const prod of prodR2) {
+    const binding = prod.binding;
+    if (!binding) fail("production R2 binding name is required");
+    const prodBucket = prod.bucket_name;
+    if (typeof prodBucket !== "string" || !prodBucket.trim()) {
+      fail(`production R2 binding "${binding}" bucket_name is required`);
+    }
+    const preview = previewR2.find((row) => row.binding === binding);
+    if (!preview) {
+      fail(`previews missing R2 binding "${binding}" (paired with production)`);
+    }
+    const expectedName = expectedNonprodStorageName(prodBucket);
+    if (preview.bucket_name !== expectedName) {
+      fail(`previews R2 binding "${binding}" must use bucket_name "${expectedName}"`);
+    }
+  }
+
+  for (const preview of previewR2) {
+    const binding = preview.binding;
+    if (!binding) fail("previews R2 binding name is required");
+    const previewBucket = preview.bucket_name;
+    if (typeof previewBucket !== "string" || !previewBucket.trim()) {
+      fail(`previews R2 binding "${binding}" bucket_name is required`);
+    }
+    const prod = prodR2.find((row) => row.binding === binding);
+    if (!prod) {
+      fail(`production missing R2 binding "${binding}" (paired with previews)`);
+    }
+    if (!previewBucket.endsWith("-nonprod")) {
+      fail(`previews R2 binding "${binding}" bucket_name must end with "-nonprod"`);
+    }
+    const expectedProd = previewBucket.slice(0, -"-nonprod".length);
+    if (prod.bucket_name !== expectedProd) {
+      fail(`production R2 binding "${binding}" must use bucket_name "${expectedProd}"`);
+    }
+  }
+}
+
 function checkDistinctD1Ids(config) {
   const topLevelIds = (config.d1_databases ?? [])
     .map((row) => row.database_id)
@@ -580,6 +667,7 @@ function main() {
 
   if (target === "preview") {
     checkPreviewBlock(config.previews);
+    checkProdPreviewD1R2BindingPairs(config);
     console.log("deploy-time guards passed (preview)");
     return;
   }
@@ -605,6 +693,7 @@ function main() {
   if (target === "production") {
     checkProductionBlock(config);
     checkPreviewBlock(config.previews);
+    checkProdPreviewD1R2BindingPairs(config);
     console.log("deploy-time guards passed (production)");
     return;
   }
