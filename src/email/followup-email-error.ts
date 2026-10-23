@@ -10,6 +10,7 @@ export type FollowupEmailErrorCode =
   | "cloudflare_from_email_missing"
   | "cloudflare_binding_missing"
   | "from_display_name_missing"
+  | "cloudflare_send_validation_failed"
   | "malformed_sink_email_config"
   | "invalid_rfc5322_message_id"
   | `cloudflare_${string}`

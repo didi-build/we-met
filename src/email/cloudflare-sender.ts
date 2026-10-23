@@ -1,4 +1,6 @@
+import { isPermanentCloudflareSendError } from "@/email/cloudflare-send-error";
 import { FollowupEmailError } from "@/email/followup-email-error";
+import { resolveCloudflareFromName } from "@/email/from-display-name";
 import { sanitizeRfc5322MessageId } from "@/email/mime-headers";
 import type {
   EmailAttachment,
@@ -12,7 +14,7 @@ export type CloudflareSendEmailBinding = {
 };
 
 export type CloudflareOutboundMessage = {
-  from: { email: string; name?: string };
+  from: { email: string; name: string };
   to: string;
   subject: string;
   text: string;
@@ -55,6 +57,12 @@ function cloudflareErrorFromThrown(error: unknown): FollowupEmailError {
   if (error instanceof FollowupEmailError) {
     return error;
   }
+  if (isPermanentCloudflareSendError(error)) {
+    console.error("cloudflare_send_permanent_failure", {
+      reason: "send_validation",
+    });
+    return new FollowupEmailError("cloudflare_send_validation_failed");
+  }
   if (
     error &&
     typeof error === "object" &&
@@ -83,9 +91,7 @@ export function createCloudflareEmailSender(
       const payload: CloudflareOutboundMessage = {
         from: {
           email: message.from,
-          ...(message.fromDisplayName?.trim()
-            ? { name: message.fromDisplayName.trim() }
-            : {}),
+          name: resolveCloudflareFromName(message.fromDisplayName),
         },
         to: message.to,
         subject: message.subject,

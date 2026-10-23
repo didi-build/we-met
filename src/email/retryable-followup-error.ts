@@ -2,6 +2,7 @@ import type { FollowupEmailErrorCode } from "@/email/followup-email-error";
 
 const NON_RETRYABLE_EXACT = new Set<FollowupEmailErrorCode>([
   "malformed_sink_email_config",
+  "cloudflare_send_validation_failed",
 ]);
 
 const CLOUDFLARE_NON_RETRYABLE_PREFIXES = ["E_HEADER_"];
