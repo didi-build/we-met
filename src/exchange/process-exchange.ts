@@ -159,5 +159,12 @@ export async function processExchange(
     Math.floor(deps.now().getTime() / 1000),
   );
 
-  return { status: "success", body: { token } };
+  return {
+    status: "success",
+    body: {
+      token,
+      ownerEmail: card.email,
+      ownerPhone: card.contact.phone,
+    },
+  };
 }

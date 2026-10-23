@@ -2,6 +2,7 @@ import { HiPageClient } from "@/components/hi/HiPageClient";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { readWeMetHostConfig } from "@/config/we-met";
 import { hiPhotoPath } from "@/lib/hi-card/paths";
+import { toHiPageCard } from "@/lib/hi-card/hi-page-card";
 import { resolveHiCardPage } from "@/lib/hi-card/resolve-card-route";
 import { resolveHiCardMetadata } from "@/lib/hi/page-metadata";
 import type { Metadata } from "next";
@@ -24,5 +25,5 @@ export default async function HiCardPage({ params }: PageProps) {
 
   const photoUrl = card.photoKey ? hiPhotoPath(slug) : null;
 
-  return <HiPageClient card={card} photoUrl={photoUrl} />;
+  return <HiPageClient card={toHiPageCard(card)} photoUrl={photoUrl} />;
 }
