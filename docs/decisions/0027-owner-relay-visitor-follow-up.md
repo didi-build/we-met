@@ -6,7 +6,7 @@
 
 ## Context
 
-Visitor follow-up email is sent from a cold subdomain (`mail.we-met.link` via Cloudflare Email Service, or Gmail with platform From). That path hurts deliverability and can spam visitors who only wanted to share contact details with the card owner. Owner notification email (lead sink) is the primary product outcome at exchange time.
+Visitor follow-up email is sent from a cold subdomain (`mail.we-met.link` via Cloudflare Email Service). That path hurts deliverability and can spam visitors who only wanted to share contact details with the card owner. Owner notification email (lead sink) is the primary product outcome at exchange time.
 
 ## Decision
 
