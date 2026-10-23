@@ -19,7 +19,10 @@ import {
   writeExchangeSession,
 } from "@/lib/hi-card/exchange-session-storage";
 import { captureSheetOpener, restoreSheetFocus } from "@/lib/hi-card/sheet-focus";
-import type { HiOwnerContact, HiPageCard } from "@/lib/hi-card/hi-page-card";
+import {
+  ownerContactFromSessionFields,
+  type HiPageCard,
+} from "@/lib/hi-card/hi-page-card";
 import type { HiExchangeOwnerContact } from "@/components/hi/hi-exchange-api";
 import {
   parseVcardReturnReason,
@@ -46,7 +49,8 @@ export function HiPageClient({ card, photoUrl, plan = "free" }: HiPageClientProp
   const [sheetOpen, setSheetOpen] = useState(false);
   const [visitorFirst, setVisitorFirst] = useState("");
   const [leadToken, setLeadToken] = useState("");
-  const [ownerContact, setOwnerContact] = useState<HiOwnerContact | null>(null);
+  const [ownerContact, setOwnerContact] =
+    useState<ReturnType<typeof ownerContactFromSessionFields>>(null);
   const [stickyVisible, setStickyVisible] = useState(false);
   const [detailsSent, setDetailsSent] = useState(false);
   const [exchangeCompleted, setExchangeCompleted] = useState(false);
@@ -92,10 +96,9 @@ export function HiPageClient({ card, photoUrl, plan = "free" }: HiPageClientProp
     setSessionActive(true);
     setVisitorFirst(session.firstName);
     setLeadToken(session.leadToken);
-    setOwnerContact({
-      email: session.ownerEmail,
-      phone: session.ownerPhone,
-    });
+    setOwnerContact(
+      ownerContactFromSessionFields(session.ownerEmail, session.ownerPhone),
+    );
   }, [card.slug]);
 
   const markDetailsSent = useCallback(() => {
@@ -179,7 +182,7 @@ export function HiPageClient({ card, photoUrl, plan = "free" }: HiPageClientProp
     ) => {
       setVisitorFirst(nextFirstName);
       setLeadToken(token);
-      setOwnerContact({ email: owner.email, phone: owner.phone });
+      setOwnerContact(ownerContactFromSessionFields(owner.email, owner.phone));
       setSessionActive(true);
       setExchangeCompleted(true);
       writeExchangeSession(card.slug, {

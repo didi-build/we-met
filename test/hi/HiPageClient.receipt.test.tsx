@@ -184,6 +184,84 @@ describe("HiPageClient visitor receipt (component)", () => {
     expect(screen.getByRole("button", { name: /Save .* contact/i })).toBeTruthy();
   });
 
+  it("hides email and call actions when restored session has no owner contact fields", () => {
+    const slug = "no-owner-contact";
+    const token = createDetailsToken(
+      "receipt-test-secret",
+      {
+        leadId: "lead-1",
+        cardId: "test-id",
+        cardSlug: slug,
+        visitorEmail: "sam@example.com",
+        visitorName: "Sam",
+      },
+      Math.floor(Date.now() / 1000),
+    );
+    window.sessionStorage.setItem(
+      exchangeSessionStorageKey(slug),
+      JSON.stringify({
+        firstName: "Sam",
+        visitorEmail: "sam@example.com",
+        leadToken: token,
+        ownerEmail: "",
+        ownerPhone: "",
+      }),
+    );
+    window.localStorage.setItem(exchangeCompletedStorageKey(slug), "1");
+
+    const pageCard = toHiPageCard(exampleCardRecord({ slug }));
+    render(
+      <ThemeProvider>
+        <HiPageClient card={pageCard} photoUrl={null} />
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByText(/Sent to/)).toBeTruthy();
+    expect(screen.queryByRole("link", { name: /^Email$/i })).toBeNull();
+    expect(screen.queryByRole("link", { name: /^Call$/i })).toBeNull();
+    expect(document.querySelector('a[href^="mailto:"]')).toBeNull();
+    expect(document.querySelector('a[href^="tel:"]')).toBeNull();
+  });
+
+  it("shows email only and a phone placeholder when restored session has no phone", () => {
+    const slug = "email-only-owner";
+    const token = createDetailsToken(
+      "receipt-test-secret",
+      {
+        leadId: "lead-1",
+        cardId: "test-id",
+        cardSlug: slug,
+        visitorEmail: "sam@example.com",
+        visitorName: "Sam",
+      },
+      Math.floor(Date.now() / 1000),
+    );
+    window.sessionStorage.setItem(
+      exchangeSessionStorageKey(slug),
+      JSON.stringify({
+        firstName: "Sam",
+        visitorEmail: "sam@example.com",
+        leadToken: token,
+        ownerEmail: "maya@example.com",
+        ownerPhone: "",
+      }),
+    );
+    window.localStorage.setItem(exchangeCompletedStorageKey(slug), "1");
+
+    const pageCard = toHiPageCard(exampleCardRecord({ slug }));
+    render(
+      <ThemeProvider>
+        <HiPageClient card={pageCard} photoUrl={null} />
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByRole("link", { name: /^Email$/i }).getAttribute("href")).toBe(
+      "mailto:maya@example.com",
+    );
+    expect(screen.queryByRole("link", { name: /^Call$/i })).toBeNull();
+    expect(document.querySelector('a[href^="tel:"]')).toBeNull();
+  });
+
   it("shows receipt when session exists and never stores lead token in localStorage", () => {
     const slug = "receipt-slug";
     const token = createDetailsToken(

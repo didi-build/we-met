@@ -105,7 +105,12 @@ export async function POST(request: Request) {
     case "invalid_token":
       if (isForm) {
         return vcardFormRedirect(
-          slugForRedirect(deps.tokenSecret, parsed.value.token, parsed.value.formSlug),
+          slugForRedirect(
+            deps.tokenSecret,
+            parsed.value.token,
+            parsed.value.formSlug,
+            Math.floor(deps.now().getTime() / 1000),
+          ),
           vcardFormErrorToRedirectReason("invalid_token"),
         );
       }

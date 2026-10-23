@@ -151,6 +151,20 @@ describe("HiVisitorReceipt (component)", () => {
     expect(screen.queryByRole("link", { name: /Call/i })).toBeNull();
   });
 
+  it("omits the email button and shows a phone placeholder when email is missing", () => {
+    render(
+      <HiVisitorReceipt
+        {...baseProps}
+        ownerContact={{ email: "", phone: "+1 416 555 0142" }}
+      />,
+    );
+    expect(screen.queryByRole("link", { name: /Email/i })).toBeNull();
+    expect(document.querySelector('a[href^="mailto:"]')).toBeNull();
+    expect(screen.getByRole("link", { name: /Call/i }).getAttribute("href")).toMatch(
+      /^tel:/,
+    );
+  });
+
   it("shows after-details copy when details were sent", () => {
     render(<HiVisitorReceipt {...baseProps} detailsSent={true} />);
     expect(screen.getByText(/Your details were added. Thanks, Sam\./)).toBeTruthy();
