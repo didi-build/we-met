@@ -85,6 +85,13 @@ describe("privacy and terms pages (unit)", () => {
     for (const heading of PRIVACY_H2) {
       expect(screen.getByRole("heading", { level: 2, name: heading })).toBeTruthy();
     }
+    expect(screen.getAllByText(/Cloudflare Email Service/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/duplicate exchange/)).toBeTruthy();
+    expect(
+      screen.getByText(/creating an exchange on your own card first/),
+    ).toBeTruthy();
+    expect(screen.queryByText(/Gmail/)).toBeNull();
+    expect(screen.queryByText(/not shown on your public card page/)).toBeNull();
     const mailLinks = screen.getAllByRole("link", { name: "hello@we-met.link" });
     expect(mailLinks.length).toBeGreaterThan(0);
     for (const link of mailLinks) {
@@ -143,20 +150,18 @@ describe("landing privacy section and footer (unit)", () => {
     expect(terms.getAttribute("href")).not.toBe("/terms");
   });
 
-  it("landing privacy section includes updated copy and page links", () => {
+  it("landing home omits the email privacy teaser and footer still links to legal pages", () => {
     render(
       <ThemeProvider>
         <LandingHome urls={urls} getStartedLabel="Get started" />
       </ThemeProvider>,
     );
 
-    const section = screen.getByRole("region", { name: /note on your emails/i });
-    expect(section.textContent).toContain("Cloudflare Email Service");
-    expect(section.textContent).toContain("delivery information");
-    expect(section.textContent).toContain("Google account email address");
+    expect(screen.queryByRole("heading", { name: /note on your emails/i })).toBeNull();
 
-    const privacy = within(section).getByRole("link", { name: "Privacy" });
-    const terms = within(section).getByRole("link", { name: "Terms" });
+    const nav = screen.getByRole("navigation", { name: "Legal" });
+    const privacy = within(nav).getByRole("link", { name: "Privacy" });
+    const terms = within(nav).getByRole("link", { name: "Terms" });
     expect(privacy.getAttribute("href")).toBe(urls.privacy);
     expect(terms.getAttribute("href")).toBe(urls.terms);
   });

@@ -24,7 +24,7 @@ export function PrivacyPolicyContent() {
         <em>Your card.</em> We keep what you put on your card: an optional display name,
         role, photo, about text, services and links, plus an optional phone number and
         any drafts you save. Once you publish, your card is public at we-met.link/hi/
-        followed by your link. The phone number is not shown on your public card page.
+        followed by your link.
       </p>
       <p className="lp-body">
         <em>People who exchange details with you.</em> When someone taps &quot;Exchange
@@ -36,8 +36,8 @@ export function PrivacyPolicyContent() {
       </p>
       <p className="lp-body">
         <em>Visitor card pages.</em> After someone submits the optional details step on
-        a card, their browser may store a small flag in local storage so the exchange
-        button shows &quot;Contact sent&quot; on that device. It contains no personal
+        a card, their browser may store a small flag in local storage so we prevent a
+        visitor from accidentally sending a duplicate exchange. It contains no personal
         data.
       </p>
       <p className="lp-body">
@@ -54,22 +54,8 @@ export function PrivacyPolicyContent() {
 
       <h2 className="lp-legal-h2">Who can see the emails</h2>
       <p className="lp-body">
-        Emails we send when you use We Met (like contact-exchange notifications) go out
-        in one of two ways, depending on how we operate the service. Both paths are
-        built into We Met today.
-      </p>
-      <p className="lp-body">
-        <em>Gmail (Google).</em> Owner lead notifications can be sent through a Google
-        mailbox we control, using Google&apos;s Gmail API. When we turn on visitor
-        follow-up email, those messages can use the same path. Google receives the full
-        message: who it is to and from (including reply addresses), the subject, the
-        text and HTML body, and any attachments (such as contact cards). Our operator
-        can read these messages in that mailbox. We do not keep the text of these emails
-        in our database.
-      </p>
-      <p className="lp-body">
-        <em>Cloudflare Email Service.</em> The same kinds of email can instead be sent
-        through Cloudflare Email Service. Cloudflare receives the same information for
+        Emails we send when you use We Met (like contact-exchange notifications) go
+        through Cloudflare Email Service. Cloudflare receives the full message for
         delivery: recipients, sender and reply-to addresses, subject, bodies, and
         attachments. We do not keep the text of these emails in our database.
       </p>
@@ -78,6 +64,10 @@ export function PrivacyPolicyContent() {
       <p className="lp-body">
         By default, we don&apos;t email them your contact card or your Google account
         email address; you follow up from your own inbox, with Reply-To set to them.
+      </p>
+      <p className="lp-body">
+        We recommend creating an exchange on your own card first so you can see what
+        visitors will get.
       </p>
       <p className="lp-body">
         When we turn on visitor follow-up email, they may receive a follow-up email from
@@ -128,14 +118,14 @@ export function PrivacyPolicyContent() {
         apply to the raw data obtained from the scopes and data aggregated, anonymized,
         or derived from them.
       </p>
-      <ol className="lp-body">
+      <ul className="lp-legal-list">
         <li>
           Limit your use of data to providing or improving user-facing features that are
           prominent in the requesting application&apos;s user interface;
         </li>
         <li>
           Transfers of data are not allowed, except:
-          <ol>
+          <ul>
             <li>
               To provide or improve your appropriate access or user-facing features that
               are visible and prominent in the requesting application&apos;s user
@@ -147,11 +137,11 @@ export function PrivacyPolicyContent() {
               As part of a merger, acquisition, or sale of assets of the developer after
               obtaining explicit prior consent from the user.
             </li>
-          </ol>
+          </ul>
         </li>
         <li>
           Don&apos;t allow humans to read the data, unless:
-          <ol>
+          <ul>
             <li>
               You first obtained the user&apos;s affirmative agreement to view specific
               messages, files, or other data, with the limited exception of use cases
@@ -168,13 +158,13 @@ export function PrivacyPolicyContent() {
               operations in accordance with applicable privacy and other jurisdictional
               legal requirements.
             </li>
-          </ol>
+          </ul>
         </li>
-      </ol>
+      </ul>
       <p className="lp-body">
         All other transfers, uses, or sales of user data are prohibited, including:
       </p>
-      <ol className="lp-body">
+      <ul className="lp-legal-list">
         <li>
           Transferring or selling user data to third parties like advertising platforms,
           data brokers, or any information resellers.
@@ -187,7 +177,7 @@ export function PrivacyPolicyContent() {
           Transferring, selling, or using user data to determine credit-worthiness or
           for lending purposes.
         </li>
-      </ol>
+      </ul>
       <p className="lp-body">
         You must ensure that your employees, agents, contractors, and successors comply
         with this Google API Services User Data Policy.
@@ -202,12 +192,11 @@ export function PrivacyPolicyContent() {
 
       <h2 className="lp-legal-h2">Who we share data with</h2>
       <p className="lp-body">
-        We use Cloudflare to host We Met, store data, and pass messages between our
-        systems (including Cloudflare Email Service when that sending path is active).
-        We use Google so you can sign in with Google, to send email when the Gmail path
-        is active, and for optional one-time Google Contacts access when you choose
-        &quot;Add We Met to my contacts&quot;. We don&apos;t sell personal information
-        and we don&apos;t use it for advertising.
+        We use Cloudflare to host We Met, store data, pass messages between our systems,
+        and send outbound email through Cloudflare Email Service. We use Google so you
+        can sign in with Google and for optional one-time Google Contacts access when
+        you choose &quot;Add We Met to my contacts&quot;. We don&apos;t sell personal
+        information and we don&apos;t use it for advertising.
       </p>
       <p className="lp-body">
         Cloudflare and Google may process personal information in Canada, the United

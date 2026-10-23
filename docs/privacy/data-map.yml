@@ -1017,8 +1017,8 @@
   column: external_ref
   whose: operational
   data:
-    Opaque flat JSON from email sink after send — Gmail path { gmailMessageId, gmailThreadId }; Cloudflare path {
-    provider, messageId } (no visitor PII)
+    Opaque flat JSON from email sink after send — Cloudflare path { provider, messageId } (legacy rows may include
+    gmailMessageId and gmailThreadId; no visitor PII)
   purpose: record-to-append threading handoff and operator correlation
   storage: D1
   processors:
@@ -1114,35 +1114,28 @@
     Email to card owner with visitor name, email, phone from exchange; Reply-To is visitor email (owner relay
     default; ADR 0027)
   purpose: notify owner of new lead so they can follow up from their inbox
-  storage:
-    Card owner inbox; sent via Gmail API when app_settings.email_provider is gmail (default), or Cloudflare Email
-    Service binding when email_provider is cloudflare
+  storage: Card owner inbox; sent via Cloudflare Email Service (follow-up consumer send_email binding)
   processors:
     - Cloudflare
-    - Google
     - Cloudflare Email Service
   retention:
-    recipient mailbox (unknown); operator Gmail copy when Gmail path (unknown per Google mailbox policy); when
-    email_provider is cloudflare, Cloudflare Email Service retains per-event sending metadata (from, to, subject,
+    recipient mailbox (unknown); Cloudflare Email Service retains per-event sending metadata (from, to, subject,
     messageId, status, authentication and error fields) for 31 days in Activity log and emailSendingAdaptive datasets
     (https://developers.cloudflare.com/email-service/observability/metrics-analytics/); optional full message preview
     about seven days when domain Email preview is on
     (https://developers.cloudflare.com/email-service/observability/logs/#message-preview); duration Cloudflare keeps
     full message bodies after delivery is unknown in Email Service developer docs (DPA Customer Content uses
     agreement-term criteria only, https://www.cloudflare.com/cloudflare-customer-dpa/)
-  who_can_see:
-    card owner; operator can read delegated Gmail mailbox when Gmail path is active; operator with Cloudflare account
-    access to Email Service Activity log when Cloudflare path is active
+  who_can_see: card owner; operator with Cloudflare account access to Email Service Activity log
   source: src/followup-email-consumer/lead-sink/email-handler.ts
   verified: false
 - id: email.owner_lead_append
   whose: visitor
   data: Email append to owner thread with visitor job title, company, note
   purpose: complete lead details to owner
-  storage: same as email.owner_lead_record (provider-selected)
+  storage: same as email.owner_lead_record
   processors:
     - Cloudflare
-    - Google
     - Cloudflare Email Service
   retention: same as email.owner_lead_record
   who_can_see: same as email.owner_lead_record
@@ -1156,32 +1149,31 @@
     given, optional nickname in brackets, and family; body includes card display name (or Google name), role, photo,
     vCard with Google email and full Google name in FN
   purpose: reciprocate contact after exchange (direct mode only)
-  storage: Visitor inbox; provider same as email.owner_lead_record
+  storage: Visitor inbox; same outbound path as email.owner_lead_record
   processors:
     - Cloudflare
-    - Google
     - Cloudflare Email Service
   retention: same as email.owner_lead_record
-  who_can_see:
-    visitor (From, signature, body, vCard); operator Gmail when Gmail path is active; operator with Cloudflare
-    account access to Email Service Activity log when Cloudflare path is active
+  who_can_see: visitor (From, signature, body, vCard); operator with Cloudflare account access to Email Service Activity log
   source: src/email/format-visitor-follow-up.ts
   verified: false
 - id: email.operator_mailbox_visibility
   whose: operational
-  data: Full MIME of sent lead and follow-up messages in operator-controlled Gmail when email_provider is gmail
-  purpose: Gmail delivery mechanism side effect (not used for Cloudflare provider path)
-  storage: Google Gmail
+  data:
+    Legacy operator Gmail mailbox copies when email_provider was gmail (Gmail API path); not used for production
+    outbound after Cloudflare Email Service-only operations (October 2026)
+  purpose: historical Gmail delivery side effect only
+  storage: Google Gmail when legacy path was active
   processors:
     - Google
   retention: unknown (Google mailbox policy)
-  who_can_see: operator
+  who_can_see: operator when legacy path was active
   source: src/email/email-provider.ts
   verified: false
 - id: config.app_settings.email_provider
   whose: operational
-  data: D1 app_settings row email_provider = gmail (default when missing or unknown) or cloudflare
-  purpose: selects outbound email adapter in follow-up consumer
+  data: D1 app_settings row email_provider; production outbound uses cloudflare (legacy gmail value unused in ops)
+  purpose: outbound email adapter in follow-up consumer (Cloudflare Email Service in production)
   storage: D1 app_settings (key and value columns)
   processors:
     - Cloudflare
