@@ -59,7 +59,7 @@ describe("email template layout (rendered output)", () => {
       });
       const greetingPos = textHtml.indexOf("Hi Alex,");
       const footnotePos = textHtml.indexOf("exchanged contact info at");
-      const promoPos = textHtml.indexOf('class="wm-promo wm-pad"');
+      const promoPos = textHtml.indexOf('class="wm-promo"');
       const sentLinePos = textHtml.indexOf("Sent with We Met</td>");
       expect(greetingPos).toBeGreaterThan(-1);
       expect(footnotePos).toBeGreaterThan(greetingPos);
@@ -77,7 +77,9 @@ describe("email template layout (rendered output)", () => {
       expect(textPlain.split("\n")[0]).toBe("Hi Alex,");
       expect(textPlain).not.toContain("\n---\n");
       const footnotePos = textPlain.indexOf("exchanged contact info at");
-      const promoPos = textPlain.indexOf("We Met: get your own card for free");
+      const promoPos = textPlain.indexOf(
+        "Get your own card for free: https://we-met.link",
+      );
       const closingPos = textPlain.indexOf("Sent with We Met.");
       expect(promoPos).toBeGreaterThan(footnotePos);
       expect(closingPos).toBeGreaterThan(promoPos);
