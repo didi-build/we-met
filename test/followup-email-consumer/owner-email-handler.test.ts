@@ -41,7 +41,7 @@ describe("createEmailLeadSinkHandler owner email (unit)", () => {
         cardSlug: "demo",
         sourceUrl: "https://we-met.link/hi/demo",
       },
-      { messageAttempts: 1, visitorEmailMode: "owner_relay" },
+      { messageAttempts: 1 },
     );
 
     expect(sendEmail).toHaveBeenCalledTimes(1);
@@ -87,7 +87,7 @@ describe("createEmailLeadSinkHandler owner email (unit)", () => {
         cardSlug: "demo",
         sourceUrl: "https://we-met.link/hi/demo",
       },
-      { messageAttempts: 1, visitorEmailMode: "direct" },
+      { messageAttempts: 1 },
     );
 
     const outbound = sendEmail.mock.calls[0]![0]! as OutboundEmail;
@@ -130,7 +130,7 @@ describe("createEmailLeadSinkHandler owner email (unit)", () => {
         cardSlug: "demo",
         sourceUrl: "https://we-met.link/hi/demo",
       },
-      { messageAttempts: 1, visitorEmailMode: "owner_relay" },
+      { messageAttempts: 1 },
     );
 
     const outbound = sendEmail.mock.calls[0]![0]! as OutboundEmail;

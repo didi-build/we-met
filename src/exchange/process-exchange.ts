@@ -121,19 +121,14 @@ export async function processExchange(
   };
 
   const sourceUrl = absoluteUrl(deps.baseUrl, `/hi/${card.slug}`);
-  await dispatchLeadOnExchange(
-    resolveLeadSinksForDispatch(sinks, card.email),
-    lead,
-    card.id,
-    card.slug,
-    sourceUrl,
-    leadFirstNameFromFullName(card.displayName),
-    sinkDispatchDeps,
-  );
+  const createdAt = deps.now().toISOString();
+  const sinksForDispatch = resolveLeadSinksForDispatch(sinks, card.email);
 
-  if (enabledSinks.length === 0) {
-    await deps.incrementDailySendCounts(card.id, dailySendKinds);
-  }
+  await deps.exchangeOwnerEmail.ensurePending({
+    leadId: lead.leadId,
+    cardId: card.id,
+    createdAt,
+  });
 
   try {
     await deps.followupQueue.enqueueVisitorLetter(
@@ -146,6 +141,20 @@ export async function processExchange(
     );
   } catch {
     return { status: "enqueue_failed" };
+  }
+
+  await dispatchLeadOnExchange(
+    sinksForDispatch,
+    lead,
+    card.id,
+    card.slug,
+    sourceUrl,
+    leadFirstNameFromFullName(card.displayName),
+    sinkDispatchDeps,
+  );
+
+  if (enabledSinks.length === 0) {
+    await deps.incrementDailySendCounts(card.id, dailySendKinds);
   }
 
   const token = createDetailsToken(

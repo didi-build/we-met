@@ -226,7 +226,6 @@ async function processQueuedLeadSink(
 
   const handlerContext = {
     messageAttempts: message.attempts,
-    visitorEmailMode: leadEmailControls.visitorEmailMode,
   };
 
   const isOwnerEmailMessage =

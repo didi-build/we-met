@@ -68,7 +68,9 @@ export async function processOwnerEmailFinalize(
       card: cardSnapshot,
     });
   } catch {
-    // Best-effort: owner email still enqueues below.
+    console.error("exchange_visitor_letter_enqueue_failed", {
+      leadId: lead.leadId,
+    });
   }
 
   const sourceUrl = absoluteUrl(deps.baseUrl, `/hi/${card.slug}`);

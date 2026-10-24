@@ -340,4 +340,72 @@ describe("processExchange (unit)", () => {
     const result = await processExchange(baseInput(), card, [], deps);
     expect(result.status).toBe("enqueue_failed");
   });
+
+  it("enqueues visitor_letter_due before owner_email_due on exchange", async () => {
+    const repo = new MemoryCardRepository();
+    const card = await repo.upsertCard(exampleCardInput());
+    const sinks = [
+      {
+        id: "sink-a",
+        cardId: card.id,
+        kind: "test_sink",
+        config: { to: "owner@example.com" },
+        enabled: true,
+        createdAt: "",
+        updatedAt: "",
+      },
+    ];
+    const callOrder: string[] = [];
+    const deps = createDeps({
+      followupQueue: {
+        enqueueVisitorLetter: async () => {
+          callOrder.push("visitor_letter_due");
+        },
+      },
+      leadSinkQueue: {
+        enqueueLeadSink: async (message) => {
+          callOrder.push((message as { type: string }).type);
+        },
+      },
+    });
+
+    const result = await processExchange(baseInput(), card, sinks, deps);
+
+    expect(result.status).toBe("success");
+    expect(callOrder).toEqual(["visitor_letter_due", "owner_email_due"]);
+  });
+
+  it("does not enqueue owner_email_due or cap counts when visitor letter enqueue fails", async () => {
+    const repo = new MemoryCardRepository();
+    const card = await repo.upsertCard(exampleCardInput());
+    const sinks = [
+      {
+        id: "sink-a",
+        cardId: card.id,
+        kind: "test_sink",
+        config: { to: "owner@example.com" },
+        enabled: true,
+        createdAt: "",
+        updatedAt: "",
+      },
+    ];
+    const deliveryLedger = new MemoryLeadDeliveryLedger();
+    const incrementDailySendCounts = vi.fn(async () => {});
+    const deps = createDeps({
+      deliveryLedger,
+      incrementDailySendCounts,
+      followupQueue: {
+        enqueueVisitorLetter: async () => {
+          throw new Error("missing binding");
+        },
+      },
+    });
+
+    const result = await processExchange(baseInput(), card, sinks, deps);
+
+    expect(result.status).toBe("enqueue_failed");
+    expect(deps.sinkMessages).toHaveLength(0);
+    expect(deliveryLedger.rows).toHaveLength(0);
+    expect(incrementDailySendCounts).not.toHaveBeenCalled();
+  });
 });

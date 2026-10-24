@@ -3,8 +3,6 @@ import type {
   LeadSinkOwnerEmailMessage,
   LeadSinkRecordLeadMessage,
 } from "@/exchange/queue/types";
-import type { VisitorEmailMode } from "@/app-settings/defaults";
-
 export type ParsedLeadSinkRecordMessage = LeadSinkRecordLeadMessage;
 export type ParsedLeadSinkAppendMessage = LeadSinkAppendDetailsMessage;
 
@@ -20,7 +18,6 @@ export type ParsedExternalRef = Record<string, string | number | boolean | null>
 
 export type LeadSinkHandlerContext = {
   messageAttempts: number;
-  visitorEmailMode: VisitorEmailMode;
 };
 
 export type LeadSinkAppendContext = LeadSinkHandlerContext & {
