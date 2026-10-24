@@ -22,7 +22,9 @@ If any signal is missing on an issue you believe came from non-prod, treat it as
 
 ## Deliberate end-to-end email test (exchange + follow-up consumer)
 
-Use this after changing the mail or consumer path. Default non-prod **`visitor_email_mode`** is **`owner_relay`** (no visitor follow-up email). See [kill-switch-and-caps](./kill-switch-and-caps.md) to flip modes.
+Use this after changing the mail or consumer path. Default non-prod **`visitor_email_mode`** is **`owner_relay`**. See [kill-switch-and-caps](./kill-switch-and-caps.md) to flip modes.
+
+Each exchange sends **two** emails: the visitor letter (`Great meeting you, {first name}`) and the owner relay email (`You met {visitor name}`). Daily caps count **two** slots per exchange in both modes ([0027](../decisions/0027-owner-relay-visitor-follow-up.md)).
 
 ### Shared steps
 
@@ -31,44 +33,30 @@ Use this after changing the mail or consumer path. Default non-prod **`visitor_e
    - **Local:** Turnstile uses Cloudflare’s always-pass **test key pair** (widget auto-passes).
    - **Preview:** complete the **real** Turnstile challenge (widget **we-met nonprod**).
 3. Confirm `POST /api/exchange` returns **200** and a non-empty signed details token.
-4. Confirm jobs on **`we-met-followup-email-nonprod`** (owner email messages and, in direct mode, visitor follow-up).
-5. Mail should arrive **From** `hello@mail.we-met.link` (secret **`WE_MET_EMAIL_FROM_CLOUDFLARE`**). Non-prod delivery is redirected to **`WE_MET_TEST_MAIL_TO`**; subjects prefix the real sink destination as `[we-met test → owner@example.com]`.
+4. Confirm jobs on **`we-met-followup-email-nonprod`** (visitor letter and owner email messages).
+5. Mail should arrive **From** `hello@mail.we-met.link` (secret **`WE_MET_EMAIL_FROM_CLOUDFLARE`**). Non-prod delivery is redirected to **`WE_MET_TEST_MAIL_TO`**; subjects prefix the real sink destination as `[we-met test → owner@example.com]` when the letter goes to the owner.
 6. No Linear verification until the Linear sink kind ships.
 
 ### Owner relay mode (default)
 
 **When:** `visitor_email_mode` is missing or `owner_relay` (see [0027](../decisions/0027-owner-relay-visitor-follow-up.md)).
 
-#### Interim until [DIDI-820](https://linear.app/didi-build/issue/DIDI-820): current main behaviour
-
-Locked Product direction on [DIDI-739](https://linear.app/didi-build/issue/DIDI-739). The checklist below matches **main today**. [DIDI-820](https://linear.app/didi-build/issue/DIDI-820) will change non-prod expectations to:
-
-- **Two emails per exchange:** the visitor letter (`Great meeting you, {first name}`) and the owner email (`You met {visitor name}`).
-- **Owner email:** `You met` with **all** detail rows in **both** modes (same template as owner relay today).
-- **Letter recipient:** **owner** in relay mode (Reply-To visitor, vCard attached); **visitor** in direct mode (From/Reply-To as today).
-- **Daily caps:** count **two** slots per exchange in both modes.
-
 1. After exchange, optional details: submit, skip/close (dismiss), or leave the sheet and wait for the **10-minute** fallback.
-2. In **`WE_MET_TEST_MAIL_TO`**, expect **exactly one** owner email per exchange (not two threaded messages).
-   - Subject: `You met {visitor name}` (with the non-prod prefix above).
-   - **Reply-To:** the visitor address (also redirected to the test inbox in non-prod).
-   - Body: owner relay template (`Hit Reply to write back`); optional phone, job title, company, and note rows only when provided (no dash placeholders).
-   - **No** `Re:` details email, **no** `In-Reply-To` / `References` threading headers.
-3. Expect **no** visitor follow-up email in this mode.
+2. In **`WE_MET_TEST_MAIL_TO`**, expect **two** emails per exchange:
+   - **Visitor letter** (to the owner; Reply-To visitor; **`.vcf`** attached). Subject: `Great meeting you, {visitor first name}` (with the non-prod prefix when redirected). Body is the visitor letter template (no visitor email, job title, company, or note rows).
+   - **Owner relay** (to the owner). Subject: `You met {visitor full name}` (with the non-prod prefix above). **Reply-To:** the visitor address (also redirected to the test inbox in non-prod). Body: owner relay template (`Hit Reply to write back`); optional phone, job title, company, and note rows only when provided (no dash placeholders).
+3. **No** `Re:` details email, **no** `In-Reply-To` / `References` threading headers on either message.
 4. Token-gated vCard: on the receipt, use **Save contact** (`POST /api/exchange/vcard`) and confirm a `.vcf` with the owner’s account email and card fields.
 
 ### Direct visitor follow-up mode
 
 **When:** `visitor_email_mode` is exact lowercase **`direct`**.
 
-#### Interim until [DIDI-820](https://linear.app/didi-build/issue/DIDI-820): current main behaviour
-
-Same locked Product direction on [DIDI-739](https://linear.app/didi-build/issue/DIDI-739) and the [DIDI-820](https://linear.app/didi-build/issue/DIDI-820) target behaviour listed under [owner relay](#owner-relay-mode-default) above. Until DIDI-820 ships, direct mode differs from that target as follows.
-
 1. Same exchange and optional-details flow as above.
-2. In **`WE_MET_TEST_MAIL_TO`**, expect **one** owner email (subject `New lead added: {visitor name}`, same Reply-To and no threading rules as owner relay) **and** one visitor follow-up to the visitor address (redirected to the test inbox in non-prod).
-3. Visitor mail includes a **`.vcf`** attachment of the owner card. **From** display name is `{Google first name} via We Met` when valid, else **`WE_MET_FROM_DISPLAY_NAME`**.
-4. Owner mail uses **`WE_MET_FROM_DISPLAY_NAME`** (example: `Diadem at We Met`).
+2. In **`WE_MET_TEST_MAIL_TO`** (owner mail redirected) and the visitor address (letter redirected in non-prod), expect **two** emails per exchange:
+   - **Visitor letter** to the **visitor** (From `{owner first name} via We Met` when valid, else **`WE_MET_FROM_DISPLAY_NAME`**; Reply-To owner; **`.vcf`** attached).
+   - **Owner relay** to the owner: same `You met` template and detail rows as owner relay mode (not the legacy `New lead added` template).
+3. Owner mail uses **`WE_MET_FROM_DISPLAY_NAME`** (example: `Diadem at We Met`).
 
 ### Flip `visitor_email_mode` per environment (operators only)
 
