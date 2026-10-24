@@ -32,6 +32,7 @@ import { processDetailsDismiss } from "@/exchange/process-details-dismiss";
 import { processExchange, type ProcessExchangeDeps } from "@/exchange/process-exchange";
 import type { EditorCard } from "@/app-api/types";
 import type { QueueSendOptions } from "@/exchange/queue/producer";
+import { OWNER_EMAIL_FALLBACK_DELAY_SECONDS } from "@/exchange/owner-email-timing";
 
 export const RELAY_E2E_ACCOUNT_ID = "acct-relay-e2e";
 export const RELAY_E2E_OWNER_EMAIL = "relay-owner@example.com";
@@ -164,7 +165,9 @@ function queueMessage(body: unknown): FollowupQueueMessage {
   };
 }
 
-function ownerSinkDeliveryOrder(messages: QueuedSinkMessage[]): QueuedSinkMessage[] {
+export function ownerSinkDeliveryOrder(
+  messages: QueuedSinkMessage[],
+): QueuedSinkMessage[] {
   return [...messages].sort((a, b) => {
     const typeA = (a.message as { type?: string }).type ?? "";
     const typeB = (b.message as { type?: string }).type ?? "";
@@ -357,6 +360,44 @@ export async function finalizeWithDetails(
   }
 }
 
+export async function tryFinalizeWithDetails(
+  ctx: RelayE2EContext,
+  details: {
+    phone: string | null;
+    jobTitle: string | null;
+    company: string | null;
+    note: string | null;
+  },
+) {
+  return processDetails({ token: ctx.detailsToken, ...details }, ctx.card, ctx.sinks, {
+    tokenSecret: ctx.exchangeDeps.tokenSecret,
+    environment: ctx.exchangeDeps.environment,
+    leadSinkQueue: ctx.exchangeDeps.leadSinkQueue,
+    deliveryLedger: ctx.exchangeDeps.deliveryLedger,
+    deliveryLogger: ctx.exchangeDeps.deliveryLogger,
+    leadSinkLogger: ctx.exchangeDeps.leadSinkLogger,
+    exchangeOwnerEmail: ctx.exchangeDeps.exchangeOwnerEmail,
+    createLedgerId: ctx.exchangeDeps.createLedgerId,
+    now: ctx.exchangeDeps.now,
+    baseUrl: ctx.exchangeDeps.baseUrl,
+  });
+}
+
+export async function tryFinalizeWithDismiss(ctx: RelayE2EContext) {
+  return processDetailsDismiss({ token: ctx.detailsToken }, ctx.card, ctx.sinks, {
+    tokenSecret: ctx.exchangeDeps.tokenSecret,
+    environment: ctx.exchangeDeps.environment,
+    leadSinkQueue: ctx.exchangeDeps.leadSinkQueue,
+    deliveryLedger: ctx.exchangeDeps.deliveryLedger,
+    deliveryLogger: ctx.exchangeDeps.deliveryLogger,
+    leadSinkLogger: ctx.exchangeDeps.leadSinkLogger,
+    exchangeOwnerEmail: ctx.exchangeDeps.exchangeOwnerEmail,
+    createLedgerId: ctx.exchangeDeps.createLedgerId,
+    now: ctx.exchangeDeps.now,
+    baseUrl: ctx.exchangeDeps.baseUrl,
+  });
+}
+
 export async function finalizeWithDismiss(ctx: RelayE2EContext): Promise<void> {
   const result = await processDetailsDismiss(
     { token: ctx.detailsToken },
@@ -393,6 +434,60 @@ export function assertOwnerRelayOutbound(
   expect(email.textPlain).toContain("Hit Reply to write back");
   expect(email.textPlain).not.toContain("Re: New lead");
   expect(email.textPlain).not.toMatch(/Phone:\s+-/);
+}
+
+/** Optional relay rows (phone, job title, company, note) omitted when unset; no dash placeholders. */
+export function assertOwnerRelayOmitsEmptyOptionalRows(email: OutboundEmail): void {
+  const { textPlain, textHtml } = email;
+  for (const label of ["Phone:", "Job title:", "Company:", "Note:"]) {
+    expect(textPlain).not.toContain(label);
+  }
+  expect(textPlain).not.toMatch(/Phone:\s+-/);
+  expect(textPlain).not.toMatch(/Job title:\s+-/);
+  expect(textPlain).not.toMatch(/Company:\s+-/);
+  expect(textPlain).not.toMatch(/Note:\s*\n\s*-/);
+  expect(textHtml).not.toContain(">Phone</td>");
+  expect(textHtml).not.toContain(">Job title</td>");
+  expect(textHtml).not.toContain(">Company</td>");
+  expect(textHtml).not.toContain(">Note</td>");
+}
+
+export function assertOnlyDelayedOwnerEmailFallbackQueued(ctx: RelayE2EContext): void {
+  expect(ctx.sinkMessages).toHaveLength(1);
+  const queued = ctx.sinkMessages[0]!;
+  expect((queued.message as { type?: string }).type).toBe("owner_email_due");
+  expect(queued.options?.delaySeconds).toBe(OWNER_EMAIL_FALLBACK_DELAY_SECONDS);
+}
+
+async function consumerDepsForOwnerDelivery(
+  ctx: RelayE2EContext,
+  ownerEmails: OutboundEmail[],
+) {
+  const controls = await readLeadEmailControls(ctx.db);
+  return createLeadSinkConsumerDeps(ctx.db, ownerEmails, controls.visitorEmailMode);
+}
+
+export async function deliverOwnerSinkBodyTwiceWithRetry(
+  ctx: RelayE2EContext,
+  body: unknown,
+): Promise<void> {
+  const deps = await consumerDepsForOwnerDelivery(ctx, ctx.ownerEmails);
+  const first = {
+    id: "owner-sink-1",
+    attempts: 1,
+    body,
+    ack: vi.fn(),
+    retry: vi.fn(),
+  };
+  const second = {
+    id: "owner-sink-2",
+    attempts: 2,
+    body,
+    ack: vi.fn(),
+    retry: vi.fn(),
+  };
+  await processLeadSinkQueueMessage(first, deps);
+  await processLeadSinkQueueMessage(second, deps);
 }
 
 export function assertDirectOwnerOutbound(

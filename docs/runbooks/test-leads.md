@@ -59,29 +59,14 @@ Use this after changing the mail or consumer path. Default non-prod **`visitor_e
 
 ### Flip `visitor_email_mode` per environment (operators only)
 
-Run against the target D1 (never production from a laptop without the production runbook). Commands are documented here; **do not** run them as part of routine CI.
+**UNVERIFIED:** The SQL below is documented for operators only. **Do not** run it from CI, from this runbook as an automated step, or without owner sign-off. Wrong environment or binding can change the wrong database.
 
-**Non-prod** (`we-met-db-nonprod`):
+Use the canonical SQL and mode semantics in [kill-switch-and-caps](./kill-switch-and-caps.md#visitor-email-mode-owner-relay-vs-direct) (`INSERT` / read-back for `visitor_email_mode`). Run it only through the D1 steps in [d1-operator-sql.md](./d1-operator-sql.md):
 
-```bash
-npx wrangler d1 execute we-met-db-nonprod --remote --command \
-  "INSERT INTO app_settings (key, value) VALUES ('visitor_email_mode', 'direct') ON CONFLICT(key) DO UPDATE SET value = excluded.value;"
-```
+- **Non-prod remote:** binding name is always **`WE_MET_DB`** against database **`we-met-db-nonprod`**, using a config from `scripts/prepare-wrangler-config.mjs` (`--target d1-migrate-nonprod`, output `wrangler.d1-nonprod.ci.jsonc`). Do **not** use `npx wrangler d1 execute we-met-db-nonprod`; that name does not match `wrangler.jsonc` (production binds `we-met-db`; non-prod uses the prepared preview config).
+- **Production:** follow the **Production** section of [d1-operator-sql.md](./d1-operator-sql.md): reviewed one-off SQL, `prepare-wrangler-config.mjs --target production`, and a **second person** for destructive or high-impact statements. The GitHub **`production`** environment approval gates **deploys**, not ad-hoc laptop SQL.
 
-Return to owner relay:
-
-```bash
-npx wrangler d1 execute we-met-db-nonprod --remote --command \
-  "INSERT INTO app_settings (key, value) VALUES ('visitor_email_mode', 'owner_relay') ON CONFLICT(key) DO UPDATE SET value = excluded.value;"
-```
-
-**Production** uses the same SQL against the production D1 binding; requires production environment approval per [deploy](./deploy.md).
-
-Read back:
-
-```sql
-SELECT key, value FROM app_settings WHERE key = 'visitor_email_mode';
-```
+Keep **`owner_relay`** in production until the [DIDI-656](https://linear.app/didi-build/issue/DIDI-656) inbox-placement gate passes (see [When to switch back to owner relay](#when-to-switch-back-to-owner-relay) below). Do not set `direct` in production for deliverability experiments without an explicit owner decision.
 
 ### When to switch back to owner relay
 
