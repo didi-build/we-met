@@ -1,9 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { MemoryExchangeOwnerEmailStore } from "@/exchange-owner-email/memory-store";
 import { OWNER_EMAIL_SEND_CLAIM_STALE_MS } from "@/exchange-owner-email/types";
-import { OWNER_EMAIL_FALLBACK_DELAY_SECONDS } from "@/exchange/owner-email-timing";
+import {
+  EXCHANGE_EMAIL_TRIGGER_DEFER_MAX_MS,
+  OWNER_EMAIL_FALLBACK_DELAY_SECONDS,
+} from "@/exchange/owner-email-timing";
 import {
   dispatchLeadOnExchange,
+  type LeadDeliveryDispatchLogger,
   type LeadSinkDispatchDeps,
 } from "@/exchange/lead-sink/dispatcher";
 import type { LeadSinkRecord } from "@/card-data/types";
@@ -14,7 +18,10 @@ import { processDetailsDismiss } from "@/exchange/process-details-dismiss";
 import { createDetailsToken } from "@/exchange/token";
 import { exampleCardInput } from "../helpers/example-card";
 import { MemoryCardRepository } from "@/card-data/memory-repository";
-import { processLeadSinkQueueMessage } from "@/followup-email-consumer/process-lead-sink";
+import {
+  processLeadSinkQueueMessage,
+  type LeadSinkConsumerDeps,
+} from "@/followup-email-consumer/process-lead-sink";
 import { MemoryConsumerLeadDeliveryLedger } from "../followup-email-consumer/memory-consumer-ledger";
 import { FollowupEmailError } from "@/email/followup-email-error";
 import { createFakeLeadSinkHandler } from "../followup-email-consumer/fake-lead-sink-handler";
@@ -34,6 +41,29 @@ function rowClaimStillHeld(
   return Boolean(row?.ownerEmailClaimedAt && !row.ownerEmailSentAt);
 }
 const SOURCE_URL = "https://we-met.link/hi/demo";
+
+const noopFollowupQueue = {
+  enqueueVisitorLetter: async () => undefined,
+};
+
+function ownerEmailFinalizeDeps(
+  deps: LeadSinkDispatchDeps,
+  exchangeOwnerEmail: MemoryExchangeOwnerEmailStore,
+  deliveryLogger: LeadDeliveryDispatchLogger,
+) {
+  return {
+    followupQueue: noopFollowupQueue,
+    leadSinkQueue: deps.producer,
+    deliveryLedger: deps.ledger,
+    deliveryLogger,
+    leadSinkLogger: deps.sinkLogger,
+    exchangeOwnerEmail,
+    createLedgerId: deps.createLedgerId,
+    now: deps.now,
+    baseUrl: "https://we-met.link",
+    logExchangeVisitorLetterEnqueueFailed: vi.fn(),
+  };
+}
 
 const lead: VisitorLead = {
   leadId: "lead-1",
@@ -104,6 +134,7 @@ async function deliverQueuedOwnerEmail(
   ledger: MemoryConsumerLeadDeliveryLedger,
   sendCount: { value: number },
   deliverOverrides?: Partial<Parameters<typeof createFakeLeadSinkHandler>[0]>,
+  consumerOverrides?: Partial<LeadSinkConsumerDeps>,
 ) {
   await seedOwnerEmailExchangeRow(
     exchangeOwnerEmail,
@@ -137,7 +168,9 @@ async function deliverQueuedOwnerEmail(
     logLeadSinkAppendDeferred: vi.fn(),
     logExchangeOwnerEmailRowMissing: vi.fn(),
     logExchangeOwnerEmailConfirmFailed: vi.fn(),
+    logExchangeOwnerEmailContentionExhausted: vi.fn(),
     now: () => NOW,
+    ...consumerOverrides,
   };
   const message = {
     id: "q-1",
@@ -189,16 +222,7 @@ describe("owner email timing (integration)", () => {
       { phone: null, jobTitle: "CTO", company: null, note: null },
       card,
       [sink("sink-a")],
-      {
-        leadSinkQueue: deps.producer,
-        deliveryLedger: deps.ledger,
-        deliveryLogger: deps.deliveryLogger,
-        leadSinkLogger: deps.sinkLogger,
-        exchangeOwnerEmail,
-        createLedgerId: deps.createLedgerId,
-        now: deps.now,
-        baseUrl: "https://we-met.link",
-      },
+      ownerEmailFinalizeDeps(deps, exchangeOwnerEmail, deps.deliveryLogger),
     );
     expect(sinkMessages).toHaveLength(2);
 
@@ -271,16 +295,7 @@ describe("owner email timing (integration)", () => {
       { phone: null, jobTitle: "CTO", company: null, note: null },
       card,
       [sink("sink-a")],
-      {
-        leadSinkQueue: deps.producer,
-        deliveryLedger: deps.ledger,
-        deliveryLogger: deps.deliveryLogger,
-        leadSinkLogger: deps.sinkLogger,
-        exchangeOwnerEmail,
-        createLedgerId: deps.createLedgerId,
-        now: deps.now,
-        baseUrl: "https://we-met.link",
-      },
+      ownerEmailFinalizeDeps(deps, exchangeOwnerEmail, deps.deliveryLogger),
     );
     expect(finalize.status).toBe("success");
     await deliverQueuedOwnerEmail(
@@ -311,27 +326,23 @@ describe("owner email timing (integration)", () => {
       { phone: null, jobTitle: "CTO", company: null, note: null },
       card,
       [sink("sink-a")],
-      {
-        leadSinkQueue: deps.producer,
-        deliveryLedger: deps.ledger,
-        deliveryLogger: deps.deliveryLogger,
-        leadSinkLogger: deps.sinkLogger,
-        exchangeOwnerEmail,
-        createLedgerId: deps.createLedgerId,
-        now: deps.now,
-        baseUrl: "https://we-met.link",
-      },
+      ownerEmailFinalizeDeps(deps, exchangeOwnerEmail, deps.deliveryLogger),
     );
     expect(finalize.status).toBe("success");
     expect(sinkMessages).toHaveLength(1);
 
     const sendCount = { value: 0 };
     const consumerLedger = new MemoryConsumerLeadDeliveryLedger();
+    const afterDeferWindow = new Date(
+      NOW.getTime() + EXCHANGE_EMAIL_TRIGGER_DEFER_MAX_MS + 60_000,
+    );
     await deliverQueuedOwnerEmail(
       queueBodyFromSinkMessage(sinkMessages[0].message),
       exchangeOwnerEmail,
       consumerLedger,
       sendCount,
+      undefined,
+      { now: () => afterDeferWindow },
     );
     expect(sendCount.value).toBe(1);
   });
@@ -353,14 +364,7 @@ describe("owner email timing (integration)", () => {
     const tokenDeps = {
       tokenSecret: "secret",
       environment: "local",
-      leadSinkQueue: deps.producer,
-      deliveryLedger: deps.ledger,
-      exchangeOwnerEmail,
-      deliveryLogger: deps.deliveryLogger,
-      leadSinkLogger: deps.sinkLogger,
-      createLedgerId: deps.createLedgerId,
-      now: deps.now,
-      baseUrl: "https://we-met.link",
+      ...ownerEmailFinalizeDeps(deps, exchangeOwnerEmail, deps.deliveryLogger),
     };
     const token = createDetailsToken(
       "secret",
@@ -602,6 +606,46 @@ describe("owner email timing (integration)", () => {
     await processLeadSinkQueueMessage(second, deps);
     expect(sendCount.value).toBe(1);
     expect(second.ack).toHaveBeenCalled();
+  });
+
+  it("defers owner_email_due while triggered_at is set and details send is pending", async () => {
+    const exchangeOwnerEmail = new MemoryExchangeOwnerEmailStore();
+    await seedOwnerEmailExchangeRow(
+      exchangeOwnerEmail,
+      lead.leadId,
+      "card-1",
+      NOW.toISOString(),
+    );
+    const row = exchangeOwnerEmail.rows.get(lead.leadId);
+    expect(row).toBeDefined();
+    row!.triggeredAt = NOW.toISOString();
+
+    const ledger = new MemoryConsumerLeadDeliveryLedger();
+    ledger.seedQueued(lead.leadId, "sink-a", "record");
+    const sendCount = { value: 0 };
+    const deps = createOwnerEmailConsumerDeps(exchangeOwnerEmail, ledger, sendCount);
+    const body = {
+      type: "owner_email_due",
+      sinkId: "sink-a",
+      sinkKind: "email",
+      sinkConfig: { to: "owner@example.com" },
+      lead,
+      details: { phone: null, jobTitle: "CTO", company: null, note: null },
+      cardId: "card-1",
+      cardSlug: "demo",
+      sourceUrl: SOURCE_URL,
+    };
+    const message = {
+      id: "defer-1",
+      attempts: 1,
+      body,
+      ack: vi.fn(),
+      retry: vi.fn(),
+    };
+    await processLeadSinkQueueMessage(message, deps);
+    expect(sendCount.value).toBe(0);
+    expect(message.retry).toHaveBeenCalledOnce();
+    expect(message.ack).not.toHaveBeenCalled();
   });
 
   it("consumer acks duplicate owner email deliveries without sending twice", async () => {

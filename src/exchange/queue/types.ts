@@ -11,6 +11,12 @@ export type VisitorFollowupQueueMessage = {
   card: CardEmailSnapshot;
 };
 
+export type VisitorLetterDueMessage = {
+  type: "visitor_letter_due";
+  lead: VisitorLead;
+  card: CardEmailSnapshot;
+};
+
 export type LeadSinkRecordLeadMessage = {
   type: "lead_sink_record";
   sinkId: string;
@@ -61,8 +67,11 @@ export type OwnerEmailDueMessage = {
   ownerFirstName?: string;
 };
 
+export type VisitorLetterQueueMessage =
+  VisitorFollowupQueueMessage | VisitorLetterDueMessage;
+
 export type WeMetQueueMessage =
-  | VisitorFollowupQueueMessage
+  | VisitorLetterQueueMessage
   | LeadSinkRecordLeadMessage
   | LeadSinkAppendDetailsMessage
   | LeadSinkOwnerEmailMessage

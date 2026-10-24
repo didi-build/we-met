@@ -54,7 +54,7 @@ describe("lead email caps (unit)", () => {
     ).toBe(false);
   });
 
-  it("direct exchange needs two slots; owner_relay exchange needs one", () => {
+  it("exchange needs two cap slots in both visitor email modes", () => {
     const controls = {
       leadEmailEnabled: true,
       visitorEmailMode: "direct" as const,
@@ -64,6 +64,10 @@ describe("lead email caps (unit)", () => {
     const usage = { globalUsed: 0, cardUsed: 9 };
     expect(leadEmailSubmissionAllowed(controls, usage, 2)).toBe(false);
     expect(leadEmailSubmissionAllowed(controls, usage, 1)).toBe(true);
+
+    const relayControls = { ...controls, visitorEmailMode: "owner_relay" as const };
+    expect(leadEmailSubmissionAllowed(relayControls, usage, 2)).toBe(false);
+    expect(leadEmailSubmissionAllowed(relayControls, usage, 1)).toBe(true);
   });
 
   it("readLeadEmailControls ignores legacy email_provider rows", async () => {

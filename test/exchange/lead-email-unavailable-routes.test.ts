@@ -10,7 +10,6 @@ import type { CardRecord } from "@/card-data/types";
 import { MemoryCardRepository } from "@/card-data/memory-repository";
 import { createExchangeOwnerEmailStoreFromD1 } from "@/exchange-owner-email/d1-repository";
 import { createLeadDeliveryLedgerFromD1 } from "@/lead-delivery-ledger/d1-repository";
-import { readLeadEmailControls } from "@/app-settings/caps";
 import { assertLeadEmailCapacity } from "@/lead-email/availability";
 import { createDetailsToken } from "@/exchange/token";
 import { exampleCardInput } from "../helpers/example-card";
@@ -80,7 +79,7 @@ function buildExchangeDeps(
     turnstile: { verify: async () => ({ success: true }) },
     rateLimiter: { check: async () => ({ allowed: true }) },
     followupQueue: {
-      enqueueVisitorFollowup: async (message: unknown) => {
+      enqueueVisitorLetter: async (message: unknown) => {
         followup.push(message);
       },
     },
@@ -104,11 +103,9 @@ function buildExchangeDeps(
     baseUrl: "https://we-met.link",
     assertLeadEmailCapacity: (cardId: string, needed: number) =>
       assertLeadEmailCapacity(db, cardId, needed, now()),
-    readVisitorEmailMode: async () => {
-      const controls = await readLeadEmailControls(db);
-      return controls.visitorEmailMode;
-    },
     incrementDailySendCounts: async () => undefined,
+    exchangeOwnerEmail: createExchangeOwnerEmailStoreFromD1(db),
+    logExchangeVisitorLetterEnqueueFailed: vi.fn(),
   };
 }
 
@@ -199,6 +196,7 @@ describe("exchange and details routes lead_email_unavailable (integration)", () 
       routeMocks.detailsDeps = {
         tokenSecret: "secret",
         environment: "preview",
+        followupQueue: exchangeDeps.followupQueue,
         leadSinkQueue: exchangeDeps.leadSinkQueue,
         deliveryLedger: exchangeDeps.deliveryLedger,
         exchangeOwnerEmail: createExchangeOwnerEmailStoreFromD1(db),
@@ -207,6 +205,7 @@ describe("exchange and details routes lead_email_unavailable (integration)", () 
         createLedgerId: () => "ledger-details-route",
         now: exchangeDeps.now,
         baseUrl: "https://we-met.link",
+        logExchangeVisitorLetterEnqueueFailed: vi.fn(),
       };
 
       await seedSettings(db, {
@@ -259,6 +258,7 @@ describe("exchange and details routes lead_email_unavailable (integration)", () 
       routeMocks.detailsDeps = {
         tokenSecret: "secret",
         environment: "preview",
+        followupQueue: exchangeDeps.followupQueue,
         leadSinkQueue: exchangeDeps.leadSinkQueue,
         deliveryLedger: exchangeDeps.deliveryLedger,
         exchangeOwnerEmail,
@@ -267,6 +267,7 @@ describe("exchange and details routes lead_email_unavailable (integration)", () 
         createLedgerId: () => "ledger-details-dup",
         now: exchangeDeps.now,
         baseUrl: "https://we-met.link",
+        logExchangeVisitorLetterEnqueueFailed: vi.fn(),
       };
 
       await seedSettings(db, {

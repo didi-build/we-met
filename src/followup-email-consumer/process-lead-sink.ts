@@ -21,6 +21,7 @@ import { UnsupportedQueueMessageError } from "@/followup-email-consumer/unsuppor
 import { LEAD_EMAIL_PAUSED_ERROR } from "@/lead-email/paused";
 import type { ExchangeOwnerEmailStore } from "@/exchange-owner-email/types";
 import { OWNER_EMAIL_SEND_CLAIM_STALE_MS } from "@/exchange-owner-email/types";
+import { shouldDeferExchangeEmailForTrigger } from "@/exchange/exchange-email-trigger-defer";
 
 export type LeadSinkConsumerDeps = {
   readLeadEmailControls: () => Promise<LeadEmailControls>;
@@ -52,6 +53,7 @@ export type LeadSinkConsumerDeps = {
   logLeadSinkAppendDeferred(leadId: string, sinkId: string, attempt: number): void;
   logExchangeOwnerEmailRowMissing(leadId: string): void;
   logExchangeOwnerEmailConfirmFailed(leadId: string): void;
+  logExchangeOwnerEmailContentionExhausted(leadId: string): void;
   now: () => Date;
 };
 
@@ -224,7 +226,6 @@ async function processQueuedLeadSink(
 
   const handlerContext = {
     messageAttempts: message.attempts,
-    visitorEmailMode: leadEmailControls.visitorEmailMode,
   };
 
   const isOwnerEmailMessage =
@@ -232,6 +233,25 @@ async function processQueuedLeadSink(
 
   if (isOwnerEmailMessage) {
     const now = deps.now();
+    if (parsed.type === "owner_email_due") {
+      const sendState = await deps.exchangeOwnerEmail.getSendState(parsed.lead.leadId);
+      if (
+        sendState &&
+        shouldDeferExchangeEmailForTrigger("owner_email", sendState, now)
+      ) {
+        const willRetry = message.attempts < MAX_VISITOR_FOLLOWUP_ATTEMPTS;
+        if (!willRetry) {
+          deps.logExchangeOwnerEmailContentionExhausted(parsed.lead.leadId);
+          message.ack();
+          return;
+        }
+        message.retry({
+          delaySeconds: followupEmailRetryDelaySeconds(message.attempts),
+        });
+        return;
+      }
+    }
+
     const claimedAt = now.toISOString();
     const staleBefore = new Date(
       now.getTime() - OWNER_EMAIL_SEND_CLAIM_STALE_MS,
@@ -253,6 +273,7 @@ async function processQueuedLeadSink(
     if (claim === "contention") {
       const willRetry = message.attempts < MAX_VISITOR_FOLLOWUP_ATTEMPTS;
       if (!willRetry) {
+        deps.logExchangeOwnerEmailContentionExhausted(parsed.lead.leadId);
         message.ack();
         return;
       }

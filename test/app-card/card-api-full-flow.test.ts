@@ -140,7 +140,7 @@ describe("card editor full flow (integration)", () => {
       const deps: ProcessExchangeDeps = {
         turnstile: { verify: async () => ({ success: true }) },
         rateLimiter: { check: async () => ({ allowed: true }) },
-        followupQueue: { enqueueVisitorFollowup: async () => undefined },
+        followupQueue: { enqueueVisitorLetter: async () => undefined },
         leadSinkQueue: { enqueueLeadSink: async () => undefined },
         deliveryLedger: ledger,
         exchangeOwnerEmail: createExchangeOwnerEmailStoreFromD1(db),
@@ -157,8 +157,8 @@ describe("card editor full flow (integration)", () => {
         now: () => new Date("2026-10-12T12:00:00.000Z"),
         baseUrl: "https://we-met.link",
         assertLeadEmailCapacity: async () => true,
-        readVisitorEmailMode: async () => "owner_relay",
         incrementDailySendCounts: async () => undefined,
+        logExchangeVisitorLetterEnqueueFailed: vi.fn(),
       };
 
       const exchange = await processExchange(

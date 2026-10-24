@@ -52,7 +52,7 @@ export type RelayE2EContext = {
   followupMessages: unknown[];
   exchangeDeps: ProcessExchangeDeps;
   ownerEmails: OutboundEmail[];
-  visitorEmails: OutboundEmail[];
+  visitorLetters: OutboundEmail[];
   leadId: string;
   detailsToken: string;
 };
@@ -151,6 +151,7 @@ function createLeadSinkConsumerDeps(
     logLeadSinkAppendDeferred: vi.fn(),
     logExchangeOwnerEmailRowMissing: vi.fn(),
     logExchangeOwnerEmailConfirmFailed: vi.fn(),
+    logExchangeOwnerEmailContentionExhausted: vi.fn(),
     now: () => RELAY_E2E_NOW,
   };
 }
@@ -195,12 +196,12 @@ export async function deliverAllSinkMessages(ctx: RelayE2EContext): Promise<void
   }
 }
 
-export async function deliverVisitorFollowups(
+export async function deliverVisitorLetters(
   ctx: RelayE2EContext,
-  visitorEmails: OutboundEmail[],
+  letterOutbox: OutboundEmail[],
 ): Promise<void> {
   const sendVisitor = vi.fn(async (message: OutboundEmail) => {
-    visitorEmails.push(message);
+    letterOutbox.push(message);
     return { messageId: "<visitor-msg@mail.we-met.link>", threadId: null };
   });
   const controls = await readLeadEmailControls(ctx.db);
@@ -224,7 +225,11 @@ export async function deliverVisitorFollowups(
       logVisitorFollowupPermanentFailure: vi.fn(),
       logMalformedVisitorFollowup: vi.fn(),
       logVisitorFollowupDroppedPaused: vi.fn(),
-      logVisitorFollowupSkippedOwnerRelay: vi.fn(),
+      logExchangeVisitorLetterRowMissing: vi.fn(),
+      logExchangeVisitorLetterConfirmFailed: vi.fn(),
+      logExchangeVisitorLetterContentionExhausted: vi.fn(),
+      logExchangeVisitorLetterSkippedPriorSend: vi.fn(),
+      logExchangeOwnerEmailContentionExhausted: vi.fn(),
       logUnsupportedType: vi.fn(),
       logMissingPhoto: vi.fn(),
       logNonJpegPhoto: vi.fn(),
@@ -241,6 +246,30 @@ export async function deliverVisitorFollowups(
       now: () => RELAY_E2E_NOW,
     },
   );
+}
+
+/** Visitor letter first, then owner relay email (best effort). */
+export async function deliverAllExchangeEmails(ctx: RelayE2EContext): Promise<void> {
+  await deliverVisitorLetters(ctx, ctx.visitorLetters);
+  await deliverAllSinkMessages(ctx);
+}
+
+function finalizeDeps(ctx: RelayE2EContext) {
+  return {
+    tokenSecret: ctx.exchangeDeps.tokenSecret,
+    environment: ctx.exchangeDeps.environment,
+    followupQueue: ctx.exchangeDeps.followupQueue,
+    leadSinkQueue: ctx.exchangeDeps.leadSinkQueue,
+    deliveryLedger: ctx.exchangeDeps.deliveryLedger,
+    deliveryLogger: ctx.exchangeDeps.deliveryLogger,
+    leadSinkLogger: ctx.exchangeDeps.leadSinkLogger,
+    exchangeOwnerEmail: ctx.exchangeDeps.exchangeOwnerEmail,
+    createLedgerId: ctx.exchangeDeps.createLedgerId,
+    now: ctx.exchangeDeps.now,
+    baseUrl: ctx.exchangeDeps.baseUrl,
+    logExchangeVisitorLetterEnqueueFailed:
+      ctx.exchangeDeps.logExchangeVisitorLetterEnqueueFailed,
+  };
 }
 
 export async function setupRelayExchange(
@@ -267,7 +296,7 @@ export async function setupRelayExchange(
     turnstile: { verify: async () => ({ success: true }) },
     rateLimiter: { check: async () => ({ allowed: true }) },
     followupQueue: {
-      enqueueVisitorFollowup: async (message) => {
+      enqueueVisitorLetter: async (message) => {
         followupMessages.push(message);
       },
     },
@@ -292,12 +321,9 @@ export async function setupRelayExchange(
     baseUrl: "https://we-met.link",
     assertLeadEmailCapacity: (cardId, needed) =>
       assertLeadEmailCapacity(db, cardId, needed, now()),
-    readVisitorEmailMode: async () => {
-      const controls = await readLeadEmailControls(db);
-      return controls.visitorEmailMode;
-    },
     incrementDailySendCounts: (cardId, kinds) =>
       incrementDailySendCounts(db, RELAY_E2E_DAY, cardId, kinds),
+    logExchangeVisitorLetterEnqueueFailed: vi.fn(),
   };
 
   const exchange = await processExchange(
@@ -323,7 +349,7 @@ export async function setupRelayExchange(
     followupMessages,
     exchangeDeps,
     ownerEmails: [],
-    visitorEmails: [],
+    visitorLetters: [],
     leadId,
     detailsToken: exchange.body.token,
   };
@@ -342,18 +368,7 @@ export async function finalizeWithDetails(
     { token: ctx.detailsToken, ...details },
     ctx.card,
     ctx.sinks,
-    {
-      tokenSecret: ctx.exchangeDeps.tokenSecret,
-      environment: ctx.exchangeDeps.environment,
-      leadSinkQueue: ctx.exchangeDeps.leadSinkQueue,
-      deliveryLedger: ctx.exchangeDeps.deliveryLedger,
-      deliveryLogger: ctx.exchangeDeps.deliveryLogger,
-      leadSinkLogger: ctx.exchangeDeps.leadSinkLogger,
-      exchangeOwnerEmail: ctx.exchangeDeps.exchangeOwnerEmail,
-      createLedgerId: ctx.exchangeDeps.createLedgerId,
-      now: ctx.exchangeDeps.now,
-      baseUrl: ctx.exchangeDeps.baseUrl,
-    },
+    finalizeDeps(ctx),
   );
   if (result.status !== "success") {
     throw new Error(`details failed: ${result.status}`);
@@ -370,31 +385,13 @@ export async function tryFinalizeWithDetails(
   },
 ) {
   return processDetails({ token: ctx.detailsToken, ...details }, ctx.card, ctx.sinks, {
-    tokenSecret: ctx.exchangeDeps.tokenSecret,
-    environment: ctx.exchangeDeps.environment,
-    leadSinkQueue: ctx.exchangeDeps.leadSinkQueue,
-    deliveryLedger: ctx.exchangeDeps.deliveryLedger,
-    deliveryLogger: ctx.exchangeDeps.deliveryLogger,
-    leadSinkLogger: ctx.exchangeDeps.leadSinkLogger,
-    exchangeOwnerEmail: ctx.exchangeDeps.exchangeOwnerEmail,
-    createLedgerId: ctx.exchangeDeps.createLedgerId,
-    now: ctx.exchangeDeps.now,
-    baseUrl: ctx.exchangeDeps.baseUrl,
+    ...finalizeDeps(ctx),
   });
 }
 
 export async function tryFinalizeWithDismiss(ctx: RelayE2EContext) {
   return processDetailsDismiss({ token: ctx.detailsToken }, ctx.card, ctx.sinks, {
-    tokenSecret: ctx.exchangeDeps.tokenSecret,
-    environment: ctx.exchangeDeps.environment,
-    leadSinkQueue: ctx.exchangeDeps.leadSinkQueue,
-    deliveryLedger: ctx.exchangeDeps.deliveryLedger,
-    deliveryLogger: ctx.exchangeDeps.deliveryLogger,
-    leadSinkLogger: ctx.exchangeDeps.leadSinkLogger,
-    exchangeOwnerEmail: ctx.exchangeDeps.exchangeOwnerEmail,
-    createLedgerId: ctx.exchangeDeps.createLedgerId,
-    now: ctx.exchangeDeps.now,
-    baseUrl: ctx.exchangeDeps.baseUrl,
+    ...finalizeDeps(ctx),
   });
 }
 
@@ -403,18 +400,7 @@ export async function finalizeWithDismiss(ctx: RelayE2EContext): Promise<void> {
     { token: ctx.detailsToken },
     ctx.card,
     ctx.sinks,
-    {
-      tokenSecret: ctx.exchangeDeps.tokenSecret,
-      environment: ctx.exchangeDeps.environment,
-      leadSinkQueue: ctx.exchangeDeps.leadSinkQueue,
-      deliveryLedger: ctx.exchangeDeps.deliveryLedger,
-      deliveryLogger: ctx.exchangeDeps.deliveryLogger,
-      leadSinkLogger: ctx.exchangeDeps.leadSinkLogger,
-      exchangeOwnerEmail: ctx.exchangeDeps.exchangeOwnerEmail,
-      createLedgerId: ctx.exchangeDeps.createLedgerId,
-      now: ctx.exchangeDeps.now,
-      baseUrl: ctx.exchangeDeps.baseUrl,
-    },
+    finalizeDeps(ctx),
   );
   if (result.status !== "success") {
     throw new Error(`dismiss failed: ${result.status}`);
@@ -452,11 +438,32 @@ export function assertOwnerRelayOmitsEmptyOptionalRows(email: OutboundEmail): vo
   expect(textHtml).not.toContain(">Note</td>");
 }
 
-export function assertOnlyDelayedOwnerEmailFallbackQueued(ctx: RelayE2EContext): void {
+export function assertVisitorLetterToOwner(email: OutboundEmail): void {
+  expect(email.to).toBe(RELAY_E2E_OWNER_EMAIL);
+  expect(email.replyTo).toBe("visitor@example.com");
+  expect(email.subject).toBe("Great meeting you, Sam");
+  expect(email.attachments?.[0]?.filename).toMatch(/\.vcf$/);
+  expect(email.textPlain).not.toContain("visitor@example.com");
+  expect(email.textPlain).not.toContain("Engineer");
+  expect(email.textPlain).not.toContain("Acme");
+}
+
+export function assertVisitorLetterToVisitor(email: OutboundEmail): void {
+  expect(email.to).toBe("visitor@example.com");
+  expect(email.replyTo).toBe(RELAY_E2E_OWNER_EMAIL);
+  expect(email.subject).toBe("Great meeting you, Sam");
+  expect(email.attachments?.[0]?.filename).toMatch(/\.vcf$/);
+}
+
+export function assertDelayedFallbacksQueuedOnExchange(ctx: RelayE2EContext): void {
+  expect(ctx.followupMessages).toHaveLength(1);
+  expect((ctx.followupMessages[0] as { type?: string }).type).toBe(
+    "visitor_letter_due",
+  );
   expect(ctx.sinkMessages).toHaveLength(1);
-  const queued = ctx.sinkMessages[0]!;
-  expect((queued.message as { type?: string }).type).toBe("owner_email_due");
-  expect(queued.options?.delaySeconds).toBe(OWNER_EMAIL_FALLBACK_DELAY_SECONDS);
+  const ownerDue = ctx.sinkMessages[0]!;
+  expect((ownerDue.message as { type?: string }).type).toBe("owner_email_due");
+  expect(ownerDue.options?.delaySeconds).toBe(OWNER_EMAIL_FALLBACK_DELAY_SECONDS);
 }
 
 async function consumerDepsForOwnerDelivery(
@@ -490,15 +497,5 @@ export async function deliverOwnerSinkBodyTwiceWithRetry(
   await processLeadSinkQueueMessage(second, deps);
 }
 
-export function assertDirectOwnerOutbound(
-  email: OutboundEmail,
-  visitorName: string,
-): void {
-  expect(email.to).toBe(RELAY_E2E_OWNER_EMAIL);
-  expect(email.replyTo).toBe("visitor@example.com");
-  expect(email.subject).toBe(`New lead added: ${visitorName}`);
-  expect(email.inReplyTo).toBeUndefined();
-  expect(email.references).toBeUndefined();
-  expect(email.subject).not.toMatch(/^Re:/);
-  expect(email.textPlain).toContain("New lead");
-}
+/** @deprecated Use {@link assertOwnerRelayOutbound}; direct mode uses the same owner template. */
+export const assertDirectOwnerOutbound = assertOwnerRelayOutbound;

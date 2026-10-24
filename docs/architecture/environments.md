@@ -113,29 +113,39 @@ The consumer registers on the queue in **its own** Wrangler config; it is not an
 
 **Consumer mail safety:** redirect and fail-closed behavior use the consumer’s own `vars.WE_MET_ENV` and the secret `WE_MET_TEST_MAIL_TO` (non-prod only). Queue fields such as `lead.environment` are ignored for recipient selection.
 
-**Consumer queue handling:** processes `visitor_followup` and **`email`** sink messages (`lead_sink_record`, `lead_sink_append_details`). Unknown `type` or unsupported `sinkKind` **retry** on the same schedule until Cloudflare discards them at `max_retries`. Malformed `visitor_followup` or known sink bodies are logged and **acked** (sink failures best-effort mark ledger `failed`). Send failures retry with exponential backoff: delay after failed attempt _n_ (1-based) is **min(1800, 30 × 2^(n−1))** seconds. **`max_retries`** and the code attempt limit are **30**; worst-case delay before the final attempt is **43,290 s** (~12 h). After the 30th failed attempt the consumer logs a permanent failure (`leadId` and `sinkId` for sinks; `errorCode` only) and **acks**. Without a dead-letter queue, messages that reach the retry limit are **deleted** ([Cloudflare dead-letter queues](https://developers.cloudflare.com/queues/configuration/dead-letter-queues/)).
+**Consumer queue handling:** processes **`visitor_followup`** (immediate visitor letter after details finalize), **`visitor_letter_due`** (delayed visitor letter fallback after exchange), and **`email`** sink messages (`lead_sink_record`, `lead_sink_append_details`, `lead_sink_owner_email`, `owner_email_due`). Unknown `type` or unsupported `sinkKind` **retry** on the same schedule until Cloudflare discards them at `max_retries`. Malformed visitor letter or known sink bodies are logged and **acked** (sink failures best-effort mark ledger `failed`). Send failures retry with exponential backoff: delay after failed attempt _n_ (1-based) is **min(1800, 30 × 2^(n−1))** seconds. **`max_retries`** and the code attempt limit are **30**; worst-case delay before the final attempt is **43,290 s** (~12 h). After the 30th failed attempt the consumer logs a permanent failure (`leadId` and `sinkId` for sinks; `errorCode` only) and **acks**. Without a dead-letter queue, messages that reach the retry limit are **deleted** ([Cloudflare dead-letter queues](https://developers.cloudflare.com/queues/configuration/dead-letter-queues/)).
+
+**App Worker logs (exchange and details):**
+
+| Event                                    | Fields                                                                             |
+| ---------------------------------------- | ---------------------------------------------------------------------------------- |
+| `exchange_visitor_letter_enqueue_failed` | `leadId` (when visitor letter queue enqueue fails on exchange or finalize; no PII) |
 
 **Consumer logs (debugging live mail):**
 
-| Event                                  | Fields                                                                                                                                         |
-| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `visitor_followup_attempt_failure`     | `leadId`, `attempt`, `errorCode`, `willRetry`; `secretName` when `errorCode` is `cloudflare_from_email_missing` or `from_display_name_missing` |
-| `visitor_followup_permanent_failure`   | `leadId`, `errorCode`; `secretName` when `errorCode` is `cloudflare_from_email_missing` or `from_display_name_missing`                         |
-| `visitor_followup_malformed`           | `leadId` (may be null)                                                                                                                         |
-| `visitor_followup_dropped_paused`      | `leadId` (when `lead_email_enabled` is off)                                                                                                    |
-| `visitor_followup_skipped_owner_relay` | `leadId` (when `visitor_email_mode` is `owner_relay`)                                                                                          |
-| `followup_unsupported_queue_type`      | `typeLabel`                                                                                                                                    |
-| `followup_vcard_photo_missing`         | `photoKey`                                                                                                                                     |
-| `followup_vcard_photo_not_jpeg`        | `photoKey`                                                                                                                                     |
-| `lead_sink_attempt_failure`            | `leadId`, `sinkId`, `attempt`, `errorCode`, `willRetry`; `secretName` when applicable                                                          |
-| `lead_sink_permanent_failure`          | `leadId`, `sinkId`, `errorCode`; `secretName` when applicable                                                                                  |
-| `lead_sink_malformed`                  | `leadId` (may be null)                                                                                                                         |
-| `lead_sink_append_deferred`            | `leadId`, `sinkId`, `attempt`                                                                                                                  |
-| `ledger_row_missing`                   | `leadId`, `sinkId`                                                                                                                             |
-| `ledger_update_failed`                 | `leadId`, `sinkId`, `errorCode` (includes `external_ref_invalid`)                                                                              |
-| `lead_sink_ledger_record_failed`       | `leadId`, `sinkId`, `errorCode`                                                                                                                |
-| `lead_sink_ledger_mark_failed`         | `leadId`, `sinkId`, `errorCode`                                                                                                                |
-| `cloudflare_send_permanent_failure`    | `reason` (for example `send_validation`; maps to `errorCode` `cloudflare_send_validation_failed`)                                              |
+| Event                                          | Fields                                                                                                                                         |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `visitor_followup_attempt_failure`             | `leadId`, `attempt`, `errorCode`, `willRetry`; `secretName` when `errorCode` is `cloudflare_from_email_missing` or `from_display_name_missing` |
+| `visitor_followup_permanent_failure`           | `leadId`, `errorCode`; `secretName` when `errorCode` is `cloudflare_from_email_missing` or `from_display_name_missing`                         |
+| `visitor_followup_malformed`                   | `leadId` (may be null)                                                                                                                         |
+| `visitor_followup_dropped_paused`              | `leadId` (when `lead_email_enabled` is off)                                                                                                    |
+| `exchange_visitor_letter_row_missing`          | `leadId`                                                                                                                                       |
+| `exchange_visitor_letter_confirm_failed`       | `leadId`                                                                                                                                       |
+| `exchange_visitor_letter_contention_exhausted` | `leadId`                                                                                                                                       |
+| `exchange_visitor_letter_skipped_prior_send`   | `leadId` (when `visitor_letter_due` finds `visitor_letter_sent_at` already set)                                                                |
+| `exchange_owner_email_contention_exhausted`    | `leadId`                                                                                                                                       |
+| `followup_unsupported_queue_type`              | `typeLabel`                                                                                                                                    |
+| `followup_vcard_photo_missing`                 | `photoKey`                                                                                                                                     |
+| `followup_vcard_photo_not_jpeg`                | `photoKey`                                                                                                                                     |
+| `lead_sink_attempt_failure`                    | `leadId`, `sinkId`, `attempt`, `errorCode`, `willRetry`; `secretName` when applicable                                                          |
+| `lead_sink_permanent_failure`                  | `leadId`, `sinkId`, `errorCode`; `secretName` when applicable                                                                                  |
+| `lead_sink_malformed`                          | `leadId` (may be null)                                                                                                                         |
+| `lead_sink_append_deferred`                    | `leadId`, `sinkId`, `attempt`                                                                                                                  |
+| `ledger_row_missing`                           | `leadId`, `sinkId`                                                                                                                             |
+| `ledger_update_failed`                         | `leadId`, `sinkId`, `errorCode` (includes `external_ref_invalid`)                                                                              |
+| `lead_sink_ledger_record_failed`               | `leadId`, `sinkId`, `errorCode`                                                                                                                |
+| `lead_sink_ledger_mark_failed`                 | `leadId`, `sinkId`, `errorCode`                                                                                                                |
+| `cloudflare_send_permanent_failure`            | `reason` (for example `send_validation`; maps to `errorCode` `cloudflare_send_validation_failed`)                                              |
 
 **Cloudflare Worker secrets (follow-up consumers):** `WE_MET_EMAIL_FROM_CLOUDFLARE` and `WE_MET_FROM_DISPLAY_NAME` on **both** consumers; **`WE_MET_TEST_MAIL_TO`** on **non-prod only** (three required names on non-prod, two on production). Legacy Gmail-era names (`GMAIL_SERVICE_ACCOUNT_JSON`, `GMAIL_SENDER`, `WE_MET_OWNER_FROM_EMAIL`) may still appear in `wrangler secret list` until [DIDI-799](https://linear.app/didi-build/issue/DIDI-799) deletes them. CI on merge to `main` checks the three non-prod required names against [deploy-consumer-nonprod.yml](../../.github/workflows/deploy-consumer-nonprod.yml); **no workflow** lists or enforces production consumer secret names.
 

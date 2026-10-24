@@ -41,7 +41,7 @@ describe("createEmailLeadSinkHandler owner email (unit)", () => {
         cardSlug: "demo",
         sourceUrl: "https://we-met.link/hi/demo",
       },
-      { messageAttempts: 1, visitorEmailMode: "owner_relay" },
+      { messageAttempts: 1 },
     );
 
     expect(sendEmail).toHaveBeenCalledTimes(1);
@@ -54,7 +54,7 @@ describe("createEmailLeadSinkHandler owner email (unit)", () => {
     expect(outbound.textPlain).toContain("Hit Reply to write back");
   });
 
-  it("uses the new-lead template for direct mode without threading headers", async () => {
+  it("uses the owner relay template in direct mode without threading headers", async () => {
     const sendEmail = vi.fn(async (_message: OutboundEmail) => ({
       messageId: "msg-2",
       threadId: null,
@@ -87,12 +87,12 @@ describe("createEmailLeadSinkHandler owner email (unit)", () => {
         cardSlug: "demo",
         sourceUrl: "https://we-met.link/hi/demo",
       },
-      { messageAttempts: 1, visitorEmailMode: "direct" },
+      { messageAttempts: 1 },
     );
 
     const outbound = sendEmail.mock.calls[0]![0]! as OutboundEmail;
-    expect(outbound.subject).toBe("New lead added: Sam Rivera");
-    expect(outbound.textPlain).toContain("New lead");
+    expect(outbound.subject).toBe("You met Sam Rivera");
+    expect(outbound.textPlain).toContain("Hit Reply to write back");
     expect(outbound.inReplyTo).toBeUndefined();
   });
 
@@ -130,7 +130,7 @@ describe("createEmailLeadSinkHandler owner email (unit)", () => {
         cardSlug: "demo",
         sourceUrl: "https://we-met.link/hi/demo",
       },
-      { messageAttempts: 1, visitorEmailMode: "owner_relay" },
+      { messageAttempts: 1 },
     );
 
     const outbound = sendEmail.mock.calls[0]![0]! as OutboundEmail;

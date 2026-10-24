@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from "vitest";
-import { readLeadEmailControls } from "@/app-settings/caps";
 import {
   APP_SETTING_DAILY_CAP_GLOBAL,
   APP_SETTING_DAILY_CAP_PER_CARD,
@@ -48,7 +47,7 @@ function exchangeDeps(
     turnstile: { verify: async () => ({ success: true }) },
     rateLimiter: { check: async () => ({ allowed: true }) },
     followupQueue: {
-      enqueueVisitorFollowup: async (message: unknown) => {
+      enqueueVisitorLetter: async (message: unknown) => {
         followup.push(message);
       },
     },
@@ -73,11 +72,8 @@ function exchangeDeps(
     baseUrl: "https://we-met.link",
     assertLeadEmailCapacity: (cardId: string, needed: number) =>
       assertLeadEmailCapacity(db, cardId, needed, now()),
-    readVisitorEmailMode: async () => {
-      const controls = await readLeadEmailControls(db);
-      return controls.visitorEmailMode;
-    },
     incrementDailySendCounts: async () => undefined,
+    logExchangeVisitorLetterEnqueueFailed: vi.fn(),
     _followup: followup,
   };
 }
@@ -199,6 +195,7 @@ describe("exchange and details abuse controls (D1 integration)", () => {
         {
           tokenSecret: "secret",
           environment: "preview",
+          followupQueue: deps.followupQueue,
           leadSinkQueue: deps.leadSinkQueue,
           deliveryLedger: deps.deliveryLedger,
           exchangeOwnerEmail: deps.exchangeOwnerEmail,
@@ -207,13 +204,14 @@ describe("exchange and details abuse controls (D1 integration)", () => {
           createLedgerId: () => "ledger-details-1",
           now: deps.now,
           baseUrl: "https://we-met.link",
+          logExchangeVisitorLetterEnqueueFailed: vi.fn(),
         },
       );
       expect(details.status).toBe("success");
     });
   });
 
-  it("increments owner count only on exchange when visitor_email_mode is owner_relay", async () => {
+  it("increments owner and visitor counts on exchange when visitor_email_mode is owner_relay", async () => {
     await withIsolatedLocalD1(async (db) => {
       await seedSettings(db, {
         [APP_SETTING_LEAD_EMAIL_ENABLED]: "1",
@@ -260,7 +258,7 @@ describe("exchange and details abuse controls (D1 integration)", () => {
         .bind("2026-10-16", card.id)
         .first<{ count: number }>();
       expect(owner?.count).toBe(1);
-      expect(visitor).toBeNull();
+      expect(visitor?.count).toBe(1);
     });
   });
 
@@ -358,6 +356,7 @@ describe("exchange and details abuse controls (D1 integration)", () => {
       const dismiss = await processDetailsDismiss({ token }, card, sinks, {
         tokenSecret: "secret",
         environment: "preview",
+        followupQueue: deps.followupQueue,
         leadSinkQueue: deps.leadSinkQueue,
         deliveryLedger: deps.deliveryLedger,
         exchangeOwnerEmail: deps.exchangeOwnerEmail,
@@ -366,6 +365,7 @@ describe("exchange and details abuse controls (D1 integration)", () => {
         createLedgerId: () => "ledger-dismiss-global",
         now: deps.now,
         baseUrl: "https://we-met.link",
+        logExchangeVisitorLetterEnqueueFailed: vi.fn(),
       });
       expect(dismiss.status).toBe("success");
       expect(sinkMessages.length).toBeGreaterThan(0);
@@ -432,6 +432,7 @@ describe("exchange and details abuse controls (D1 integration)", () => {
         {
           tokenSecret: "secret",
           environment: "preview",
+          followupQueue: deps.followupQueue,
           leadSinkQueue: deps.leadSinkQueue,
           deliveryLedger: deps.deliveryLedger,
           exchangeOwnerEmail: deps.exchangeOwnerEmail,
@@ -440,6 +441,7 @@ describe("exchange and details abuse controls (D1 integration)", () => {
           createLedgerId: () => "ledger-details-global",
           now: deps.now,
           baseUrl: "https://we-met.link",
+          logExchangeVisitorLetterEnqueueFailed: vi.fn(),
         },
       );
       expect(details.status).toBe("success");
@@ -473,7 +475,7 @@ describe("exchange and details abuse controls (D1 integration)", () => {
       const buildDeps = () => ({
         turnstile: { verify: async () => ({ success: true }) },
         rateLimiter: { check: async () => ({ allowed: true }) },
-        followupQueue: { enqueueVisitorFollowup: async () => undefined },
+        followupQueue: { enqueueVisitorLetter: async () => undefined },
         leadSinkQueue: {
           enqueueLeadSink: async (message: unknown) => {
             sinkMessages.push(message);
@@ -495,11 +497,8 @@ describe("exchange and details abuse controls (D1 integration)", () => {
         baseUrl: "https://we-met.link",
         assertLeadEmailCapacity: (cardId: string, needed: number) =>
           assertLeadEmailCapacity(db, cardId, needed, new Date(nowMs)),
-        readVisitorEmailMode: async () => {
-          const controls = await readLeadEmailControls(db);
-          return controls.visitorEmailMode;
-        },
         incrementDailySendCounts: async () => undefined,
+        logExchangeVisitorLetterEnqueueFailed: vi.fn(),
       });
 
       await processExchange(
@@ -539,8 +538,8 @@ describe("exchange and details abuse controls (D1 integration)", () => {
         )
         .bind(card.id)
         .first<{ c: number }>();
-      expect(day16?.c).toBe(1);
-      expect(day17?.c).toBe(1);
+      expect(day16?.c).toBe(2);
+      expect(day17?.c).toBe(2);
     });
   });
 
@@ -571,7 +570,7 @@ describe("exchange and details abuse controls (D1 integration)", () => {
       const buildDeps = () => ({
         turnstile: { verify: async () => ({ success: true }) },
         rateLimiter: { check: async () => ({ allowed: true }) },
-        followupQueue: { enqueueVisitorFollowup: async () => undefined },
+        followupQueue: { enqueueVisitorLetter: async () => undefined },
         leadSinkQueue: {
           enqueueLeadSink: async (message: unknown) => {
             sinkMessages.push(message);
@@ -593,11 +592,8 @@ describe("exchange and details abuse controls (D1 integration)", () => {
         baseUrl: "https://we-met.link",
         assertLeadEmailCapacity: (cardId: string, needed: number) =>
           assertLeadEmailCapacity(db, cardId, needed, new Date(nowMs)),
-        readVisitorEmailMode: async () => {
-          const controls = await readLeadEmailControls(db);
-          return controls.visitorEmailMode;
-        },
         incrementDailySendCounts: async () => undefined,
+        logExchangeVisitorLetterEnqueueFailed: vi.fn(),
       });
 
       await processExchange(
@@ -690,6 +686,7 @@ describe("exchange and details abuse controls (D1 integration)", () => {
       const detailsDeps = {
         tokenSecret: "secret",
         environment: "preview",
+        followupQueue: deps.followupQueue,
         leadSinkQueue: deps.leadSinkQueue,
         deliveryLedger: deps.deliveryLedger,
         exchangeOwnerEmail: deps.exchangeOwnerEmail,
@@ -698,6 +695,7 @@ describe("exchange and details abuse controls (D1 integration)", () => {
         createLedgerId: () => "ledger-details-dup",
         now: deps.now,
         baseUrl: "https://we-met.link",
+        logExchangeVisitorLetterEnqueueFailed: vi.fn(),
       };
       const first = await processDetails(
         { token, phone: null, jobTitle: "CTO", company: "Co", note: "Hi" },

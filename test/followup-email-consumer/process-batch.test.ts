@@ -67,6 +67,22 @@ function createMessage(
 
 const PLATFORM_FROM_DISPLAY_NAME = "Diadem at We Met";
 
+function defaultVisitorLetterExchangeStore(): MemoryExchangeOwnerEmailStore {
+  const store = new MemoryExchangeOwnerEmailStore();
+  store.rows.set("lead-1", {
+    leadId: "lead-1",
+    cardId: "card-1",
+    triggeredAt: null,
+    ownerEmailClaimedAt: null,
+    ownerEmailSentAt: null,
+    visitorLetterClaimedAt: null,
+    visitorLetterSentAt: null,
+    createdAt: "2026-10-12T12:00:00.000Z",
+    updatedAt: "2026-10-12T12:00:00.000Z",
+  });
+  return store;
+}
+
 const CLOUDFLARE_EMAIL_ADDRESS_NAME_TYPE_ERROR =
   "Incorrect type for the 'name' field on 'EmailAddress': the provided value is not of type 'string'.";
 
@@ -134,7 +150,7 @@ function createDeps(
     logExchangeOwnerEmailRowMissing: vi.fn(),
     logExchangeOwnerEmailConfirmFailed: vi.fn(),
     exchangeOwnerEmail:
-      overrides.exchangeOwnerEmail ?? new MemoryExchangeOwnerEmailStore(),
+      overrides.exchangeOwnerEmail ?? defaultVisitorLetterExchangeStore(),
     logLeadSinkLedgerRecordFailed: vi.fn(),
     logLeadSinkLedgerMarkFailed: vi.fn(),
     logLeadSinkAttemptFailure: vi.fn(),
@@ -156,7 +172,11 @@ function createDeps(
     logVisitorFollowupPermanentFailure: vi.fn(),
     logMalformedVisitorFollowup: vi.fn(),
     logVisitorFollowupDroppedPaused: vi.fn(),
-    logVisitorFollowupSkippedOwnerRelay: vi.fn(),
+    logExchangeVisitorLetterRowMissing: vi.fn(),
+    logExchangeVisitorLetterConfirmFailed: vi.fn(),
+    logExchangeVisitorLetterContentionExhausted: vi.fn(),
+    logExchangeVisitorLetterSkippedPriorSend: vi.fn(),
+    logExchangeOwnerEmailContentionExhausted: vi.fn(),
     logUnsupportedType: vi.fn(),
     logMissingPhoto: vi.fn(),
     logNonJpegPhoto: vi.fn(),

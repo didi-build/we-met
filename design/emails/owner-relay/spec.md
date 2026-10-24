@@ -4,7 +4,7 @@ Design-only spec. Approved MagicPath: [smart-light-1323](https://designs.magicpa
 
 ## Purpose
 
-Send **one owner email per exchange** that replaces today's **New lead** email and the threaded **Re:** details update email. The owner gets a single, reply-friendly summary when the visitor finishes or skips the details step (or after a timed fallback).
+Send the **owner relay** email ("You met …") per exchange alongside the visitor letter ([visitor-followup](../visitor-followup/spec.md)). This message replaces today's **New lead** email and the threaded **Re:** details update email. The owner gets a reply-friendly summary with full detail rows when the visitor finishes or skips the details step (or after a timed fallback).
 
 **Retired (do not ship):** [owner-new-lead](../owner-new-lead/spec.md), [owner-details-update](../owner-details-update/spec.md).
 
@@ -43,12 +43,12 @@ Phone value links with `tel:{{lead_phone_tel}}`; email uses `mailto:`.
 
 ## Timing (CTO decision)
 
-Send **once** per exchange:
+Send **once** per exchange (independent of the visitor letter send):
 
 1. **Primary:** as soon as the visitor submits the details step, skips it, or closes the details sheet.
-2. **Fallback:** if step 1 completed but no relay send yet, enqueue a delayed message **10 minutes** after step 1; mark done once sent.
+2. **Fallback:** if step 1 completed but no owner relay send yet, enqueue a delayed message **10 minutes** after exchange step 1; mark done once sent.
 
-Daily send caps and counters count **one send per exchange** (not separate new-lead plus details emails).
+Daily send caps and counters count **each email** (visitor letter plus owner relay, two per exchange in both relay and direct modes).
 
 ## Mockups and templates
 

@@ -7,13 +7,13 @@ import { parseExchangeBody } from "@/exchange/validation";
 import type { VisitorEmailMode } from "@/app-settings/defaults";
 import { withIsolatedLocalD1 } from "../helpers/d1";
 import {
-  assertDirectOwnerOutbound,
-  assertOnlyDelayedOwnerEmailFallbackQueued,
+  assertDelayedFallbacksQueuedOnExchange,
   assertOwnerRelayOmitsEmptyOptionalRows,
   assertOwnerRelayOutbound,
-  deliverAllSinkMessages,
+  assertVisitorLetterToOwner,
+  assertVisitorLetterToVisitor,
+  deliverAllExchangeEmails,
   deliverOwnerSinkBodyTwiceWithRetry,
-  deliverVisitorFollowups,
   finalizeWithDetails,
   finalizeWithDismiss,
   ownerSinkDeliveryOrder,
@@ -31,8 +31,6 @@ const hostConfig = {
   previewHostSuffix: "-we-met.example.workers.dev",
   weMetEnv: "production",
 };
-
-// Target: locked Product direction on DIDI-739, implemented by DIDI-820
 
 const ownerRelayModeCases: {
   label: string;
@@ -54,7 +52,7 @@ function immediateOwnerSinkBody(ctx: RelayE2EContext): unknown {
 }
 
 describe.each(ownerRelayModeCases)(
-  "relay exchange path (owner_relay: $label, integration; interim until DIDI-820)",
+  "relay exchange path (owner_relay: $label, integration)",
   ({ mode }) => {
     it("step 1 accepts name and email only; phone is ignored on exchange", () => {
       const parsed = parseExchangeBody({
@@ -71,7 +69,7 @@ describe.each(ownerRelayModeCases)(
       }
     });
 
-    it("interim until DIDI-820: sends exactly one owner relay email when details are submitted", async () => {
+    it("sends visitor letter and owner relay email when details are submitted", async () => {
       await withIsolatedLocalD1(async (db) => {
         const ctx = await setupRelayExchange(
           db,
@@ -84,19 +82,19 @@ describe.each(ownerRelayModeCases)(
           company: "Acme",
           note: "Met at demo",
         });
-        await deliverAllSinkMessages(ctx);
+        await deliverAllExchangeEmails(ctx);
+        expect(ctx.visitorLetters).toHaveLength(1);
         expect(ctx.ownerEmails).toHaveLength(1);
+        assertVisitorLetterToOwner(ctx.visitorLetters[0]!);
         assertOwnerRelayOutbound(ctx.ownerEmails[0]!, "Sam Visitor");
         expect(ctx.ownerEmails[0]!.textPlain).toContain("Phone:     +1 555 0102");
         expect(ctx.ownerEmails[0]!.textPlain).toContain("Job title: Engineer");
         expect(ctx.ownerEmails[0]!.textPlain).toContain("Company:   Acme");
         expect(ctx.ownerEmails[0]!.textPlain).toContain("Met at demo");
-        expect(ctx.followupMessages).toHaveLength(0);
-        expect(ctx.visitorEmails).toHaveLength(0);
       });
     });
 
-    it("interim until DIDI-820: sends exactly one owner relay email when details are dismissed", async () => {
+    it("sends visitor letter and owner relay email when details are dismissed", async () => {
       await withIsolatedLocalD1(async (db) => {
         const ctx = await setupRelayExchange(
           db,
@@ -104,29 +102,33 @@ describe.each(ownerRelayModeCases)(
           `lead-relay-dismiss-${mode ?? "default"}`,
         );
         await finalizeWithDismiss(ctx);
-        await deliverAllSinkMessages(ctx);
+        await deliverAllExchangeEmails(ctx);
+        expect(ctx.visitorLetters).toHaveLength(1);
         expect(ctx.ownerEmails).toHaveLength(1);
+        assertVisitorLetterToOwner(ctx.visitorLetters[0]!);
         assertOwnerRelayOutbound(ctx.ownerEmails[0]!, "Sam Visitor");
         assertOwnerRelayOmitsEmptyOptionalRows(ctx.ownerEmails[0]!);
       });
     });
 
-    it("interim until DIDI-820: sends exactly one owner relay email on the 10-minute fallback only", async () => {
+    it("sends visitor letter and owner relay email on the 10-minute fallback only", async () => {
       await withIsolatedLocalD1(async (db) => {
         const ctx = await setupRelayExchange(
           db,
           mode,
           `lead-relay-fallback-${mode ?? "default"}`,
         );
-        assertOnlyDelayedOwnerEmailFallbackQueued(ctx);
-        await deliverAllSinkMessages(ctx);
+        assertDelayedFallbacksQueuedOnExchange(ctx);
+        await deliverAllExchangeEmails(ctx);
+        expect(ctx.visitorLetters).toHaveLength(1);
         expect(ctx.ownerEmails).toHaveLength(1);
+        assertVisitorLetterToOwner(ctx.visitorLetters[0]!);
         assertOwnerRelayOutbound(ctx.ownerEmails[0]!, "Sam Visitor");
         assertOwnerRelayOmitsEmptyOptionalRows(ctx.ownerEmails[0]!);
       });
     });
 
-    it("interim until DIDI-820: does not send twice when immediate and fallback queue messages are both delivered", async () => {
+    it("does not send twice when immediate and fallback queue messages are both delivered", async () => {
       await withIsolatedLocalD1(async (db) => {
         const ctx = await setupRelayExchange(
           db,
@@ -139,13 +141,14 @@ describe.each(ownerRelayModeCases)(
           company: null,
           note: null,
         });
-        await deliverAllSinkMessages(ctx);
+        await deliverAllExchangeEmails(ctx);
+        expect(ctx.visitorLetters).toHaveLength(1);
         expect(ctx.ownerEmails).toHaveLength(1);
         assertOwnerRelayOmitsEmptyOptionalRows(ctx.ownerEmails[0]!);
       });
     });
 
-    it("interim until DIDI-820: counts only the owner slot in daily_send_counts and sends no visitor mail", async () => {
+    it("counts owner and visitor slots in daily_send_counts", async () => {
       await withIsolatedLocalD1(async (db) => {
         const ctx = await setupRelayExchange(
           db,
@@ -153,8 +156,7 @@ describe.each(ownerRelayModeCases)(
           `lead-relay-caps-${mode ?? "default"}`,
         );
         await finalizeWithDismiss(ctx);
-        await deliverAllSinkMessages(ctx);
-        await deliverVisitorFollowups(ctx, ctx.visitorEmails);
+        await deliverAllExchangeEmails(ctx);
         const owner = await db
           .prepare(
             `SELECT count FROM daily_send_counts WHERE day = ? AND card_id = ? AND kind = 'owner'`,
@@ -168,8 +170,7 @@ describe.each(ownerRelayModeCases)(
           .bind(RELAY_E2E_DAY, ctx.card.id)
           .first<{ count: number }>();
         expect(owner?.count).toBe(1);
-        expect(visitor).toBeNull();
-        expect(ctx.visitorEmails).toHaveLength(0);
+        expect(visitor?.count).toBe(1);
       });
     });
 
@@ -213,9 +214,8 @@ describe.each(ownerRelayModeCases)(
   },
 );
 
-// Interim behaviour per CTO decision on DIDI-749; changes in DIDI-820 (target: DIDI-739 Product direction)
-describe("relay exchange path (owner_relay: duplicate triggers, integration; interim until DIDI-820)", () => {
-  it("interim until DIDI-820: delivers the same owner sink message twice (retry) and sends only once", async () => {
+describe("relay exchange path (owner_relay: duplicate triggers, integration)", () => {
+  it("delivers the same owner sink message twice (retry) and sends only once", async () => {
     await withIsolatedLocalD1(async (db) => {
       const ctx = await setupRelayExchange(db, "owner_relay", "lead-relay-retry-dup");
       await finalizeWithDetails(ctx, {
@@ -230,7 +230,7 @@ describe("relay exchange path (owner_relay: duplicate triggers, integration; int
     });
   });
 
-  it("interim until DIDI-820: dismiss twice still yields one owner email after queue delivery", async () => {
+  it("dismiss twice still yields one letter and one owner email after queue delivery", async () => {
     await withIsolatedLocalD1(async (db) => {
       const ctx = await setupRelayExchange(
         db,
@@ -241,12 +241,13 @@ describe("relay exchange path (owner_relay: duplicate triggers, integration; int
       expect(first.status).toBe("success");
       const second = await tryFinalizeWithDismiss(ctx);
       expect(second.status).toBe("already_finalized");
-      await deliverAllSinkMessages(ctx);
+      await deliverAllExchangeEmails(ctx);
+      expect(ctx.visitorLetters).toHaveLength(1);
       expect(ctx.ownerEmails).toHaveLength(1);
     });
   });
 
-  it("interim until DIDI-820: submit details twice still yields one owner email after queue delivery", async () => {
+  it("submit details twice still yields one letter and one owner email after queue delivery", async () => {
     await withIsolatedLocalD1(async (db) => {
       const ctx = await setupRelayExchange(
         db,
@@ -263,7 +264,8 @@ describe("relay exchange path (owner_relay: duplicate triggers, integration; int
       expect(first.status).toBe("success");
       const second = await tryFinalizeWithDetails(ctx, details);
       expect(second.status).toBe("details_already_sent");
-      await deliverAllSinkMessages(ctx);
+      await deliverAllExchangeEmails(ctx);
+      expect(ctx.visitorLetters).toHaveLength(1);
       expect(ctx.ownerEmails).toHaveLength(1);
     });
   });
@@ -304,43 +306,45 @@ describe("owner relay template optional rows (unit guard)", () => {
   });
 });
 
-// Interim behaviour per CTO decision on DIDI-749; changes in DIDI-820 (target: DIDI-739 Product direction)
-describe("relay exchange path (direct visitor_email_mode, integration; interim until DIDI-820)", () => {
-  it("interim until DIDI-820: sends visitor follow-up with vCard and one owner email without threading", async () => {
+describe("relay exchange path (direct visitor_email_mode, integration)", () => {
+  it("sends visitor letter to the visitor and owner relay email with vCard", async () => {
     await withIsolatedLocalD1(async (db) => {
       const ctx = await setupRelayExchange(db, "direct");
       expect(ctx.followupMessages).toHaveLength(1);
+      expect((ctx.followupMessages[0] as { type?: string }).type).toBe(
+        "visitor_letter_due",
+      );
       await finalizeWithDetails(ctx, {
         phone: "+1 555 0102",
         jobTitle: "Engineer",
         company: "Acme",
         note: "Note",
       });
-      await deliverAllSinkMessages(ctx);
-      await deliverVisitorFollowups(ctx, ctx.visitorEmails);
+      await deliverAllExchangeEmails(ctx);
       expect(ctx.ownerEmails).toHaveLength(1);
-      assertDirectOwnerOutbound(ctx.ownerEmails[0]!, "Sam Visitor");
-      expect(ctx.visitorEmails).toHaveLength(1);
-      const visitor = ctx.visitorEmails[0]!;
-      expect(visitor.to).toBe("visitor@example.com");
-      expect(visitor.attachments?.[0]?.filename).toMatch(/\.vcf$/);
-      const vcardBody = visitor.attachments?.[0]?.body ?? "";
+      assertOwnerRelayOutbound(ctx.ownerEmails[0]!, "Sam Visitor");
+      expect(ctx.ownerEmails[0]!.textPlain).toContain("Job title: Engineer");
+      expect(ctx.visitorLetters).toHaveLength(1);
+      const letter = ctx.visitorLetters[0]!;
+      assertVisitorLetterToVisitor(letter);
+      const vcardBody = letter.attachments?.[0]?.body ?? "";
       expect(vcardBody).toContain("BEGIN:VCARD");
       expect(vcardBody).toContain(RELAY_E2E_OWNER_EMAIL);
     });
   });
 
-  it("interim until DIDI-820: delivers only one owner email when fallback and immediate owner messages are processed", async () => {
+  it("delivers only one letter and one owner email when fallback and immediate messages are processed", async () => {
     await withIsolatedLocalD1(async (db) => {
       const ctx = await setupRelayExchange(db, "direct", "lead-direct-dup");
       await finalizeWithDismiss(ctx);
-      await deliverAllSinkMessages(ctx);
+      await deliverAllExchangeEmails(ctx);
+      expect(ctx.visitorLetters).toHaveLength(1);
       expect(ctx.ownerEmails).toHaveLength(1);
-      assertDirectOwnerOutbound(ctx.ownerEmails[0]!, "Sam Visitor");
+      assertOwnerRelayOutbound(ctx.ownerEmails[0]!, "Sam Visitor");
     });
   });
 
-  it("interim until DIDI-820: increments owner and visitor daily_send_counts on exchange", async () => {
+  it("increments owner and visitor daily_send_counts on exchange", async () => {
     await withIsolatedLocalD1(async (db) => {
       const ctx = await setupRelayExchange(db, "direct", "lead-direct-counts");
       const owner = await db

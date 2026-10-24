@@ -40,7 +40,6 @@ describe("createEmailLeadSinkHandler deliverAppend (unit)", () => {
 
     await handler.deliverAppend(message, {
       messageAttempts: 1,
-      visitorEmailMode: "owner_relay",
       recordRef: null,
     });
 
