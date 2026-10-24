@@ -92,7 +92,7 @@ describe("processDetails (unit)", () => {
     );
 
     const result = await processDetails(
-      { token, jobTitle: "CTO", company: "Co", note: "Hi" },
+      { token, phone: null, jobTitle: "CTO", company: "Co", note: "Hi" },
       card,
       [
         {
@@ -129,6 +129,53 @@ describe("processDetails (unit)", () => {
     expect(result.status).toBe("success");
     expect(sinkMessages).toHaveLength(1);
     expect((sinkMessages[0] as { type: string }).type).toBe("lead_sink_append_details");
+  });
+
+  it("includes optional phone in append-details queue payload", async () => {
+    const repo = new MemoryCardRepository();
+    const card = await repo.upsertCard(exampleCardInput());
+    const sinkMessages: unknown[] = [];
+    const nowSeconds = Math.floor(
+      new Date("2026-10-12T12:00:00.000Z").getTime() / 1000,
+    );
+    const token = createDetailsToken(
+      "secret",
+      {
+        leadId: "lead-phone",
+        cardId: card.id,
+        cardSlug: card.slug,
+        visitorEmail: "visitor@example.com",
+        visitorName: "Visitor",
+      },
+      nowSeconds,
+    );
+
+    const result = await processDetails(
+      {
+        token,
+        phone: "+1 416 555 0100",
+        jobTitle: null,
+        company: null,
+        note: null,
+      },
+      card,
+      [
+        {
+          id: "sink-1",
+          cardId: card.id,
+          kind: "test_sink",
+          config: {},
+          enabled: true,
+          createdAt: "",
+          updatedAt: "",
+        },
+      ],
+      detailsDeps(new MemoryLeadDeliveryLedger(), sinkMessages),
+    );
+
+    expect(result.status).toBe("success");
+    const message = sinkMessages[0] as { details: { phone: string | null } };
+    expect(message.details.phone).toBe("+1 416 555 0100");
   });
 
   it("rejects a second details submit for the same lead", async () => {
@@ -180,7 +227,7 @@ describe("processDetails (unit)", () => {
       baseUrl: "https://we-met.link",
       ...leadEmailCapacityAlwaysAllowed,
     };
-    const input = { token, jobTitle: "CTO", company: "Co", note: "Hi" };
+    const input = { token, phone: null, jobTitle: "CTO", company: "Co", note: "Hi" };
 
     const first = await processDetails(input, card, sinks, deps);
     expect(first.status).toBe("success");
@@ -214,7 +261,7 @@ describe("processDetails (unit)", () => {
     );
 
     const result = await processDetails(
-      { token, jobTitle: "CTO", company: null, note: null },
+      { token, phone: null, jobTitle: "CTO", company: null, note: null },
       card,
       [
         {
@@ -251,7 +298,7 @@ describe("processDetails (unit)", () => {
     );
 
     const result = await processDetails(
-      { token, jobTitle: "CTO", company: null, note: null },
+      { token, phone: null, jobTitle: "CTO", company: null, note: null },
       card,
       [
         {
@@ -275,7 +322,7 @@ describe("processDetails (unit)", () => {
     const repo = new MemoryCardRepository();
     const card = await repo.upsertCard(exampleCardInput());
     const result = await processDetails(
-      { token: "bad", jobTitle: null, company: null, note: null },
+      { token: "bad", phone: null, jobTitle: null, company: null, note: null },
       card,
       [],
       {

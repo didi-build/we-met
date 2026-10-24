@@ -116,7 +116,17 @@ function parseDetails(value: unknown): LeadSinkAppendDetailsMessage["details"] |
   ) {
     return null;
   }
+  const phone =
+    value.phone === undefined
+      ? null
+      : value.phone === null || typeof value.phone === "string"
+        ? value.phone
+        : undefined;
+  if (phone === undefined) {
+    return null;
+  }
   return {
+    phone,
     jobTitle: value.jobTitle,
     company: value.company,
     note: value.note,
