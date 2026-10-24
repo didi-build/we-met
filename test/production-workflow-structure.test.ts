@@ -100,6 +100,8 @@ function deployStepByName(steps: DeployStepBlock[], name: string): DeployStepBlo
 }
 
 const CONSUMER_DEPLOY_STEP_NAME = "Deploy follow-up email consumer to production";
+const CONSUMER_SECRET_CHECK_STEP_NAME =
+  "Require production consumer Worker secrets (names only)";
 const WARMUP_DEPLOY_STEP_NAME = "Deploy warmup cron Worker to production";
 const CONSUMER_PREPARE_STEP_NAME =
   "Prepare follow-up email consumer Wrangler config (production D1 ID)";
@@ -151,6 +153,22 @@ function assertDeployJobCloudflareTokenIsolation(deploySection: string): void {
     throw new Error("deploy job has no parseable steps");
   }
 
+  const consumerSecretCheck = deployStepByName(steps, CONSUMER_SECRET_CHECK_STEP_NAME);
+  if (
+    !consumerSecretCheck.block.includes(
+      "CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION }}",
+    )
+  ) {
+    throw new Error(
+      `${CONSUMER_SECRET_CHECK_STEP_NAME} must set CLOUDFLARE_API_TOKEN to CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION`,
+    );
+  }
+  if (consumerSecretCheck.block.includes("CLOUDFLARE_API_TOKEN_PRODUCTION")) {
+    throw new Error(
+      `${CONSUMER_SECRET_CHECK_STEP_NAME} must not reference CLOUDFLARE_API_TOKEN_PRODUCTION`,
+    );
+  }
+
   const consumerDeploy = deployStepByName(steps, CONSUMER_DEPLOY_STEP_NAME);
   if (
     !consumerDeploy.block.includes(
@@ -168,7 +186,12 @@ function assertDeployJobCloudflareTokenIsolation(deploySection: string): void {
   }
 
   for (const step of steps) {
-    if (step.name === CONSUMER_DEPLOY_STEP_NAME) continue;
+    if (
+      step.name === CONSUMER_DEPLOY_STEP_NAME ||
+      step.name === CONSUMER_SECRET_CHECK_STEP_NAME
+    ) {
+      continue;
+    }
     if (step.block.includes("CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION")) {
       throw new Error(
         `step "${step.name ?? "(unnamed)"}" must not reference CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION`,
@@ -392,7 +415,12 @@ describe("Deploy production workflow structure (unit)", () => {
     expect(turnstileIdx).toBeGreaterThan(warmupGuardsIdx);
     expect(migrationsIdx).toBeGreaterThan(warmupGuardsIdx);
     expect(appDeployIdx).toBeGreaterThan(turnstileIdx);
+    const consumerSecretCheckIdx = deploySection.indexOf(
+      CONSUMER_SECRET_CHECK_STEP_NAME,
+    );
     expect(consumerDeployIdx).toBeGreaterThan(appDeployIdx);
+    expect(consumerSecretCheckIdx).toBeGreaterThan(appDeployIdx);
+    expect(consumerSecretCheckIdx).toBeLessThan(consumerDeployIdx);
     expect(warmupDeployIdx).toBeGreaterThan(consumerDeployIdx);
     expect(deploySection).not.toContain("WE_MET_TEST_MAIL_TO");
   });
