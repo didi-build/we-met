@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
+import { MemoryExchangeOwnerEmailStore } from "@/exchange-owner-email/memory-store";
+import { OWNER_EMAIL_FALLBACK_DELAY_SECONDS } from "@/exchange/owner-email-timing";
 import { MemoryLeadDeliveryLedger } from "@/lead-delivery-ledger/memory-repository";
 import { FOLLOWUP_RETRY_RETENTION_BUDGET_SECONDS } from "../../scripts/lib/queue-retry-policy.mjs";
 import {
@@ -64,16 +66,18 @@ function createDispatchDeps(
     deliveryLogger: typeof deliveryLogger;
   } = {
     producer: {
-      enqueueLeadSink: async (message) => {
+      enqueueLeadSink: async (message, options) => {
         const sinkId = (message as { sinkId: string }).sinkId;
         if (failing.has(sinkId)) {
           throw new Error("queue down");
         }
-        sinkMessages.push(message);
+        sinkMessages.push({ message, options });
       },
     },
     sinkLogger: { logSinkEnqueueFailure: vi.fn() },
     ledger,
+    exchangeOwnerEmail:
+      overrides.exchangeOwnerEmail ?? new MemoryExchangeOwnerEmailStore(),
     deliveryLogger,
     now: () => NOW,
     createLedgerId: () => `ledger-${++ledgerSeq}`,
@@ -91,10 +95,18 @@ describe("lead delivery dispatch (unit)", () => {
       "card-1",
       "demo",
       SOURCE_URL,
+      "Demo",
       deps,
     );
 
     expect(deps.sinkMessages).toHaveLength(2);
+    expect((deps.sinkMessages[0] as { message: { type: string } }).message.type).toBe(
+      "owner_email_due",
+    );
+    expect(
+      (deps.sinkMessages[0] as { options?: { delaySeconds?: number } }).options
+        ?.delaySeconds,
+    ).toBe(OWNER_EMAIL_FALLBACK_DELAY_SECONDS);
     expect(deps.ledger.rows).toHaveLength(2);
     expect(deps.ledger.rows.every((r) => r.phase === "record")).toBe(true);
     expect(deps.ledger.rows.every((r) => r.status === "queued")).toBe(true);
@@ -106,7 +118,7 @@ describe("lead delivery dispatch (unit)", () => {
 
   it("writes no ledger rows when no sinks are enabled", async () => {
     const deps = createDispatchDeps();
-    await dispatchLeadOnExchange([], lead, "card-1", "demo", SOURCE_URL, deps);
+    await dispatchLeadOnExchange([], lead, "card-1", "demo", SOURCE_URL, "Demo", deps);
     expect(deps.ledger.rows).toHaveLength(0);
     expect(deps.sinkMessages).toHaveLength(0);
   });
@@ -124,6 +136,7 @@ describe("lead delivery dispatch (unit)", () => {
       "card-1",
       "demo",
       SOURCE_URL,
+      "Demo",
       deps,
     );
 
@@ -145,6 +158,7 @@ describe("lead delivery dispatch (unit)", () => {
       "card-1",
       "demo",
       SOURCE_URL,
+      "Demo",
       deps,
     );
 
@@ -158,16 +172,15 @@ describe("lead delivery dispatch (unit)", () => {
     expect(deps.ledger.rows[0]?.errorCode).toBe("enqueue_failed");
   });
 
-  it("dispatchDetailsAppend reports inserted, already_exists, and failed outcomes", async () => {
+  it("dispatchOwnerEmailImmediate enqueues lead_sink_owner_email messages", async () => {
     const deps = createDispatchDeps();
     const sinks = [sink("sink-a", "a@example.com")];
     const details = { phone: null, jobTitle: null, company: null, note: null };
-    const appendLead = { leadId: lead.leadId, name: lead.name, email: lead.email };
     const submittedAt = NOW.toISOString();
 
-    const first = await dispatchDetailsAppend(
+    const outcome = await dispatchDetailsAppend(
       sinks,
-      appendLead,
+      lead,
       details,
       "card-1",
       "demo",
@@ -175,84 +188,22 @@ describe("lead delivery dispatch (unit)", () => {
       submittedAt,
       deps,
     );
-    expect(first).toBe("inserted");
-
-    const second = await dispatchDetailsAppend(
-      sinks,
-      appendLead,
-      details,
-      "card-1",
-      "demo",
-      SOURCE_URL,
-      submittedAt,
-      deps,
-    );
-    expect(second).toBe("already_exists");
-
-    const throwingLedger = {
-      ...deps.ledger,
-      insertAppendIfAbsent: async () => {
-        throw new Error("d1");
-      },
-      insertAppendIfAbsentWithDailySendIncrements: async () => {
-        throw new Error("d1");
-      },
-    };
-    const failed = await dispatchDetailsAppend(
-      sinks,
-      appendLead,
-      details,
-      "card-1",
-      "demo",
-      SOURCE_URL,
-      submittedAt,
-      { ...deps, ledger: throwingLedger },
-    );
-    expect(failed).toBe("failed");
-  });
-
-  it("details double submit enqueues append once per sink", async () => {
-    const deps = createDispatchDeps();
-    const sinks = [sink("sink-a", "a@example.com")];
-    const details = { phone: null, jobTitle: "CTO", company: "Co", note: "Hi" };
-
-    const appendLead = { leadId: lead.leadId, name: lead.name, email: lead.email };
-    const submittedAt = NOW.toISOString();
-    await dispatchDetailsAppend(
-      sinks,
-      appendLead,
-      details,
-      "card-1",
-      "demo",
-      SOURCE_URL,
-      submittedAt,
-      deps,
-    );
-    await dispatchDetailsAppend(
-      sinks,
-      appendLead,
-      details,
-      "card-1",
-      "demo",
-      SOURCE_URL,
-      submittedAt,
-      deps,
-    );
-
+    expect(outcome).toBe("inserted");
     expect(deps.sinkMessages).toHaveLength(1);
-    expect(deps.ledger.rows.filter((r) => r.phase === "append")).toHaveLength(1);
+    expect((deps.sinkMessages[0] as { message: { type: string } }).message.type).toBe(
+      "lead_sink_owner_email",
+    );
   });
 
-  it("does not re-enqueue append after enqueue_failed left a row", async () => {
+  it("marks failed when immediate enqueue fails", async () => {
     const deps = createDispatchDeps({ failingSinkIds: new Set(["sink-a"]) });
     const sinks = [sink("sink-a", "a@example.com")];
     const details = { phone: null, jobTitle: null, company: null, note: null };
-
-    const appendLead = { leadId: lead.leadId, name: lead.name, email: lead.email };
     const submittedAt = NOW.toISOString();
-    await dispatchDetailsAppend(
+
+    const outcome = await dispatchDetailsAppend(
       sinks,
-      appendLead,
+      lead,
       details,
       "card-1",
       "demo",
@@ -260,19 +211,7 @@ describe("lead delivery dispatch (unit)", () => {
       submittedAt,
       deps,
     );
-    const failing = createDispatchDeps({ ledger: deps.ledger });
-    await dispatchDetailsAppend(
-      sinks,
-      appendLead,
-      details,
-      "card-1",
-      "demo",
-      SOURCE_URL,
-      submittedAt,
-      failing,
-    );
-
+    expect(outcome).toBe("failed");
     expect(deps.sinkMessages).toHaveLength(0);
-    expect(failing.sinkMessages).toHaveLength(0);
   });
 });

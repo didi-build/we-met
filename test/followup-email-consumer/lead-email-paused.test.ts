@@ -8,6 +8,13 @@ import { createEmailLeadSinkHandler } from "@/followup-email-consumer/lead-sink/
 import { createLeadSinkHandlerRegistry } from "@/followup-email-consumer/lead-sink/registry";
 import { MemoryConsumerLeadDeliveryLedger } from "./memory-consumer-ledger";
 import { leadEmailConsumerEnabled } from "../helpers/lead-email-deps";
+import { MemoryExchangeOwnerEmailStore } from "@/exchange-owner-email/memory-store";
+
+const pausedConsumerExtras = {
+  exchangeOwnerEmail: new MemoryExchangeOwnerEmailStore(),
+  logExchangeOwnerEmailRowMissing: vi.fn(),
+  logExchangeOwnerEmailConfirmFailed: vi.fn(),
+};
 
 function createMessage(body: unknown): FollowupQueueMessage {
   return {
@@ -85,6 +92,7 @@ describe("lead email kill switch in consumer (unit)", () => {
         logLeadSinkLedgerRecordFailed: vi.fn(),
         logLeadSinkLedgerMarkFailed: vi.fn(),
         logLeadSinkAppendDeferred: vi.fn(),
+        ...pausedConsumerExtras,
         now: () => new Date("2026-10-12T12:00:00.000Z"),
       },
     );
@@ -160,6 +168,7 @@ describe("lead email kill switch in consumer (unit)", () => {
         logLeadSinkLedgerRecordFailed: vi.fn(),
         logLeadSinkLedgerMarkFailed: vi.fn(),
         logLeadSinkAppendDeferred: vi.fn(),
+        ...pausedConsumerExtras,
         now: () => new Date("2026-10-12T12:00:00.000Z"),
       },
     );
@@ -195,6 +204,7 @@ describe("lead email kill switch in consumer (unit)", () => {
 
     await processLeadSinkQueueMessage(message, {
       ...leadEmailConsumerEnabled,
+      ...pausedConsumerExtras,
       readLeadEmailControls: async () => ({
         leadEmailEnabled: false,
         visitorEmailMode: "direct",
@@ -222,6 +232,7 @@ describe("lead email kill switch in consumer (unit)", () => {
       logLedgerUpdateFailed: vi.fn(),
       logLeadSinkAppendDeferred: vi.fn(),
       now: () => new Date("2026-10-12T12:00:00.000Z"),
+      ...pausedConsumerExtras,
     });
 
     expect(send).not.toHaveBeenCalled();
@@ -294,6 +305,7 @@ describe("lead email kill switch in consumer (unit)", () => {
           logLeadSinkLedgerRecordFailed: vi.fn(),
           logLeadSinkLedgerMarkFailed: vi.fn(),
           logLeadSinkAppendDeferred: vi.fn(),
+          ...pausedConsumerExtras,
           now: () => new Date("2026-10-12T12:00:00.000Z"),
         },
       ),

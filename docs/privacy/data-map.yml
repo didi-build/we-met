@@ -392,6 +392,38 @@ d1_tables:
         data: Row update time
         purpose: audit
         source: docs/decisions/0022-lead-delivery-ledger.md
+  exchange_owner_email:
+    defaults:
+      whose: operational
+      storage: D1
+      processors:
+        - Cloudflare
+      retention: indefinite
+      who_can_see: operator
+      source: migrations/0008_exchange_owner_email.sql
+      verified: false
+    columns:
+      card_id:
+        data: Card UUID
+        purpose: tie exchange to card for owner email timing
+      created_at:
+        data: Row creation time
+        purpose: audit
+      owner_email_claimed_at:
+        data: In-flight owner email send claim timestamp
+        purpose: single-worker send gate before owner_email_sent_at is set
+      lead_id:
+        data: Opaque lead correlation id
+        purpose: one owner email per exchange idempotency
+      owner_email_sent_at:
+        data: Successful owner email send time
+        purpose: audit and duplicate suppression
+      triggered_at:
+        data: Details submit or dismiss time
+        purpose: immediate owner email trigger
+      updated_at:
+        data: Row update time
+        purpose: audit
   lead_sinks:
     defaults:
       storage: D1

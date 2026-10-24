@@ -1,54 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import { MemoryCardRepository } from "@/card-data/memory-repository";
+import { MemoryExchangeOwnerEmailStore } from "@/exchange-owner-email/memory-store";
 import { MemoryLeadDeliveryLedger } from "@/lead-delivery-ledger/memory-repository";
-import type {
-  DailySendCountIncrement,
-  InsertQueuedLeadDeliveryInput,
-  LeadDeliveryLedger,
-} from "@/lead-delivery-ledger/types";
 import { processDetails } from "@/exchange/process-details";
 import { createDetailsToken } from "@/exchange/token";
 import { exampleCardInput } from "../helpers/example-card";
-import { leadEmailCapacityAlwaysAllowed } from "../helpers/lead-email-deps";
-
-class AppendInsertThrowsLedger extends MemoryLeadDeliveryLedger {
-  async hasAppendPhaseForLead(_leadId: string): Promise<boolean> {
-    return false;
-  }
-
-  async insertAppendIfAbsent(_input: InsertQueuedLeadDeliveryInput): Promise<boolean> {
-    throw new Error("d1_unavailable");
-  }
-
-  async insertAppendIfAbsentWithDailySendIncrements(
-    _input: InsertQueuedLeadDeliveryInput,
-    _increments: DailySendCountIncrement,
-  ): Promise<boolean> {
-    throw new Error("d1_unavailable");
-  }
-}
-
-class AppendRaceLedger extends MemoryLeadDeliveryLedger {
-  async hasAppendPhaseForLead(_leadId: string): Promise<boolean> {
-    return false;
-  }
-
-  async insertAppendIfAbsent(_input: InsertQueuedLeadDeliveryInput): Promise<boolean> {
-    return false;
-  }
-
-  async insertAppendIfAbsentWithDailySendIncrements(
-    _input: InsertQueuedLeadDeliveryInput,
-    _increments: DailySendCountIncrement,
-  ): Promise<boolean> {
-    return false;
-  }
-}
 
 function detailsDeps(
-  ledger: LeadDeliveryLedger,
   sinkMessages: unknown[],
-  createLedgerId = () => "ledger-1",
+  exchangeOwnerEmail = new MemoryExchangeOwnerEmailStore(),
 ) {
   return {
     tokenSecret: "secret",
@@ -59,20 +19,20 @@ function detailsDeps(
       },
     },
     leadSinkLogger: { logSinkEnqueueFailure: vi.fn() },
-    deliveryLedger: ledger,
+    deliveryLedger: new MemoryLeadDeliveryLedger(),
+    exchangeOwnerEmail,
     deliveryLogger: {
       logLedgerWriteFailed: vi.fn(),
       logLedgerEnqueueFailed: vi.fn(),
     },
-    createLedgerId,
+    createLedgerId: () => "ledger-1",
     now: () => new Date("2026-10-12T12:00:00.000Z"),
     baseUrl: "https://we-met.link",
-    ...leadEmailCapacityAlwaysAllowed,
   };
 }
 
 describe("processDetails (unit)", () => {
-  it("dispatches append-details sink messages", async () => {
+  it("dispatches lead_sink_owner_email sink messages", async () => {
     const repo = new MemoryCardRepository();
     const card = await repo.upsertCard(exampleCardInput());
     const sinkMessages: unknown[] = [];
@@ -105,33 +65,15 @@ describe("processDetails (unit)", () => {
           updatedAt: "",
         },
       ],
-      {
-        tokenSecret: "secret",
-        environment: "local",
-        leadSinkQueue: {
-          enqueueLeadSink: async (message) => {
-            sinkMessages.push(message);
-          },
-        },
-        leadSinkLogger: { logSinkEnqueueFailure: vi.fn() },
-        deliveryLedger: new MemoryLeadDeliveryLedger(),
-        deliveryLogger: {
-          logLedgerWriteFailed: vi.fn(),
-          logLedgerEnqueueFailed: vi.fn(),
-        },
-        createLedgerId: () => "ledger-1",
-        now: () => new Date("2026-10-12T12:00:00.000Z"),
-        baseUrl: "https://we-met.link",
-        ...leadEmailCapacityAlwaysAllowed,
-      },
+      detailsDeps(sinkMessages),
     );
 
     expect(result.status).toBe("success");
     expect(sinkMessages).toHaveLength(1);
-    expect((sinkMessages[0] as { type: string }).type).toBe("lead_sink_append_details");
+    expect((sinkMessages[0] as { type: string }).type).toBe("lead_sink_owner_email");
   });
 
-  it("includes optional phone in append-details queue payload", async () => {
+  it("includes optional phone in owner email queue payload", async () => {
     const repo = new MemoryCardRepository();
     const card = await repo.upsertCard(exampleCardInput());
     const sinkMessages: unknown[] = [];
@@ -170,7 +112,7 @@ describe("processDetails (unit)", () => {
           updatedAt: "",
         },
       ],
-      detailsDeps(new MemoryLeadDeliveryLedger(), sinkMessages),
+      detailsDeps(sinkMessages),
     );
 
     expect(result.status).toBe("success");
@@ -182,7 +124,7 @@ describe("processDetails (unit)", () => {
     const repo = new MemoryCardRepository();
     const card = await repo.upsertCard(exampleCardInput());
     const sinkMessages: unknown[] = [];
-    const ledger = new MemoryLeadDeliveryLedger();
+    const exchangeOwnerEmail = new MemoryExchangeOwnerEmailStore();
     const nowSeconds = Math.floor(
       new Date("2026-10-12T12:00:00.000Z").getTime() / 1000,
     );
@@ -208,25 +150,7 @@ describe("processDetails (unit)", () => {
         updatedAt: "",
       },
     ];
-    const deps = {
-      tokenSecret: "secret",
-      environment: "local",
-      leadSinkQueue: {
-        enqueueLeadSink: async (message: unknown) => {
-          sinkMessages.push(message);
-        },
-      },
-      leadSinkLogger: { logSinkEnqueueFailure: vi.fn() },
-      deliveryLedger: ledger,
-      deliveryLogger: {
-        logLedgerWriteFailed: vi.fn(),
-        logLedgerEnqueueFailed: vi.fn(),
-      },
-      createLedgerId: () => "ledger-1",
-      now: () => new Date("2026-10-12T12:00:00.000Z"),
-      baseUrl: "https://we-met.link",
-      ...leadEmailCapacityAlwaysAllowed,
-    };
+    const deps = detailsDeps(sinkMessages, exchangeOwnerEmail);
     const input = { token, phone: null, jobTitle: "CTO", company: "Co", note: "Hi" };
 
     const first = await processDetails(input, card, sinks, deps);
@@ -237,85 +161,10 @@ describe("processDetails (unit)", () => {
       { ...input, jobTitle: "CEO", company: "Other", note: "Changed" },
       card,
       sinks,
-      { ...deps, createLedgerId: () => "ledger-2" },
+      deps,
     );
     expect(second.status).toBe("details_already_sent");
     expect(sinkMessages).toHaveLength(1);
-    expect(ledger.rows.filter((r) => r.phase === "append")).toHaveLength(1);
-  });
-
-  it("returns server_error when append ledger insert throws", async () => {
-    const repo = new MemoryCardRepository();
-    const card = await repo.upsertCard(exampleCardInput());
-    const sinkMessages: unknown[] = [];
-    const token = createDetailsToken(
-      "secret",
-      {
-        leadId: "lead-1",
-        cardId: card.id,
-        cardSlug: card.slug,
-        visitorEmail: "visitor@example.com",
-        visitorName: "Visitor",
-      },
-      Math.floor(new Date("2026-10-12T12:00:00.000Z").getTime() / 1000),
-    );
-
-    const result = await processDetails(
-      { token, phone: null, jobTitle: "CTO", company: null, note: null },
-      card,
-      [
-        {
-          id: "sink-1",
-          cardId: card.id,
-          kind: "test_sink",
-          config: {},
-          enabled: true,
-          createdAt: "",
-          updatedAt: "",
-        },
-      ],
-      detailsDeps(new AppendInsertThrowsLedger(), sinkMessages),
-    );
-
-    expect(result.status).toBe("server_error");
-    expect(sinkMessages).toHaveLength(0);
-  });
-
-  it("returns details_already_sent when pre-check misses but append insert conflicts", async () => {
-    const repo = new MemoryCardRepository();
-    const card = await repo.upsertCard(exampleCardInput());
-    const sinkMessages: unknown[] = [];
-    const token = createDetailsToken(
-      "secret",
-      {
-        leadId: "lead-1",
-        cardId: card.id,
-        cardSlug: card.slug,
-        visitorEmail: "visitor@example.com",
-        visitorName: "Visitor",
-      },
-      Math.floor(new Date("2026-10-12T12:00:00.000Z").getTime() / 1000),
-    );
-
-    const result = await processDetails(
-      { token, phone: null, jobTitle: "CTO", company: null, note: null },
-      card,
-      [
-        {
-          id: "sink-1",
-          cardId: card.id,
-          kind: "test_sink",
-          config: {},
-          enabled: true,
-          createdAt: "",
-          updatedAt: "",
-        },
-      ],
-      detailsDeps(new AppendRaceLedger(), sinkMessages),
-    );
-
-    expect(result.status).toBe("details_already_sent");
-    expect(sinkMessages).toHaveLength(0);
   });
 
   it("rejects invalid tokens", async () => {
@@ -325,21 +174,7 @@ describe("processDetails (unit)", () => {
       { token: "bad", phone: null, jobTitle: null, company: null, note: null },
       card,
       [],
-      {
-        tokenSecret: "secret",
-        environment: "local",
-        leadSinkQueue: { enqueueLeadSink: async () => {} },
-        leadSinkLogger: { logSinkEnqueueFailure: vi.fn() },
-        deliveryLedger: new MemoryLeadDeliveryLedger(),
-        deliveryLogger: {
-          logLedgerWriteFailed: vi.fn(),
-          logLedgerEnqueueFailed: vi.fn(),
-        },
-        createLedgerId: () => "ledger-1",
-        now: () => new Date(),
-        baseUrl: "https://we-met.link",
-        ...leadEmailCapacityAlwaysAllowed,
-      },
+      detailsDeps([]),
     );
     expect(result.status).toBe("invalid_token");
   });

@@ -15,6 +15,10 @@ export type ValidatedDetailsInput = {
   note: string | null;
 };
 
+export type ValidatedDetailsDismissInput = {
+  token: string;
+};
+
 export type ParseExchangeBodyResult =
   | { ok: true; honeypot: true }
   | { ok: true; value: ValidatedExchangeInput }
@@ -206,4 +210,17 @@ export function parseDetailsBody(
     ok: true,
     value: { token, phone: phoneRaw, jobTitle, company, note },
   };
+}
+
+export function parseDetailsDismissBody(
+  body: unknown,
+): { ok: true; value: ValidatedDetailsDismissInput } | { ok: false } {
+  if (!isPlainObject(body)) {
+    return { ok: false };
+  }
+  const token = readString(body, "token", 4096, true);
+  if (!token) {
+    return { ok: false };
+  }
+  return { ok: true, value: { token } };
 }

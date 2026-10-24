@@ -17,6 +17,8 @@ const FILES = [
   ["ownerNewLeadText", "owner-new-lead.txt"],
   ["ownerDetailsUpdateHtml", "owner-details-update.html"],
   ["ownerDetailsUpdateText", "owner-details-update.txt"],
+  ["ownerRelayHtml", "owner-relay.html"],
+  ["ownerRelayText", "owner-relay.txt"],
 ];
 
 export function buildGeneratedEmailTemplatesSource() {

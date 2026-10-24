@@ -16,6 +16,7 @@ import {
 } from "@/followup-email-consumer/process-batch";
 import { MemoryConsumerLeadDeliveryLedger } from "../followup-email-consumer/memory-consumer-ledger";
 import { leadEmailConsumerEnabled } from "../helpers/lead-email-deps";
+import { MemoryExchangeOwnerEmailStore } from "@/exchange-owner-email/memory-store";
 
 const card: CardEmailSnapshot = {
   slug: "demo",
@@ -130,6 +131,10 @@ function createDeps(
     logLedgerRowMissing,
     logLedgerUpdateFailed,
     logLeadSinkAppendDeferred: vi.fn(),
+    logExchangeOwnerEmailRowMissing: vi.fn(),
+    logExchangeOwnerEmailConfirmFailed: vi.fn(),
+    exchangeOwnerEmail:
+      overrides.exchangeOwnerEmail ?? new MemoryExchangeOwnerEmailStore(),
     logLeadSinkLedgerRecordFailed: vi.fn(),
     logLeadSinkLedgerMarkFailed: vi.fn(),
     logLeadSinkAttemptFailure: vi.fn(),
@@ -551,7 +556,7 @@ describe("processFollowupQueueBatch (unit)", () => {
     expect(bad.retry).toHaveBeenCalledOnce();
   });
 
-  it("defers append while record row is still queued", async () => {
+  it("sends legacy append immediately without waiting on record row", async () => {
     const ledger = new MemoryConsumerLeadDeliveryLedger();
     ledger.seedQueued("lead-1", "sink-1", "record");
     ledger.seedQueued("lead-1", "sink-1", "append");
@@ -566,7 +571,7 @@ describe("processFollowupQueueBatch (unit)", () => {
           name: "Alex Visitor",
           email: "visitor@example.com",
         },
-        details: { jobTitle: null, company: null, note: null },
+        details: { phone: null, jobTitle: null, company: null, note: null },
         detailsSubmittedAt: "2026-10-12T01:00:00.000Z",
         cardId: "card-1",
         cardSlug: "demo",
@@ -578,10 +583,9 @@ describe("processFollowupQueueBatch (unit)", () => {
 
     await processFollowupQueueBatch({ messages: [message] }, deps);
 
-    expect(deps.sendEmail).not.toHaveBeenCalled();
-    expect(deps.logLeadSinkAppendDeferred).toHaveBeenCalledWith("lead-1", "sink-1", 2);
-    expect(message.retry).toHaveBeenCalledOnce();
-    expect(message.ack).not.toHaveBeenCalled();
+    expect(deps.sendEmail).toHaveBeenCalledOnce();
+    expect(message.ack).toHaveBeenCalledOnce();
+    expect(message.retry).not.toHaveBeenCalled();
   });
 
   it("sends append unthreaded when record row failed", async () => {
@@ -1138,7 +1142,7 @@ describe("processFollowupQueueBatch (unit)", () => {
     );
   });
 
-  it("threads lead_sink_append_details with Cloudflare record messageId", async () => {
+  it("does not thread legacy lead_sink_append_details with record messageId", async () => {
     const ledger = new MemoryConsumerLeadDeliveryLedger();
     ledger.seedSent(
       "lead-1",
@@ -1160,7 +1164,7 @@ describe("processFollowupQueueBatch (unit)", () => {
         name: "Alex Visitor",
         email: "visitor@example.com",
       },
-      details: { jobTitle: "CEO", company: null, note: null },
+      details: { phone: null, jobTitle: "CEO", company: null, note: null },
       detailsSubmittedAt: "2026-10-12T01:00:00.000Z",
       cardId: "card-1",
       cardSlug: "demo",
@@ -1173,8 +1177,8 @@ describe("processFollowupQueueBatch (unit)", () => {
     expect(deps.sendEmail).toHaveBeenCalledOnce();
     const sent = vi.mocked(deps.sendEmail).mock.calls[0]![0];
     expect(sent.from).toBe("hello@mail.we-met.link");
-    expect(sent.inReplyTo).toBe("<record@mail.we-met.link>");
-    expect(sent.references).toBe("<record@mail.we-met.link>");
+    expect(sent.inReplyTo).toBeUndefined();
+    expect(sent.references).toBeUndefined();
     expect(message.ack).toHaveBeenCalledOnce();
   });
 

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { MemoryCardRepository } from "@/card-data/memory-repository";
+import { MemoryExchangeOwnerEmailStore } from "@/exchange-owner-email/memory-store";
 import { MemoryLeadDeliveryLedger } from "@/lead-delivery-ledger/memory-repository";
 import { exampleCardInput } from "../helpers/example-card";
 import { processExchange } from "@/exchange/process-exchange";
@@ -49,6 +50,8 @@ function createDeps(
     clientIp: "203.0.113.1",
     leadSinkLogger: { logSinkEnqueueFailure: vi.fn() },
     deliveryLedger,
+    exchangeOwnerEmail:
+      overrides.exchangeOwnerEmail ?? new MemoryExchangeOwnerEmailStore(),
     deliveryLogger: {
       logLedgerWriteFailed: vi.fn(),
       logLedgerEnqueueFailed: vi.fn(),

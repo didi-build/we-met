@@ -4,15 +4,11 @@ import {
 } from "@/email/followup-email-error";
 import { isRetryableFollowupEmailError } from "@/email/retryable-followup-error";
 import type { LeadEmailControls } from "@/app-settings/caps";
-import {
-  parseExternalRef,
-  validateExternalRefForStorage,
-} from "@/followup-email-consumer/external-ref";
+import { validateExternalRefForStorage } from "@/followup-email-consumer/external-ref";
 import type { ConsumerLeadDeliveryLedger } from "@/followup-email-consumer/lead-delivery-ledger";
 import { getLeadSinkHandler } from "@/followup-email-consumer/lead-sink/registry";
 import type {
   LeadSinkHandler,
-  ParsedExternalRef,
   ParsedLeadSinkMessage,
 } from "@/followup-email-consumer/lead-sink/types";
 import {
@@ -23,9 +19,12 @@ import { parseLeadSinkMessage } from "@/followup-email-consumer/validate";
 import type { FollowupQueueMessage } from "@/followup-email-consumer/process-batch";
 import { UnsupportedQueueMessageError } from "@/followup-email-consumer/unsupported-queue-message";
 import { LEAD_EMAIL_PAUSED_ERROR } from "@/lead-email/paused";
+import type { ExchangeOwnerEmailStore } from "@/exchange-owner-email/types";
+import { OWNER_EMAIL_SEND_CLAIM_STALE_MS } from "@/exchange-owner-email/types";
 
 export type LeadSinkConsumerDeps = {
   readLeadEmailControls: () => Promise<LeadEmailControls>;
+  exchangeOwnerEmail: ExchangeOwnerEmailStore;
   sinkHandlers: Map<string, LeadSinkHandler>;
   ledger: ConsumerLeadDeliveryLedger;
   logUnsupportedType(typeLabel: string): void;
@@ -51,11 +50,16 @@ export type LeadSinkConsumerDeps = {
   logLedgerRowMissing(leadId: string, sinkId: string): void;
   logLedgerUpdateFailed(leadId: string, sinkId: string, errorCode: string): void;
   logLeadSinkAppendDeferred(leadId: string, sinkId: string, attempt: number): void;
+  logExchangeOwnerEmailRowMissing(leadId: string): void;
+  logExchangeOwnerEmailConfirmFailed(leadId: string): void;
   now: () => Date;
 };
 
 function leadSinkPhase(message: ParsedLeadSinkMessage): "record" | "append" {
-  return message.type === "lead_sink_record" ? "record" : "append";
+  if (message.type === "lead_sink_append_details") {
+    return "append";
+  }
+  return "record";
 }
 
 function leadIdFromBody(body: unknown): string | null {
@@ -194,46 +198,6 @@ async function afterSuccessfulDelivery(
   message.ack();
 }
 
-async function resolveAppendRecordRef(
-  message: FollowupQueueMessage,
-  parsed: ParsedLeadSinkMessage,
-  handler: LeadSinkHandler,
-  deps: LeadSinkConsumerDeps,
-): Promise<
-  | { action: "defer" }
-  | { action: "fail"; errorCode: "record_unavailable" }
-  | { action: "deliver"; recordRef: ParsedExternalRef | null }
-> {
-  const recordRow = await deps.ledger.findRow(
-    parsed.lead.leadId,
-    parsed.sinkId,
-    "record",
-  );
-
-  if (recordRow?.status === "queued") {
-    const willRetry = message.attempts < MAX_VISITOR_FOLLOWUP_ATTEMPTS;
-    if (willRetry) {
-      return { action: "defer" };
-    }
-    if (handler.appendRequiresRecord) {
-      return { action: "fail", errorCode: "record_unavailable" };
-    }
-    return { action: "deliver", recordRef: null };
-  }
-
-  if (recordRow?.status === "sent") {
-    return {
-      action: "deliver",
-      recordRef: parseExternalRef(recordRow.externalRef),
-    };
-  }
-
-  if (handler.appendRequiresRecord) {
-    return { action: "fail", errorCode: "record_unavailable" };
-  }
-  return { action: "deliver", recordRef: null };
-}
-
 async function processQueuedLeadSink(
   message: FollowupQueueMessage,
   parsed: ParsedLeadSinkMessage,
@@ -263,34 +227,70 @@ async function processQueuedLeadSink(
     visitorEmailMode: leadEmailControls.visitorEmailMode,
   };
 
+  const isOwnerEmailMessage =
+    parsed.type === "lead_sink_owner_email" || parsed.type === "owner_email_due";
+
+  if (isOwnerEmailMessage) {
+    const now = deps.now();
+    const claimedAt = now.toISOString();
+    const staleBefore = new Date(
+      now.getTime() - OWNER_EMAIL_SEND_CLAIM_STALE_MS,
+    ).toISOString();
+    const claim = await deps.exchangeOwnerEmail.tryClaimOwnerEmailSend(
+      parsed.lead.leadId,
+      claimedAt,
+      staleBefore,
+    );
+    if (claim === "row_missing") {
+      deps.logExchangeOwnerEmailRowMissing(parsed.lead.leadId);
+      message.ack();
+      return;
+    }
+    if (claim === "already_sent") {
+      message.ack();
+      return;
+    }
+    if (claim === "contention") {
+      const willRetry = message.attempts < MAX_VISITOR_FOLLOWUP_ATTEMPTS;
+      if (!willRetry) {
+        message.ack();
+        return;
+      }
+      message.retry({
+        delaySeconds: followupEmailRetryDelaySeconds(message.attempts),
+      });
+      return;
+    }
+  }
+
   try {
+    if (isOwnerEmailMessage) {
+      const result = await handler.deliverOwnerEmail(parsed, handlerContext);
+      const sentAt = deps.now().toISOString();
+      try {
+        await deps.exchangeOwnerEmail.confirmOwnerEmailSent(parsed.lead.leadId, sentAt);
+      } catch {
+        deps.logExchangeOwnerEmailConfirmFailed(parsed.lead.leadId);
+      }
+      await afterSuccessfulDelivery(message, parsed, result.externalRef, deps);
+      return;
+    }
+
     if (parsed.type === "lead_sink_record") {
       const result = await handler.deliverRecord(parsed, handlerContext);
       await afterSuccessfulDelivery(message, parsed, result.externalRef, deps);
       return;
     }
 
-    const appendPlan = await resolveAppendRecordRef(message, parsed, handler, deps);
-    if (appendPlan.action === "defer") {
-      deps.logLeadSinkAppendDeferred(
-        parsed.lead.leadId,
-        parsed.sinkId,
-        message.attempts,
-      );
-      message.retry({ delaySeconds: followupEmailRetryDelaySeconds(message.attempts) });
-      return;
-    }
-    if (appendPlan.action === "fail") {
-      await markNonRetryableFailure(message, parsed, appendPlan.errorCode, deps);
-      return;
-    }
-
     const result = await handler.deliverAppend(parsed, {
       ...handlerContext,
-      recordRef: appendPlan.recordRef,
+      recordRef: null,
     });
     await afterSuccessfulDelivery(message, parsed, result.externalRef, deps);
   } catch (error) {
+    if (isOwnerEmailMessage) {
+      await deps.exchangeOwnerEmail.releaseOwnerEmailSendClaim(parsed.lead.leadId);
+    }
     const errorFields = followupEmailErrorLogFields(error);
     if (!isRetryableFollowupEmailError(errorFields.code)) {
       await markNonRetryableFailure(message, parsed, errorFields.code, deps);

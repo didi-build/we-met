@@ -77,6 +77,33 @@ export async function postHiExchange(payload: HiExchangePayload): Promise<
   }
 }
 
+export async function postHiDetailsDismiss(
+  token: string,
+): Promise<{ ok: true } | { ok: false; kind: HiExchangeFailureKind }> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), HI_EXCHANGE_REQUEST_TIMEOUT_MS);
+
+  try {
+    const response = await fetch("/api/details/dismiss", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token }),
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      return { ok: false, kind: "server" };
+    }
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      return { ok: false, kind: "timeout" };
+    }
+    return { ok: false, kind: "network" };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export async function postHiDetails(
   payload: HiDetailsPayload,
 ): Promise<{ ok: true } | { ok: false; kind: HiExchangeFailureKind }> {

@@ -2,6 +2,7 @@ import type {
   LeadSinkAppendContext,
   LeadSinkHandler,
   ParsedLeadSinkAppendMessage,
+  ParsedLeadSinkOwnerEmailMessage,
   ParsedLeadSinkRecordMessage,
 } from "@/followup-email-consumer/lead-sink/types";
 
@@ -12,6 +13,8 @@ export type FakeLeadSinkHandlerOptions = {
   onAppend?: (message: ParsedLeadSinkAppendMessage, ctx: LeadSinkAppendContext) => void;
   deliverRecord?: () => Promise<{ externalRef: string | null }>;
   deliverAppend?: () => Promise<{ externalRef: string | null }>;
+  deliverOwnerEmail?: () => Promise<{ externalRef: string | null }>;
+  onOwnerEmail?: (message: ParsedLeadSinkOwnerEmailMessage) => void;
 };
 
 export function createFakeLeadSinkHandler(
@@ -37,6 +40,13 @@ export function createFakeLeadSinkHandler(
         return options.deliverAppend();
       }
       return { externalRef: null };
+    },
+    async deliverOwnerEmail(message) {
+      options.onOwnerEmail?.(message);
+      if (options.deliverOwnerEmail) {
+        return options.deliverOwnerEmail();
+      }
+      return { externalRef: recordRef };
     },
   };
 }

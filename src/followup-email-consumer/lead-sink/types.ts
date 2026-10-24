@@ -1,5 +1,6 @@
 import type {
   LeadSinkAppendDetailsMessage,
+  LeadSinkOwnerEmailMessage,
   LeadSinkRecordLeadMessage,
 } from "@/exchange/queue/types";
 import type { VisitorEmailMode } from "@/app-settings/defaults";
@@ -7,8 +8,13 @@ import type { VisitorEmailMode } from "@/app-settings/defaults";
 export type ParsedLeadSinkRecordMessage = LeadSinkRecordLeadMessage;
 export type ParsedLeadSinkAppendMessage = LeadSinkAppendDetailsMessage;
 
+export type ParsedLeadSinkOwnerEmailMessage =
+  LeadSinkOwnerEmailMessage | import("@/exchange/queue/types").OwnerEmailDueMessage;
+
 export type ParsedLeadSinkMessage =
-  LeadSinkRecordLeadMessage | LeadSinkAppendDetailsMessage;
+  | LeadSinkRecordLeadMessage
+  | LeadSinkAppendDetailsMessage
+  | ParsedLeadSinkOwnerEmailMessage;
 
 export type ParsedExternalRef = Record<string, string | number | boolean | null>;
 
@@ -34,5 +40,9 @@ export type LeadSinkHandler = {
   deliverAppend(
     message: ParsedLeadSinkAppendMessage,
     ctx: LeadSinkAppendContext,
+  ): Promise<LeadSinkDeliveryResult>;
+  deliverOwnerEmail(
+    message: ParsedLeadSinkOwnerEmailMessage,
+    ctx: LeadSinkHandlerContext,
   ): Promise<LeadSinkDeliveryResult>;
 };

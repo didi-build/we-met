@@ -35,6 +35,7 @@ import { createLeadSinkHandlerRegistry } from "@/followup-email-consumer/lead-si
 import { processLeadSinkQueueMessage } from "@/followup-email-consumer/process-lead-sink";
 import { UnsupportedQueueMessageError } from "@/followup-email-consumer/unsupported-queue-message";
 import { readLeadEmailControls, type LeadEmailControls } from "@/app-settings/caps";
+import { createExchangeOwnerEmailStoreFromD1 } from "@/exchange-owner-email/d1-repository";
 import {
   isLeadSinkQueueMessageType,
   isUnsupportedQueueMessageType,
@@ -113,11 +114,14 @@ export type FollowupConsumerDeps = {
   ): void;
   logLeadSinkLedgerMarkFailed(leadId: string, sinkId: string, errorCode: string): void;
   logLeadSinkAppendDeferred(leadId: string, sinkId: string, attempt: number): void;
+  logExchangeOwnerEmailRowMissing(leadId: string): void;
+  logExchangeOwnerEmailConfirmFailed(leadId: string): void;
   sinkHandlers: Map<
     string,
     import("@/followup-email-consumer/lead-sink/types").LeadSinkHandler
   >;
   ledger: import("@/followup-email-consumer/lead-delivery-ledger").ConsumerLeadDeliveryLedger;
+  exchangeOwnerEmail: import("@/exchange-owner-email/types").ExchangeOwnerEmailStore;
   fromDisplayName?: string;
   now: () => Date;
 };
@@ -126,6 +130,7 @@ export function createFollowupConsumerDepsFromEnv(
   env: FollowupConsumerEnv,
 ): FollowupConsumerDeps {
   const ledger = createConsumerLeadDeliveryLedger(env.WE_MET_DB);
+  const exchangeOwnerEmail = createExchangeOwnerEmailStoreFromD1(env.WE_MET_DB);
   const sendEmail = createConsumerOutboundEmailSend(env);
   const outboundFrom: OutboundFromSecrets = {
     cloudflareFromEmail: env.WE_MET_EMAIL_FROM_CLOUDFLARE,
@@ -223,7 +228,14 @@ export function createFollowupConsumerDepsFromEnv(
     logLeadSinkAppendDeferred(leadId, sinkId, attempt) {
       console.error("lead_sink_append_deferred", { leadId, sinkId, attempt });
     },
+    logExchangeOwnerEmailRowMissing(leadId) {
+      console.error("exchange_owner_email_row_missing", { leadId });
+    },
+    logExchangeOwnerEmailConfirmFailed(leadId) {
+      console.error("exchange_owner_email_confirm_failed", { leadId });
+    },
     ledger,
+    exchangeOwnerEmail,
     fromDisplayName: env.WE_MET_FROM_DISPLAY_NAME,
     now,
     sinkHandlers: createLeadSinkHandlerRegistry({

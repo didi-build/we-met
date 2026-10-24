@@ -31,6 +31,8 @@ export type CardEmailSnapshot = {
   photoKey: string | null;
   contact: CardContact;
   pageCopy: Pick<CardPageCopy, "emailFromName">;
+  /** Additive queue snapshot field (optional on legacy messages). */
+  ownerFirstName?: string;
 };
 
 export type ExchangeSuccessResponse = {

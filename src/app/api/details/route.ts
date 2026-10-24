@@ -51,12 +51,8 @@ export async function POST(request: Request) {
     case "invalid_token":
     case "card_not_found":
       return Response.json({ error: "invalid_token" }, { status: 401 });
-    case "lead_email_unavailable":
-      return Response.json({ error: "lead_email_unavailable" }, { status: 503 });
     case "details_already_sent":
       return Response.json({ error: "details-already-sent" }, { status: 409 });
-    case "server_error":
-      return Response.json({ error: "server_error" }, { status: 500 });
     default:
       return Response.json({ error: "server_error" }, { status: 500 });
   }

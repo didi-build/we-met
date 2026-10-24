@@ -14,7 +14,7 @@ import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { HiExchangeFailureMessage } from "./HiExchangeFailureMessage";
 import type { HiExchangeOwnerContact } from "./hi-exchange-api";
-import { postHiDetails, postHiExchange } from "./hi-exchange-api";
+import { postHiDetails, postHiDetailsDismiss, postHiExchange } from "./hi-exchange-api";
 import { prefersReducedMotion, runSheetCloseAnimation } from "./hi-sheet-motion";
 import { useFocusTrap } from "./useFocusTrap";
 
@@ -225,6 +225,13 @@ export function HiExchangeSheet({
     };
   }, []);
 
+  const finalizeDetailsIfNeeded = useCallback(async () => {
+    if (step !== "details" || !token || detailsSaved || detailsPending) {
+      return;
+    }
+    await postHiDetailsDismiss(token);
+  }, [detailsPending, detailsSaved, step, token]);
+
   const animateClose = useCallback(
     (options?: { dy?: number; velocity?: number }) => {
       if (closing) {
@@ -236,7 +243,7 @@ export function HiExchangeSheet({
         return;
       }
       if (prefersReducedMotion()) {
-        onClose();
+        void finalizeDetailsIfNeeded().finally(() => onClose());
         return;
       }
 
@@ -252,11 +259,11 @@ export function HiExchangeSheet({
         velocity: options?.velocity,
         onComplete: () => {
           closeAnimationCleanupRef.current = null;
-          onClose();
+          void finalizeDetailsIfNeeded().finally(() => onClose());
         },
       });
     },
-    [closing, onClose],
+    [closing, finalizeDetailsIfNeeded, onClose],
   );
 
   useEffect(() => {
