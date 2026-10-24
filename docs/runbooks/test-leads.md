@@ -20,18 +20,77 @@ If any signal is missing on an issue you believe came from non-prod, treat it as
 2. Confirm the description includes a non-prod `WE_MET_ENV`.
 3. Archive or delete test issues after the test session. Do not merge test leads into production reporting.
 
-## Deliberate end-to-end email test (step 1)
+## Deliberate end-to-end email test (exchange + follow-up consumer)
 
-Use this after changing the mail or consumer path:
+Use this after changing the mail or consumer path. Default non-prod **`visitor_email_mode`** is **`owner_relay`** (no visitor follow-up email). See [kill-switch-and-caps](./kill-switch-and-caps.md) to flip modes.
+
+### Shared steps
 
 1. Open a **PR preview** (non-prod bindings only). Local dev with remote queue is acceptable for narrower checks.
-2. Submit the exchange form with obvious fake contact details.
+2. Submit the exchange form with obvious fake contact details (`@example.com` only in automated tests; use a disposable address you control for manual runs).
    - **Local:** Turnstile uses Cloudflare’s always-pass **test key pair** (widget auto-passes).
    - **Preview:** complete the **real** Turnstile challenge (widget **we-met nonprod**).
-3. Confirm exchange returns **200** and a non-empty signed token; optional details step returns **200**.
-4. Confirm jobs on **`we-met-followup-email-nonprod`**.
-5. Check **`WE_MET_TEST_MAIL_TO`** for redirected **visitor** follow-up mail and **email** sink owner notifications (subject/body label the sink destination in non-prod). **Visitor** follow-up uses `{Google first name} via We Met` when the owner’s Google first name passes validation (example: `Diadem via We Met`); otherwise it falls back to secret **`WE_MET_FROM_DISPLAY_NAME`**. **Owner** sink mail always uses **`WE_MET_FROM_DISPLAY_NAME`** (example: `Diadem at We Met`). Mail should arrive **From** `hello@mail.we-met.link` (secret **`WE_MET_EMAIL_FROM_CLOUDFLARE`**). Owner **record** then **append** should thread in the mailbox using Cloudflare-generated `Message-ID` values (check ledger `external_ref` for `{ "provider": "cloudflare", "messageId": "..." }`).
+3. Confirm `POST /api/exchange` returns **200** and a non-empty signed details token.
+4. Confirm jobs on **`we-met-followup-email-nonprod`** (owner email messages and, in direct mode, visitor follow-up).
+5. Mail should arrive **From** `hello@mail.we-met.link` (secret **`WE_MET_EMAIL_FROM_CLOUDFLARE`**). Non-prod delivery is redirected to **`WE_MET_TEST_MAIL_TO`**; subjects prefix the real sink destination as `[we-met test → owner@example.com]`.
 6. No Linear verification until the Linear sink kind ships.
+
+### Owner relay mode (default)
+
+**When:** `visitor_email_mode` is missing or `owner_relay` (see [0027](../decisions/0027-owner-relay-visitor-follow-up.md)).
+
+1. After exchange, optional details: submit, skip/close (dismiss), or leave the sheet and wait for the **10-minute** fallback.
+2. In **`WE_MET_TEST_MAIL_TO`**, expect **exactly one** owner email per exchange (not two threaded messages).
+   - Subject: `You met {visitor name}` (with the non-prod prefix above).
+   - **Reply-To:** the visitor address (also redirected to the test inbox in non-prod).
+   - Body: owner relay template (`Hit Reply to write back`); optional phone, job title, company, and note rows only when provided (no dash placeholders).
+   - **No** `Re:` details email, **no** `In-Reply-To` / `References` threading headers.
+3. Expect **no** visitor follow-up email in this mode.
+4. Token-gated vCard: on the receipt, use **Save contact** (`POST /api/exchange/vcard`) and confirm a `.vcf` with the owner’s account email and card fields.
+
+### Direct visitor follow-up mode
+
+**When:** `visitor_email_mode` is exact lowercase **`direct`**.
+
+1. Same exchange and optional-details flow as above.
+2. In **`WE_MET_TEST_MAIL_TO`**, expect **one** owner email (subject `New lead added: {visitor name}`, same Reply-To and no threading rules as owner relay) **and** one visitor follow-up to the visitor address (redirected to the test inbox in non-prod).
+3. Visitor mail includes a **`.vcf`** attachment of the owner card. **From** display name is `{Google first name} via We Met` when valid, else **`WE_MET_FROM_DISPLAY_NAME`**.
+4. Owner mail uses **`WE_MET_FROM_DISPLAY_NAME`** (example: `Diadem at We Met`).
+
+### Flip `visitor_email_mode` per environment (operators only)
+
+Run against the target D1 (never production from a laptop without the production runbook). Commands are documented here; **do not** run them as part of routine CI.
+
+**Non-prod** (`we-met-db-nonprod`):
+
+```bash
+npx wrangler d1 execute we-met-db-nonprod --remote --command \
+  "INSERT INTO app_settings (key, value) VALUES ('visitor_email_mode', 'direct') ON CONFLICT(key) DO UPDATE SET value = excluded.value;"
+```
+
+Return to owner relay:
+
+```bash
+npx wrangler d1 execute we-met-db-nonprod --remote --command \
+  "INSERT INTO app_settings (key, value) VALUES ('visitor_email_mode', 'owner_relay') ON CONFLICT(key) DO UPDATE SET value = excluded.value;"
+```
+
+**Production** uses the same SQL against the production D1 binding; requires production environment approval per [deploy](./deploy.md).
+
+Read back:
+
+```sql
+SELECT key, value FROM app_settings WHERE key = 'visitor_email_mode';
+```
+
+### When to switch back to owner relay
+
+Keep **`owner_relay`** in production until deliverability gates pass ([DIDI-656](https://linear.app/didi-build/issue/DIDI-656), [DIDI-661](https://linear.app/didi-build/issue/DIDI-661)):
+
+- **Decision gate ([DIDI-656](https://linear.app/didi-build/issue/DIDI-656)):** at least **80% Inbox** on fresh Gmail seed mailboxes for both visitor and owner mail before pointing real traffic at the new card (for example `didi.build/hi` redirect). Below that, stay on owner relay or execute the documented fallback (hybrid provider, alternate ESP, or Gmail-only).
+- **Warm-up ([DIDI-661](https://linear.app/didi-build/issue/DIDI-661)):** prefer steady real exchanges with replies; weekly placement logs on control mailboxes.
+
+After a non-prod manual run, record folder placement (Inbox, Spam, Promotions) and comment on [DIDI-739](https://linear.app/didi-build/issue/DIDI-739).
 
 ## Deliberate end-to-end test (with Linear sink, step 2+)
 
