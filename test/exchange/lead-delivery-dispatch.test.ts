@@ -161,7 +161,7 @@ describe("lead delivery dispatch (unit)", () => {
   it("dispatchDetailsAppend reports inserted, already_exists, and failed outcomes", async () => {
     const deps = createDispatchDeps();
     const sinks = [sink("sink-a", "a@example.com")];
-    const details = { jobTitle: null, company: null, note: null };
+    const details = { phone: null, jobTitle: null, company: null, note: null };
     const appendLead = { leadId: lead.leadId, name: lead.name, email: lead.email };
     const submittedAt = NOW.toISOString();
 
@@ -214,7 +214,7 @@ describe("lead delivery dispatch (unit)", () => {
   it("details double submit enqueues append once per sink", async () => {
     const deps = createDispatchDeps();
     const sinks = [sink("sink-a", "a@example.com")];
-    const details = { jobTitle: "CTO", company: "Co", note: "Hi" };
+    const details = { phone: null, jobTitle: "CTO", company: "Co", note: "Hi" };
 
     const appendLead = { leadId: lead.leadId, name: lead.name, email: lead.email };
     const submittedAt = NOW.toISOString();
@@ -246,7 +246,7 @@ describe("lead delivery dispatch (unit)", () => {
   it("does not re-enqueue append after enqueue_failed left a row", async () => {
     const deps = createDispatchDeps({ failingSinkIds: new Set(["sink-a"]) });
     const sinks = [sink("sink-a", "a@example.com")];
-    const details = { jobTitle: null, company: null, note: null };
+    const details = { phone: null, jobTitle: null, company: null, note: null };
 
     const appendLead = { leadId: lead.leadId, name: lead.name, email: lead.email };
     const submittedAt = NOW.toISOString();

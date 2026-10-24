@@ -4,12 +4,12 @@ export type ValidatedExchangeInput = {
   slug: string;
   name: string;
   email: string;
-  phone: string | null;
   turnstileToken: string;
 };
 
 export type ValidatedDetailsInput = {
   token: string;
+  phone: string | null;
   jobTitle: string | null;
   company: string | null;
   note: string | null;
@@ -146,18 +146,10 @@ export function parseExchangeBody(body: unknown): ParseExchangeBodyResult {
     return { ok: false };
   }
 
-  const phoneRaw = readOptionalNullableString(body, "phone", LIMITS.phone);
-  if (phoneRaw === undefined) {
-    return { ok: false };
-  }
-
   if (hasForbiddenSingleLineControlChars(slug)) {
     return { ok: false };
   }
   if (hasForbiddenSingleLineControlChars(name)) {
-    return { ok: false };
-  }
-  if (phoneRaw !== null && hasForbiddenSingleLineControlChars(phoneRaw)) {
     return { ok: false };
   }
 
@@ -167,7 +159,6 @@ export function parseExchangeBody(body: unknown): ParseExchangeBodyResult {
       slug,
       name,
       email: emailRaw.toLowerCase(),
-      phone: phoneRaw,
       turnstileToken,
     },
   };
@@ -185,13 +176,22 @@ export function parseDetailsBody(
     return { ok: false };
   }
 
+  const phoneRaw = readOptionalNullableString(body, "phone", LIMITS.phone);
   const jobTitle = readOptionalNullableString(body, "jobTitle", LIMITS.jobTitle);
   const company = readOptionalNullableString(body, "company", LIMITS.company);
   const note = readOptionalNullableString(body, "note", LIMITS.note);
-  if (jobTitle === undefined || company === undefined || note === undefined) {
+  if (
+    phoneRaw === undefined ||
+    jobTitle === undefined ||
+    company === undefined ||
+    note === undefined
+  ) {
     return { ok: false };
   }
 
+  if (phoneRaw !== null && hasForbiddenSingleLineControlChars(phoneRaw)) {
+    return { ok: false };
+  }
   if (jobTitle !== null && hasForbiddenSingleLineControlChars(jobTitle)) {
     return { ok: false };
   }
@@ -204,6 +204,6 @@ export function parseDetailsBody(
 
   return {
     ok: true,
-    value: { token, jobTitle, company, note },
+    value: { token, phone: phoneRaw, jobTitle, company, note },
   };
 }

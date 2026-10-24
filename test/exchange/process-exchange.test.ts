@@ -17,7 +17,6 @@ function baseInput(
     slug: "demo",
     name: "Test Visitor",
     email: "visitor@example.com",
-    phone: null,
     turnstileToken: "token",
     ...overrides,
   };

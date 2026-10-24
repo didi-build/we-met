@@ -53,6 +53,7 @@ describe("format owner lead email (unit)", () => {
     const content = buildOwnerLeadAppendEmail({
       name: "Sam",
       email: "sam@example.com",
+      phone: null,
       jobTitle: "Founder",
       company: null,
       note: null,
@@ -90,6 +91,7 @@ describe("format owner lead email (unit)", () => {
     const content = buildOwnerLeadAppendEmail({
       name: "Sam",
       email: "sam@example.com",
+      phone: null,
       jobTitle: null,
       company: null,
       note: `<unsafe> & "quotes"`,

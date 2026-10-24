@@ -64,25 +64,15 @@ describe("exchange validation (unit)", () => {
     expect(parsed.ok).toBe(false);
   });
 
-  it("accepts a formatted phone string within the server limit", () => {
-    const phone = `+1 ${"5".repeat(EXCHANGE_LIMITS.phone - 3)}`;
-    expect(phone.length).toBe(EXCHANGE_LIMITS.phone);
+  it("ignores phone on exchange step 1", () => {
     const parsed = parseExchangeBody({
       ...validExchange,
-      phone,
+      phone: "+1 555 0100",
     });
     expect(parsed.ok).toBe(true);
     if (parsed.ok && !("honeypot" in parsed)) {
-      expect(parsed.value.phone).toBe(phone);
+      expect(parsed.value).not.toHaveProperty("phone");
     }
-  });
-
-  it("rejects a formatted phone string over the server limit", () => {
-    const parsed = parseExchangeBody({
-      ...validExchange,
-      phone: `+1 ${"5".repeat(EXCHANGE_LIMITS.phone - 2)}`,
-    });
-    expect(parsed.ok).toBe(false);
   });
 
   describe("website honeypot", () => {
@@ -133,14 +123,6 @@ describe("exchange validation (unit)", () => {
       const parsed = parseExchangeBody({
         ...validExchange,
         slug: "dem\u0000o",
-      });
-      expect(parsed.ok).toBe(false);
-    });
-
-    it("rejects control chars in phone", () => {
-      const parsed = parseExchangeBody({
-        ...validExchange,
-        phone: "+1\u007f555",
       });
       expect(parsed.ok).toBe(false);
     });
@@ -198,5 +180,46 @@ describe("exchange validation (unit)", () => {
       note: null,
     });
     expect(parsed.ok).toBe(true);
+    if (parsed.ok) {
+      expect(parsed.value.phone).toBe(null);
+    }
+  });
+
+  it("accepts a formatted phone string in details within the server limit", () => {
+    const phone = `+1 ${"5".repeat(EXCHANGE_LIMITS.phone - 3)}`;
+    expect(phone.length).toBe(EXCHANGE_LIMITS.phone);
+    const parsed = parseDetailsBody({
+      token: "abc",
+      phone,
+      jobTitle: null,
+      company: null,
+      note: null,
+    });
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok) {
+      expect(parsed.value.phone).toBe(phone);
+    }
+  });
+
+  it("rejects a formatted phone string in details over the server limit", () => {
+    const parsed = parseDetailsBody({
+      token: "abc",
+      phone: `+1 ${"5".repeat(EXCHANGE_LIMITS.phone - 2)}`,
+      jobTitle: null,
+      company: null,
+      note: null,
+    });
+    expect(parsed.ok).toBe(false);
+  });
+
+  it("rejects control chars in details phone", () => {
+    const parsed = parseDetailsBody({
+      token: "abc",
+      phone: "+1\u007f555",
+      jobTitle: null,
+      company: null,
+      note: null,
+    });
+    expect(parsed.ok).toBe(false);
   });
 });

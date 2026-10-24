@@ -164,7 +164,6 @@ describe("card editor full flow (integration)", () => {
           slug: "flow-card",
           name: "Visitor",
           email: "visitor@example.com",
-          phone: null,
           turnstileToken: "tok",
         },
         record!,

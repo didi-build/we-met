@@ -108,7 +108,6 @@ describe("exchange and details abuse controls (D1 integration)", () => {
           slug: card.slug,
           name: "Visitor",
           email: "visitor@example.com",
-          phone: null,
           turnstileToken: "tok",
         },
         card,
@@ -171,7 +170,6 @@ describe("exchange and details abuse controls (D1 integration)", () => {
           slug: card.slug,
           name: "Visitor",
           email: "visitor@example.com",
-          phone: null,
           turnstileToken: "tok",
         },
         card,
@@ -192,7 +190,7 @@ describe("exchange and details abuse controls (D1 integration)", () => {
         Math.floor(new Date("2026-10-16T12:00:00.000Z").getTime() / 1000),
       );
       const details = await processDetails(
-        { token, jobTitle: "CTO", company: "Co", note: "Hi" },
+        { token, phone: null, jobTitle: "CTO", company: "Co", note: "Hi" },
         card,
         sinks,
         {
@@ -239,7 +237,6 @@ describe("exchange and details abuse controls (D1 integration)", () => {
           slug: card.slug,
           name: "Visitor",
           email: "visitor@example.com",
-          phone: null,
           turnstileToken: "tok",
         },
         card,
@@ -292,7 +289,6 @@ describe("exchange and details abuse controls (D1 integration)", () => {
           slug: card.slug,
           name: "Visitor",
           email: "visitor@example.com",
-          phone: null,
           turnstileToken: "tok",
         },
         card,
@@ -349,7 +345,6 @@ describe("exchange and details abuse controls (D1 integration)", () => {
           slug: card.slug,
           name: "Visitor",
           email: "visitor@example.com",
-          phone: null,
           turnstileToken: "tok",
         },
         card,
@@ -372,7 +367,7 @@ describe("exchange and details abuse controls (D1 integration)", () => {
         Math.floor(new Date("2026-10-16T12:00:00.000Z").getTime() / 1000),
       );
       const details = await processDetails(
-        { token, jobTitle: "CTO", company: "Co", note: "Hi" },
+        { token, phone: null, jobTitle: "CTO", company: "Co", note: "Hi" },
         card,
         sinks,
         {
@@ -462,7 +457,6 @@ describe("exchange and details abuse controls (D1 integration)", () => {
           slug: card.slug,
           name: "Visitor",
           email: "visitor@example.com",
-          phone: null,
           turnstileToken: "tok",
         },
         card,
@@ -476,7 +470,6 @@ describe("exchange and details abuse controls (D1 integration)", () => {
           slug: card.slug,
           name: "Visitor Two",
           email: "visitor2@example.com",
-          phone: null,
           turnstileToken: "tok",
         },
         card,
@@ -561,7 +554,6 @@ describe("exchange and details abuse controls (D1 integration)", () => {
           slug: card.slug,
           name: "Visitor",
           email: "visitor@example.com",
-          phone: null,
           turnstileToken: "tok",
         },
         card,
@@ -575,7 +567,6 @@ describe("exchange and details abuse controls (D1 integration)", () => {
           slug: card.slug,
           name: "Visitor Two",
           email: "visitor2@example.com",
-          phone: null,
           turnstileToken: "tok",
         },
         card,
@@ -646,13 +637,13 @@ describe("exchange and details abuse controls (D1 integration)", () => {
         assertLeadEmailCapacity: deps.assertLeadEmailCapacity,
       };
       const first = await processDetails(
-        { token, jobTitle: "CTO", company: "Co", note: "Hi" },
+        { token, phone: null, jobTitle: "CTO", company: "Co", note: "Hi" },
         card,
         sinks,
         detailsDeps,
       );
       const second = await processDetails(
-        { token, jobTitle: "CTO", company: "Co", note: "Hi again" },
+        { token, phone: null, jobTitle: "CTO", company: "Co", note: "Hi again" },
         card,
         sinks,
         detailsDeps,
@@ -687,7 +678,6 @@ describe("exchange and details abuse controls (D1 integration)", () => {
           slug: card.slug,
           name: "Visitor",
           email: "visitor@example.com",
-          phone: null,
           turnstileToken: "tok",
         },
         card,

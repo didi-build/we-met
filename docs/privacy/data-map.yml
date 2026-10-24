@@ -785,7 +785,8 @@ other_items:
     verified: true
   - id: email.owner_lead_append
     whose: visitor
-    data: Email append to owner thread with visitor job title, company, note
+    data: Email append to owner thread with optional visitor phone, job title,
+      company, note
     purpose: complete lead details to owner
     storage: same as email.owner_lead_record
     processors:
@@ -797,8 +798,9 @@ other_items:
     verified: false
   - id: email.owner_lead_record
     whose: visitor
-    data: Email to card owner with visitor name, email, phone from exchange;
-      Reply-To is visitor email (owner relay default; ADR 0027)
+    data: Email to card owner with visitor name and email from exchange (phone
+      null until details step); Reply-To is visitor email (owner relay default;
+      ADR 0027)
     purpose: notify owner of new lead so they can follow up from their inbox
     storage: Card owner inbox; sent via Cloudflare Email Service (follow-up consumer
       send_email binding)
@@ -904,8 +906,8 @@ other_items:
   - id: queue.lead_sink_append_details
     binding: WE_MET_FOLLOWUP_EMAIL_QUEUE
     whose: visitor
-    data: Visitor lead identifiers plus job title, company, note in
-      lead_sink_append_details message
+    data: Visitor lead identifiers plus optional phone, job title, company, note
+      in lead_sink_append_details message
     purpose: owner lead email append after details step
     storage: Cloudflare Queue
     processors:
@@ -917,8 +919,8 @@ other_items:
   - id: queue.lead_sink_record
     binding: WE_MET_FOLLOWUP_EMAIL_QUEUE
     whose: visitor
-    data: Visitor lead (name, email, phone) in lead_sink_record message plus sink
-      config and card metadata
+    data: Visitor lead (name, email; phone null on exchange after DIDI-751) in
+      lead_sink_record message plus sink config and card metadata
     purpose: owner lead email (initial record)
     storage: Cloudflare Queue
     processors:

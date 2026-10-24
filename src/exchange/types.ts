@@ -11,6 +11,7 @@ export type VisitorLead = {
 };
 
 export type VisitorLeadDetails = {
+  phone: string | null;
   jobTitle: string | null;
   company: string | null;
   note: string | null;
