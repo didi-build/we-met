@@ -1,0 +1,151 @@
+/* DIDI-741 (rescoped Oct 22, 2026 from Diadem's Gmail screenshots).
+   1. Visitor email (visitor-followup): keep the current email; only move the "Get your own card" banner toward the bottom.
+   2. Owner email (CTO decision, Oct 22, 2026): owner-new-lead and the threaded owner-details-update are retired and replaced by ONE
+      owner relay email per exchange (owner-relay), no threading, Reply-To the visitor. Optional rows (phone, job title, company, note)
+      are left out entirely when empty.
+   Templates are generated from the repo's design/emails by build741.mjs (see templates.ts). */
+
+import { TEMPLATES, LOGO_DATA_URI } from "./templates";
+
+export type VisitorVariant = "baseline" | "a" | "b" | "c";
+export type DetailsVariant = "baseline" | "updated";
+export type OwnerVariant = "baseline" | "full" | "minimal";
+
+const AVATAR =
+  "data:image/svg+xml;utf8," +
+  encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e9d9c8"/><stop offset="1" stop-color="#c9b29b"/></linearGradient></defs><rect width="96" height="96" fill="url(#g)"/><circle cx="48" cy="38" r="17" fill="#6b5545"/><path d="M14 96c4-20 18-30 34-30s30 10 34 30z" fill="#3b3b3b"/></svg>`,
+  );
+
+export const DATA = {
+  visitorFirst: "Sam",
+  visitorName: "Sam Rivera",
+  visitorEmail: "sam.rivera@gmail.com",
+  visitorPhone: "+1 416 555 0142",
+  visitorPhoneTel: "+14165550142",
+  jobTitle: "Product manager",
+  company: "Harbour Labs",
+  note: "We met at the design meetup",
+  ownerName: "Maya Chen",
+  ownerFirst: "Maya",
+  ownerRole: "Product designer at Northwind Studio",
+  ownerEmail: "maya@northwind.studio",
+  cardUrl: "https://we-met.link/hi/maya",
+  cardUrlDisplay: "we-met.link/hi/maya",
+  sender: "hello@mail.we-met.link",
+  ownerSenderName: "Diadem at We Met", // WE_MET_FROM_DISPLAY_NAME (platform secret), as in the screenshot
+  testSink: "test-sink@didi.build",
+  vcfName: "Maya-Chen.vcf",
+};
+
+export const VISITOR = {
+  subject: `Great meeting you, ${DATA.visitorFirst}`,
+  fromDisplay: `${DATA.ownerFirst} via We Met`,
+  from: `${DATA.ownerFirst} via We Met <${DATA.sender}>`,
+  replyTo: `${DATA.ownerName} <${DATA.ownerEmail}>`,
+  to: `${DATA.visitorName} <${DATA.visitorEmail}>`,
+};
+/** Owner email From: WE_MET_FROM_DISPLAY_NAME (resolveFromDisplayName in src/email/from-display-name.ts), Reply-To the visitor. */
+export const OWNER_BASELINE = {
+  subject: `New lead added: ${DATA.visitorName}`,
+  fromDisplay: DATA.ownerSenderName,
+  from: `${DATA.ownerSenderName} <${DATA.sender}>`,
+  replyTo: `${DATA.visitorName} <${DATA.visitorEmail}>`,
+  to: `${DATA.ownerName} <${DATA.ownerEmail}>`,
+};
+/** Relay subject chosen by Diadem (Oct 22, 2026): "You met {visitor_full_name}". Non-prod keeps the [we-met test → sink] prefix. */
+export const OWNER_RELAY = { ...OWNER_BASELINE, subject: `You met ${DATA.visitorName}` };
+export const DETAILS = {
+  subject: `Re: New lead added: ${DATA.visitorName}`,
+  fromDisplay: DATA.ownerSenderName,
+  from: `${DATA.ownerSenderName} <${DATA.sender}>`,
+  replyTo: `${DATA.visitorName} <${DATA.visitorEmail}>`,
+  to: `${DATA.ownerName} <${DATA.ownerEmail}>`,
+};
+
+const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+/** Minimal handlebars: {{#if x}}..{{else}}..{{/if}} (non-nested) and {{var}}. */
+export function fill(tpl: string, vars: Record<string, string | undefined>, html = true): string {
+  const out = tpl.replace(/\{\{#if (\w+)\}\}([\s\S]*?)\{\{\/if\}\}/g, (_m, k: string, body: string) => {
+    const [yes, no = ""] = body.split("{{else}}");
+    return vars[k] ? yes : no;
+  });
+  return out.replace(/\{\{(\w+)\}\}/g, (_m, k: string) => {
+    const v = vars[k] ?? "";
+    return html && !k.endsWith("_url") ? esc(v) : v;
+  });
+}
+
+function visitorVars(test: boolean) {
+  return {
+    visitor_first_name: DATA.visitorFirst,
+    owner_name: DATA.ownerName,
+    owner_role: DATA.ownerRole,
+    owner_photo_url: AVATAR,
+    card_url: DATA.cardUrl,
+    card_url_display: DATA.cardUrlDisplay,
+    logo_url: LOGO_DATA_URI,
+    test_sink: test ? DATA.testSink : undefined,
+  };
+}
+function detailsVars(test: boolean) {
+  return {
+    lead_name: DATA.visitorName,
+    lead_first_name: DATA.visitorFirst,
+    lead_email: DATA.visitorEmail,
+    lead_phone: DATA.visitorPhone,
+    lead_phone_tel: DATA.visitorPhoneTel,
+    job_title: DATA.jobTitle,
+    company: DATA.company,
+    note: DATA.note,
+    test_sink: test ? DATA.testSink : undefined,
+  };
+}
+
+function ownerVars(test: boolean, full: boolean) {
+  return {
+    lead_name: DATA.visitorName,
+    lead_first_name: DATA.visitorFirst,
+    lead_email: DATA.visitorEmail,
+    lead_phone: full ? DATA.visitorPhone : undefined,
+    lead_phone_tel: full ? DATA.visitorPhoneTel : undefined,
+    job_title: full ? DATA.jobTitle : undefined,
+    company: full ? DATA.company : undefined,
+    note: full ? DATA.note : undefined,
+    card_url: DATA.cardUrl,
+    card_url_display: DATA.cardUrlDisplay,
+    received_at: "Oct 22, 2026, 9:41 p.m. (America/Toronto)",
+    test_sink: test ? DATA.testSink : undefined,
+  };
+}
+
+const darkify = (html: string, dark: boolean) =>
+  dark ? html.replace("@media (prefers-color-scheme:dark){", "@media all{") : html;
+
+export function renderVisitor(v: VisitorVariant, o: { test?: boolean; dark?: boolean } = {}): string {
+  return darkify(fill(TEMPLATES[`visitor-followup.${v}.html`], visitorVars(!!o.test)), !!o.dark);
+}
+export function renderVisitorText(v: VisitorVariant, test = false): string {
+  return fill(TEMPLATES[`visitor-followup.${v}.txt`], visitorVars(test), false);
+}
+export function renderDetails(v: DetailsVariant, o: { test?: boolean; dark?: boolean } = {}): string {
+  return darkify(fill(TEMPLATES[`owner-details-update.${v}.html`], detailsVars(!!o.test)), !!o.dark);
+}
+export function renderDetailsText(v: DetailsVariant, test = false): string {
+  return fill(TEMPLATES[`owner-details-update.${v}.txt`], detailsVars(test), false);
+}
+export function subjectFor(subject: string, test: boolean, to: string): string {
+  return test ? `[we-met test → ${to}] ${subject}` : subject;
+}
+
+export function renderOwner(v: OwnerVariant, o: { test?: boolean; dark?: boolean } = {}): string {
+  const tpl = v === "baseline" ? TEMPLATES["owner-new-lead.baseline.html"] : TEMPLATES["owner-relay.html"];
+  // Baseline = today's New lead email, as sent today (phone is still on today's exchange form).
+  const vars = ownerVars(!!o.test, v !== "minimal");
+  return darkify(fill(tpl, vars), !!o.dark);
+}
+export function renderOwnerText(v: OwnerVariant, test = false): string {
+  const tpl = v === "baseline" ? TEMPLATES["owner-new-lead.baseline.txt"] : TEMPLATES["owner-relay.txt"];
+  return fill(tpl, ownerVars(test, v !== "minimal"), false);
+}

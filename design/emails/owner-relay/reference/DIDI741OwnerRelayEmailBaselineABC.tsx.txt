@@ -1,0 +1,2 @@
+import Didi741 from "./Didi741";
+export const DIDI741OwnerRelayEmailBaselineABC = () => <Didi741 />;
