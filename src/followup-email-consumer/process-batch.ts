@@ -99,6 +99,7 @@ export type FollowupConsumerDeps = {
   logExchangeVisitorLetterRowMissing(leadId: string): void;
   logExchangeVisitorLetterConfirmFailed(leadId: string): void;
   logExchangeVisitorLetterContentionExhausted(leadId: string): void;
+  logExchangeVisitorLetterSkippedPriorSend(leadId: string): void;
   logUnsupportedType(typeLabel: string): void;
   logMissingPhoto(key: string): void;
   logNonJpegPhoto(key: string): void;
@@ -207,6 +208,9 @@ export function createFollowupConsumerDepsFromEnv(
     },
     logExchangeVisitorLetterContentionExhausted(leadId) {
       console.error("exchange_visitor_letter_contention_exhausted", { leadId });
+    },
+    logExchangeVisitorLetterSkippedPriorSend(leadId) {
+      console.error("exchange_visitor_letter_skipped_prior_send", { leadId });
     },
     logExchangeOwnerEmailContentionExhausted(leadId) {
       console.error("exchange_owner_email_contention_exhausted", { leadId });
@@ -389,6 +393,11 @@ async function processQueueMessage(
   const now = deps.now();
   if (visitorLetterMessageIsFallback(parsed)) {
     const sendState = await deps.exchangeOwnerEmail.getSendState(parsed.lead.leadId);
+    if (sendState?.visitorLetterSentAt) {
+      deps.logExchangeVisitorLetterSkippedPriorSend(parsed.lead.leadId);
+      message.ack();
+      return;
+    }
     if (
       sendState &&
       shouldDeferExchangeEmailForTrigger("visitor_letter", sendState, now)

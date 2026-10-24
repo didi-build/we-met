@@ -44,3 +44,13 @@ INSERT INTO app_settings (key, value) VALUES ('visitor_email_mode', 'owner_relay
 ```
 
 Or delete the row; missing key defaults to `owner_relay`.
+
+## Migration 0009 rollout and rollback (DIDI-820)
+
+**Migration:** `0009_exchange_owner_email_visitor_letter.sql` adds `visitor_letter_claimed_at` and `visitor_letter_sent_at` on `exchange_owner_email`. Apply on non-prod before consumer deploy; production requires privileged-change review and manual migrate apply ([0011](./0011-d1-migrations.md)).
+
+**Rollout order:** apply migration 0009, deploy the follow-up consumer (letter claims and `visitor_letter_sent_at`), then deploy the app Worker (enqueues `visitor_letter_due` and immediate `visitor_followup` on finalize). Production `visitor_email_mode` is not set in Wrangler; absent `app_settings` rows default to **`owner_relay`** via `visitorEmailModeFromSettingValue` in `src/app-settings/defaults.ts`.
+
+**Code rollback (app or consumer):** redeploy the previous Worker build. Pending queue messages of type `visitor_letter_due` are not produced by the rolled-back app and will be acked or retried by the rolled-back consumer until they expire; operators may purge the queue if needed. Rows in `exchange_owner_email` keep the new columns (harmless when old code ignores them).
+
+**Deploy-window note (direct mode):** pre-DIDI-820 direct exchanges enqueued `visitor_followup` on exchange without writing `visitor_letter_sent_at`. A finalize after deploy can enqueue a second `visitor_followup` until the new consumer has recorded `visitor_letter_sent_at` on the first delivery. Post-820, `visitor_letter_due` acks without send when `visitor_letter_sent_at` is already set (`exchange_visitor_letter_skipped_prior_send`). There is no durable legacy marker for letters already sent by the old consumer without that column; see PR discussion for operator mitigation.

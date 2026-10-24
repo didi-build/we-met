@@ -2,7 +2,7 @@
 
 ## Purpose
 
-**We Met** hosts digital exchange-contact cards: a visitor opens a card URL, shares their details, and the owner receives the details they share by email (Reply-To the visitor). Visitor follow-up email is optional (`visitor_email_mode=direct`; default **owner relay** skips it; [0027](../decisions/0027-owner-relay-visitor-follow-up.md)). The MVP adds Google sign-in, a card editor on the app host, and per-account published cards on `/hi/<slug>` ([0025](../decisions/0025-we-met-mvp-accounts-sign-in-and-app-backend.md)).
+**We Met** hosts digital exchange-contact cards: a visitor opens a card URL, shares their details, and the owner receives lead notification email (Reply-To the visitor). Each exchange also sends a **visitor letter** (vCard) in both `visitor_email_mode` values; the setting only changes who receives that letter ([0027](../decisions/0027-owner-relay-visitor-follow-up.md)). Default **`owner_relay`** delivers the letter to the owner (Reply-To the visitor); **`direct`** delivers it to the visitor (Reply-To the owner). The MVP adds Google sign-in, a card editor on the app host, and per-account published cards on `/hi/<slug>` ([0025](../decisions/0025-we-met-mvp-accounts-sign-in-and-app-backend.md)).
 
 ## Boundaries
 
@@ -45,7 +45,7 @@ Agents should extend behavior only through these interfaces, not ad hoc fetches 
 | `/api/auth/*`          | App (+ local)   | Google sign-in, preview test login, logout ([0025](../decisions/0025-we-met-mvp-accounts-sign-in-and-app-backend.md)). |
 | `/api/app/*`           | App (+ local)   | Session, draft, publish, slug check, photo ([app-api-contract](./app-api-contract.md)).                                |
 
-**Legacy mapping:** `didi.build/hi` → `/hi/didi`. **`didi.build` is not redirected.** Owner vCard is available after exchange via token-gated `POST /api/exchange/vcard` in both `visitor_email_mode` values and may be attached in optional visitor follow-up email when `visitor_email_mode` is `direct` (no public `/hi/<slug>/contact.vcf`; [DIDI-641](https://linear.app/didi-build/issue/DIDI-641), [0027](../decisions/0027-owner-relay-visitor-follow-up.md)). Slug rules: [0003](../decisions/0003-urls-and-lookup.md). Exchange API: [0008](../decisions/0008-api-routes-exchange-and-details.md).
+**Legacy mapping:** `didi.build/hi` → `/hi/didi`. **`didi.build` is not redirected.** Owner vCard is available after exchange via token-gated `POST /api/exchange/vcard` in both `visitor_email_mode` values and is attached on the visitor letter in both modes (no public `/hi/<slug>/contact.vcf`; [DIDI-641](https://linear.app/didi-build/issue/DIDI-641), [0027](../decisions/0027-owner-relay-visitor-follow-up.md)). Slug rules: [0003](../decisions/0003-urls-and-lookup.md). Exchange API: [0008](../decisions/0008-api-routes-exchange-and-details.md).
 
 ## Theming
 
@@ -69,7 +69,7 @@ sequenceDiagram
   M->>M: Turnstile, honeypot, rate limit, app_settings caps
   M->>D: Dispatch enabled lead sinks
   D->>Q: One message per enabled sink
-  M->>Q: Enqueue visitor_followup only when visitor_email_mode is direct (default owner_relay; [0027](../decisions/0027-owner-relay-visitor-follow-up.md))
+  M->>Q: Enqueue visitor_letter_due (delayed) and owner_email_due per enabled sink ([0027](../decisions/0027-owner-relay-visitor-follow-up.md))
   M-->>V: 200 + signed token (2h TTL)
 
   V->>M: POST /api/details (token + fields)
@@ -77,10 +77,10 @@ sequenceDiagram
   M-->>V: 200, or 409 details-already-sent on repeat submit
 
   Q->>C: Deliver jobs (per-message retries)
-  C->>C: Email sink delivery; visitor follow-up only in direct mode
+  C->>C: Email sink delivery; visitor letter (immediate or fallback) in both modes
 ```
 
-The **follow-up email consumer** (`we-met-followup-email-consumer` or `-nonprod`) sends **`email`** lead sink deliveries always, and **visitor** follow-up mail only when `app_settings.visitor_email_mode` is **`direct`** (default **`owner_relay`** skips send; [0027](../decisions/0027-owner-relay-visitor-follow-up.md)). **Lead sink delivery** uses **one queue message per sink** so retries and failures are independent ([0018](../decisions/0018-lead-sink.md)). Queue payloads carry a card field snapshot ([0016](../decisions/0016-queue-message-snapshot.md)). A **live** card must have exactly one enabled email sink ([0025](../decisions/0025-we-met-mvp-accounts-sign-in-and-app-backend.md)).
+The **follow-up email consumer** (`we-met-followup-email-consumer` or `-nonprod`) sends **`email`** lead sink deliveries always, and the **visitor letter** in both modes (`visitor_email_mode` picks the letter recipient only; [0027](../decisions/0027-owner-relay-visitor-follow-up.md)). **Lead sink delivery** uses **one queue message per sink** so retries and failures are independent ([0018](../decisions/0018-lead-sink.md)). Queue payloads carry a card field snapshot ([0016](../decisions/0016-queue-message-snapshot.md)). A **live** card must have exactly one enabled email sink ([0025](../decisions/0025-we-met-mvp-accounts-sign-in-and-app-backend.md)).
 
 **Failure handling**
 
@@ -90,7 +90,7 @@ The **follow-up email consumer** (`we-met-followup-email-consumer` or `-nonprod`
 | Turnstile fails                               | **403**                                                                  |
 | Rate limited                                  | **429**                                                                  |
 | Kill switch off or daily cap exceeded         | **503** `lead_email_unavailable`; no ledger, enqueue, or counter bump    |
-| Visitor follow-up enqueue fails (direct mode) | **500**, generic message to client                                       |
+| Visitor letter enqueue fails on exchange      | **500**, generic message to client                                       |
 | Lead sink dispatch enqueue fails (one sink)   | **Does not** fail other sinks or the HTTP response; that message retries |
 | Lead sink delivery fails (consumer, one sink) | Retries for **that message only**; visitor email unaffected              |
 | Visitor email fails after max attempts        | Acknowledged; sink handlers may note delivery failure                    |

@@ -175,6 +175,7 @@ function createDeps(
     logExchangeVisitorLetterRowMissing: vi.fn(),
     logExchangeVisitorLetterConfirmFailed: vi.fn(),
     logExchangeVisitorLetterContentionExhausted: vi.fn(),
+    logExchangeVisitorLetterSkippedPriorSend: vi.fn(),
     logExchangeOwnerEmailContentionExhausted: vi.fn(),
     logUnsupportedType: vi.fn(),
     logMissingPhoto: vi.fn(),

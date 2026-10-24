@@ -18,6 +18,7 @@ const pausedConsumerExtras = {
   logExchangeVisitorLetterRowMissing: vi.fn(),
   logExchangeVisitorLetterConfirmFailed: vi.fn(),
   logExchangeVisitorLetterContentionExhausted: vi.fn(),
+  logExchangeVisitorLetterSkippedPriorSend: vi.fn(),
 };
 
 function createMessage(body: unknown): FollowupQueueMessage {

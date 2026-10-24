@@ -6,17 +6,16 @@ Design-only spec. Approved MagicPath: [smart-light-1323](https://designs.magicpa
 
 Send the visitor letter after exchange with the owner's vCard attached. **Variant B** is approved: only the promotional banner changes; letter copy, signature block, headers, and attachment behavior stay the same.
 
-## Recipients (locked)
+## Recipients and headers (locked)
 
-| `visitor_email_mode` | **To** | **Reply-To** |
-| --- | --- | --- |
-| `owner_relay` (default) | Card owner email | Visitor email |
-| `direct` | Visitor email | Card owner email |
+| `visitor_email_mode` | **To** | **Reply-To** | **From display name** |
+| --- | --- | --- | --- |
+| `owner_relay` (default) | Card owner email | Visitor email | Platform name from `WE_MET_FROM_DISPLAY_NAME` (consumer `fromDisplayName`) |
+| `direct` | Visitor email | Card owner email | `{owner first name} via We Met` when the first name passes validation, otherwise the same platform name |
 
 ## Unchanged (variant B)
 
 - Letter copy (greeting, body paragraphs, owner signature block).
-- **From:** `{first} via We Met` (visitor-facing display name from owner first name).
 - vCard attachment and footer disclaimer (`You're getting this because…`, `This is the only email…`).
 - Non-prod test sink line and subject prefix.
 
