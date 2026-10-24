@@ -44,8 +44,16 @@ describe("format owner relay email (unit)", () => {
       sourceUrl: "https://we-met.link/hi/demo",
     });
     expect(content.textPlain).not.toContain("Phone:");
+    expect(content.textPlain).not.toContain("Job title:");
+    expect(content.textPlain).not.toContain("Company:");
+    expect(content.textPlain).not.toContain("Note:");
     expect(content.textPlain).not.toMatch(/Phone:\s+-/);
+    expect(content.textPlain).not.toMatch(/Job title:\s+-/);
+    expect(content.textPlain).not.toMatch(/Company:\s+-/);
     expect(content.textHtml).not.toContain(">Phone</td>");
+    expect(content.textHtml).not.toContain(">Job title</td>");
+    expect(content.textHtml).not.toContain(">Company</td>");
+    expect(content.textHtml).not.toContain(">Note</td>");
 
     const full = buildOwnerRelayEmail({
       name: "Sam Rivera",
