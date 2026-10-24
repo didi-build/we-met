@@ -32,8 +32,7 @@ const hostConfig = {
   weMetEnv: "production",
 };
 
-// Interim until DIDI-820: single-owner-email and one cap slot per exchange match current main.
-// Locked Product direction on DIDI-739 (parent DIDI-820 changes to two emails and two cap slots).
+// Target: locked Product direction on DIDI-739, implemented by DIDI-820
 
 const ownerRelayModeCases: {
   label: string;
@@ -214,7 +213,7 @@ describe.each(ownerRelayModeCases)(
   },
 );
 
-// Interim until DIDI-820: duplicate-trigger tests assert a single owner send (DIDI-739 Product direction).
+// Interim behaviour per CTO decision on DIDI-749; changes in DIDI-820 (target: DIDI-739 Product direction)
 describe("relay exchange path (owner_relay: duplicate triggers, integration; interim until DIDI-820)", () => {
   it("interim until DIDI-820: delivers the same owner sink message twice (retry) and sends only once", async () => {
     await withIsolatedLocalD1(async (db) => {
@@ -305,7 +304,7 @@ describe("owner relay template optional rows (unit guard)", () => {
   });
 });
 
-// Interim until DIDI-820: direct mode uses new-lead owner template and one owner + one visitor send (DIDI-739).
+// Interim behaviour per CTO decision on DIDI-749; changes in DIDI-820 (target: DIDI-739 Product direction)
 describe("relay exchange path (direct visitor_email_mode, integration; interim until DIDI-820)", () => {
   it("interim until DIDI-820: sends visitor follow-up with vCard and one owner email without threading", async () => {
     await withIsolatedLocalD1(async (db) => {
