@@ -43,6 +43,25 @@ jobs: {}
     expect(triggers).toEqual(["pull_request"]);
   });
 
+  it("parses on: flow-map form", () => {
+    const triggers = parseWorkflowTriggerEvents(`name: X
+on: { pull_request: { types: [opened] }, workflow_dispatch: {} }
+jobs: {}
+`);
+    expect(triggers).toEqual(
+      expect.arrayContaining(["pull_request", "workflow_dispatch"]),
+    );
+    expect(workflowUsesPullRequestTrigger(triggers ?? [])).toBe(true);
+  });
+
+  it("returns null for unknown on: inline form", () => {
+    const triggers = parseWorkflowTriggerEvents(`name: X
+on: "*"
+jobs: {}
+`);
+    expect(triggers).toBeNull();
+  });
+
   it("does not treat pull_request_target as pull_request", () => {
     const triggers = parseWorkflowTriggerEvents(`name: X
 on:
@@ -115,6 +134,31 @@ jobs:
     rmSync(dir, { recursive: true, force: true });
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("bad-string.yml");
+  });
+
+  it("fails when provision workflow on: triggers cannot be parsed", () => {
+    const dir = mkdtempSync(join(tmpdir(), "wf-policy-"));
+    const workflows = join(dir, "workflows");
+    mkdirSync(workflows, { recursive: true });
+    writeFileSync(
+      join(workflows, "bad-unknown-on.yml"),
+      `name: Bad
+on: "*"
+jobs:
+  x:
+    steps:
+      - run: node scripts/provision-resources.mjs
+`,
+      "utf8",
+    );
+    const result = spawnSync("node", [SCRIPT], {
+      encoding: "utf8",
+      env: { ...process.env, WE_MET_WORKFLOW_POLICY_ROOT: workflows },
+    });
+    rmSync(dir, { recursive: true, force: true });
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("bad-unknown-on.yml");
+    expect(result.stderr).toContain("could not be parsed");
   });
 
   it("fails when provision runs on pull_request inline list on form", () => {
