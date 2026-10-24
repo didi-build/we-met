@@ -32,6 +32,9 @@ const hostConfig = {
   weMetEnv: "production",
 };
 
+// Interim until DIDI-820: single-owner-email and one cap slot per exchange match current main.
+// Locked Product direction on DIDI-739 (parent DIDI-820 changes to two emails and two cap slots).
+
 const ownerRelayModeCases: {
   label: string;
   mode: VisitorEmailMode | undefined;
@@ -52,7 +55,7 @@ function immediateOwnerSinkBody(ctx: RelayE2EContext): unknown {
 }
 
 describe.each(ownerRelayModeCases)(
-  "relay exchange path (owner_relay: $label, integration)",
+  "relay exchange path (owner_relay: $label, integration; interim until DIDI-820)",
   ({ mode }) => {
     it("step 1 accepts name and email only; phone is ignored on exchange", () => {
       const parsed = parseExchangeBody({
@@ -69,7 +72,7 @@ describe.each(ownerRelayModeCases)(
       }
     });
 
-    it("sends exactly one owner relay email when details are submitted", async () => {
+    it("interim until DIDI-820: sends exactly one owner relay email when details are submitted", async () => {
       await withIsolatedLocalD1(async (db) => {
         const ctx = await setupRelayExchange(
           db,
@@ -94,7 +97,7 @@ describe.each(ownerRelayModeCases)(
       });
     });
 
-    it("sends exactly one owner relay email when details are dismissed", async () => {
+    it("interim until DIDI-820: sends exactly one owner relay email when details are dismissed", async () => {
       await withIsolatedLocalD1(async (db) => {
         const ctx = await setupRelayExchange(
           db,
@@ -109,7 +112,7 @@ describe.each(ownerRelayModeCases)(
       });
     });
 
-    it("sends exactly one owner relay email on the 10-minute fallback only", async () => {
+    it("interim until DIDI-820: sends exactly one owner relay email on the 10-minute fallback only", async () => {
       await withIsolatedLocalD1(async (db) => {
         const ctx = await setupRelayExchange(
           db,
@@ -124,7 +127,7 @@ describe.each(ownerRelayModeCases)(
       });
     });
 
-    it("does not send twice when immediate and fallback queue messages are both delivered", async () => {
+    it("interim until DIDI-820: does not send twice when immediate and fallback queue messages are both delivered", async () => {
       await withIsolatedLocalD1(async (db) => {
         const ctx = await setupRelayExchange(
           db,
@@ -143,7 +146,7 @@ describe.each(ownerRelayModeCases)(
       });
     });
 
-    it("counts only the owner slot in daily_send_counts and sends no visitor mail", async () => {
+    it("interim until DIDI-820: counts only the owner slot in daily_send_counts and sends no visitor mail", async () => {
       await withIsolatedLocalD1(async (db) => {
         const ctx = await setupRelayExchange(
           db,
@@ -211,8 +214,9 @@ describe.each(ownerRelayModeCases)(
   },
 );
 
-describe("relay exchange path (owner_relay: duplicate triggers, integration)", () => {
-  it("delivers the same owner sink message twice (retry) and sends only once", async () => {
+// Interim until DIDI-820: duplicate-trigger tests assert a single owner send (DIDI-739 Product direction).
+describe("relay exchange path (owner_relay: duplicate triggers, integration; interim until DIDI-820)", () => {
+  it("interim until DIDI-820: delivers the same owner sink message twice (retry) and sends only once", async () => {
     await withIsolatedLocalD1(async (db) => {
       const ctx = await setupRelayExchange(db, "owner_relay", "lead-relay-retry-dup");
       await finalizeWithDetails(ctx, {
@@ -227,7 +231,7 @@ describe("relay exchange path (owner_relay: duplicate triggers, integration)", (
     });
   });
 
-  it("dismiss twice still yields one owner email after queue delivery", async () => {
+  it("interim until DIDI-820: dismiss twice still yields one owner email after queue delivery", async () => {
     await withIsolatedLocalD1(async (db) => {
       const ctx = await setupRelayExchange(
         db,
@@ -243,7 +247,7 @@ describe("relay exchange path (owner_relay: duplicate triggers, integration)", (
     });
   });
 
-  it("submit details twice still yields one owner email after queue delivery", async () => {
+  it("interim until DIDI-820: submit details twice still yields one owner email after queue delivery", async () => {
     await withIsolatedLocalD1(async (db) => {
       const ctx = await setupRelayExchange(
         db,
@@ -301,8 +305,9 @@ describe("owner relay template optional rows (unit guard)", () => {
   });
 });
 
-describe("relay exchange path (direct visitor_email_mode, integration)", () => {
-  it("sends visitor follow-up with vCard and one owner email without threading", async () => {
+// Interim until DIDI-820: direct mode uses new-lead owner template and one owner + one visitor send (DIDI-739).
+describe("relay exchange path (direct visitor_email_mode, integration; interim until DIDI-820)", () => {
+  it("interim until DIDI-820: sends visitor follow-up with vCard and one owner email without threading", async () => {
     await withIsolatedLocalD1(async (db) => {
       const ctx = await setupRelayExchange(db, "direct");
       expect(ctx.followupMessages).toHaveLength(1);
@@ -326,7 +331,7 @@ describe("relay exchange path (direct visitor_email_mode, integration)", () => {
     });
   });
 
-  it("delivers only one owner email when fallback and immediate owner messages are processed", async () => {
+  it("interim until DIDI-820: delivers only one owner email when fallback and immediate owner messages are processed", async () => {
     await withIsolatedLocalD1(async (db) => {
       const ctx = await setupRelayExchange(db, "direct", "lead-direct-dup");
       await finalizeWithDismiss(ctx);
@@ -336,7 +341,7 @@ describe("relay exchange path (direct visitor_email_mode, integration)", () => {
     });
   });
 
-  it("increments owner and visitor daily_send_counts on exchange", async () => {
+  it("interim until DIDI-820: increments owner and visitor daily_send_counts on exchange", async () => {
     await withIsolatedLocalD1(async (db) => {
       const ctx = await setupRelayExchange(db, "direct", "lead-direct-counts");
       const owner = await db

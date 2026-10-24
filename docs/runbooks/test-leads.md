@@ -39,6 +39,15 @@ Use this after changing the mail or consumer path. Default non-prod **`visitor_e
 
 **When:** `visitor_email_mode` is missing or `owner_relay` (see [0027](../decisions/0027-owner-relay-visitor-follow-up.md)).
 
+#### Interim until [DIDI-820](https://linear.app/didi-build/issue/DIDI-820): current main behaviour
+
+Locked Product direction on [DIDI-739](https://linear.app/didi-build/issue/DIDI-739). The checklist below matches **main today**. [DIDI-820](https://linear.app/didi-build/issue/DIDI-820) will change non-prod expectations to:
+
+- **Two emails per exchange:** the visitor letter (`Great meeting you, {first name}`) and the owner email (`You met {visitor name}`).
+- **Owner email:** `You met` with **all** detail rows in **both** modes (same template as owner relay today).
+- **Letter recipient:** **owner** in relay mode (Reply-To visitor, vCard attached); **visitor** in direct mode (From/Reply-To as today).
+- **Daily caps:** count **two** slots per exchange in both modes.
+
 1. After exchange, optional details: submit, skip/close (dismiss), or leave the sheet and wait for the **10-minute** fallback.
 2. In **`WE_MET_TEST_MAIL_TO`**, expect **exactly one** owner email per exchange (not two threaded messages).
    - Subject: `You met {visitor name}` (with the non-prod prefix above).
@@ -51,6 +60,10 @@ Use this after changing the mail or consumer path. Default non-prod **`visitor_e
 ### Direct visitor follow-up mode
 
 **When:** `visitor_email_mode` is exact lowercase **`direct`**.
+
+#### Interim until [DIDI-820](https://linear.app/didi-build/issue/DIDI-820): current main behaviour
+
+Same locked Product direction on [DIDI-739](https://linear.app/didi-build/issue/DIDI-739) and the [DIDI-820](https://linear.app/didi-build/issue/DIDI-820) target behaviour listed under [owner relay](#owner-relay-mode-default) above. Until DIDI-820 ships, direct mode differs from that target as follows.
 
 1. Same exchange and optional-details flow as above.
 2. In **`WE_MET_TEST_MAIL_TO`**, expect **one** owner email (subject `New lead added: {visitor name}`, same Reply-To and no threading rules as owner relay) **and** one visitor follow-up to the visitor address (redirected to the test inbox in non-prod).
