@@ -115,6 +115,12 @@ The consumer registers on the queue in **its own** Wrangler config; it is not an
 
 **Consumer queue handling:** processes **`visitor_followup`** (immediate visitor letter after details finalize), **`visitor_letter_due`** (delayed visitor letter fallback after exchange), and **`email`** sink messages (`lead_sink_record`, `lead_sink_append_details`, `lead_sink_owner_email`, `owner_email_due`). Unknown `type` or unsupported `sinkKind` **retry** on the same schedule until Cloudflare discards them at `max_retries`. Malformed visitor letter or known sink bodies are logged and **acked** (sink failures best-effort mark ledger `failed`). Send failures retry with exponential backoff: delay after failed attempt _n_ (1-based) is **min(1800, 30 × 2^(n−1))** seconds. **`max_retries`** and the code attempt limit are **30**; worst-case delay before the final attempt is **43,290 s** (~12 h). After the 30th failed attempt the consumer logs a permanent failure (`leadId` and `sinkId` for sinks; `errorCode` only) and **acks**. Without a dead-letter queue, messages that reach the retry limit are **deleted** ([Cloudflare dead-letter queues](https://developers.cloudflare.com/queues/configuration/dead-letter-queues/)).
 
+**App Worker logs (exchange and details):**
+
+| Event                                    | Fields                                                                             |
+| ---------------------------------------- | ---------------------------------------------------------------------------------- |
+| `exchange_visitor_letter_enqueue_failed` | `leadId` (when visitor letter queue enqueue fails on exchange or finalize; no PII) |
+
 **Consumer logs (debugging live mail):**
 
 | Event                                          | Fields                                                                                                                                         |

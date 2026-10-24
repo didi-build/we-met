@@ -67,9 +67,9 @@ sequenceDiagram
 
   V->>M: POST /api/exchange (Turnstile + form)
   M->>M: Turnstile, honeypot, rate limit, app_settings caps
+  M->>Q: Enqueue visitor_letter_due (delayed) ([0027](../decisions/0027-owner-relay-visitor-follow-up.md))
   M->>D: Dispatch enabled lead sinks
-  D->>Q: One message per enabled sink
-  M->>Q: Enqueue visitor_letter_due (delayed) and owner_email_due per enabled sink ([0027](../decisions/0027-owner-relay-visitor-follow-up.md))
+  D->>Q: owner_email_due per enabled sink
   M-->>V: 200 + signed token (2h TTL)
 
   V->>M: POST /api/details (token + fields)

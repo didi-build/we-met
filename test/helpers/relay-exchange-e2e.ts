@@ -267,6 +267,8 @@ function finalizeDeps(ctx: RelayE2EContext) {
     createLedgerId: ctx.exchangeDeps.createLedgerId,
     now: ctx.exchangeDeps.now,
     baseUrl: ctx.exchangeDeps.baseUrl,
+    logExchangeVisitorLetterEnqueueFailed:
+      ctx.exchangeDeps.logExchangeVisitorLetterEnqueueFailed,
   };
 }
 
@@ -321,6 +323,7 @@ export async function setupRelayExchange(
       assertLeadEmailCapacity(db, cardId, needed, now()),
     incrementDailySendCounts: (cardId, kinds) =>
       incrementDailySendCounts(db, RELAY_E2E_DAY, cardId, kinds),
+    logExchangeVisitorLetterEnqueueFailed: vi.fn(),
   };
 
   const exchange = await processExchange(

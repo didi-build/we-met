@@ -45,6 +45,7 @@ export type ProcessExchangeDeps = {
     cardId: string,
     kinds: readonly DailySendKind[],
   ) => Promise<void>;
+  logExchangeVisitorLetterEnqueueFailed(leadId: string): void;
 };
 
 export type ProcessExchangeResult =
@@ -140,6 +141,7 @@ export async function processExchange(
       { delaySeconds: OWNER_EMAIL_FALLBACK_DELAY_SECONDS },
     );
   } catch {
+    deps.logExchangeVisitorLetterEnqueueFailed(lead.leadId);
     return { status: "enqueue_failed" };
   }
 

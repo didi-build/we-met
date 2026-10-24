@@ -29,6 +29,7 @@ function detailsDeps(
     createLedgerId: () => "ledger-1",
     now: () => new Date("2026-10-12T12:00:00.000Z"),
     baseUrl: "https://we-met.link",
+    logExchangeVisitorLetterEnqueueFailed: vi.fn(),
   };
 }
 

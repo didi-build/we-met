@@ -52,6 +52,10 @@ function consoleSinkLogger() {
   };
 }
 
+function consoleExchangeVisitorLetterEnqueueFailed(leadId: string) {
+  console.error("exchange_visitor_letter_enqueue_failed", { leadId });
+}
+
 function consoleDeliveryLogger() {
   return {
     logLedgerWriteFailed(leadId: string, sinkId: string, errorCode: string) {
@@ -129,6 +133,7 @@ export async function createProcessExchangeDeps(
       assertLeadEmailCapacity(db, cardId, needed, now()),
     incrementDailySendCounts: (cardId, kinds) =>
       incrementDailySendCounts(db, utcDayFromDate(now()), cardId, kinds),
+    logExchangeVisitorLetterEnqueueFailed: consoleExchangeVisitorLetterEnqueueFailed,
   };
 }
 
@@ -200,5 +205,6 @@ export async function createProcessDetailsDeps(): Promise<ProcessDetailsDeps> {
     createLedgerId: () => crypto.randomUUID(),
     now,
     baseUrl: hostConfig.baseUrl,
+    logExchangeVisitorLetterEnqueueFailed: consoleExchangeVisitorLetterEnqueueFailed,
   };
 }

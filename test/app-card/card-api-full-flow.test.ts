@@ -158,6 +158,7 @@ describe("card editor full flow (integration)", () => {
         baseUrl: "https://we-met.link",
         assertLeadEmailCapacity: async () => true,
         incrementDailySendCounts: async () => undefined,
+        logExchangeVisitorLetterEnqueueFailed: vi.fn(),
       };
 
       const exchange = await processExchange(

@@ -61,6 +61,7 @@ function ownerEmailFinalizeDeps(
     createLedgerId: deps.createLedgerId,
     now: deps.now,
     baseUrl: "https://we-met.link",
+    logExchangeVisitorLetterEnqueueFailed: vi.fn(),
   };
 }
 

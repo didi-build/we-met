@@ -57,6 +57,7 @@ function createDeps(
     createLedgerId: () => "ledger-1",
     now: () => new Date("2026-10-12T12:00:00.000Z"),
     baseUrl: "https://we-met.link",
+    logExchangeVisitorLetterEnqueueFailed: vi.fn(),
     ...leadEmailCapacityAlwaysAllowed,
     ...overrides,
   };
@@ -373,6 +374,26 @@ describe("processExchange (unit)", () => {
 
     expect(result.status).toBe("success");
     expect(callOrder).toEqual(["visitor_letter_due", "owner_email_due"]);
+  });
+
+  it("logs exchange_visitor_letter_enqueue_failed when visitor letter enqueue fails on exchange", async () => {
+    const repo = new MemoryCardRepository();
+    const card = await repo.upsertCard(exampleCardInput());
+    const logEnqueueFailed = vi.fn();
+    const deps = createDeps({
+      logExchangeVisitorLetterEnqueueFailed: logEnqueueFailed,
+      followupQueue: {
+        enqueueVisitorLetter: async () => {
+          throw new Error("missing binding");
+        },
+      },
+    });
+
+    const result = await processExchange(baseInput(), card, [], deps);
+
+    expect(result.status).toBe("enqueue_failed");
+    expect(logEnqueueFailed).toHaveBeenCalledOnce();
+    expect(logEnqueueFailed).toHaveBeenCalledWith("lead-1");
   });
 
   it("does not enqueue owner_email_due or cap counts when visitor letter enqueue fails", async () => {

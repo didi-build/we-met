@@ -73,6 +73,7 @@ function exchangeDeps(
     assertLeadEmailCapacity: (cardId: string, needed: number) =>
       assertLeadEmailCapacity(db, cardId, needed, now()),
     incrementDailySendCounts: async () => undefined,
+    logExchangeVisitorLetterEnqueueFailed: vi.fn(),
     _followup: followup,
   };
 }
@@ -203,6 +204,7 @@ describe("exchange and details abuse controls (D1 integration)", () => {
           createLedgerId: () => "ledger-details-1",
           now: deps.now,
           baseUrl: "https://we-met.link",
+          logExchangeVisitorLetterEnqueueFailed: vi.fn(),
         },
       );
       expect(details.status).toBe("success");
@@ -363,6 +365,7 @@ describe("exchange and details abuse controls (D1 integration)", () => {
         createLedgerId: () => "ledger-dismiss-global",
         now: deps.now,
         baseUrl: "https://we-met.link",
+        logExchangeVisitorLetterEnqueueFailed: vi.fn(),
       });
       expect(dismiss.status).toBe("success");
       expect(sinkMessages.length).toBeGreaterThan(0);
@@ -438,6 +441,7 @@ describe("exchange and details abuse controls (D1 integration)", () => {
           createLedgerId: () => "ledger-details-global",
           now: deps.now,
           baseUrl: "https://we-met.link",
+          logExchangeVisitorLetterEnqueueFailed: vi.fn(),
         },
       );
       expect(details.status).toBe("success");
@@ -494,6 +498,7 @@ describe("exchange and details abuse controls (D1 integration)", () => {
         assertLeadEmailCapacity: (cardId: string, needed: number) =>
           assertLeadEmailCapacity(db, cardId, needed, new Date(nowMs)),
         incrementDailySendCounts: async () => undefined,
+        logExchangeVisitorLetterEnqueueFailed: vi.fn(),
       });
 
       await processExchange(
@@ -588,6 +593,7 @@ describe("exchange and details abuse controls (D1 integration)", () => {
         assertLeadEmailCapacity: (cardId: string, needed: number) =>
           assertLeadEmailCapacity(db, cardId, needed, new Date(nowMs)),
         incrementDailySendCounts: async () => undefined,
+        logExchangeVisitorLetterEnqueueFailed: vi.fn(),
       });
 
       await processExchange(
@@ -689,6 +695,7 @@ describe("exchange and details abuse controls (D1 integration)", () => {
         createLedgerId: () => "ledger-details-dup",
         now: deps.now,
         baseUrl: "https://we-met.link",
+        logExchangeVisitorLetterEnqueueFailed: vi.fn(),
       };
       const first = await processDetails(
         { token, phone: null, jobTitle: "CTO", company: "Co", note: "Hi" },

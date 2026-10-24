@@ -27,6 +27,7 @@ export type ProcessOwnerEmailFinalizeDeps = {
   createLedgerId: () => string;
   now: () => Date;
   baseUrl: string;
+  logExchangeVisitorLetterEnqueueFailed(leadId: string): void;
 };
 
 export type ProcessOwnerEmailFinalizeResult =
@@ -68,9 +69,7 @@ export async function processOwnerEmailFinalize(
       card: cardSnapshot,
     });
   } catch {
-    console.error("exchange_visitor_letter_enqueue_failed", {
-      leadId: lead.leadId,
-    });
+    deps.logExchangeVisitorLetterEnqueueFailed(lead.leadId);
   }
 
   const sourceUrl = absoluteUrl(deps.baseUrl, `/hi/${card.slug}`);

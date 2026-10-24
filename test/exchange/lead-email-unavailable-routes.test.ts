@@ -104,6 +104,8 @@ function buildExchangeDeps(
     assertLeadEmailCapacity: (cardId: string, needed: number) =>
       assertLeadEmailCapacity(db, cardId, needed, now()),
     incrementDailySendCounts: async () => undefined,
+    exchangeOwnerEmail: createExchangeOwnerEmailStoreFromD1(db),
+    logExchangeVisitorLetterEnqueueFailed: vi.fn(),
   };
 }
 
@@ -194,6 +196,7 @@ describe("exchange and details routes lead_email_unavailable (integration)", () 
       routeMocks.detailsDeps = {
         tokenSecret: "secret",
         environment: "preview",
+        followupQueue: exchangeDeps.followupQueue,
         leadSinkQueue: exchangeDeps.leadSinkQueue,
         deliveryLedger: exchangeDeps.deliveryLedger,
         exchangeOwnerEmail: createExchangeOwnerEmailStoreFromD1(db),
@@ -202,6 +205,7 @@ describe("exchange and details routes lead_email_unavailable (integration)", () 
         createLedgerId: () => "ledger-details-route",
         now: exchangeDeps.now,
         baseUrl: "https://we-met.link",
+        logExchangeVisitorLetterEnqueueFailed: vi.fn(),
       };
 
       await seedSettings(db, {
@@ -254,6 +258,7 @@ describe("exchange and details routes lead_email_unavailable (integration)", () 
       routeMocks.detailsDeps = {
         tokenSecret: "secret",
         environment: "preview",
+        followupQueue: exchangeDeps.followupQueue,
         leadSinkQueue: exchangeDeps.leadSinkQueue,
         deliveryLedger: exchangeDeps.deliveryLedger,
         exchangeOwnerEmail,
@@ -262,6 +267,7 @@ describe("exchange and details routes lead_email_unavailable (integration)", () 
         createLedgerId: () => "ledger-details-dup",
         now: exchangeDeps.now,
         baseUrl: "https://we-met.link",
+        logExchangeVisitorLetterEnqueueFailed: vi.fn(),
       };
 
       await seedSettings(db, {
