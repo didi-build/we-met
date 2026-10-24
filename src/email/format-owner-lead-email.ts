@@ -50,6 +50,7 @@ export type OwnerLeadRecordEmailInput = {
 export type OwnerLeadAppendEmailInput = {
   name: string;
   email: string;
+  phone: string | null;
   jobTitle: string | null;
   company: string | null;
   note: string | null;
@@ -72,13 +73,16 @@ function recordTemplateData(
   };
 }
 
-function appendTemplateData(
+export function appendTemplateData(
   input: OwnerLeadAppendEmailInput,
 ): Record<string, string | undefined> {
+  const phone = input.phone?.trim() ?? "";
   return {
     lead_name: input.name,
     lead_first_name: leadFirstNameFromFullName(input.name),
     lead_email: input.email,
+    lead_phone: phone || undefined,
+    lead_phone_tel: phone ? leadPhoneTel(phone) : undefined,
     job_title: input.jobTitle?.trim() || undefined,
     company: input.company?.trim() || undefined,
     note: input.note?.trim() || undefined,

@@ -81,6 +81,7 @@ export async function processDetails(
   }
 
   const details: VisitorLeadDetails = {
+    phone: input.phone,
     jobTitle: input.jobTitle,
     company: input.company,
     note: input.note,

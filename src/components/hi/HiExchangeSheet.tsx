@@ -321,7 +321,6 @@ export function HiExchangeSheet({
       slug,
       name: name.trim(),
       email: email.trim(),
-      phone: formatHiPhone(countryCode, phone),
       turnstileToken: turnstile,
       website: honeypot,
     });
@@ -399,6 +398,7 @@ export function HiExchangeSheet({
 
     const result = await postHiDetails({
       token,
+      phone: formatHiPhone(countryCode, phone),
       jobTitle: jobTitle.trim() || undefined,
       company: company.trim() || undefined,
       note: note.trim() || undefined,
@@ -641,45 +641,6 @@ export function HiExchangeSheet({
                     disabled={exchangePending}
                   />
                 </HiFloatingField>
-
-                <HiFloatingField
-                  id={`${formId}-phone`}
-                  label={copy.phoneLabel}
-                  optionalHint={copy.phoneOptional}
-                  focused={focusField === "phone"}
-                  invalid={false}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <select
-                      aria-label={copy.countryCodeAriaLabel}
-                      value={countryCode}
-                      onChange={(event) => setCountryCode(event.target.value)}
-                      onFocus={() => setFocusField("phone")}
-                      onBlur={() => setFocusField(null)}
-                      disabled={exchangePending}
-                      className="shrink-0 cursor-pointer border-0 bg-transparent pr-1 text-[17px] font-medium text-ink outline-none"
-                    >
-                      {HI_COUNTRY_DIAL_CODES.map((entry) => (
-                        <option key={entry.code} value={entry.code}>
-                          {entry.label}
-                        </option>
-                      ))}
-                    </select>
-                    <input
-                      id={`${formId}-phone`}
-                      type="tel"
-                      inputMode="tel"
-                      autoComplete="tel-national"
-                      className={fieldInputClass}
-                      value={phone}
-                      maxLength={EXCHANGE_LIMITS.phoneNational}
-                      onChange={(event) => setPhone(event.target.value)}
-                      onFocus={() => setFocusField("phone")}
-                      onBlur={() => setFocusField(null)}
-                      disabled={exchangePending}
-                    />
-                  </div>
-                </HiFloatingField>
               </div>
 
               {siteKey && (
@@ -738,6 +699,43 @@ export function HiExchangeSheet({
                 </p>
               )}
               <div className="flex flex-col gap-3">
+                <HiFloatingField
+                  id={`${formId}-phone`}
+                  label={copy.phoneLabel}
+                  focused={focusField === "phone"}
+                  invalid={false}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <select
+                      aria-label={copy.countryCodeAriaLabel}
+                      value={countryCode}
+                      onChange={(event) => setCountryCode(event.target.value)}
+                      onFocus={() => setFocusField("phone")}
+                      onBlur={() => setFocusField(null)}
+                      disabled={detailsPending}
+                      className="shrink-0 cursor-pointer border-0 bg-transparent pr-1 text-[17px] font-medium text-ink outline-none"
+                    >
+                      {HI_COUNTRY_DIAL_CODES.map((entry) => (
+                        <option key={entry.code} value={entry.code}>
+                          {entry.label}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      id={`${formId}-phone`}
+                      type="tel"
+                      inputMode="tel"
+                      autoComplete="tel-national"
+                      className={fieldInputClass}
+                      value={phone}
+                      maxLength={EXCHANGE_LIMITS.phoneNational}
+                      onChange={(event) => setPhone(event.target.value)}
+                      onFocus={() => setFocusField("phone")}
+                      onBlur={() => setFocusField(null)}
+                      disabled={detailsPending}
+                    />
+                  </div>
+                </HiFloatingField>
                 <HiFloatingField
                   id={`${formId}-job`}
                   label={copy.jobTitleLabel}

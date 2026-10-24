@@ -138,4 +138,22 @@ describe("HiExchangeSheet details submit", () => {
       expect(screen.getByRole("status").textContent).toContain(sheetCopy.detailsSaved);
     });
   });
+
+  it("sends optional phone from the details step", async () => {
+    vi.mocked(postHiDetails).mockResolvedValue({ ok: true });
+
+    renderDetailsStep();
+    const dialog = screen.getByRole("dialog");
+    fireEvent.change(
+      dialog.querySelector('input[autocomplete="tel-national"]') as HTMLInputElement,
+      { target: { value: "4165550100" } },
+    );
+    submitDetails();
+
+    await waitFor(() => {
+      expect(postHiDetails).toHaveBeenCalledWith(
+        expect.objectContaining({ token: "lead-token", phone: "+1 4165550100" }),
+      );
+    });
+  });
 });

@@ -112,6 +112,7 @@ describe("email template layout (rendered output)", () => {
       const content = buildOwnerLeadAppendEmail({
         name: "Sam",
         email: "sam@example.com",
+        phone: null,
         jobTitle: "Founder",
         company: null,
         note: null,

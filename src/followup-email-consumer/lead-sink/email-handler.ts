@@ -106,6 +106,7 @@ export function createEmailLeadSinkHandler(
       const content = buildOwnerLeadAppendEmail({
         name: message.lead.name,
         email: message.lead.email,
+        phone: message.details.phone,
         jobTitle: message.details.jobTitle,
         company: message.details.company,
         note: message.details.note,

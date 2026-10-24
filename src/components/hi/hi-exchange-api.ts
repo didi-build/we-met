@@ -2,13 +2,13 @@ export type HiExchangePayload = {
   slug: string;
   name: string;
   email: string;
-  phone?: string;
   turnstileToken: string;
   website?: string;
 };
 
 export type HiDetailsPayload = {
   token: string;
+  phone?: string;
   jobTitle?: string;
   company?: string;
   note?: string;

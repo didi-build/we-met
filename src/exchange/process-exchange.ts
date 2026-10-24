@@ -67,7 +67,7 @@ function buildVisitorLead(
     isTestLead,
     name: input.name,
     email: input.email,
-    phone: input.phone,
+    phone: null,
   };
 }
 
