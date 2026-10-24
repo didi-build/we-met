@@ -6,6 +6,7 @@ import { POST as previewLoginPost } from "@/app/api/auth/preview-login/route";
 import { SESSION_COOKIE_NAME } from "@/app-auth/cookies";
 import { createCardRepositoryFromD1 } from "@/card-data/get-repository";
 import { resolveLeadSinksForDispatch } from "@/card-data/account-email";
+import { createExchangeOwnerEmailStoreFromD1 } from "@/exchange-owner-email/d1-repository";
 import { createLeadDeliveryLedgerFromD1 } from "@/lead-delivery-ledger/d1-repository";
 import { processExchange } from "@/exchange/process-exchange";
 import type { ProcessExchangeDeps } from "@/exchange/process-exchange";
@@ -142,6 +143,7 @@ describe("card editor full flow (integration)", () => {
         followupQueue: { enqueueVisitorFollowup: async () => undefined },
         leadSinkQueue: { enqueueLeadSink: async () => undefined },
         deliveryLedger: ledger,
+        exchangeOwnerEmail: createExchangeOwnerEmailStoreFromD1(db),
         deliveryLogger: {
           logLedgerWriteFailed: vi.fn(),
           logLedgerEnqueueFailed: vi.fn(),

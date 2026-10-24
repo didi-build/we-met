@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import * as formatOwnerLeadEmail from "@/email/format-owner-lead-email";
+import * as formatOwnerRelayEmail from "@/email/format-owner-relay-email";
 import { createEmailLeadSinkHandler } from "@/followup-email-consumer/lead-sink/email-handler";
 import type { ParsedLeadSinkAppendMessage } from "@/followup-email-consumer/lead-sink/types";
 
 describe("createEmailLeadSinkHandler deliverAppend (unit)", () => {
-  it("passes details.phone into buildOwnerLeadAppendEmail", async () => {
-    const buildSpy = vi.spyOn(formatOwnerLeadEmail, "buildOwnerLeadAppendEmail");
+  it("passes details.phone into buildOwnerRelayEmail for owner_relay", async () => {
+    const buildSpy = vi.spyOn(formatOwnerRelayEmail, "buildOwnerRelayEmail");
     const sendEmail = vi.fn(async () => ({ messageId: "msg-1", threadId: null }));
 
     const handler = createEmailLeadSinkHandler({

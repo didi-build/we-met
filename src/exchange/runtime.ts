@@ -19,6 +19,7 @@ import type { ProcessVCardDeps } from "@/exchange/process-vcard";
 import { createReadOnlyR2Assets } from "@/assets/read-only-r2-assets";
 import type { R2Bucket } from "@cloudflare/workers-types";
 import type { TurnstileLogger } from "@/exchange/turnstile";
+import { createExchangeOwnerEmailStoreFromD1 } from "@/exchange-owner-email/d1-repository";
 import { createLeadDeliveryLedgerFromD1 } from "@/lead-delivery-ledger/d1-repository";
 import { readLeadEmailControls } from "@/app-settings/caps";
 import { assertLeadEmailCapacity } from "@/lead-email/availability";
@@ -106,6 +107,7 @@ export async function createProcessExchangeDeps(
     throw new Error("WE_MET_DB binding is not configured");
   }
   const deliveryLedger = createLeadDeliveryLedgerFromD1(db);
+  const exchangeOwnerEmail = createExchangeOwnerEmailStoreFromD1(db);
   const now = () => new Date();
 
   return {
@@ -114,6 +116,7 @@ export async function createProcessExchangeDeps(
     followupQueue,
     leadSinkQueue,
     deliveryLedger,
+    exchangeOwnerEmail,
     deliveryLogger: consoleDeliveryLogger(),
     tokenSecret,
     environment: hostConfig.weMetEnv,
@@ -186,6 +189,7 @@ export async function createProcessDetailsDeps(): Promise<ProcessDetailsDeps> {
     throw new Error("WE_MET_DB binding is not configured");
   }
   const deliveryLedger = createLeadDeliveryLedgerFromD1(db);
+  const exchangeOwnerEmail = createExchangeOwnerEmailStoreFromD1(db);
   const now = () => new Date();
 
   return {
@@ -193,12 +197,11 @@ export async function createProcessDetailsDeps(): Promise<ProcessDetailsDeps> {
     environment: hostConfig.weMetEnv,
     leadSinkQueue,
     deliveryLedger,
+    exchangeOwnerEmail,
     deliveryLogger: consoleDeliveryLogger(),
     leadSinkLogger: consoleSinkLogger(),
     createLedgerId: () => crypto.randomUUID(),
     now,
     baseUrl: hostConfig.baseUrl,
-    assertLeadEmailCapacity: (cardId, needed) =>
-      assertLeadEmailCapacity(db, cardId, needed, now()),
   };
 }

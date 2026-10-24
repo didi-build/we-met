@@ -4,15 +4,11 @@ import {
 } from "@/email/followup-email-error";
 import { isRetryableFollowupEmailError } from "@/email/retryable-followup-error";
 import type { LeadEmailControls } from "@/app-settings/caps";
-import {
-  parseExternalRef,
-  validateExternalRefForStorage,
-} from "@/followup-email-consumer/external-ref";
+import { validateExternalRefForStorage } from "@/followup-email-consumer/external-ref";
 import type { ConsumerLeadDeliveryLedger } from "@/followup-email-consumer/lead-delivery-ledger";
 import { getLeadSinkHandler } from "@/followup-email-consumer/lead-sink/registry";
 import type {
   LeadSinkHandler,
-  ParsedExternalRef,
   ParsedLeadSinkMessage,
 } from "@/followup-email-consumer/lead-sink/types";
 import {
@@ -55,7 +51,10 @@ export type LeadSinkConsumerDeps = {
 };
 
 function leadSinkPhase(message: ParsedLeadSinkMessage): "record" | "append" {
-  return message.type === "lead_sink_record" ? "record" : "append";
+  if (message.type === "lead_sink_append_details") {
+    return "append";
+  }
+  return "record";
 }
 
 function leadIdFromBody(body: unknown): string | null {
@@ -194,46 +193,6 @@ async function afterSuccessfulDelivery(
   message.ack();
 }
 
-async function resolveAppendRecordRef(
-  message: FollowupQueueMessage,
-  parsed: ParsedLeadSinkMessage,
-  handler: LeadSinkHandler,
-  deps: LeadSinkConsumerDeps,
-): Promise<
-  | { action: "defer" }
-  | { action: "fail"; errorCode: "record_unavailable" }
-  | { action: "deliver"; recordRef: ParsedExternalRef | null }
-> {
-  const recordRow = await deps.ledger.findRow(
-    parsed.lead.leadId,
-    parsed.sinkId,
-    "record",
-  );
-
-  if (recordRow?.status === "queued") {
-    const willRetry = message.attempts < MAX_VISITOR_FOLLOWUP_ATTEMPTS;
-    if (willRetry) {
-      return { action: "defer" };
-    }
-    if (handler.appendRequiresRecord) {
-      return { action: "fail", errorCode: "record_unavailable" };
-    }
-    return { action: "deliver", recordRef: null };
-  }
-
-  if (recordRow?.status === "sent") {
-    return {
-      action: "deliver",
-      recordRef: parseExternalRef(recordRow.externalRef),
-    };
-  }
-
-  if (handler.appendRequiresRecord) {
-    return { action: "fail", errorCode: "record_unavailable" };
-  }
-  return { action: "deliver", recordRef: null };
-}
-
 async function processQueuedLeadSink(
   message: FollowupQueueMessage,
   parsed: ParsedLeadSinkMessage,
@@ -264,30 +223,21 @@ async function processQueuedLeadSink(
   };
 
   try {
+    if (parsed.type === "lead_sink_owner_email" || parsed.type === "owner_email_due") {
+      const result = await handler.deliverOwnerEmail(parsed, handlerContext);
+      await afterSuccessfulDelivery(message, parsed, result.externalRef, deps);
+      return;
+    }
+
     if (parsed.type === "lead_sink_record") {
       const result = await handler.deliverRecord(parsed, handlerContext);
       await afterSuccessfulDelivery(message, parsed, result.externalRef, deps);
       return;
     }
 
-    const appendPlan = await resolveAppendRecordRef(message, parsed, handler, deps);
-    if (appendPlan.action === "defer") {
-      deps.logLeadSinkAppendDeferred(
-        parsed.lead.leadId,
-        parsed.sinkId,
-        message.attempts,
-      );
-      message.retry({ delaySeconds: followupEmailRetryDelaySeconds(message.attempts) });
-      return;
-    }
-    if (appendPlan.action === "fail") {
-      await markNonRetryableFailure(message, parsed, appendPlan.errorCode, deps);
-      return;
-    }
-
     const result = await handler.deliverAppend(parsed, {
       ...handlerContext,
-      recordRef: appendPlan.recordRef,
+      recordRef: null,
     });
     await afterSuccessfulDelivery(message, parsed, result.externalRef, deps);
   } catch (error) {

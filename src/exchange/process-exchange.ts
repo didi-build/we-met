@@ -7,6 +7,7 @@ import {
   type LeadSinkDispatchDeps,
   type LeadSinkDispatchLogger,
 } from "@/exchange/lead-sink/dispatcher";
+import type { ExchangeOwnerEmailStore } from "@/exchange-owner-email/types";
 import type { LeadDeliveryLedger } from "@/lead-delivery-ledger/types";
 import type {
   FollowupEmailQueueProducer,
@@ -16,6 +17,7 @@ import type { ExchangeRateLimiter } from "@/exchange/rate-limit";
 import { createDetailsToken } from "@/exchange/token";
 import type { TurnstileVerifier } from "@/exchange/turnstile";
 import { absoluteUrl } from "@/config/we-met";
+import { leadFirstNameFromFullName } from "@/email/email-template-vars";
 import type { ExchangeSuccessResponse, VisitorLead } from "@/exchange/types";
 import type { ValidatedExchangeInput } from "@/exchange/validation";
 import type { VisitorEmailMode } from "@/app-settings/defaults";
@@ -28,6 +30,7 @@ export type ProcessExchangeDeps = {
   followupQueue: FollowupEmailQueueProducer;
   leadSinkQueue: LeadSinkQueueProducer;
   deliveryLedger: LeadDeliveryLedger;
+  exchangeOwnerEmail: ExchangeOwnerEmailStore;
   deliveryLogger: LeadDeliveryDispatchLogger;
   tokenSecret: string;
   environment: string;
@@ -112,6 +115,7 @@ export async function processExchange(
     producer: deps.leadSinkQueue,
     sinkLogger: deps.leadSinkLogger,
     ledger: deps.deliveryLedger,
+    exchangeOwnerEmail: deps.exchangeOwnerEmail,
     deliveryLogger: deps.deliveryLogger,
     now: deps.now,
     createLedgerId: deps.createLedgerId,
@@ -128,6 +132,7 @@ export async function processExchange(
     card.id,
     card.slug,
     sourceUrl,
+    leadFirstNameFromFullName(card.displayName),
     sinkDispatchDeps,
   );
 

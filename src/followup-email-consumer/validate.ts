@@ -1,7 +1,9 @@
 import { isPlainSingleEmailAddress } from "@/email/plain-email";
 import type {
   LeadSinkAppendDetailsMessage,
+  LeadSinkOwnerEmailMessage,
   LeadSinkRecordLeadMessage,
+  OwnerEmailDueMessage,
 } from "@/exchange/queue/types";
 import type {
   CardEmailSnapshot,
@@ -26,6 +28,10 @@ function parseCardSnapshot(value: unknown): CardEmailSnapshot | null {
   }
   const pageCopy = isRecord(value.pageCopy) ? value.pageCopy : null;
   const contact = isRecord(value.contact) ? value.contact : null;
+  const ownerFirstName =
+    typeof value.ownerFirstName === "string" && value.ownerFirstName.trim().length > 0
+      ? value.ownerFirstName.trim()
+      : undefined;
   if (
     !isNonEmptyString(value.slug) ||
     !isNonEmptyString(value.displayName) ||
@@ -40,6 +46,7 @@ function parseCardSnapshot(value: unknown): CardEmailSnapshot | null {
     slug: value.slug,
     displayName: value.displayName,
     email: value.email,
+    ...(ownerFirstName ? { ownerFirstName } : {}),
     photoKey:
       value.photoKey === null
         ? null
@@ -163,7 +170,12 @@ function parseLeadSinkCommon(body: Record<string, unknown>): {
 
 export function parseLeadSinkMessage(
   body: unknown,
-): LeadSinkRecordLeadMessage | LeadSinkAppendDetailsMessage | null {
+):
+  | LeadSinkRecordLeadMessage
+  | LeadSinkAppendDetailsMessage
+  | LeadSinkOwnerEmailMessage
+  | OwnerEmailDueMessage
+  | null {
   if (!isRecord(body)) {
     return null;
   }
@@ -199,6 +211,25 @@ export function parseLeadSinkMessage(
     };
   }
 
+  if (body.type === "lead_sink_owner_email" || body.type === "owner_email_due") {
+    const lead = parseLead(body.lead);
+    const details = parseDetails(body.details);
+    if (!lead || !details) {
+      return null;
+    }
+    const ownerFirstName =
+      typeof body.ownerFirstName === "string" && body.ownerFirstName.trim().length > 0
+        ? body.ownerFirstName.trim()
+        : undefined;
+    return {
+      type: body.type,
+      ...common,
+      lead,
+      details,
+      ...(ownerFirstName ? { ownerFirstName } : {}),
+    };
+  }
+
   return null;
 }
 
@@ -206,7 +237,12 @@ export function isLeadSinkQueueMessageType(body: unknown): boolean {
   if (!isRecord(body) || typeof body.type !== "string") {
     return false;
   }
-  return body.type === "lead_sink_record" || body.type === "lead_sink_append_details";
+  return (
+    body.type === "lead_sink_record" ||
+    body.type === "lead_sink_append_details" ||
+    body.type === "lead_sink_owner_email" ||
+    body.type === "owner_email_due"
+  );
 }
 
 export function isUnsupportedQueueMessageType(body: unknown): boolean {
@@ -216,7 +252,9 @@ export function isUnsupportedQueueMessageType(body: unknown): boolean {
   if (
     body.type === "visitor_followup" ||
     body.type === "lead_sink_record" ||
-    body.type === "lead_sink_append_details"
+    body.type === "lead_sink_append_details" ||
+    body.type === "lead_sink_owner_email" ||
+    body.type === "owner_email_due"
   ) {
     return false;
   }

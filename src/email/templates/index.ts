@@ -3,6 +3,8 @@ import {
   ownerDetailsUpdateText,
   ownerNewLeadHtml,
   ownerNewLeadText,
+  ownerRelayHtml,
+  ownerRelayText,
   visitorFollowupHtml,
   visitorFollowupText,
 } from "@/email/templates/generated";
@@ -20,4 +22,9 @@ export const ownerNewLeadTemplates = {
 export const ownerDetailsUpdateTemplates = {
   html: ownerDetailsUpdateHtml,
   text: ownerDetailsUpdateText,
+};
+
+export const ownerRelayTemplates = {
+  html: ownerRelayHtml,
+  text: ownerRelayText,
 };

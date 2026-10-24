@@ -7,6 +7,7 @@ import {
   APP_SETTING_VISITOR_EMAIL_MODE,
 } from "@/app-settings/defaults";
 import { MemoryCardRepository } from "@/card-data/memory-repository";
+import { createExchangeOwnerEmailStoreFromD1 } from "@/exchange-owner-email/d1-repository";
 import { createLeadDeliveryLedgerFromD1 } from "@/lead-delivery-ledger/d1-repository";
 import { assertLeadEmailCapacity } from "@/lead-email/availability";
 import { processDetails } from "@/exchange/process-details";
@@ -56,6 +57,7 @@ function exchangeDeps(
       },
     },
     deliveryLedger: ledger,
+    exchangeOwnerEmail: createExchangeOwnerEmailStoreFromD1(db),
     deliveryLogger: {
       logLedgerWriteFailed: vi.fn(),
       logLedgerEnqueueFailed: vi.fn(),
@@ -198,12 +200,12 @@ describe("exchange and details abuse controls (D1 integration)", () => {
           environment: "preview",
           leadSinkQueue: deps.leadSinkQueue,
           deliveryLedger: deps.deliveryLedger,
+          exchangeOwnerEmail: deps.exchangeOwnerEmail,
           deliveryLogger: deps.deliveryLogger,
           leadSinkLogger: deps.leadSinkLogger,
           createLedgerId: () => "ledger-details-1",
           now: deps.now,
           baseUrl: "https://we-met.link",
-          assertLeadEmailCapacity: deps.assertLeadEmailCapacity,
         },
       );
       expect(details.status).toBe("success");
@@ -313,7 +315,7 @@ describe("exchange and details abuse controls (D1 integration)", () => {
     });
   });
 
-  it("rejects exchange and details at global cap with no side effects", async () => {
+  it("rejects exchange at global cap while details finalize does not recheck caps", async () => {
     await withIsolatedLocalD1(async (db) => {
       await seedSettings(db, {
         [APP_SETTING_LEAD_EMAIL_ENABLED]: "1",
@@ -375,26 +377,16 @@ describe("exchange and details abuse controls (D1 integration)", () => {
           environment: "preview",
           leadSinkQueue: deps.leadSinkQueue,
           deliveryLedger: deps.deliveryLedger,
+          exchangeOwnerEmail: deps.exchangeOwnerEmail,
           deliveryLogger: deps.deliveryLogger,
           leadSinkLogger: deps.leadSinkLogger,
           createLedgerId: () => "ledger-details-global",
           now: deps.now,
           baseUrl: "https://we-met.link",
-          assertLeadEmailCapacity: deps.assertLeadEmailCapacity,
         },
       );
-      expect(details.status).toBe("lead_email_unavailable");
-      const ledgerCount = await db
-        .prepare("SELECT COUNT(*) AS c FROM lead_delivery_ledger")
-        .first<{ c: number }>();
-      expect(ledgerCount?.c).toBe(0);
-      const counterCount = await db
-        .prepare(
-          "SELECT COALESCE(SUM(count), 0) AS c FROM daily_send_counts WHERE card_id = ?",
-        )
-        .bind(card.id)
-        .first<{ c: number }>();
-      expect(counterCount?.c).toBe(0);
+      expect(details.status).toBe("success");
+      expect(sinkMessages.length).toBeGreaterThan(0);
     });
   });
 
@@ -431,6 +423,7 @@ describe("exchange and details abuse controls (D1 integration)", () => {
           },
         },
         deliveryLedger: ledger,
+        exchangeOwnerEmail: createExchangeOwnerEmailStoreFromD1(db),
         deliveryLogger: {
           logLedgerWriteFailed: vi.fn(),
           logLedgerEnqueueFailed: vi.fn(),
@@ -528,6 +521,7 @@ describe("exchange and details abuse controls (D1 integration)", () => {
           },
         },
         deliveryLedger: ledger,
+        exchangeOwnerEmail: createExchangeOwnerEmailStoreFromD1(db),
         deliveryLogger: {
           logLedgerWriteFailed: vi.fn(),
           logLedgerEnqueueFailed: vi.fn(),
@@ -591,7 +585,7 @@ describe("exchange and details abuse controls (D1 integration)", () => {
     });
   });
 
-  it("details increments owner counter once and not on duplicate append", async () => {
+  it("counts owner email once per exchange and ignores duplicate details finalize", async () => {
     await withIsolatedLocalD1(async (db) => {
       await seedSettings(db, {
         [APP_SETTING_LEAD_EMAIL_ENABLED]: "1",
@@ -613,6 +607,18 @@ describe("exchange and details abuse controls (D1 integration)", () => {
       ];
       const sinkMessages: unknown[] = [];
       const deps = exchangeDeps(db, sinkMessages);
+      const exchange = await processExchange(
+        {
+          slug: card.slug,
+          name: "Visitor",
+          email: "visitor@example.com",
+          turnstileToken: "tok",
+        },
+        card,
+        sinks,
+        deps,
+      );
+      expect(exchange.status).toBe("success");
       const token = createDetailsToken(
         "secret",
         {
@@ -629,12 +635,12 @@ describe("exchange and details abuse controls (D1 integration)", () => {
         environment: "preview",
         leadSinkQueue: deps.leadSinkQueue,
         deliveryLedger: deps.deliveryLedger,
+        exchangeOwnerEmail: deps.exchangeOwnerEmail,
         deliveryLogger: deps.deliveryLogger,
         leadSinkLogger: deps.leadSinkLogger,
         createLedgerId: () => "ledger-details-dup",
         now: deps.now,
         baseUrl: "https://we-met.link",
-        assertLeadEmailCapacity: deps.assertLeadEmailCapacity,
       };
       const first = await processDetails(
         { token, phone: null, jobTitle: "CTO", company: "Co", note: "Hi" },
@@ -657,7 +663,7 @@ describe("exchange and details abuse controls (D1 integration)", () => {
         .bind(card.id)
         .first<{ count: number }>();
       expect(owner?.count).toBe(1);
-      expect(sinkMessages).toHaveLength(1);
+      expect(sinkMessages).toHaveLength(2);
     });
   });
 

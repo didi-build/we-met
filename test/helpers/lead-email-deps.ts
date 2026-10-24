@@ -12,6 +12,8 @@ export const defaultLeadEmailControls = {
   dailyCapPerCard: 50,
 };
 
+export const leadEmailControlsFixture = defaultLeadEmailControls;
+
 export const readVisitorEmailModeDirect = async () => "direct" as const;
 
 export const leadEmailConsumerEnabled = {

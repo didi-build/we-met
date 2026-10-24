@@ -8,6 +8,7 @@ import {
 } from "@/app-settings/defaults";
 import type { CardRecord } from "@/card-data/types";
 import { MemoryCardRepository } from "@/card-data/memory-repository";
+import { createExchangeOwnerEmailStoreFromD1 } from "@/exchange-owner-email/d1-repository";
 import { createLeadDeliveryLedgerFromD1 } from "@/lead-delivery-ledger/d1-repository";
 import { readLeadEmailControls } from "@/app-settings/caps";
 import { assertLeadEmailCapacity } from "@/lead-email/availability";
@@ -186,7 +187,7 @@ describe("exchange and details routes lead_email_unavailable (integration)", () 
     });
   });
 
-  it("POST /api/details returns 503 JSON when over global cap", async () => {
+  it("POST /api/details succeeds without rechecking global caps", async () => {
     await withIsolatedLocalD1(async (db) => {
       const repo = new MemoryCardRepository();
       const card = await repo.upsertCard(exampleCardInput());
@@ -200,12 +201,12 @@ describe("exchange and details routes lead_email_unavailable (integration)", () 
         environment: "preview",
         leadSinkQueue: exchangeDeps.leadSinkQueue,
         deliveryLedger: exchangeDeps.deliveryLedger,
+        exchangeOwnerEmail: createExchangeOwnerEmailStoreFromD1(db),
         deliveryLogger: exchangeDeps.deliveryLogger,
         leadSinkLogger: exchangeDeps.leadSinkLogger,
         createLedgerId: () => "ledger-details-route",
         now: exchangeDeps.now,
         baseUrl: "https://we-met.link",
-        assertLeadEmailCapacity: exchangeDeps.assertLeadEmailCapacity,
       };
 
       await seedSettings(db, {
@@ -240,13 +241,12 @@ describe("exchange and details routes lead_email_unavailable (integration)", () 
           body: JSON.stringify({ token, jobTitle: "CTO" }),
         }),
       );
-      expect(response.status).toBe(503);
-      expect(await response.json()).toEqual({ error: "lead_email_unavailable" });
-      expect(sinkMessages).toHaveLength(0);
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ ok: true });
     });
   });
 
-  it("POST /api/details returns 409 when append ledger already exists for the lead", async () => {
+  it("POST /api/details returns 409 when finalize already ran for the lead", async () => {
     await withIsolatedLocalD1(async (db) => {
       const repo = new MemoryCardRepository();
       const card = await repo.upsertCard(exampleCardInput());
@@ -255,17 +255,18 @@ describe("exchange and details routes lead_email_unavailable (integration)", () 
       const sinkMessages: unknown[] = [];
       const followup: unknown[] = [];
       const exchangeDeps = buildExchangeDeps(db, sinkMessages, followup);
+      const exchangeOwnerEmail = createExchangeOwnerEmailStoreFromD1(db);
       routeMocks.detailsDeps = {
         tokenSecret: "secret",
         environment: "preview",
         leadSinkQueue: exchangeDeps.leadSinkQueue,
         deliveryLedger: exchangeDeps.deliveryLedger,
+        exchangeOwnerEmail,
         deliveryLogger: exchangeDeps.deliveryLogger,
         leadSinkLogger: exchangeDeps.leadSinkLogger,
         createLedgerId: () => "ledger-details-dup",
         now: exchangeDeps.now,
         baseUrl: "https://we-met.link",
-        assertLeadEmailCapacity: exchangeDeps.assertLeadEmailCapacity,
       };
 
       await seedSettings(db, {
@@ -275,15 +276,15 @@ describe("exchange and details routes lead_email_unavailable (integration)", () 
       });
 
       const leadId = "lead-details-dup";
-      await exchangeDeps.deliveryLedger.insertAppendIfAbsent({
-        id: "ledger-existing-append",
+      await exchangeOwnerEmail.ensurePending({
         leadId,
         cardId: card.id,
-        sinkId: "sink-existing",
-        sinkKind: "email",
-        phase: "append",
-        retryUntil: "2026-10-17T12:00:00.000Z",
         createdAt: "2026-10-16T12:00:00.000Z",
+      });
+      await exchangeOwnerEmail.tryFinalize({
+        leadId,
+        details: null,
+        finalizedAt: "2026-10-16T12:00:00.000Z",
       });
 
       const tokenNowSeconds = Math.floor(Date.now() / 1000);

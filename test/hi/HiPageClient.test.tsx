@@ -17,6 +17,14 @@ vi.mock("@marsidev/react-turnstile", () => ({
   Turnstile: () => null,
 }));
 
+vi.mock("@/components/hi/hi-exchange-api", async (importOriginal) => {
+  const mod = await importOriginal<typeof import("@/components/hi/hi-exchange-api")>();
+  return {
+    ...mod,
+    postHiDetailsDismiss: vi.fn(async () => ({ ok: true as const })),
+  };
+});
+
 vi.mock("@/components/hi/hi-sheet-motion", async (importOriginal) => {
   const mod = await importOriginal<typeof import("@/components/hi/hi-sheet-motion")>();
   return {
@@ -177,7 +185,9 @@ describe("HiPageClient (component)", () => {
     expect(screen.getByRole("dialog")).toBeTruthy();
 
     fireEvent.keyDown(document, { key: "Escape" });
-    expect(screen.queryByRole("dialog")).toBeNull();
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).toBeNull();
+    });
 
     await waitFor(() => {
       expect(focusSpy).toHaveBeenCalled();
@@ -191,9 +201,9 @@ describe("HiPageClient (component)", () => {
   it("disables exchange buttons when the details-sent flag is set without a receipt session", () => {
     window.localStorage.setItem(detailsSentStorageKey("didi"), "1");
     renderCard();
-    const mainExchange = screen.getByRole("button", {
+    const mainExchange = screen.getAllByRole("button", {
       name: HI_CONTACT_SENT_BUTTON_LABEL,
-    });
+    })[0]!;
     expect(mainExchange.hasAttribute("disabled")).toBe(true);
     fireEvent.scroll(window);
     const stickyExchange = screen.getAllByRole("button", {

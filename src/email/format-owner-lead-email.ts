@@ -111,6 +111,28 @@ export function buildOwnerLeadRecordEmail(input: OwnerLeadRecordEmailInput): {
   };
 }
 
+/** Single owner email for direct visitor mode (no threading, no append pass). */
+export function buildOwnerDirectExchangeEmail(
+  input: OwnerLeadRecordEmailInput & {
+    jobTitle: string | null;
+    company: string | null;
+    note: string | null;
+  },
+): {
+  subject: string;
+  textPlain: string;
+  textHtml: string;
+} {
+  return buildOwnerLeadRecordEmail({
+    name: input.name,
+    email: input.email,
+    phone: input.phone,
+    sourceUrl: input.sourceUrl,
+    receivedAtIso: input.receivedAtIso,
+    nonProdSinkDestinationLabel: input.nonProdSinkDestinationLabel,
+  });
+}
+
 export function buildOwnerLeadAppendEmail(input: OwnerLeadAppendEmailInput): {
   subject: string;
   textPlain: string;

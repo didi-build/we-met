@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { useState } from "react";
 import { HiExchangeSheet } from "@/components/hi/HiExchangeSheet";
@@ -11,6 +11,14 @@ const sheetCopy = exampleCardInput().copy.exchangeSheet;
 vi.mock("@marsidev/react-turnstile", () => ({
   Turnstile: () => null,
 }));
+
+vi.mock("@/components/hi/hi-exchange-api", async (importOriginal) => {
+  const mod = await importOriginal<typeof import("@/components/hi/hi-exchange-api")>();
+  return {
+    ...mod,
+    postHiDetailsDismiss: vi.fn(async () => ({ ok: true as const })),
+  };
+});
 
 vi.mock("@/components/hi/hi-sheet-motion", async (importOriginal) => {
   const mod = await importOriginal<typeof import("@/components/hi/hi-sheet-motion")>();
@@ -54,7 +62,7 @@ function queryScrim(): HTMLElement | null {
 }
 
 describe("HiExchangeSheet reopen motion", () => {
-  it("applies enter animation classes on the first render after a close", () => {
+  it("applies enter animation classes on the first render after a close", async () => {
     render(<SheetHarness />);
 
     fireEvent.click(screen.getByTestId("open-sheet"));
@@ -62,7 +70,7 @@ describe("HiExchangeSheet reopen motion", () => {
     expect(queryScrim()?.className).toContain("animate-hi-scrim-in");
 
     fireEvent.click(queryScrim()!);
-    expect(queryPanel()).toBeNull();
+    await waitFor(() => expect(queryPanel()).toBeNull());
 
     fireEvent.click(screen.getByTestId("open-sheet"));
     const panel = queryPanel();

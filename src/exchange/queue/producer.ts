@@ -9,11 +9,16 @@ export type FollowupEmailQueueProducer = {
 export type LeadSinkQueueProducer = {
   enqueueLeadSink(
     message: Exclude<WeMetQueueMessage, { type: "visitor_followup" }>,
+    options?: QueueSendOptions,
   ): Promise<void>;
 };
 
+export type QueueSendOptions = {
+  delaySeconds?: number;
+};
+
 export type CloudflareQueueBinding = {
-  send(message: unknown): Promise<void>;
+  send(message: unknown, options?: QueueSendOptions): Promise<void>;
 };
 
 export class MissingQueueBindingError extends Error {
@@ -47,8 +52,8 @@ export function createCloudflareLeadSinkQueueProducer(
   binding: CloudflareQueueBinding,
 ): LeadSinkQueueProducer {
   return {
-    async enqueueLeadSink(message) {
-      await binding.send(message);
+    async enqueueLeadSink(message, options) {
+      await binding.send(message, options);
     },
   };
 }

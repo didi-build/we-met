@@ -35,7 +35,35 @@ export type LeadSinkAppendDetailsMessage = {
   detailsSubmittedAt: string;
 };
 
+export type LeadSinkOwnerEmailMessage = {
+  type: "lead_sink_owner_email";
+  sinkId: string;
+  sinkKind: string;
+  sinkConfig: unknown;
+  lead: VisitorLead;
+  details: VisitorLeadDetails;
+  cardId: string;
+  cardSlug: string;
+  sourceUrl: string;
+  ownerFirstName?: string;
+};
+
+export type OwnerEmailDueMessage = {
+  type: "owner_email_due";
+  sinkId: string;
+  sinkKind: string;
+  sinkConfig: unknown;
+  lead: VisitorLead;
+  details: VisitorLeadDetails;
+  cardId: string;
+  cardSlug: string;
+  sourceUrl: string;
+  ownerFirstName?: string;
+};
+
 export type WeMetQueueMessage =
   | VisitorFollowupQueueMessage
   | LeadSinkRecordLeadMessage
-  | LeadSinkAppendDetailsMessage;
+  | LeadSinkAppendDetailsMessage
+  | LeadSinkOwnerEmailMessage
+  | OwnerEmailDueMessage;

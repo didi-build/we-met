@@ -53,6 +53,20 @@ export type ResolveSinkEmailRecipientResult =
   | { mode: "nonprod"; to: string; sinkDestinationForContent: string };
 
 /** Sink owner mail: production → `sinkConfig.to`; non-prod → test inbox. */
+export type ResolveOwnerSinkReplyToInput = {
+  weMetEnv: string;
+  visitorEmail: string;
+  testMailTo: string | undefined;
+};
+
+/** Owner sink Reply-To: visitor in production; test inbox redirect otherwise. */
+export function resolveOwnerSinkReplyTo(input: ResolveOwnerSinkReplyToInput): string {
+  if (input.weMetEnv === "production") {
+    return input.visitorEmail.trim();
+  }
+  return resolveNonProdTestMailTo(input.testMailTo);
+}
+
 export function resolveSinkEmailRecipient(
   input: ResolveSinkEmailRecipientInput,
 ): ResolveSinkEmailRecipientResult {
