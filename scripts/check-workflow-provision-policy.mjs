@@ -127,6 +127,10 @@ export function parseWorkflowTriggerEvents(content) {
       inlineEvents = parseInlineOnRest(inline[1]);
       return inlineEvents;
     }
+    const quotedInline = /^["']on["']:\s+(.+)$/.exec(noComment);
+    if (quotedInline) {
+      return null;
+    }
     if (/^on:\s*$/.test(noComment) || /^["']on["']:\s*$/.test(noComment.trim())) {
       onLineIndex = i;
       break;
@@ -189,7 +193,9 @@ function workflowReferencesProvision(contents) {
 }
 
 function main() {
-  const files = readdirSync(WORKFLOWS_DIR).filter((name) => name.endsWith(".yml"));
+  const files = readdirSync(WORKFLOWS_DIR).filter(
+    (name) => name.endsWith(".yml") || name.endsWith(".yaml"),
+  );
   for (const file of files) {
     const path = resolve(WORKFLOWS_DIR, file);
     const contents = readFileSync(path, "utf8");
