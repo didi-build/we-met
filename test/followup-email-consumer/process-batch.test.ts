@@ -16,6 +16,7 @@ import {
 } from "@/followup-email-consumer/process-batch";
 import { MemoryConsumerLeadDeliveryLedger } from "../followup-email-consumer/memory-consumer-ledger";
 import { leadEmailConsumerEnabled } from "../helpers/lead-email-deps";
+import { MemoryExchangeOwnerEmailStore } from "@/exchange-owner-email/memory-store";
 
 const card: CardEmailSnapshot = {
   slug: "demo",
@@ -130,6 +131,9 @@ function createDeps(
     logLedgerRowMissing,
     logLedgerUpdateFailed,
     logLeadSinkAppendDeferred: vi.fn(),
+    logExchangeOwnerEmailRowMissing: vi.fn(),
+    exchangeOwnerEmail:
+      overrides.exchangeOwnerEmail ?? new MemoryExchangeOwnerEmailStore(),
     logLeadSinkLedgerRecordFailed: vi.fn(),
     logLeadSinkLedgerMarkFailed: vi.fn(),
     logLeadSinkAttemptFailure: vi.fn(),

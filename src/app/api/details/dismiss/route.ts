@@ -52,8 +52,6 @@ export async function POST(request: Request) {
     case "invalid_token":
     case "card_not_found":
       return Response.json({ error: "invalid_token" }, { status: 401 });
-    case "server_error":
-      return Response.json({ error: "server_error" }, { status: 500 });
     default:
       return Response.json({ error: "server_error" }, { status: 500 });
   }

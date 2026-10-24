@@ -281,10 +281,9 @@ describe("exchange and details routes lead_email_unavailable (integration)", () 
         cardId: card.id,
         createdAt: "2026-10-16T12:00:00.000Z",
       });
-      await exchangeOwnerEmail.tryFinalize({
+      await exchangeOwnerEmail.trySetTriggeredAt({
         leadId,
-        details: null,
-        finalizedAt: "2026-10-16T12:00:00.000Z",
+        triggeredAt: "2026-10-16T12:00:00.000Z",
       });
 
       const tokenNowSeconds = Math.floor(Date.now() / 1000);

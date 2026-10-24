@@ -19,9 +19,12 @@ import { parseLeadSinkMessage } from "@/followup-email-consumer/validate";
 import type { FollowupQueueMessage } from "@/followup-email-consumer/process-batch";
 import { UnsupportedQueueMessageError } from "@/followup-email-consumer/unsupported-queue-message";
 import { LEAD_EMAIL_PAUSED_ERROR } from "@/lead-email/paused";
+import type { ExchangeOwnerEmailStore } from "@/exchange-owner-email/types";
+import { OWNER_EMAIL_SEND_CLAIM_STALE_MS } from "@/exchange-owner-email/types";
 
 export type LeadSinkConsumerDeps = {
   readLeadEmailControls: () => Promise<LeadEmailControls>;
+  exchangeOwnerEmail: ExchangeOwnerEmailStore;
   sinkHandlers: Map<string, LeadSinkHandler>;
   ledger: ConsumerLeadDeliveryLedger;
   logUnsupportedType(typeLabel: string): void;
@@ -47,6 +50,7 @@ export type LeadSinkConsumerDeps = {
   logLedgerRowMissing(leadId: string, sinkId: string): void;
   logLedgerUpdateFailed(leadId: string, sinkId: string, errorCode: string): void;
   logLeadSinkAppendDeferred(leadId: string, sinkId: string, attempt: number): void;
+  logExchangeOwnerEmailRowMissing(leadId: string): void;
   now: () => Date;
 };
 
@@ -222,9 +226,38 @@ async function processQueuedLeadSink(
     visitorEmailMode: leadEmailControls.visitorEmailMode,
   };
 
+  const isOwnerEmailMessage =
+    parsed.type === "lead_sink_owner_email" || parsed.type === "owner_email_due";
+
+  if (isOwnerEmailMessage) {
+    const now = deps.now();
+    const claimedAt = now.toISOString();
+    const staleBefore = new Date(
+      now.getTime() - OWNER_EMAIL_SEND_CLAIM_STALE_MS,
+    ).toISOString();
+    const claim = await deps.exchangeOwnerEmail.tryClaimOwnerEmailSend(
+      parsed.lead.leadId,
+      claimedAt,
+      staleBefore,
+    );
+    if (claim === "row_missing") {
+      deps.logExchangeOwnerEmailRowMissing(parsed.lead.leadId);
+      message.ack();
+      return;
+    }
+    if (claim !== "claimed") {
+      message.ack();
+      return;
+    }
+  }
+
   try {
-    if (parsed.type === "lead_sink_owner_email" || parsed.type === "owner_email_due") {
+    if (isOwnerEmailMessage) {
       const result = await handler.deliverOwnerEmail(parsed, handlerContext);
+      await deps.exchangeOwnerEmail.confirmOwnerEmailSent(
+        parsed.lead.leadId,
+        deps.now().toISOString(),
+      );
       await afterSuccessfulDelivery(message, parsed, result.externalRef, deps);
       return;
     }
@@ -241,6 +274,9 @@ async function processQueuedLeadSink(
     });
     await afterSuccessfulDelivery(message, parsed, result.externalRef, deps);
   } catch (error) {
+    if (isOwnerEmailMessage) {
+      await deps.exchangeOwnerEmail.releaseOwnerEmailSendClaim(parsed.lead.leadId);
+    }
     const errorFields = followupEmailErrorLogFields(error);
     if (!isRetryableFollowupEmailError(errorFields.code)) {
       await markNonRetryableFailure(message, parsed, errorFields.code, deps);

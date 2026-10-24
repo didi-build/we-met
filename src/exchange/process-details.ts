@@ -16,8 +16,7 @@ export type ProcessDetailsResult =
   | { status: "success" }
   | { status: "invalid_token" }
   | { status: "card_not_found" }
-  | { status: "details_already_sent" }
-  | { status: "server_error" };
+  | { status: "details_already_sent" };
 
 function leadFromToken(
   payload: {
@@ -63,7 +62,7 @@ export async function processDetails(
     return { status: "card_not_found" };
   }
 
-  if (await deps.exchangeOwnerEmail.hasFinalized(verified.payload.leadId)) {
+  if (await deps.exchangeOwnerEmail.hasTriggered(verified.payload.leadId)) {
     return { status: "details_already_sent" };
   }
 
@@ -86,9 +85,5 @@ export async function processDetails(
       return { status: "success" };
     case "already_finalized":
       return { status: "details_already_sent" };
-    case "server_error":
-      return { status: "server_error" };
-    default:
-      return { status: "server_error" };
   }
 }

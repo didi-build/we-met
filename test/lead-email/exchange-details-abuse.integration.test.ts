@@ -11,6 +11,7 @@ import { createExchangeOwnerEmailStoreFromD1 } from "@/exchange-owner-email/d1-r
 import { createLeadDeliveryLedgerFromD1 } from "@/lead-delivery-ledger/d1-repository";
 import { assertLeadEmailCapacity } from "@/lead-email/availability";
 import { processDetails } from "@/exchange/process-details";
+import { processDetailsDismiss } from "@/exchange/process-details-dismiss";
 import { processExchange } from "@/exchange/process-exchange";
 import { createDetailsToken } from "@/exchange/token";
 import { exampleCardInput } from "../helpers/example-card";
@@ -312,6 +313,62 @@ describe("exchange and details abuse controls (D1 integration)", () => {
         .first<{ count: number }>();
       expect(owner?.count).toBe(1);
       expect(visitor?.count).toBe(1);
+    });
+  });
+
+  it("rejects exchange at global cap while details dismiss does not recheck caps", async () => {
+    await withIsolatedLocalD1(async (db) => {
+      await seedSettings(db, {
+        [APP_SETTING_LEAD_EMAIL_ENABLED]: "1",
+        [APP_SETTING_DAILY_CAP_GLOBAL]: "1",
+        [APP_SETTING_DAILY_CAP_PER_CARD]: "100",
+      });
+      const repo = new MemoryCardRepository();
+      const card = await repo.upsertCard(exampleCardInput());
+      await db
+        .prepare(
+          `INSERT INTO daily_send_counts (day, card_id, kind, count) VALUES ('2026-10-16', ?, 'owner', 1)`,
+        )
+        .bind(card.id)
+        .run();
+      const sinks = [
+        {
+          id: "sink-1",
+          cardId: card.id,
+          kind: "email",
+          config: { to: "owner@example.com" },
+          enabled: true,
+          createdAt: "",
+          updatedAt: "",
+        },
+      ];
+      const sinkMessages: unknown[] = [];
+      const deps = exchangeDeps(db, sinkMessages);
+      const token = createDetailsToken(
+        "secret",
+        {
+          leadId: "lead-abuse-1",
+          cardId: card.id,
+          cardSlug: card.slug,
+          visitorEmail: "visitor@example.com",
+          visitorName: "Visitor",
+        },
+        Math.floor(new Date("2026-10-16T12:00:00.000Z").getTime() / 1000),
+      );
+      const dismiss = await processDetailsDismiss({ token }, card, sinks, {
+        tokenSecret: "secret",
+        environment: "preview",
+        leadSinkQueue: deps.leadSinkQueue,
+        deliveryLedger: deps.deliveryLedger,
+        exchangeOwnerEmail: deps.exchangeOwnerEmail,
+        deliveryLogger: deps.deliveryLogger,
+        leadSinkLogger: deps.leadSinkLogger,
+        createLedgerId: () => "ledger-dismiss-global",
+        now: deps.now,
+        baseUrl: "https://we-met.link",
+      });
+      expect(dismiss.status).toBe("success");
+      expect(sinkMessages.length).toBeGreaterThan(0);
     });
   });
 

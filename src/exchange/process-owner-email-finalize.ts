@@ -25,7 +25,7 @@ export type ProcessOwnerEmailFinalizeDeps = {
 };
 
 export type ProcessOwnerEmailFinalizeResult =
-  { status: "success" } | { status: "already_finalized" } | { status: "server_error" };
+  { status: "success" } | { status: "already_finalized" };
 
 const EMPTY_DETAILS: VisitorLeadDetails = {
   phone: null,
@@ -41,18 +41,17 @@ export async function processOwnerEmailFinalize(
   sinks: LeadSinkRecord[],
   deps: ProcessOwnerEmailFinalizeDeps,
 ): Promise<ProcessOwnerEmailFinalizeResult> {
-  const finalizedAt = deps.now().toISOString();
+  const triggeredAt = deps.now().toISOString();
   await deps.exchangeOwnerEmail.ensurePending({
     leadId: lead.leadId,
     cardId: card.id,
-    createdAt: finalizedAt,
+    createdAt: triggeredAt,
   });
-  const newlyFinalized = await deps.exchangeOwnerEmail.tryFinalize({
+  const newlyTriggered = await deps.exchangeOwnerEmail.trySetTriggeredAt({
     leadId: lead.leadId,
-    details,
-    finalizedAt,
+    triggeredAt,
   });
-  if (!newlyFinalized) {
+  if (!newlyTriggered) {
     return { status: "already_finalized" };
   }
 
@@ -68,7 +67,7 @@ export async function processOwnerEmailFinalize(
     createLedgerId: deps.createLedgerId,
   };
 
-  const outcome = await dispatchOwnerEmailImmediate(
+  await dispatchOwnerEmailImmediate(
     sinksForDispatch,
     lead,
     details ?? EMPTY_DETAILS,
@@ -79,8 +78,5 @@ export async function processOwnerEmailFinalize(
     sinkDispatchDeps,
   );
 
-  if (outcome === "failed") {
-    return { status: "server_error" };
-  }
   return { status: "success" };
 }

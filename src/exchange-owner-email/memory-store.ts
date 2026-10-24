@@ -1,11 +1,14 @@
-import type { VisitorLeadDetails } from "@/exchange/types";
-import type { ExchangeOwnerEmailStore } from "@/exchange-owner-email/types";
+import type {
+  ExchangeOwnerEmailStore,
+  OwnerEmailSendClaimResult,
+} from "@/exchange-owner-email/types";
 
 type Row = {
   leadId: string;
   cardId: string;
   triggeredAt: string | null;
-  details: VisitorLeadDetails | null;
+  ownerEmailClaimedAt: string | null;
+  ownerEmailSentAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -25,29 +28,68 @@ export class MemoryExchangeOwnerEmailStore implements ExchangeOwnerEmailStore {
       leadId: input.leadId,
       cardId: input.cardId,
       triggeredAt: null,
-      details: null,
+      ownerEmailClaimedAt: null,
+      ownerEmailSentAt: null,
       createdAt: input.createdAt,
       updatedAt: input.createdAt,
     });
   }
 
-  async tryFinalize(input: {
+  async trySetTriggeredAt(input: {
     leadId: string;
-    details: VisitorLeadDetails | null;
-    finalizedAt: string;
+    triggeredAt: string;
   }): Promise<boolean> {
     const row = this.rows.get(input.leadId);
     if (!row || row.triggeredAt) {
       return false;
     }
-    row.triggeredAt = input.finalizedAt;
-    row.details = input.details;
-    row.updatedAt = input.finalizedAt;
+    row.triggeredAt = input.triggeredAt;
+    row.updatedAt = input.triggeredAt;
     return true;
   }
 
-  async hasFinalized(leadId: string): Promise<boolean> {
+  async hasTriggered(leadId: string): Promise<boolean> {
     const row = this.rows.get(leadId);
     return Boolean(row?.triggeredAt);
+  }
+
+  async tryClaimOwnerEmailSend(
+    leadId: string,
+    claimedAt: string,
+    staleBeforeIso: string,
+  ): Promise<OwnerEmailSendClaimResult> {
+    const row = this.rows.get(leadId);
+    if (!row) {
+      return "row_missing";
+    }
+    if (row.ownerEmailSentAt) {
+      return "already_sent";
+    }
+    const claim = row.ownerEmailClaimedAt;
+    if (claim && claim >= staleBeforeIso) {
+      return "contention";
+    }
+    row.ownerEmailClaimedAt = claimedAt;
+    row.updatedAt = claimedAt;
+    return "claimed";
+  }
+
+  async confirmOwnerEmailSent(leadId: string, sentAt: string): Promise<void> {
+    const row = this.rows.get(leadId);
+    if (!row) {
+      return;
+    }
+    row.ownerEmailSentAt = sentAt;
+    row.ownerEmailClaimedAt = null;
+    row.updatedAt = sentAt;
+  }
+
+  async releaseOwnerEmailSendClaim(leadId: string): Promise<void> {
+    const row = this.rows.get(leadId);
+    if (!row || row.ownerEmailSentAt) {
+      return;
+    }
+    row.ownerEmailClaimedAt = null;
+    row.updatedAt = new Date().toISOString();
   }
 }

@@ -16,8 +16,7 @@ export type ProcessDetailsDismissResult =
   | { status: "success" }
   | { status: "invalid_token" }
   | { status: "card_not_found" }
-  | { status: "already_finalized" }
-  | { status: "server_error" };
+  | { status: "already_finalized" };
 
 function leadFromToken(
   payload: {
@@ -63,7 +62,7 @@ export async function processDetailsDismiss(
     return { status: "card_not_found" };
   }
 
-  if (await deps.exchangeOwnerEmail.hasFinalized(verified.payload.leadId)) {
+  if (await deps.exchangeOwnerEmail.hasTriggered(verified.payload.leadId)) {
     return { status: "already_finalized" };
   }
 
@@ -74,9 +73,5 @@ export async function processDetailsDismiss(
       return { status: "success" };
     case "already_finalized":
       return { status: "already_finalized" };
-    case "server_error":
-      return { status: "server_error" };
-    default:
-      return { status: "server_error" };
   }
 }

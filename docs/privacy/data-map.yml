@@ -409,9 +409,9 @@ d1_tables:
       created_at:
         data: Row creation time
         purpose: audit
-      details_json:
-        data: Optional visitor details JSON from the details step (no direct email in this column)
-        purpose: owner email payload when finalized before fallback
+      owner_email_claimed_at:
+        data: In-flight owner email send claim timestamp
+        purpose: single-worker send gate before owner_email_sent_at is set
       lead_id:
         data: Opaque lead correlation id
         purpose: one owner email per exchange idempotency

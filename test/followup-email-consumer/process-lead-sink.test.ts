@@ -6,6 +6,8 @@ import type { LeadSinkConsumerDeps } from "@/followup-email-consumer/process-lea
 import { createFakeLeadSinkHandler } from "./fake-lead-sink-handler";
 import { MemoryConsumerLeadDeliveryLedger } from "./memory-consumer-ledger";
 import { leadEmailConsumerEnabled } from "../helpers/lead-email-deps";
+import { MemoryExchangeOwnerEmailStore } from "@/exchange-owner-email/memory-store";
+import { seedOwnerEmailExchangeRow } from "../helpers/owner-email-consumer";
 
 function sinkOwnerEmailBody() {
   return {
@@ -64,8 +66,11 @@ function createDeps(
   overrides: Partial<LeadSinkConsumerDeps> = {},
 ): LeadSinkConsumerDeps {
   const resolvedLedger = overrides.ledger ?? ledger;
+  const exchangeOwnerEmail =
+    overrides.exchangeOwnerEmail ?? new MemoryExchangeOwnerEmailStore();
   return {
     ...leadEmailConsumerEnabled,
+    exchangeOwnerEmail,
     sinkHandlers: new Map([["fake", handler]]),
     ledger: resolvedLedger,
     logUnsupportedType: vi.fn(),
@@ -77,6 +82,7 @@ function createDeps(
     logLedgerRowMissing: vi.fn(),
     logLedgerUpdateFailed: vi.fn(),
     logLeadSinkAppendDeferred: vi.fn(),
+    logExchangeOwnerEmailRowMissing: vi.fn(),
     now: () => new Date("2026-10-12T12:00:00.000Z"),
     ...overrides,
   };
@@ -86,13 +92,20 @@ describe("processLeadSinkQueueMessage with fake sink (unit)", () => {
   it("delivers owner email messages through deliverOwnerEmail", async () => {
     const ledger = new MemoryConsumerLeadDeliveryLedger();
     ledger.seedQueued("lead-1", "sink-1", "record");
+    const exchangeOwnerEmail = new MemoryExchangeOwnerEmailStore();
+    await seedOwnerEmailExchangeRow(
+      exchangeOwnerEmail,
+      "lead-1",
+      "card-1",
+      "2026-10-12T12:00:00.000Z",
+    );
     let ownerDelivered = false;
     const handler = createFakeLeadSinkHandler({
       onOwnerEmail: () => {
         ownerDelivered = true;
       },
     });
-    const deps = createDeps(ledger, handler);
+    const deps = createDeps(ledger, handler, { exchangeOwnerEmail });
     const message = createMessage(sinkOwnerEmailBody());
 
     await processLeadSinkQueueMessage(message, deps);
@@ -138,12 +151,19 @@ describe("processLeadSinkQueueMessage with fake sink (unit)", () => {
   it("retries retryable handler failures", async () => {
     const ledger = new MemoryConsumerLeadDeliveryLedger();
     ledger.seedQueued("lead-1", "sink-1", "record");
+    const exchangeOwnerEmail = new MemoryExchangeOwnerEmailStore();
+    await seedOwnerEmailExchangeRow(
+      exchangeOwnerEmail,
+      "lead-1",
+      "card-1",
+      "2026-10-12T12:00:00.000Z",
+    );
     const handler = createFakeLeadSinkHandler({
       deliverOwnerEmail: async () => {
         throw new FollowupEmailError("cloudflare_send_failed");
       },
     });
-    const deps = createDeps(ledger, handler);
+    const deps = createDeps(ledger, handler, { exchangeOwnerEmail });
     const message = createMessage(sinkOwnerEmailBody(), { attempts: 2 });
 
     await processLeadSinkQueueMessage(message, deps);
