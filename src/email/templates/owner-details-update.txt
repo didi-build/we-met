@@ -4,7 +4,8 @@
 
 {{lead_name}}
 {{lead_email}}
-{{#if job_title}}
+{{#if lead_phone}}
+Phone:     {{lead_phone}}{{/if}}{{#if job_title}}
 Job title: {{job_title}}{{/if}}{{#if company}}
 Company:   {{company}}{{/if}}{{#if note}}
 

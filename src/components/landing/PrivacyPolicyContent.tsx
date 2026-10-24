@@ -28,11 +28,11 @@ export function PrivacyPolicyContent() {
       </p>
       <p className="lp-body">
         <em>People who exchange details with you.</em> When someone taps &quot;Exchange
-        contact&quot; on your card, they enter their name and email. On an optional
-        second step they can add a phone number, job title, company and a note. We email
-        these details to you (Reply-To is the visitor) so you can follow up. We do not
-        keep their lead contents in our database. We keep only delivery records: whether
-        an email was queued, sent or failed, when, and an error code if it failed.
+        contact&quot; on your card, they enter their name and email, and can add a phone
+        number, job title, company and a note. We email these details to you (Reply-To
+        is the visitor) so you can follow up. We do not keep their lead contents in our
+        database. We keep only delivery records: whether an email was queued, sent or
+        failed, when, and an error code if it failed.
       </p>
       <p className="lp-body">
         <em>Visitor card pages.</em> After someone submits the optional details step on

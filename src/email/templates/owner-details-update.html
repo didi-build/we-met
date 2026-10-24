@@ -38,6 +38,12 @@ a{color:#171717}
 <tr><td class="wm-ink" style="font-size:18px;line-height:26px;mso-line-height-rule:exactly;color:#171717;padding:0 0 28px;word-break:break-word"><a href="mailto:{{lead_email}}" style="color:#171717;text-decoration:underline">{{lead_email}}</a></td></tr>
 <tr><td>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:15px;line-height:22px;mso-line-height-rule:exactly">
+{{#if lead_phone}}
+<tr>
+<td class="wm-muted wm-row" width="96" valign="top" style="padding:14px 12px 14px 0;border-top:1px solid #dfdfdf;color:#555555">Phone</td>
+<td class="wm-ink wm-row" valign="top" style="padding:14px 0;border-top:1px solid #dfdfdf;color:#171717"><a href="tel:{{lead_phone_tel}}" style="color:#171717;text-decoration:underline">{{lead_phone}}</a></td>
+</tr>
+{{/if}}
 {{#if job_title}}
 <tr>
 <td class="wm-muted wm-row" width="96" valign="top" style="padding:14px 12px 14px 0;border-top:1px solid #dfdfdf;color:#555555">Job title</td>

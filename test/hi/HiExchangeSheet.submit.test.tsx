@@ -129,6 +129,12 @@ describe("HiExchangeSheet exchange submit", () => {
     });
   });
 
+  it("does not render a phone field on exchange step 1", () => {
+    renderOpenSheet();
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.querySelector('input[autocomplete="tel-national"]')).toBeNull();
+  });
+
   it("waits for Turnstile without a spam check message, then auto-submits when the token arrives", async () => {
     vi.mocked(postHiExchange).mockResolvedValue({
       ok: true,
@@ -156,6 +162,9 @@ describe("HiExchangeSheet exchange submit", () => {
           turnstileToken: "turnstile-token",
         }),
       );
+      const payload = vi.mocked(postHiExchange).mock.calls[0]?.[0];
+      expect(payload).toBeDefined();
+      expect(payload).not.toHaveProperty("phone");
     });
   });
 

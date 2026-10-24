@@ -73,7 +73,7 @@ function recordTemplateData(
   };
 }
 
-function appendTemplateData(
+export function appendTemplateData(
   input: OwnerLeadAppendEmailInput,
 ): Record<string, string | undefined> {
   const phone = input.phone?.trim() ?? "";

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  appendTemplateData,
   buildOwnerLeadAppendEmail,
   buildOwnerLeadRecordEmail,
   formatOwnerLeadEmailSubjects,
@@ -47,6 +48,59 @@ describe("format owner lead email (unit)", () => {
       receivedAtIso: "2026-10-10T12:00:00.000Z",
     });
     expect(content.textPlain).toContain("Phone:     -");
+  });
+
+  it("sets lead_phone template fields in appendTemplateData when phone is given", () => {
+    const data = appendTemplateData({
+      name: "Sam",
+      email: "sam@example.com",
+      phone: "+1 555 0103",
+      jobTitle: null,
+      company: null,
+      note: null,
+    });
+    expect(data.lead_phone).toBe("+1 555 0103");
+    expect(data.lead_phone_tel).toBe("+15550103");
+  });
+
+  it("leaves lead_phone template fields unset in appendTemplateData when phone is null", () => {
+    const data = appendTemplateData({
+      name: "Sam",
+      email: "sam@example.com",
+      phone: null,
+      jobTitle: null,
+      company: null,
+      note: null,
+    });
+    expect(data.lead_phone).toBeUndefined();
+    expect(data.lead_phone_tel).toBeUndefined();
+  });
+
+  it("includes visitor phone in owner details-update email when provided", () => {
+    const content = buildOwnerLeadAppendEmail({
+      name: "Sam",
+      email: "sam@example.com",
+      phone: "+1 555 0104",
+      jobTitle: null,
+      company: null,
+      note: null,
+    });
+    expect(content.textPlain).toContain("Phone:     +1 555 0104");
+    expect(content.textHtml).toContain('href="tel:+15550104"');
+    expect(content.textHtml).toContain("+1 555 0104");
+  });
+
+  it("omits phone row from owner details-update email when phone is null", () => {
+    const content = buildOwnerLeadAppendEmail({
+      name: "Sam",
+      email: "sam@example.com",
+      phone: null,
+      jobTitle: "Founder",
+      company: null,
+      note: null,
+    });
+    expect(content.textPlain).not.toMatch(/Phone:/);
+    expect(content.textHtml).not.toContain(">Phone</td>");
   });
 
   it("includes only provided detail fields in append plain text", () => {
