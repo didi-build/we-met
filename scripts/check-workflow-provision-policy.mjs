@@ -33,23 +33,77 @@ function normalizeEventToken(token) {
 }
 
 /**
+ * @param {string} token
+ */
+function isWorkflowEventName(token) {
+  return /^[a-z_][a-z0-9_-]*$/.test(token);
+}
+
+/**
+ * @param {string[]} events
+ * @returns {string[] | null}
+ */
+function normalizeEventList(events) {
+  const normalized = events.map((part) => normalizeEventToken(part)).filter(Boolean);
+  if (normalized.length === 0) return [];
+  if (!normalized.every(isWorkflowEventName)) return null;
+  return normalized;
+}
+
+/**
+ * @param {string} rest
+ * @returns {string[] | null}
+ */
+function parseFlowMapOnRest(rest) {
+  const trimmed = rest.trim();
+  if (!trimmed.startsWith("{")) return null;
+  const close = trimmed.lastIndexOf("}");
+  if (close <= 0) return null;
+  const inner = trimmed.slice(1, close);
+  /** @type {string[]} */
+  const keys = [];
+  let depth = 0;
+  let keyStart = -1;
+  for (let i = 0; i < inner.length; i++) {
+    const c = inner[i];
+    if (c === "{" || c === "[") depth++;
+    else if (c === "}" || c === "]") depth--;
+    else if (depth === 0) {
+      if (keyStart === -1 && /[A-Za-z_]/.test(c)) {
+        keyStart = i;
+      } else if (keyStart !== -1 && c === ":") {
+        const key = inner.slice(keyStart, i).trim();
+        if (!/^[A-Za-z_][A-Za-z0-9_-]*$/.test(key)) return null;
+        keys.push(normalizeEventToken(key));
+        keyStart = -1;
+      }
+    }
+  }
+  if (keyStart !== -1) return null;
+  if (trimmed.length > close + 1 && trimmed.slice(close + 1).trim()) return null;
+  const events = normalizeEventList(keys);
+  if (!events || events.length === 0) return null;
+  return events;
+}
+
+/**
  * @param {string} rest
  * @returns {string[] | null}
  */
 function parseInlineOnRest(rest) {
   const trimmed = rest.trim();
   if (!trimmed) return null;
+  if (trimmed.startsWith("{")) {
+    return parseFlowMapOnRest(trimmed);
+  }
   const bracket = /^\[([^\]]*)\]\s*$/.exec(trimmed);
   if (bracket) {
     const inner = bracket[1].trim();
     if (!inner) return [];
-    return inner
-      .split(",")
-      .map((part) => normalizeEventToken(part))
-      .filter(Boolean);
+    return normalizeEventList(inner.split(",").map((part) => part.trim()));
   }
   const first = trimmed.split(/\s+/)[0];
-  return [normalizeEventToken(first)];
+  return normalizeEventList([first]);
 }
 
 /**
@@ -72,6 +126,10 @@ export function parseWorkflowTriggerEvents(content) {
     if (inline) {
       inlineEvents = parseInlineOnRest(inline[1]);
       return inlineEvents;
+    }
+    const quotedInline = /^["']on["']:\s+(.+)$/.exec(noComment);
+    if (quotedInline) {
+      return null;
     }
     if (/^on:\s*$/.test(noComment) || /^["']on["']:\s*$/.test(noComment.trim())) {
       onLineIndex = i;
@@ -102,20 +160,25 @@ export function parseWorkflowTriggerEvents(content) {
 
     const seqMatch = /^\s*-\s+([A-Za-z_][A-Za-z0-9_-]*)\s*:?\s*$/.exec(noComment);
     if (seqMatch) {
-      triggers.add(seqMatch[1].toLowerCase());
+      const key = seqMatch[1].toLowerCase();
+      if (!isWorkflowEventName(key)) return null;
+      triggers.add(key);
       continue;
     }
 
     const keyMatch = /^\s*([A-Za-z_][A-Za-z0-9_-]*)\s*:/.exec(noComment);
     if (keyMatch) {
-      triggers.add(keyMatch[1].toLowerCase());
+      const key = keyMatch[1].toLowerCase();
+      if (!isWorkflowEventName(key)) return null;
+      triggers.add(key);
       continue;
     }
 
     return null;
   }
 
-  return triggers.size > 0 ? [...triggers] : null;
+  if (triggers.size === 0) return null;
+  return [...triggers];
 }
 
 /**
@@ -130,13 +193,15 @@ function workflowReferencesProvision(contents) {
 }
 
 function main() {
-  const files = readdirSync(WORKFLOWS_DIR).filter((name) => name.endsWith(".yml"));
+  const files = readdirSync(WORKFLOWS_DIR).filter(
+    (name) => name.endsWith(".yml") || name.endsWith(".yaml"),
+  );
   for (const file of files) {
     const path = resolve(WORKFLOWS_DIR, file);
     const contents = readFileSync(path, "utf8");
     if (!workflowReferencesProvision(contents)) continue;
     const triggers = parseWorkflowTriggerEvents(contents);
-    if (!triggers) {
+    if (!triggers || triggers.length === 0) {
       fail(
         `${file} uses ${PROVISION_MARKER} but workflow on: triggers could not be parsed`,
       );
