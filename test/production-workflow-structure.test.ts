@@ -107,8 +107,11 @@ const CONSUMER_PREPARE_STEP_NAME =
   "Prepare follow-up email consumer Wrangler config (production D1 ID)";
 const CONSUMER_GUARDS_STEP_NAME = "Deploy-time guards (production consumer)";
 const WARMUP_GUARDS_STEP_NAME = "Deploy-time guards (production warmup)";
+const PROVISION_STEP_NAME = "Provision D1 and R2 (production)";
 const MIGRATIONS_STEP_NAME = "Apply production D1 migrations";
 const APP_DEPLOY_STEP_NAME = "Deploy Worker to production";
+const CONSUMER_COMMITTED_GUARDS_STEP_NAME =
+  "Deploy-time guards (production consumer, committed config)";
 
 const CONSUMER_PREPARE_ALLOWED_SECRET = "SECRETS.WE_MET_D1_DATABASE_ID_PRODUCTION";
 
@@ -269,7 +272,7 @@ function assertDeployJobCloudflareTokenIsolation(deploySection: string): void {
   }
 }
 
-/** Deploy job steps as of DIDI-595 (must stay unchanged aside from `needs: plan`). */
+/** Deploy job steps prefix through app deploy (DIDI-803 adds consumer secret name check before provision). */
 const EXPECTED_DEPLOY_STEPS_BLOCK = `    steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -284,6 +287,56 @@ const EXPECTED_DEPLOY_STEPS_BLOCK = `    steps:
           node scripts/check-deploy-guards.mjs \\
             --target consumer-production \\
             --config workers/we-met-followup-email-consumer/wrangler.production.jsonc
+      - name: Require production consumer Worker secrets (names only)
+        env:
+          CLOUDFLARE_API_TOKEN: \${{ secrets.CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION }}
+          CLOUDFLARE_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          SECRET_LIST_STDOUT=$(mktemp)
+          SECRET_LIST_STDERR=$(mktemp)
+          if ! npx wrangler secret list --name we-met-followup-email-consumer \\
+            >"$SECRET_LIST_STDOUT" 2>"$SECRET_LIST_STDERR"; then
+            echo "::error::wrangler secret list failed for Worker we-met-followup-email-consumer using CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION. Production follow-up consumer deploy was stopped. See docs/decisions/0017-cloudflare-api-credentials.md for token scoping."
+            grep -oE '\\[code: [0-9]+\\]' "$SECRET_LIST_STDERR" | sort -u || true
+            exit 1
+          fi
+          export SECRET_LIST_STDOUT
+          node --input-type=module -e "
+            import { readFileSync } from 'node:fs';
+            const required = [
+              'WE_MET_EMAIL_FROM_CLOUDFLARE',
+              'WE_MET_FROM_DISPLAY_NAME',
+            ];
+            const raw = readFileSync(process.env.SECRET_LIST_STDOUT, 'utf8');
+            const firstBracket = raw.indexOf('[');
+            const lastBracket = raw.lastIndexOf(']');
+            if (firstBracket === -1 || lastBracket === -1 || lastBracket < firstBracket) {
+              console.error('::error::Could not locate a JSON array in wrangler secret list stdout for we-met-followup-email-consumer. Production follow-up consumer deploy was stopped.');
+              process.exit(1);
+            }
+            const jsonText = raw.slice(firstBracket, lastBracket + 1);
+            let parsed;
+            try {
+              parsed = JSON.parse(jsonText);
+            } catch {
+              console.error('::error::wrangler secret list stdout was not valid JSON for we-met-followup-email-consumer. Production follow-up consumer deploy was stopped.');
+              process.exit(1);
+            }
+            if (!Array.isArray(parsed)) {
+              console.error('::error::Unexpected wrangler secret list shape for we-met-followup-email-consumer; expected a JSON array. Production follow-up consumer deploy was stopped.');
+              process.exit(1);
+            }
+            const names = new Set(parsed.map((entry) => entry?.name).filter(Boolean));
+            const missing = required.filter((name) => !names.has(name));
+            if (missing.length > 0) {
+              for (const name of missing) {
+                console.error('::error::Missing required Worker secret on we-met-followup-email-consumer: ' + name + '. Production follow-up consumer deploy was stopped.');
+              }
+              process.exit(1);
+            }
+            console.log('All required production consumer secret names are present (' + required.length + ').');
+          "
       - name: Provision D1 and R2 (production)
         id: provision
         env:
@@ -404,10 +457,17 @@ describe("Deploy production workflow structure (unit)", () => {
     const turnstileIdx = deploySection.indexOf("Require production Turnstile site key");
     const migrationsIdx = deploySection.indexOf(MIGRATIONS_STEP_NAME);
     const appDeployIdx = deploySection.indexOf("opennextjs-cloudflare deploy");
+    const consumerCommittedGuardsIdx = deploySection.indexOf(
+      CONSUMER_COMMITTED_GUARDS_STEP_NAME,
+    );
+    const provisionIdx = deploySection.indexOf(PROVISION_STEP_NAME);
     const consumerDeployIdx = deploySection.indexOf(
       "Deploy follow-up email consumer to production",
     );
     const warmupDeployIdx = deploySection.indexOf(WARMUP_DEPLOY_STEP_NAME);
+    const consumerSecretCheckIdx = deploySection.indexOf(
+      CONSUMER_SECRET_CHECK_STEP_NAME,
+    );
     expect(productionGuardsIdx).toBeGreaterThan(-1);
     expect(consumerPrepareIdx).toBeGreaterThan(productionGuardsIdx);
     expect(consumerGuardsIdx).toBeGreaterThan(consumerPrepareIdx);
@@ -415,14 +475,18 @@ describe("Deploy production workflow structure (unit)", () => {
     expect(turnstileIdx).toBeGreaterThan(warmupGuardsIdx);
     expect(migrationsIdx).toBeGreaterThan(warmupGuardsIdx);
     expect(appDeployIdx).toBeGreaterThan(turnstileIdx);
-    const consumerSecretCheckIdx = deploySection.indexOf(
-      CONSUMER_SECRET_CHECK_STEP_NAME,
-    );
+    expect(consumerCommittedGuardsIdx).toBeGreaterThan(-1);
+    expect(provisionIdx).toBeGreaterThan(-1);
+    expect(consumerSecretCheckIdx).toBeGreaterThan(consumerCommittedGuardsIdx);
+    expect(consumerSecretCheckIdx).toBeLessThan(provisionIdx);
+    expect(consumerSecretCheckIdx).toBeLessThan(migrationsIdx);
+    expect(consumerSecretCheckIdx).toBeLessThan(appDeployIdx);
     expect(consumerDeployIdx).toBeGreaterThan(appDeployIdx);
-    expect(consumerSecretCheckIdx).toBeGreaterThan(appDeployIdx);
     expect(consumerSecretCheckIdx).toBeLessThan(consumerDeployIdx);
     expect(warmupDeployIdx).toBeGreaterThan(consumerDeployIdx);
     expect(deploySection).not.toContain("WE_MET_TEST_MAIL_TO");
+    expect(deploySection).not.toContain("stdoutPreview");
+    expect(deploySection).not.toMatch(/cat "\$SECRET_LIST_STDERR"/);
   });
 
   it("plan job uses only pinned actions/* SHAs", () => {
