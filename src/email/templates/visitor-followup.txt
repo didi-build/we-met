@@ -14,7 +14,5 @@ You're getting this because you exchanged contact info at {{card_url}}.
 
 This is the only email you'll get from this exchange unless you reply.
 
-We Met: get your own card for free
-https://we-met.link
-
+Get your own card for free: https://we-met.link
 Sent with We Met.
