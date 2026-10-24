@@ -76,6 +76,21 @@ describe("format owner lead email (unit)", () => {
     expect(data.lead_phone_tel).toBeUndefined();
   });
 
+  it("escapes visitor phone in owner details-update HTML", () => {
+    const maliciousPhone = `+1 <b>"x"&`;
+    const content = buildOwnerLeadAppendEmail({
+      name: "Sam",
+      email: "sam@example.com",
+      phone: maliciousPhone,
+      jobTitle: null,
+      company: null,
+      note: null,
+    });
+    expect(content.textHtml).toContain("+1 &lt;b&gt;&quot;x&quot;&amp;");
+    expect(content.textHtml).not.toContain("<b>");
+    expect(content.textPlain).toContain(`Phone:     ${maliciousPhone}`);
+  });
+
   it("includes visitor phone in owner details-update email when provided", () => {
     const content = buildOwnerLeadAppendEmail({
       name: "Sam",
