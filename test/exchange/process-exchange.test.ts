@@ -6,10 +6,7 @@ import { exampleCardInput } from "../helpers/example-card";
 import { processExchange } from "@/exchange/process-exchange";
 import type { ProcessExchangeDeps } from "@/exchange/process-exchange";
 import type { ValidatedExchangeInput } from "@/exchange/validation";
-import {
-  leadEmailCapacityAlwaysAllowed,
-  readVisitorEmailModeDirect,
-} from "../helpers/lead-email-deps";
+import { leadEmailCapacityAlwaysAllowed } from "../helpers/lead-email-deps";
 
 function baseInput(
   overrides: Partial<ValidatedExchangeInput> = {},
@@ -36,7 +33,7 @@ function createDeps(
     turnstile: { verify: async () => ({ success: true }) },
     rateLimiter: { check: async () => ({ allowed: true }) },
     followupQueue: {
-      enqueueVisitorFollowup: async (message) => {
+      enqueueVisitorLetter: async (message) => {
         followupMessages.push(message);
       },
     },
@@ -60,7 +57,6 @@ function createDeps(
     createLedgerId: () => "ledger-1",
     now: () => new Date("2026-10-12T12:00:00.000Z"),
     baseUrl: "https://we-met.link",
-    readVisitorEmailMode: readVisitorEmailModeDirect,
     ...leadEmailCapacityAlwaysAllowed,
     ...overrides,
   };
@@ -95,7 +91,7 @@ describe("processExchange (unit)", () => {
       type: string;
       lead: { isTestLead: boolean };
     };
-    expect(msg.type).toBe("visitor_followup");
+    expect(msg.type).toBe("visitor_letter_due");
     expect(msg.lead.isTestLead).toBe(true);
     if (result.status === "success") {
       expect(result.body.token.length).toBeGreaterThan(10);
@@ -168,7 +164,7 @@ describe("processExchange (unit)", () => {
     const card = await repo.upsertCard(exampleCardInput());
     const deps = createDeps({
       followupQueue: {
-        enqueueVisitorFollowup: async () => {
+        enqueueVisitorLetter: async () => {
           throw new Error("missing binding");
         },
       },
@@ -276,7 +272,7 @@ describe("processExchange (unit)", () => {
     expect(sinkMessages).toHaveLength(1);
   });
 
-  it("in owner_relay skips visitor follow-up, reserves one cap slot, and counts owner only", async () => {
+  it("in owner_relay enqueues delayed visitor letter, reserves two cap slots, and counts owner and visitor", async () => {
     const repo = new MemoryCardRepository();
     const card = await repo.upsertCard(exampleCardInput());
     const sinks = [
@@ -293,7 +289,6 @@ describe("processExchange (unit)", () => {
     const capacityCheck = vi.fn(async () => true);
     const incrementDailySendCounts = vi.fn(async () => {});
     const deps = createDeps({
-      readVisitorEmailMode: async () => "owner_relay",
       assertLeadEmailCapacity: capacityCheck,
       incrementDailySendCounts,
     });
@@ -301,8 +296,11 @@ describe("processExchange (unit)", () => {
     const result = await processExchange(baseInput(), card, sinks, deps);
 
     expect(result.status).toBe("success");
-    expect(capacityCheck).toHaveBeenCalledWith(card.id, 1);
-    expect(deps.followupMessages).toHaveLength(0);
+    expect(capacityCheck).toHaveBeenCalledWith(card.id, 2);
+    expect(deps.followupMessages).toHaveLength(1);
+    expect((deps.followupMessages[0] as { type: string }).type).toBe(
+      "visitor_letter_due",
+    );
     expect(deps.sinkMessages).toHaveLength(1);
     expect(incrementDailySendCounts).not.toHaveBeenCalled();
     if (result.status === "success") {
@@ -310,20 +308,22 @@ describe("processExchange (unit)", () => {
     }
   });
 
-  it("in owner_relay with no sinks increments owner count only", async () => {
+  it("with no sinks increments owner and visitor counts", async () => {
     const repo = new MemoryCardRepository();
     const card = await repo.upsertCard(exampleCardInput());
     const incrementDailySendCounts = vi.fn(async () => {});
     const deps = createDeps({
-      readVisitorEmailMode: async () => "owner_relay",
       incrementDailySendCounts,
     });
 
     const result = await processExchange(baseInput(), card, [], deps);
 
     expect(result.status).toBe("success");
-    expect(deps.followupMessages).toHaveLength(0);
-    expect(incrementDailySendCounts).toHaveBeenCalledWith(card.id, ["owner"]);
+    expect(deps.followupMessages).toHaveLength(1);
+    expect(incrementDailySendCounts).toHaveBeenCalledWith(card.id, [
+      "owner",
+      "visitor",
+    ]);
   });
 
   it("fails when visitor follow-up enqueue fails", async () => {
@@ -331,7 +331,7 @@ describe("processExchange (unit)", () => {
     const card = await repo.upsertCard(exampleCardInput());
     const deps = createDeps({
       followupQueue: {
-        enqueueVisitorFollowup: async () => {
+        enqueueVisitorLetter: async () => {
           throw new Error("missing binding");
         },
       },

@@ -21,7 +21,6 @@ import type { R2Bucket } from "@cloudflare/workers-types";
 import type { TurnstileLogger } from "@/exchange/turnstile";
 import { createExchangeOwnerEmailStoreFromD1 } from "@/exchange-owner-email/d1-repository";
 import { createLeadDeliveryLedgerFromD1 } from "@/lead-delivery-ledger/d1-repository";
-import { readLeadEmailControls } from "@/app-settings/caps";
 import { assertLeadEmailCapacity } from "@/lead-email/availability";
 import {
   incrementDailySendCounts,
@@ -128,10 +127,6 @@ export async function createProcessExchangeDeps(
     baseUrl: hostConfig.baseUrl,
     assertLeadEmailCapacity: (cardId, needed) =>
       assertLeadEmailCapacity(db, cardId, needed, now()),
-    readVisitorEmailMode: async () => {
-      const controls = await readLeadEmailControls(db);
-      return controls.visitorEmailMode;
-    },
     incrementDailySendCounts: (cardId, kinds) =>
       incrementDailySendCounts(db, utcDayFromDate(now()), cardId, kinds),
   };
@@ -183,6 +178,7 @@ export async function createProcessDetailsDeps(): Promise<ProcessDetailsDeps> {
     "WE_MET_TOKEN_SECRET",
     bindings.WE_MET_TOKEN_SECRET,
   );
+  const followupQueue = createCloudflareFollowupEmailQueueProducer(queue);
   const leadSinkQueue = createCloudflareLeadSinkQueueProducer(queue);
   const db = (env as { WE_MET_DB?: D1Database }).WE_MET_DB;
   if (!db) {
@@ -195,6 +191,7 @@ export async function createProcessDetailsDeps(): Promise<ProcessDetailsDeps> {
   return {
     tokenSecret,
     environment: hostConfig.weMetEnv,
+    followupQueue,
     leadSinkQueue,
     deliveryLedger,
     exchangeOwnerEmail,

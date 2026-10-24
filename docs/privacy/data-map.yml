@@ -418,6 +418,12 @@ d1_tables:
       owner_email_sent_at:
         data: Successful owner email send time
         purpose: audit and duplicate suppression
+      visitor_letter_claimed_at:
+        data: In-flight visitor letter send claim timestamp
+        purpose: single-worker send gate before visitor_letter_sent_at is set
+      visitor_letter_sent_at:
+        data: Successful visitor letter send time
+        purpose: audit and duplicate suppression
       triggered_at:
         data: Details submit or dismiss time
         purpose: immediate owner email trigger

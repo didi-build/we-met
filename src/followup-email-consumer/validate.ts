@@ -10,7 +10,6 @@ import type {
   LeadSinkAppendLead,
   VisitorLead,
 } from "@/exchange/types";
-import type { VisitorFollowupQueueMessage } from "@/exchange/queue/types";
 
 export { isPlainSingleEmailAddress };
 
@@ -77,20 +76,35 @@ function parseLead(value: unknown): VisitorLead | null {
   return value as VisitorLead;
 }
 
-export type ParsedVisitorFollowup = VisitorFollowupQueueMessage;
+export type ParsedVisitorFollowup =
+  import("@/exchange/queue/types").VisitorLetterQueueMessage;
 
-export function parseVisitorFollowupMessage(
-  body: unknown,
+function parseVisitorLetterPayload(
+  body: Record<string, unknown>,
+  type: "visitor_followup" | "visitor_letter_due",
 ): ParsedVisitorFollowup | null {
-  if (!isRecord(body) || body.type !== "visitor_followup") {
-    return null;
-  }
   const lead = parseLead(body.lead);
   const card = parseCardSnapshot(body.card);
   if (!lead || !card) {
     return null;
   }
-  return { type: "visitor_followup", lead, card };
+  return { type, lead, card };
+}
+
+export function parseVisitorFollowupMessage(
+  body: unknown,
+): ParsedVisitorFollowup | null {
+  if (!isRecord(body)) {
+    return null;
+  }
+  if (body.type === "visitor_followup" || body.type === "visitor_letter_due") {
+    return parseVisitorLetterPayload(body, body.type);
+  }
+  return null;
+}
+
+export function visitorLetterMessageIsFallback(parsed: ParsedVisitorFollowup): boolean {
+  return parsed.type === "visitor_letter_due";
 }
 
 function parseAppendLead(value: unknown): LeadSinkAppendLead | null {
@@ -251,6 +265,7 @@ export function isUnsupportedQueueMessageType(body: unknown): boolean {
   }
   if (
     body.type === "visitor_followup" ||
+    body.type === "visitor_letter_due" ||
     body.type === "lead_sink_record" ||
     body.type === "lead_sink_append_details" ||
     body.type === "lead_sink_owner_email" ||

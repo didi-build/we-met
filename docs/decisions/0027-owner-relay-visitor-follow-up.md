@@ -2,7 +2,7 @@
 
 - **Status:** accepted
 - **Date:** 2026-10-22 (approved by Diadem)
-- **Updates:** [0023](./0023-owner-email-lead-sink-consumer.md), [0025](./0025-we-met-mvp-accounts-sign-in-and-app-backend.md) phase 4 caps, [DIDI-656](https://linear.app/didi-build/issue/DIDI-656) (cold `mail.we-met.link` deliverability).
+- **Updates:** [0023](./0023-owner-email-lead-sink-consumer.md), [0025](./0025-we-met-mvp-accounts-sign-in-and-app-backend.md) phase 4 caps, [DIDI-656](https://linear.app/didi-build/issue/DIDI-656) (cold `mail.we-met.link` deliverability). **Amended 2026-10-24 ([DIDI-820](https://linear.app/didi-build/issue/DIDI-820)):** `visitor_email_mode` only picks who receives the visitor letter; both modes send the letter and the owner relay email (two sends per exchange).
 
 ## Context
 
@@ -10,24 +10,24 @@ Visitor follow-up email is sent from a cold subdomain (`mail.we-met.link` via Cl
 
 ## Decision
 
-1. **`app_settings.visitor_email_mode`** controls whether the app enqueues and the consumer sends **visitor follow-up** email.
+1. **`app_settings.visitor_email_mode`** controls **who receives the visitor letter** (the "Great meeting you" email with vCard). It does **not** disable the letter.
 2. **Values:** `owner_relay` (default) or `direct` (exact match, lowercase only).
-3. **Default:** missing, empty, unknown, or mixed-case values resolve to **`owner_relay`** (`visitorEmailModeFromSettingValue` in `src/app-settings/defaults.ts`). Only the trimmed string **`direct`** enables visitor follow-up. No migration: absent key means owner relay.
-4. **`owner_relay`:** exchange does **not** call `enqueueVisitorFollowup`; daily caps reserve **one** slot (owner sink only). Owner lead-sink dispatch and the details token are unchanged. The consumer **acks** any queued `visitor_followup` message without send and logs `visitor_followup_skipped_owner_relay` with `leadId` only.
-5. **`direct`:** preserves pre-0027 behavior (visitor follow-up enqueued and sent when `lead_email_enabled` is on).
-6. **Owner sink templates** may branch on `visitorEmailMode` in the email lead-sink handler context ([DIDI-745](https://linear.app/didi-build/issue/DIDI-745)); this ADR does not change templates.
+3. **Default:** missing, empty, unknown, or mixed-case values resolve to **`owner_relay`** (`visitorEmailModeFromSettingValue` in `src/app-settings/defaults.ts`). Only the trimmed string **`direct`** sends the letter to the visitor. No migration: absent key means owner relay.
+4. **`owner_relay`:** the visitor letter goes to the **owner** (Reply-To the visitor, vCard attached). The **owner relay** email ("You met …") also goes to the owner with full details. Daily caps reserve **two** slots per exchange (letter + owner email).
+5. **`direct`:** the visitor letter goes to the **visitor** (From/Reply-To as before). The owner relay email is unchanged from `owner_relay`.
+6. **Owner sink** always uses `buildOwnerRelayEmail` regardless of mode ([DIDI-745](https://linear.app/didi-build/issue/DIDI-745), [DIDI-820](https://linear.app/didi-build/issue/DIDI-820)).
 
 ## Reasons
 
-- Stop cold-subdomain mail to visitors by default while keeping owner notification.
+- Stop cold-subdomain mail to visitors by default while keeping owner notification and a shareable letter the owner can forward.
 - Fail closed toward **not** emailing visitors when the setting is missing or mistyped.
 - Keep `direct` available for rollback and non-prod experiments without code deploy.
 
 ## Consequences
 
 - Production uses owner relay unless operators set `visitor_email_mode` to `direct` in D1 (see [kill-switch-and-caps](../runbooks/kill-switch-and-caps.md)).
-- Daily cap math for exchange drops from two slots to one under owner relay.
-- Visitor follow-up code and templates remain for `direct` mode.
+- Daily cap math for exchange counts **two** enqueue slots per exchange in both modes.
+- Visitor follow-up templates and consumer send path remain; relay mode changes recipient and Reply-To only.
 
 ## Switching back to direct visitor email
 

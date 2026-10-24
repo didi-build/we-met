@@ -1,8 +1,9 @@
 import type { WeMetQueueMessage } from "@/exchange/queue/types";
 
 export type FollowupEmailQueueProducer = {
-  enqueueVisitorFollowup(
-    message: WeMetQueueMessage & { type: "visitor_followup" },
+  enqueueVisitorLetter(
+    message: import("@/exchange/queue/types").VisitorLetterQueueMessage,
+    options?: QueueSendOptions,
   ): Promise<void>;
 };
 
@@ -42,8 +43,8 @@ export function createCloudflareFollowupEmailQueueProducer(
   binding: CloudflareQueueBinding,
 ): FollowupEmailQueueProducer {
   return {
-    async enqueueVisitorFollowup(message) {
-      await binding.send(message);
+    async enqueueVisitorLetter(message, options) {
+      await binding.send(message, options);
     },
   };
 }

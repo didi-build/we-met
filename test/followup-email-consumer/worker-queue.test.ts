@@ -1,4 +1,22 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MemoryExchangeOwnerEmailStore } from "@/exchange-owner-email/memory-store";
+import * as exchangeOwnerEmailD1 from "@/exchange-owner-email/d1-repository";
+
+function seededExchangeOwnerEmailStore(): MemoryExchangeOwnerEmailStore {
+  const store = new MemoryExchangeOwnerEmailStore();
+  store.rows.set("lead-1", {
+    leadId: "lead-1",
+    cardId: "card-1",
+    triggeredAt: null,
+    ownerEmailClaimedAt: null,
+    ownerEmailSentAt: null,
+    visitorLetterClaimedAt: null,
+    visitorLetterSentAt: null,
+    createdAt: "2026-10-12T12:00:00.000Z",
+    updatedAt: "2026-10-12T12:00:00.000Z",
+  });
+  return store;
+}
 import type { CardEmailSnapshot } from "@/exchange/types";
 import followupEmailConsumer from "../../workers/we-met-followup-email-consumer/index";
 import type { FollowupConsumerEnv } from "@/followup-email-consumer/process-batch";
@@ -46,6 +64,13 @@ const card: CardEmailSnapshot = {
 };
 
 describe("follow-up email consumer worker queue (integration)", () => {
+  beforeEach(() => {
+    vi.spyOn(
+      exchangeOwnerEmailD1,
+      "createExchangeOwnerEmailStoreFromD1",
+    ).mockImplementation(() => seededExchangeOwnerEmailStore());
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -147,7 +172,7 @@ describe("follow-up email consumer worker queue (integration)", () => {
             body: {
               type: "visitor_followup",
               lead: {
-                leadId: "lead-2",
+                leadId: "lead-1",
                 submittedAt: "2026-10-12T00:00:00.000Z",
                 environment: "preview",
                 isTestLead: true,
@@ -171,7 +196,7 @@ describe("follow-up email consumer worker queue (integration)", () => {
       (call) => call[0] === "visitor_followup_attempt_failure",
     );
     expect(failureLog?.[1]).toMatchObject({
-      leadId: "lead-2",
+      leadId: "lead-1",
       errorCode: "cloudflare_binding_missing",
       willRetry: true,
     });
@@ -232,7 +257,7 @@ describe("follow-up email consumer worker queue (integration)", () => {
               body: {
                 type: "visitor_followup",
                 lead: {
-                  leadId: "lead-legacy-provider",
+                  leadId: "lead-1",
                   submittedAt: "2026-10-12T00:00:00.000Z",
                   environment: "preview",
                   isTestLead: true,

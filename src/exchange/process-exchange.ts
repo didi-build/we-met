@@ -20,7 +20,7 @@ import { absoluteUrl } from "@/config/we-met";
 import { leadFirstNameFromFullName } from "@/email/email-template-vars";
 import type { ExchangeSuccessResponse, VisitorLead } from "@/exchange/types";
 import type { ValidatedExchangeInput } from "@/exchange/validation";
-import type { VisitorEmailMode } from "@/app-settings/defaults";
+import { OWNER_EMAIL_FALLBACK_DELAY_SECONDS } from "@/exchange/owner-email-timing";
 import type { DailySendKind } from "@/lead-email/daily-send-counts";
 import { utcDayFromDate } from "@/lead-email/daily-send-counts";
 
@@ -41,7 +41,6 @@ export type ProcessExchangeDeps = {
   now: () => Date;
   baseUrl: string;
   assertLeadEmailCapacity: (cardId: string, needed: number) => Promise<boolean>;
-  readVisitorEmailMode: () => Promise<VisitorEmailMode>;
   incrementDailySendCounts: (
     cardId: string,
     kinds: readonly DailySendKind[],
@@ -94,9 +93,7 @@ export async function processExchange(
     return { status: "rate_limited" };
   }
 
-  const visitorEmailMode = await deps.readVisitorEmailMode();
-  const sendVisitorFollowupEmail = visitorEmailMode === "direct";
-  const emailSlotsNeeded = sendVisitorFollowupEmail ? 2 : 1;
+  const emailSlotsNeeded = 2;
 
   if (!(await deps.assertLeadEmailCapacity(card.id, emailSlotsNeeded))) {
     return { status: "lead_email_unavailable" };
@@ -108,9 +105,7 @@ export async function processExchange(
 
   const day = utcDayFromDate(deps.now());
   const enabledSinks = sinks.filter((s) => s.enabled);
-  const dailySendKinds: DailySendKind[] = sendVisitorFollowupEmail
-    ? ["owner", "visitor"]
-    : ["owner"];
+  const dailySendKinds: DailySendKind[] = ["owner", "visitor"];
   const sinkDispatchDeps: LeadSinkDispatchDeps = {
     producer: deps.leadSinkQueue,
     sinkLogger: deps.leadSinkLogger,
@@ -140,16 +135,17 @@ export async function processExchange(
     await deps.incrementDailySendCounts(card.id, dailySendKinds);
   }
 
-  if (sendVisitorFollowupEmail) {
-    try {
-      await deps.followupQueue.enqueueVisitorFollowup({
-        type: "visitor_followup",
+  try {
+    await deps.followupQueue.enqueueVisitorLetter(
+      {
+        type: "visitor_letter_due",
         lead,
         card: cardSnapshot,
-      });
-    } catch {
-      return { status: "enqueue_failed" };
-    }
+      },
+      { delaySeconds: OWNER_EMAIL_FALLBACK_DELAY_SECONDS },
+    );
+  } catch {
+    return { status: "enqueue_failed" };
   }
 
   const token = createDetailsToken(

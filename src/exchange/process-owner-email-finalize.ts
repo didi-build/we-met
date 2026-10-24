@@ -1,5 +1,6 @@
 import { resolveLeadSinksForDispatch } from "@/card-data/account-email";
 import type { CardRecord, LeadSinkRecord } from "@/card-data/types";
+import { buildCardEmailSnapshot } from "@/exchange/card-snapshot";
 import type { ExchangeOwnerEmailStore } from "@/exchange-owner-email/types";
 import {
   dispatchOwnerEmailImmediate,
@@ -9,11 +10,15 @@ import {
 } from "@/exchange/lead-sink/dispatcher";
 import { leadFirstNameFromFullName } from "@/email/email-template-vars";
 import type { LeadDeliveryLedger } from "@/lead-delivery-ledger/types";
-import type { LeadSinkQueueProducer } from "@/exchange/queue/producer";
+import type {
+  FollowupEmailQueueProducer,
+  LeadSinkQueueProducer,
+} from "@/exchange/queue/producer";
 import { absoluteUrl } from "@/config/we-met";
 import type { VisitorLead, VisitorLeadDetails } from "@/exchange/types";
 
 export type ProcessOwnerEmailFinalizeDeps = {
+  followupQueue: FollowupEmailQueueProducer;
   leadSinkQueue: LeadSinkQueueProducer;
   deliveryLedger: LeadDeliveryLedger;
   deliveryLogger: LeadDeliveryDispatchLogger;
@@ -53,6 +58,17 @@ export async function processOwnerEmailFinalize(
   });
   if (!newlyTriggered) {
     return { status: "already_finalized" };
+  }
+
+  const cardSnapshot = buildCardEmailSnapshot(card);
+  try {
+    await deps.followupQueue.enqueueVisitorLetter({
+      type: "visitor_followup",
+      lead,
+      card: cardSnapshot,
+    });
+  } catch {
+    // Best-effort: owner email still enqueues below.
   }
 
   const sourceUrl = absoluteUrl(deps.baseUrl, `/hi/${card.slug}`);

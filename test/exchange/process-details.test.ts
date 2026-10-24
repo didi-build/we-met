@@ -13,6 +13,7 @@ function detailsDeps(
   return {
     tokenSecret: "secret",
     environment: "local",
+    followupQueue: { enqueueVisitorLetter: async () => undefined },
     leadSinkQueue: {
       enqueueLeadSink: async (message: unknown) => {
         sinkMessages.push(message);

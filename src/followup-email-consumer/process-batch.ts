@@ -18,7 +18,13 @@ import {
   resolveFromDisplayName,
   resolveVisitorFromDisplayName,
 } from "@/email/from-display-name";
-import { resolveEmailRecipient } from "@/email/recipient";
+import {
+  resolveEmailRecipient,
+  resolveOwnerSinkReplyTo,
+  resolveSinkEmailRecipient,
+} from "@/email/recipient";
+import { shouldDeferExchangeEmailForTrigger } from "@/exchange/exchange-email-trigger-defer";
+import { VISITOR_LETTER_SEND_CLAIM_STALE_MS } from "@/exchange-owner-email/types";
 import {
   buildOwnerVCardAttachment,
   type ReadOnlyR2Assets,
@@ -41,7 +47,9 @@ import {
   isUnsupportedQueueMessageType,
   parseVisitorFollowupMessage,
   queueMessageTypeLabel,
+  visitorLetterMessageIsFallback,
 } from "@/followup-email-consumer/validate";
+import type { VisitorEmailMode } from "@/app-settings/defaults";
 
 export { UnsupportedQueueMessageError };
 
@@ -88,7 +96,9 @@ export type FollowupConsumerDeps = {
   ): void;
   logMalformedVisitorFollowup(leadId: string | null): void;
   logVisitorFollowupDroppedPaused(leadId: string): void;
-  logVisitorFollowupSkippedOwnerRelay(leadId: string): void;
+  logExchangeVisitorLetterRowMissing(leadId: string): void;
+  logExchangeVisitorLetterConfirmFailed(leadId: string): void;
+  logExchangeVisitorLetterContentionExhausted(leadId: string): void;
   logUnsupportedType(typeLabel: string): void;
   logMissingPhoto(key: string): void;
   logNonJpegPhoto(key: string): void;
@@ -116,6 +126,7 @@ export type FollowupConsumerDeps = {
   logLeadSinkAppendDeferred(leadId: string, sinkId: string, attempt: number): void;
   logExchangeOwnerEmailRowMissing(leadId: string): void;
   logExchangeOwnerEmailConfirmFailed(leadId: string): void;
+  logExchangeOwnerEmailContentionExhausted(leadId: string): void;
   sinkHandlers: Map<
     string,
     import("@/followup-email-consumer/lead-sink/types").LeadSinkHandler
@@ -188,8 +199,17 @@ export function createFollowupConsumerDepsFromEnv(
     logVisitorFollowupDroppedPaused(leadId) {
       console.error("visitor_followup_dropped_paused", { leadId });
     },
-    logVisitorFollowupSkippedOwnerRelay(leadId) {
-      console.error("visitor_followup_skipped_owner_relay", { leadId });
+    logExchangeVisitorLetterRowMissing(leadId) {
+      console.error("exchange_visitor_letter_row_missing", { leadId });
+    },
+    logExchangeVisitorLetterConfirmFailed(leadId) {
+      console.error("exchange_visitor_letter_confirm_failed", { leadId });
+    },
+    logExchangeVisitorLetterContentionExhausted(leadId) {
+      console.error("exchange_visitor_letter_contention_exhausted", { leadId });
+    },
+    logExchangeOwnerEmailContentionExhausted(leadId) {
+      console.error("exchange_owner_email_contention_exhausted", { leadId });
     },
     logUnsupportedType(typeLabel) {
       console.error("followup_unsupported_queue_type", { typeLabel });
@@ -253,30 +273,55 @@ export function createFollowupConsumerDepsFromEnv(
   };
 }
 
-async function sendVisitorFollowup(
+async function sendVisitorLetter(
   message: NonNullable<ReturnType<typeof parseVisitorFollowupMessage>>,
+  visitorEmailMode: VisitorEmailMode,
   deps: FollowupConsumerDeps,
 ): Promise<void> {
   const ownerFrom = resolveOutboundFromEmail(deps.outboundFrom);
   const platformFromDisplayName = resolveFromDisplayName(deps.fromDisplayName);
-  const fromDisplayName = resolveVisitorFromDisplayName(
-    message.card.contact.name.given,
-    platformFromDisplayName,
-  );
-  const recipient = resolveEmailRecipient({
-    weMetEnv: deps.weMetEnv,
-    visitorEmail: message.lead.email,
-    testMailTo: deps.testMailTo,
-  });
 
-  const nonProdLabel =
-    recipient.mode === "nonprod" ? recipient.visitorEmailForContent : undefined;
+  let to: string;
+  let replyTo: string;
+  let fromDisplayName: string;
+  let nonProdVisitorEmailLabel: string | undefined;
+
+  if (visitorEmailMode === "owner_relay") {
+    const recipient = resolveSinkEmailRecipient({
+      weMetEnv: deps.weMetEnv,
+      sinkDestinationEmail: message.card.email,
+      testMailTo: deps.testMailTo,
+    });
+    to = recipient.to;
+    replyTo = resolveOwnerSinkReplyTo({
+      weMetEnv: deps.weMetEnv,
+      visitorEmail: message.lead.email,
+      testMailTo: deps.testMailTo,
+    });
+    fromDisplayName = platformFromDisplayName;
+    nonProdVisitorEmailLabel =
+      recipient.mode === "nonprod" ? recipient.sinkDestinationForContent : undefined;
+  } else {
+    fromDisplayName = resolveVisitorFromDisplayName(
+      message.card.contact.name.given,
+      platformFromDisplayName,
+    );
+    const recipient = resolveEmailRecipient({
+      weMetEnv: deps.weMetEnv,
+      visitorEmail: message.lead.email,
+      testMailTo: deps.testMailTo,
+    });
+    to = recipient.to;
+    replyTo = message.card.email;
+    nonProdVisitorEmailLabel =
+      recipient.mode === "nonprod" ? recipient.visitorEmailForContent : undefined;
+  }
 
   const content = buildVisitorFollowUpEmail({
     card: message.card,
     visitorName: message.lead.name,
     baseUrl: deps.baseUrl,
-    nonProdVisitorEmailLabel: nonProdLabel,
+    nonProdVisitorEmailLabel,
   });
 
   const { vcardBody, filename } = await buildOwnerVCardAttachment(
@@ -290,8 +335,8 @@ async function sendVisitorFollowup(
   await deps.sendEmail({
     from: ownerFrom,
     fromDisplayName,
-    to: recipient.to,
-    replyTo: sanitizeEmailHeaderValue(message.card.email),
+    to,
+    replyTo: sanitizeEmailHeaderValue(replyTo),
     subject: content.subject,
     textPlain: content.textPlain,
     textHtml: content.textHtml,
@@ -341,16 +386,71 @@ async function processQueueMessage(
     return;
   }
 
-  if (leadEmailControls.visitorEmailMode === "owner_relay") {
-    deps.logVisitorFollowupSkippedOwnerRelay(parsed.lead.leadId);
+  const now = deps.now();
+  if (visitorLetterMessageIsFallback(parsed)) {
+    const sendState = await deps.exchangeOwnerEmail.getSendState(parsed.lead.leadId);
+    if (
+      sendState &&
+      shouldDeferExchangeEmailForTrigger("visitor_letter", sendState, now)
+    ) {
+      const willRetry = message.attempts < MAX_VISITOR_FOLLOWUP_ATTEMPTS;
+      if (!willRetry) {
+        deps.logExchangeVisitorLetterContentionExhausted(parsed.lead.leadId);
+        message.ack();
+        return;
+      }
+      message.retry({
+        delaySeconds: followupEmailRetryDelaySeconds(message.attempts),
+      });
+      return;
+    }
+  }
+
+  const claimedAt = now.toISOString();
+  const staleBefore = new Date(
+    now.getTime() - VISITOR_LETTER_SEND_CLAIM_STALE_MS,
+  ).toISOString();
+  const claim = await deps.exchangeOwnerEmail.tryClaimVisitorLetterSend(
+    parsed.lead.leadId,
+    claimedAt,
+    staleBefore,
+  );
+  if (claim === "row_missing") {
+    deps.logExchangeVisitorLetterRowMissing(parsed.lead.leadId);
     message.ack();
+    return;
+  }
+  if (claim === "already_sent") {
+    message.ack();
+    return;
+  }
+  if (claim === "contention") {
+    const willRetry = message.attempts < MAX_VISITOR_FOLLOWUP_ATTEMPTS;
+    if (!willRetry) {
+      deps.logExchangeVisitorLetterContentionExhausted(parsed.lead.leadId);
+      message.ack();
+      return;
+    }
+    message.retry({
+      delaySeconds: followupEmailRetryDelaySeconds(message.attempts),
+    });
     return;
   }
 
   try {
-    await sendVisitorFollowup(parsed, deps);
+    await sendVisitorLetter(parsed, leadEmailControls.visitorEmailMode, deps);
+    const sentAt = deps.now().toISOString();
+    try {
+      await deps.exchangeOwnerEmail.confirmVisitorLetterSent(
+        parsed.lead.leadId,
+        sentAt,
+      );
+    } catch {
+      deps.logExchangeVisitorLetterConfirmFailed(parsed.lead.leadId);
+    }
     message.ack();
   } catch (error) {
+    await deps.exchangeOwnerEmail.releaseVisitorLetterSendClaim(parsed.lead.leadId);
     const errorFields = followupEmailErrorLogFields(error);
     if (!isRetryableFollowupEmailError(errorFields.code)) {
       deps.logVisitorFollowupPermanentFailure(parsed.lead.leadId, errorFields);
