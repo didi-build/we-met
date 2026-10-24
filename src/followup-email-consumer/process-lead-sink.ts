@@ -51,6 +51,7 @@ export type LeadSinkConsumerDeps = {
   logLedgerUpdateFailed(leadId: string, sinkId: string, errorCode: string): void;
   logLeadSinkAppendDeferred(leadId: string, sinkId: string, attempt: number): void;
   logExchangeOwnerEmailRowMissing(leadId: string): void;
+  logExchangeOwnerEmailConfirmFailed(leadId: string): void;
   now: () => Date;
 };
 
@@ -245,8 +246,19 @@ async function processQueuedLeadSink(
       message.ack();
       return;
     }
-    if (claim !== "claimed") {
+    if (claim === "already_sent") {
       message.ack();
+      return;
+    }
+    if (claim === "contention") {
+      const willRetry = message.attempts < MAX_VISITOR_FOLLOWUP_ATTEMPTS;
+      if (!willRetry) {
+        message.ack();
+        return;
+      }
+      message.retry({
+        delaySeconds: followupEmailRetryDelaySeconds(message.attempts),
+      });
       return;
     }
   }
@@ -254,10 +266,12 @@ async function processQueuedLeadSink(
   try {
     if (isOwnerEmailMessage) {
       const result = await handler.deliverOwnerEmail(parsed, handlerContext);
-      await deps.exchangeOwnerEmail.confirmOwnerEmailSent(
-        parsed.lead.leadId,
-        deps.now().toISOString(),
-      );
+      const sentAt = deps.now().toISOString();
+      try {
+        await deps.exchangeOwnerEmail.confirmOwnerEmailSent(parsed.lead.leadId, sentAt);
+      } catch {
+        deps.logExchangeOwnerEmailConfirmFailed(parsed.lead.leadId);
+      }
       await afterSuccessfulDelivery(message, parsed, result.externalRef, deps);
       return;
     }

@@ -43,6 +43,7 @@ export function createOwnerEmailConsumerDeps(
     logLedgerUpdateFailed: vi.fn(),
     logLeadSinkAppendDeferred: vi.fn(),
     logExchangeOwnerEmailRowMissing: vi.fn(),
+    logExchangeOwnerEmailConfirmFailed: vi.fn(),
     now: () => new Date("2026-10-12T12:00:00.000Z"),
     ...overrides,
   };

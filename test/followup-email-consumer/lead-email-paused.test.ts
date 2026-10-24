@@ -13,6 +13,7 @@ import { MemoryExchangeOwnerEmailStore } from "@/exchange-owner-email/memory-sto
 const pausedConsumerExtras = {
   exchangeOwnerEmail: new MemoryExchangeOwnerEmailStore(),
   logExchangeOwnerEmailRowMissing: vi.fn(),
+  logExchangeOwnerEmailConfirmFailed: vi.fn(),
 };
 
 function createMessage(body: unknown): FollowupQueueMessage {

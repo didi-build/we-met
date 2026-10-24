@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { MemoryExchangeOwnerEmailStore } from "@/exchange-owner-email/memory-store";
+import { OWNER_EMAIL_SEND_CLAIM_STALE_MS } from "@/exchange-owner-email/types";
 import { OWNER_EMAIL_FALLBACK_DELAY_SECONDS } from "@/exchange/owner-email-timing";
 import {
   dispatchLeadOnExchange,
@@ -24,6 +25,14 @@ import {
 } from "../helpers/owner-email-consumer";
 
 const NOW = new Date("2026-10-12T12:00:00.000Z");
+
+function rowClaimStillHeld(
+  store: MemoryExchangeOwnerEmailStore,
+  leadId: string,
+): boolean {
+  const row = store.rows.get(leadId);
+  return Boolean(row?.ownerEmailClaimedAt && !row.ownerEmailSentAt);
+}
 const SOURCE_URL = "https://we-met.link/hi/demo";
 
 const lead: VisitorLead = {
@@ -127,6 +136,7 @@ async function deliverQueuedOwnerEmail(
     logLedgerUpdateFailed: vi.fn(),
     logLeadSinkAppendDeferred: vi.fn(),
     logExchangeOwnerEmailRowMissing: vi.fn(),
+    logExchangeOwnerEmailConfirmFailed: vi.fn(),
     now: () => NOW,
   };
   const message = {
@@ -391,6 +401,152 @@ describe("owner email timing (integration)", () => {
       sendCount,
     );
     expect(sendCount.value).toBe(1);
+  });
+
+  it("retries on claim contention and does not ack", async () => {
+    const exchangeOwnerEmail = new MemoryExchangeOwnerEmailStore();
+    await seedOwnerEmailExchangeRow(
+      exchangeOwnerEmail,
+      lead.leadId,
+      "card-1",
+      NOW.toISOString(),
+    );
+    const row = exchangeOwnerEmail.rows.get(lead.leadId);
+    expect(row).toBeDefined();
+    row!.ownerEmailClaimedAt = NOW.toISOString();
+
+    const ledger = new MemoryConsumerLeadDeliveryLedger();
+    ledger.seedQueued(lead.leadId, "sink-a", "record");
+    const sendCount = { value: 0 };
+    const logConfirmFailed = vi.fn();
+    const deps = createOwnerEmailConsumerDeps(exchangeOwnerEmail, ledger, sendCount, {
+      logExchangeOwnerEmailConfirmFailed: logConfirmFailed,
+    });
+    const body = {
+      type: "lead_sink_owner_email",
+      sinkId: "sink-a",
+      sinkKind: "email",
+      sinkConfig: { to: "owner@example.com" },
+      lead,
+      details: { phone: null, jobTitle: null, company: null, note: null },
+      cardId: "card-1",
+      cardSlug: "demo",
+      sourceUrl: SOURCE_URL,
+    };
+    const message = {
+      id: "contention-1",
+      attempts: 1,
+      body,
+      ack: vi.fn(),
+      retry: vi.fn(),
+    };
+    await processLeadSinkQueueMessage(message, deps);
+    expect(message.retry).toHaveBeenCalledOnce();
+    expect(message.ack).not.toHaveBeenCalled();
+    expect(sendCount.value).toBe(0);
+  });
+
+  it("redelivers after a crashed stale claim and sends exactly once", async () => {
+    const exchangeOwnerEmail = new MemoryExchangeOwnerEmailStore();
+    await seedOwnerEmailExchangeRow(
+      exchangeOwnerEmail,
+      lead.leadId,
+      "card-1",
+      NOW.toISOString(),
+    );
+    const row = exchangeOwnerEmail.rows.get(lead.leadId);
+    expect(row).toBeDefined();
+    const crashedClaimAt = new Date(
+      NOW.getTime() - OWNER_EMAIL_SEND_CLAIM_STALE_MS - 60_000,
+    ).toISOString();
+    row!.ownerEmailClaimedAt = crashedClaimAt;
+
+    const ledger = new MemoryConsumerLeadDeliveryLedger();
+    ledger.seedQueued(lead.leadId, "sink-a", "record");
+    const sendCount = { value: 0 };
+    const afterStale = new Date(
+      NOW.getTime() + OWNER_EMAIL_SEND_CLAIM_STALE_MS + 60_000,
+    );
+    const deps = createOwnerEmailConsumerDeps(exchangeOwnerEmail, ledger, sendCount, {
+      now: () => afterStale,
+    });
+    const body = {
+      type: "owner_email_due",
+      sinkId: "sink-a",
+      sinkKind: "email",
+      sinkConfig: { to: "owner@example.com" },
+      lead,
+      details: { phone: null, jobTitle: null, company: null, note: null },
+      cardId: "card-1",
+      cardSlug: "demo",
+      sourceUrl: SOURCE_URL,
+    };
+    const first = {
+      id: "stale-1",
+      attempts: 1,
+      body,
+      ack: vi.fn(),
+      retry: vi.fn(),
+    };
+    await processLeadSinkQueueMessage(first, deps);
+    expect(sendCount.value).toBe(1);
+    expect(first.ack).toHaveBeenCalledOnce();
+
+    const second = {
+      ...first,
+      id: "stale-2",
+      ack: vi.fn(),
+      retry: vi.fn(),
+    };
+    await processLeadSinkQueueMessage(second, deps);
+    expect(sendCount.value).toBe(1);
+    expect(second.ack).toHaveBeenCalledOnce();
+  });
+
+  it("acks without resend when confirmOwnerEmailSent fails after a successful send", async () => {
+    const exchangeOwnerEmail = new MemoryExchangeOwnerEmailStore();
+    await seedOwnerEmailExchangeRow(
+      exchangeOwnerEmail,
+      lead.leadId,
+      "card-1",
+      NOW.toISOString(),
+    );
+    const confirmSpy = vi
+      .spyOn(exchangeOwnerEmail, "confirmOwnerEmailSent")
+      .mockRejectedValue(new Error("d1 write failed"));
+
+    const ledger = new MemoryConsumerLeadDeliveryLedger();
+    ledger.seedQueued(lead.leadId, "sink-a", "record");
+    const sendCount = { value: 0 };
+    const logConfirmFailed = vi.fn();
+    const deps = createOwnerEmailConsumerDeps(exchangeOwnerEmail, ledger, sendCount, {
+      logExchangeOwnerEmailConfirmFailed: logConfirmFailed,
+    });
+    const body = {
+      type: "lead_sink_owner_email",
+      sinkId: "sink-a",
+      sinkKind: "email",
+      sinkConfig: { to: "owner@example.com" },
+      lead,
+      details: { phone: null, jobTitle: null, company: null, note: null },
+      cardId: "card-1",
+      cardSlug: "demo",
+      sourceUrl: SOURCE_URL,
+    };
+    const message = {
+      id: "confirm-fail-1",
+      attempts: 1,
+      body,
+      ack: vi.fn(),
+      retry: vi.fn(),
+    };
+    await processLeadSinkQueueMessage(message, deps);
+    expect(sendCount.value).toBe(1);
+    expect(logConfirmFailed).toHaveBeenCalledWith(lead.leadId);
+    expect(message.ack).toHaveBeenCalledOnce();
+    expect(message.retry).not.toHaveBeenCalled();
+    expect(rowClaimStillHeld(exchangeOwnerEmail, lead.leadId)).toBe(true);
+    confirmSpy.mockRestore();
   });
 
   it("releases the send claim after a retryable failure so a retry can send", async () => {

@@ -115,6 +115,7 @@ export type FollowupConsumerDeps = {
   logLeadSinkLedgerMarkFailed(leadId: string, sinkId: string, errorCode: string): void;
   logLeadSinkAppendDeferred(leadId: string, sinkId: string, attempt: number): void;
   logExchangeOwnerEmailRowMissing(leadId: string): void;
+  logExchangeOwnerEmailConfirmFailed(leadId: string): void;
   sinkHandlers: Map<
     string,
     import("@/followup-email-consumer/lead-sink/types").LeadSinkHandler
@@ -229,6 +230,9 @@ export function createFollowupConsumerDepsFromEnv(
     },
     logExchangeOwnerEmailRowMissing(leadId) {
       console.error("exchange_owner_email_row_missing", { leadId });
+    },
+    logExchangeOwnerEmailConfirmFailed(leadId) {
+      console.error("exchange_owner_email_confirm_failed", { leadId });
     },
     ledger,
     exchangeOwnerEmail,

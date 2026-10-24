@@ -132,6 +132,7 @@ function createDeps(
     logLedgerUpdateFailed,
     logLeadSinkAppendDeferred: vi.fn(),
     logExchangeOwnerEmailRowMissing: vi.fn(),
+    logExchangeOwnerEmailConfirmFailed: vi.fn(),
     exchangeOwnerEmail:
       overrides.exchangeOwnerEmail ?? new MemoryExchangeOwnerEmailStore(),
     logLeadSinkLedgerRecordFailed: vi.fn(),
