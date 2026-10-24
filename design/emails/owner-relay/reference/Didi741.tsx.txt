@@ -1,0 +1,180 @@
+import { useEffect, useRef, useState } from "react";
+import { ThemeRoot, Switcher, Seg, param, type Mode, ContactIcon, DownloadIcon } from "./kit";
+import { DATA, VISITOR, DETAILS, OWNER_BASELINE, OWNER_RELAY, renderVisitor, renderDetails, renderOwner, subjectFor, type VisitorVariant, type DetailsVariant, type OwnerVariant } from "./emails";
+import { FormsStage, type FormVariant } from "./forms";
+
+/* DIDI-741, rescoped from Diadem's Gmail screenshots: the real visitor email and owner details email.
+   Emails are the repo's table-based templates (design/emails), rendered in an iframe; the frame mimics an opened Gmail message. */
+
+type Frame = `v-${VisitorVariant}` | `o-${OwnerVariant}` | `d-${DetailsVariant}` | `f-${FormVariant}`;
+type Group = "v" | "o" | "f";
+const FRAMES: {
+  id: Frame;
+  label: string;
+  desc: string;
+}[] = [{
+  id: "v-baseline",
+  label: "Baseline",
+  desc: "Today's visitor email, exactly as in the screenshot: banner on top, letter, footer, vCard attached."
+}, {
+  id: "v-a",
+  label: "A",
+  desc: "Same banner card, moved below the letter. Everything else unchanged."
+}, {
+  id: "v-b",
+  label: "B",
+  desc: "A slimmer one-line banner merged into the footer, under the footer lines."
+}, {
+  id: "v-c",
+  label: "C",
+  desc: "No banner. The footer link becomes its own line: Get your own card for free."
+}, {
+  id: "o-baseline",
+  label: "Baseline",
+  desc: "Today's New lead email (owner-new-lead), sent at step 1: name, email, Phone (dash when empty), Source, Received. Retired."
+}, {
+  id: "o-full",
+  label: "All details",
+  desc: "The one owner relay email per exchange: no threading, relay subject, Reply-To Sam. Rows Name, Email, Phone, Job title, Company, Note."
+}, {
+  id: "o-minimal",
+  label: "Name and email only",
+  desc: "Same email when Sam left after step 1 (sent by the 10 minute fallback): optional rows are left out entirely, no dashes."
+}, {
+  id: "d-baseline",
+  label: "Old details email",
+  desc: "Retired: today's threaded Re: details email (owner-details-update), kept here for reference."
+}, {
+  id: "f-exchange-baseline",
+  label: "Exchange Baseline",
+  desc: "Today's exchange sheet on Maya's card: Full name, Email, Phone (optional) with country code, Exchange contact, consent line."
+}, {
+  id: "f-exchange-updated",
+  label: "Exchange Updated",
+  desc: "Phone removed. The exchange form is just Full name and Email, both required. Button and consent line unchanged."
+}, {
+  id: "f-details-baseline",
+  label: "Details Baseline",
+  desc: "Today's optional details sheet after the exchange: Job title, Company, Note, Save details."
+}, {
+  id: "f-details-updated",
+  label: "Details Updated",
+  desc: "Phone added as the first field (tel input with the same country code picker), then Job title, Company, Note. Optional like the rest, so no hint."
+}];
+function EmailFrame({
+  html,
+  title
+}: {
+  html: string;
+  title: string;
+}) {
+  const ref = useRef<HTMLIFrameElement>(null);
+  const [h, setH] = useState(600);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const fit = () => {
+      const body = el.contentDocument?.body;
+      if (!body) return;
+      const bottoms = Array.from(body.children).map(c => (c as HTMLElement).getBoundingClientRect().bottom);
+      if (bottoms.length) setH(Math.max(120, Math.ceil(Math.max(...bottoms))));
+    };
+    el.addEventListener("load", fit);
+    const id = window.setInterval(fit, 400);
+    return () => {
+      el.removeEventListener("load", fit);
+      window.clearInterval(id);
+    };
+  }, [html]);
+  return <iframe ref={ref} title={title} srcDoc={html} className="block w-full border-0" style={{
+    height: h
+  }} />;
+}
+function Attachment() {
+  return <div className="mx-4 mb-4 mt-1 w-[240px] overflow-hidden rounded-[12px] border border-[var(--line)] bg-[var(--surface-2)]">
+      <div className="flex h-[96px] items-center justify-center"><ContactIcon size={28} className="text-[var(--ink-muted)]" /></div>
+      <div className="flex items-center gap-2 border-t border-[var(--line)] bg-[var(--surface)] px-3 py-2.5">
+        <ContactIcon size={16} />
+        <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{DATA.vcfName}</span>
+        <DownloadIcon size={16} className="text-[var(--ink-muted)]" />
+      </div>
+    </div>;
+}
+export default function Didi741() {
+  const [frame, setFrame] = useState<Frame>(param("f", "v-baseline") as Frame);
+  const [mode, setMode] = useState<Mode>(param("theme", "light") as Mode);
+  const [test, setTest] = useState(param("test", "0") === "1");
+  const capture = param("capture", "0") === "1";
+  const current = FRAMES.find(f => f.id === frame) ?? FRAMES[0];
+  const group = (frame.startsWith("d-") ? "o" : frame.charAt(0)) as Group;
+  const isVisitor = group === "v";
+  const isOwner = frame.startsWith("o-");
+  const isForms = group === "f";
+  const variant = frame.slice(2);
+  const meta = isVisitor ? VISITOR : frame === "o-baseline" ? OWNER_BASELINE : isOwner ? OWNER_RELAY : DETAILS;
+  const html = isForms ? "" : isOwner ? renderOwner(variant as OwnerVariant, {
+    test,
+    dark: mode === "dark"
+  }) : isVisitor ? renderVisitor(variant as VisitorVariant, {
+    test,
+    dark: mode === "dark"
+  }) : renderDetails(variant as DetailsVariant, {
+    test,
+    dark: mode === "dark"
+  });
+  const subject = subjectFor(meta.subject, test, isVisitor ? DATA.visitorEmail : DATA.testSink);
+  const initial = meta.fromDisplay.charAt(0);
+  return <ThemeRoot mode={mode}>
+      <Switcher title="DIDI-741" hidden={capture}>
+        <Seg label="Email" value={group} onChange={(v: Group) => setFrame(v === "v" ? "v-baseline" : v === "o" ? "o-baseline" : "f-exchange-baseline")} options={[{
+        id: "v",
+        label: "Visitor email"
+      }, {
+        id: "o",
+        label: "Owner email"
+      }, {
+        id: "f",
+        label: "Forms"
+      }]} />
+        <Seg label="Design" value={frame} onChange={setFrame} options={FRAMES.filter(f => group === "o" ? f.id.startsWith("o-") || f.id === "d-baseline" : f.id.startsWith(`${group}-`)).map(f => ({
+        id: f.id,
+        label: f.label
+      }))} />
+        <Seg label="Theme" value={mode} onChange={setMode} options={[{
+        id: "light",
+        label: "Light"
+      }, {
+        id: "dark",
+        label: "Dark"
+      }]} />
+        {!isForms && <Seg label="Env" value={test ? "test" : "prod"} onChange={v => setTest(v === "test")} options={[{
+        id: "prod",
+        label: "Prod"
+      }, {
+        id: "test",
+        label: "Non-prod"
+      }]} />}
+        
+        <p className="basis-full text-[12px] leading-snug text-[var(--ink-muted)]">{current.desc}</p>
+      </Switcher>
+
+      {isForms ? <FormsStage variant={variant as FormVariant} /> : <div className="mx-auto w-full max-w-[680px] py-4 sm:px-4">
+        <div className="overflow-hidden border-y border-[var(--line)] bg-[var(--surface)] sm:rounded-[24px] sm:border">
+          <div className="px-4 pb-3 pt-4">
+            <p className="m-0 text-[20px] font-medium leading-snug tracking-[-0.01em]">{subject}</p>
+          </div>
+          <div className="flex items-start gap-3 px-4 pb-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] text-[15px] font-semibold text-[var(--ink-muted)]">{initial}</span>
+            <div className="min-w-0 flex-1 text-[13px] leading-[1.45]">
+              <div className="flex items-baseline gap-2"><span className="text-[15px] font-semibold">{meta.fromDisplay}</span><span className="text-[var(--ink-muted)]">9:41 PM</span></div>
+              <div className="break-words text-[var(--ink-muted)]">{meta.from.replace(/^.*</, "<")}</div>
+              <div className="break-words text-[var(--ink-muted)]">Reply-To: {meta.replyTo}</div>
+              <div className="text-[var(--ink-muted)]">to me</div>
+            </div>
+          </div>
+          <EmailFrame html={html} title="Email preview" />
+          {isVisitor && <Attachment />}
+        </div>
+      </div>}
+    </ThemeRoot>;
+}

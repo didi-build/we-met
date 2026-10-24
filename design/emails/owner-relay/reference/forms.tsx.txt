@@ -1,0 +1,176 @@
+import { useState, type ReactNode } from "react";
+import { btnPrimary, CloseIcon, WeMetMark, LeafIcon } from "./kit";
+
+/* DIDI-741 scope addition: phone moves from the exchange form to the optional details form.
+   Faithful rebuild of src/components/hi/HiExchangeSheet.tsx (bottom sheet on /hi/<slug>) over a dimmed card page.
+   Copy is DEFAULT_MVP_CARD_COPY.exchangeSheet (src/app-card/default-card-copy.ts). */
+
+export type FormVariant = "exchange-baseline" | "exchange-updated" | "details-baseline" | "details-updated";
+
+const OWNER = { first: "Maya", initials: "MC", role: "Product designer, Northwind Studio" };
+const VISITOR = { first: "Sam", name: "Sam Rivera", email: "sam.rivera@gmail.com", phone: "416 555 0142", job: "Product manager", company: "Harbour Labs", note: "We met at the design meetup" };
+const COPY = {
+  exchangeTitle: "Let's stay in touch",
+  detailsTitle: `Nice to meet you, ${VISITOR.first} 👋`,
+  detailsIntro: "Add a few details to help me remember you.",
+  nameLabel: "Full name",
+  emailLabel: "Email",
+  phoneLabel: "Phone",
+  phoneOptional: "(optional)",
+  submitExchange: "Exchange contact",
+  submitDetails: "Save details",
+  consent: "I agree to share my contact details.",
+  notePlaceholder: "Where we met, what you're working on",
+  jobTitleLabel: "Job title",
+  companyLabel: "Company",
+  noteLabel: "Note",
+};
+const DIAL = ["CA +1", "US +1", "UK +44", "AU +61", "IN +91", "EG +20", "FR +33", "DE +49"];
+
+const inputCls = "m-0 w-full min-w-0 border-0 bg-transparent p-0 text-[17px] leading-snug text-[var(--ink)] outline-none";
+
+/** HiFloatingField: 12px radius, surface-2 fill, label inside; focused = surface fill + accent border. */
+function Field({ label, hint, focused, children }: { label: string; hint?: string; focused: boolean; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label
+        className={`flex cursor-text flex-col gap-0.5 rounded-[12px] border px-4 py-2.5 transition-colors ${
+          focused ? "border-[var(--accent)] bg-[var(--surface)] shadow-[0_0_0_1px_var(--accent)]" : "border-transparent bg-[var(--surface-2)]"
+        }`}
+      >
+        <span className={`flex items-baseline gap-1.5 text-[13px] font-medium leading-snug ${focused ? "text-[var(--ink)]" : "text-[var(--ink-muted)]"}`}>
+          {label}
+          {hint && <span className="font-normal text-[var(--ink-muted)]">{hint}</span>}
+        </span>
+        {children}
+      </label>
+    </div>
+  );
+}
+
+function useFocus() {
+  const [f, setF] = useState<string | null>(null);
+  return { f, on: (k: string) => ({ onFocus: () => setF(k), onBlur: () => setF(null) }) };
+}
+
+function PhoneControl({ focus, value, onChange }: { focus: ReturnType<typeof useFocus>; value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <select aria-label="Country code" defaultValue="CA +1" {...focus.on("phone")} className="shrink-0 cursor-pointer border-0 bg-transparent pr-1 text-[17px] font-medium text-[var(--ink)] outline-none">
+        {DIAL.map((d) => <option key={d} value={d}>{d}</option>)}
+      </select>
+      <input type="tel" inputMode="tel" autoComplete="tel-national" maxLength={30} className={inputCls} value={value} onChange={(e) => onChange(e.target.value)} {...focus.on("phone")} />
+    </div>
+  );
+}
+
+function ExchangeForm({ withPhone }: { withPhone: boolean }) {
+  const focus = useFocus();
+  const [name, setName] = useState(VISITOR.name);
+  const [email, setEmail] = useState(VISITOR.email);
+  const [phone, setPhone] = useState(VISITOR.phone);
+  return (
+    <form onSubmit={(e) => e.preventDefault()} noValidate aria-label="Exchange contact form" className="flex flex-col gap-5">
+      <div className="flex flex-col gap-3">
+        <Field label={COPY.nameLabel} focused={focus.f === "name"}>
+          <input className={inputCls} value={name} maxLength={100} autoComplete="name" onChange={(e) => setName(e.target.value)} {...focus.on("name")} />
+        </Field>
+        <Field label={COPY.emailLabel} focused={focus.f === "email"}>
+          <input type="email" inputMode="email" className={inputCls} value={email} maxLength={254} autoComplete="email" onChange={(e) => setEmail(e.target.value)} {...focus.on("email")} />
+        </Field>
+        {withPhone && (
+          <Field label={COPY.phoneLabel} hint={COPY.phoneOptional} focused={focus.f === "phone"}>
+            <PhoneControl focus={focus} value={phone} onChange={setPhone} />
+          </Field>
+        )}
+      </div>
+      <div className="flex flex-col gap-2">
+        <button type="submit" className={`${btnPrimary} min-h-14 w-full text-[17px]`}>{COPY.submitExchange}</button>
+        <p className="m-0 text-center text-[14px] leading-snug text-[var(--ink-muted)]">{COPY.consent}</p>
+      </div>
+    </form>
+  );
+}
+
+function DetailsForm({ withPhone }: { withPhone: boolean }) {
+  const focus = useFocus();
+  const [phone, setPhone] = useState(VISITOR.phone);
+  const [job, setJob] = useState(VISITOR.job);
+  const [company, setCompany] = useState(VISITOR.company);
+  const [note, setNote] = useState(VISITOR.note);
+  return (
+    <form onSubmit={(e) => e.preventDefault()} aria-label="Optional details form" className="flex flex-col gap-5">
+      <p className="m-0 text-[17px] leading-relaxed text-[var(--ink-muted)] text-pretty">{COPY.detailsIntro}</p>
+      <div className="flex flex-col gap-3">
+        {withPhone && (
+          <Field label={COPY.phoneLabel} focused={focus.f === "phone"}>
+            <PhoneControl focus={focus} value={phone} onChange={setPhone} />
+          </Field>
+        )}
+        <Field label={COPY.jobTitleLabel} focused={focus.f === "job"}>
+          <input className={inputCls} value={job} maxLength={100} autoComplete="organization-title" onChange={(e) => setJob(e.target.value)} {...focus.on("job")} />
+        </Field>
+        <Field label={COPY.companyLabel} focused={focus.f === "company"}>
+          <input className={inputCls} value={company} maxLength={100} autoComplete="organization" onChange={(e) => setCompany(e.target.value)} {...focus.on("company")} />
+        </Field>
+        <Field label={COPY.noteLabel} focused={focus.f === "note"}>
+          <textarea rows={3} placeholder={COPY.notePlaceholder} maxLength={1000} className={`${inputCls} resize-none`} value={note} onChange={(e) => setNote(e.target.value)} {...focus.on("note")} />
+        </Field>
+      </div>
+      <button type="submit" className={`${btnPrimary} min-h-14 w-full text-[17px]`}>{COPY.submitDetails}</button>
+    </form>
+  );
+}
+
+/** Dimmed card page behind the sheet (HiCardPresentation shell, paid plan). */
+function CardBehind() {
+  return (
+    <div aria-hidden className="relative isolate h-full overflow-hidden">
+      <div className="pointer-events-none absolute -top-[200px] left-1/2 z-[-1] h-[420px] w-[520px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,var(--accent-soft),transparent)]" />
+      <div className="mx-auto flex w-full max-w-[420px] flex-col items-center gap-12 px-6 pb-5 pt-4 text-center">
+        <section className="relative mt-[84px] w-full rounded-[24px] border border-[var(--line)] bg-[var(--surface)] px-6 py-7 text-left">
+          <div className="-mt-24 flex flex-col gap-6">
+            <div className="flex flex-col items-center gap-3.5 text-center">
+              <div className="flex h-[136px] w-[136px] items-center justify-center rounded-full border border-[var(--line)] bg-[var(--surface-2)] text-[44px] font-semibold tracking-[-0.02em]" style={{ boxShadow: "0 0 0 6px var(--bg)" }}>{OWNER.initials}</div>
+              <div className="flex flex-col items-center gap-1">
+                <p className="text-[28px] font-semibold leading-[1.15] tracking-[-0.03em]">I'm {OWNER.first}</p>
+                <p className="text-[15px] font-medium leading-[1.45] text-[var(--ink-muted)]">{OWNER.role}</p>
+              </div>
+            </div>
+            <span className={`${btnPrimary} min-h-14 w-full text-[17px]`}>Exchange contact</span>
+            <div className="h-px bg-[var(--line)]" />
+          </div>
+          <div className="mt-6">
+            <h3 className="text-[22px] font-semibold leading-[1.15] tracking-[-0.02em]">About</h3>
+            <p className="mt-2.5 text-[16px] leading-[1.55] text-[var(--ink-muted)]">I help early-stage teams turn rough ideas into products people enjoy using.</p>
+          </div>
+        </section>
+        <p className="inline-flex items-center gap-2 text-[15px] font-medium text-[var(--ink-muted)]">Powered by <WeMetMark /> We Met <LeafIcon /> Didi Build</p>
+      </div>
+    </div>
+  );
+}
+
+export function FormsStage({ variant }: { variant: FormVariant }) {
+  const isExchange = variant.startsWith("exchange");
+  const updated = variant.endsWith("updated");
+  const title = isExchange ? COPY.exchangeTitle : COPY.detailsTitle;
+  return (
+    <div className="relative mx-auto h-[844px] w-full max-w-[520px] overflow-hidden bg-[var(--bg)]">
+      <CardBehind />
+      <div className="absolute inset-0 bg-[var(--scrim)]" />
+      <div key={variant} role="dialog" aria-modal="true" aria-label={title} className="wm-sheet absolute inset-x-0 bottom-0 max-h-[calc(100%-24px)] overflow-y-auto rounded-t-[24px] bg-[var(--bg)] text-[var(--ink)]">
+        <div className="mx-auto flex max-w-[420px] flex-col gap-2 px-6 pb-7">
+          <div className="-mx-6 bg-[var(--bg)] px-6">
+            <div aria-hidden className="flex justify-center pb-0.5 pt-2.5"><span className="block h-[5px] w-10 rounded-full bg-[var(--line-strong)]" /></div>
+            <div className="flex items-center justify-between gap-3 py-2.5">
+              <h1 className="m-0 min-w-0 text-balance text-[20px] font-semibold leading-tight tracking-tight">{title}</h1>
+              <button type="button" aria-label="Close" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-0 bg-transparent text-[var(--ink)] hover:bg-[var(--surface-2)]"><CloseIcon /></button>
+            </div>
+          </div>
+          {isExchange ? <ExchangeForm withPhone={!updated} /> : <DetailsForm withPhone={updated} />}
+        </div>
+      </div>
+    </div>
+  );
+}

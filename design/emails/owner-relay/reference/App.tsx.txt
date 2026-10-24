@@ -1,0 +1,24 @@
+import { Theme } from './settings/types';
+import { DIDI741OwnerRelayEmailBaselineABC } from './components/generated/DIDI741OwnerRelayEmailBaselineABC';
+
+let theme: Theme = 'light';
+
+function App() {
+  function setTheme(theme: Theme) {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }
+
+  setTheme(theme);
+
+  return (
+    <>
+      <DIDI741OwnerRelayEmailBaselineABC />
+    </>
+  ); // %EXPORT_STATEMENT%
+}
+
+export default App;
