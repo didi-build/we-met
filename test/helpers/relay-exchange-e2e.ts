@@ -446,8 +446,8 @@ export function assertVisitorLetterToOwner(email: OutboundEmail): void {
   expect(email.replyTo).toBe("visitor@example.com");
   expect(email.subject).toBe("Great meeting you, Sam");
   expect(email.attachments?.[0]?.filename).toMatch(/\.vcf$/);
-  expect(email.textPlain).toContain("Save my contact card:");
-  expect(email.textHtml).toContain("Save my contact card");
+  expect(email.textPlain).toContain("If it is missing when you reply");
+  expect(email.textHtml).toContain("save my contact card");
   expect(email.textPlain).toMatch(/\/api\/exchange\/[^/\s]+\/contact-card\?token=/);
   expect(email.textPlain).not.toContain("visitor@example.com");
   expect(email.textPlain).not.toContain("Engineer");
