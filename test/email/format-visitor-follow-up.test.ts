@@ -59,12 +59,9 @@ describe("format visitor follow-up email (unit)", () => {
       baseUrl,
       contactCardDownloadUrl: url,
     });
-    expect(content.textPlain).toContain(
-      "If it is missing when you reply, save my contact card:",
-    );
+    expect(content.textPlain).toContain("Save my contact card:");
     expect(content.textPlain).toContain(url);
-    expect(content.textHtml).toContain("If it is missing when you reply");
-    expect(content.textHtml).toContain("save my contact card");
+    expect(content.textHtml).toContain("Save my contact card");
     expect(content.textHtml).toContain(url);
   });
 
@@ -74,8 +71,8 @@ describe("format visitor follow-up email (unit)", () => {
       visitorName: "Alex",
       baseUrl,
     });
-    expect(content.textPlain).not.toContain("save my contact card");
-    expect(content.textHtml).not.toContain("save my contact card");
+    expect(content.textPlain).not.toContain("Save my contact card");
+    expect(content.textHtml).not.toContain("Save my contact card");
   });
 
   it("never leaves raw template tags in HTML or text (relay and direct)", () => {
