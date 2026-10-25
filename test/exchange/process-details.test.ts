@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import type { VisitorEmailMode } from "@/app-settings/defaults";
 import { MemoryCardRepository } from "@/card-data/memory-repository";
 import { MemoryExchangeOwnerEmailStore } from "@/exchange-owner-email/memory-store";
 import { MemoryLeadDeliveryLedger } from "@/lead-delivery-ledger/memory-repository";
@@ -30,6 +31,7 @@ function detailsDeps(
     now: () => new Date("2026-10-12T12:00:00.000Z"),
     baseUrl: "https://we-met.link",
     logExchangeVisitorLetterEnqueueFailed: vi.fn(),
+    resolveVisitorEmailMode: async (): Promise<VisitorEmailMode> => "owner_relay",
   };
 }
 

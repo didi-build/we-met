@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import type { VisitorEmailMode } from "@/app-settings/defaults";
 import { MemoryCardRepository } from "@/card-data/memory-repository";
 import { MemoryExchangeOwnerEmailStore } from "@/exchange-owner-email/memory-store";
 import { MemoryLeadDeliveryLedger } from "@/lead-delivery-ledger/memory-repository";
@@ -37,6 +38,8 @@ describe("exchange_visitor_letter_enqueue_failed (unit)", () => {
     const exchangeOwnerEmail = new MemoryExchangeOwnerEmailStore();
 
     const result = await processOwnerEmailFinalize(lead, null, card, [sink()], {
+      tokenSecret: "test-secret",
+      resolveVisitorEmailMode: async (): Promise<VisitorEmailMode> => "owner_relay",
       followupQueue: {
         enqueueVisitorLetter: async () => {
           throw new Error("missing binding");

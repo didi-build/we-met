@@ -15,9 +15,13 @@ import type {
   LeadSinkQueueProducer,
 } from "@/exchange/queue/producer";
 import { absoluteUrl } from "@/config/we-met";
+import type { VisitorEmailMode } from "@/app-settings/defaults";
+import { relayContactCardTokenForEnqueue } from "@/exchange/relay-contact-card-token";
 import type { VisitorLead, VisitorLeadDetails } from "@/exchange/types";
 
 export type ProcessOwnerEmailFinalizeDeps = {
+  tokenSecret: string;
+  resolveVisitorEmailMode: () => Promise<VisitorEmailMode>;
   followupQueue: FollowupEmailQueueProducer;
   leadSinkQueue: LeadSinkQueueProducer;
   deliveryLedger: LeadDeliveryLedger;
@@ -62,11 +66,20 @@ export async function processOwnerEmailFinalize(
   }
 
   const cardSnapshot = buildCardEmailSnapshot(card);
+  const visitorEmailMode = await deps.resolveVisitorEmailMode();
+  const relayContactCardToken = relayContactCardTokenForEnqueue(
+    deps.tokenSecret,
+    visitorEmailMode,
+    lead.leadId,
+    card.id,
+    card.slug,
+  );
   try {
     await deps.followupQueue.enqueueVisitorLetter({
       type: "visitor_followup",
       lead,
       card: cardSnapshot,
+      ...(relayContactCardToken ? { relayContactCardToken } : {}),
     });
   } catch {
     deps.logExchangeVisitorLetterEnqueueFailed(lead.leadId);

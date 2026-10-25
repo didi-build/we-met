@@ -4,7 +4,9 @@ import {
   APP_SETTING_DAILY_CAP_PER_CARD,
   APP_SETTING_LEAD_EMAIL_ENABLED,
   APP_SETTING_VISITOR_EMAIL_MODE,
+  type VisitorEmailMode,
 } from "@/app-settings/defaults";
+import type { ProcessExchangeDeps } from "@/exchange/process-exchange";
 import { MemoryCardRepository } from "@/card-data/memory-repository";
 import { createExchangeOwnerEmailStoreFromD1 } from "@/exchange-owner-email/d1-repository";
 import { createLeadDeliveryLedgerFromD1 } from "@/lead-delivery-ledger/d1-repository";
@@ -39,7 +41,7 @@ function exchangeDeps(
   ledgerMessages?: {
     followup: unknown[];
   },
-) {
+): ProcessExchangeDeps & { _followup: unknown[] } {
   const ledger = createLeadDeliveryLedgerFromD1(db);
   const now = () => new Date("2026-10-16T12:00:00.000Z");
   const followup: unknown[] = ledgerMessages?.followup ?? [];
@@ -74,6 +76,7 @@ function exchangeDeps(
       assertLeadEmailCapacity(db, cardId, needed, now()),
     incrementDailySendCounts: async () => undefined,
     logExchangeVisitorLetterEnqueueFailed: vi.fn(),
+    resolveVisitorEmailMode: async (): Promise<VisitorEmailMode> => "owner_relay",
     _followup: followup,
   };
 }
@@ -205,6 +208,7 @@ describe("exchange and details abuse controls (D1 integration)", () => {
           now: deps.now,
           baseUrl: "https://we-met.link",
           logExchangeVisitorLetterEnqueueFailed: vi.fn(),
+          resolveVisitorEmailMode: async (): Promise<VisitorEmailMode> => "owner_relay",
         },
       );
       expect(details.status).toBe("success");
@@ -366,6 +370,7 @@ describe("exchange and details abuse controls (D1 integration)", () => {
         now: deps.now,
         baseUrl: "https://we-met.link",
         logExchangeVisitorLetterEnqueueFailed: vi.fn(),
+        resolveVisitorEmailMode: async (): Promise<VisitorEmailMode> => "owner_relay",
       });
       expect(dismiss.status).toBe("success");
       expect(sinkMessages.length).toBeGreaterThan(0);
@@ -442,6 +447,7 @@ describe("exchange and details abuse controls (D1 integration)", () => {
           now: deps.now,
           baseUrl: "https://we-met.link",
           logExchangeVisitorLetterEnqueueFailed: vi.fn(),
+          resolveVisitorEmailMode: async (): Promise<VisitorEmailMode> => "owner_relay",
         },
       );
       expect(details.status).toBe("success");
@@ -499,6 +505,7 @@ describe("exchange and details abuse controls (D1 integration)", () => {
           assertLeadEmailCapacity(db, cardId, needed, new Date(nowMs)),
         incrementDailySendCounts: async () => undefined,
         logExchangeVisitorLetterEnqueueFailed: vi.fn(),
+        resolveVisitorEmailMode: async (): Promise<VisitorEmailMode> => "owner_relay",
       });
 
       await processExchange(
@@ -594,6 +601,7 @@ describe("exchange and details abuse controls (D1 integration)", () => {
           assertLeadEmailCapacity(db, cardId, needed, new Date(nowMs)),
         incrementDailySendCounts: async () => undefined,
         logExchangeVisitorLetterEnqueueFailed: vi.fn(),
+        resolveVisitorEmailMode: async (): Promise<VisitorEmailMode> => "direct",
       });
 
       await processExchange(
@@ -696,6 +704,7 @@ describe("exchange and details abuse controls (D1 integration)", () => {
         now: deps.now,
         baseUrl: "https://we-met.link",
         logExchangeVisitorLetterEnqueueFailed: vi.fn(),
+        resolveVisitorEmailMode: async (): Promise<VisitorEmailMode> => "owner_relay",
       };
       const first = await processDetails(
         { token, phone: null, jobTitle: "CTO", company: "Co", note: "Hi" },

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import type { VisitorEmailMode } from "@/app-settings/defaults";
 import { MemoryExchangeOwnerEmailStore } from "@/exchange-owner-email/memory-store";
 import { OWNER_EMAIL_SEND_CLAIM_STALE_MS } from "@/exchange-owner-email/types";
 import {
@@ -52,6 +53,8 @@ function ownerEmailFinalizeDeps(
   deliveryLogger: LeadDeliveryDispatchLogger,
 ) {
   return {
+    tokenSecret: "test-secret",
+    resolveVisitorEmailMode: async (): Promise<VisitorEmailMode> => "owner_relay",
     followupQueue: noopFollowupQueue,
     leadSinkQueue: deps.producer,
     deliveryLedger: deps.ledger,
@@ -362,7 +365,6 @@ describe("owner email timing (integration)", () => {
     const repo = new MemoryCardRepository();
     const card = await repo.upsertCard(exampleCardInput());
     const tokenDeps = {
-      tokenSecret: "secret",
       environment: "local",
       ...ownerEmailFinalizeDeps(deps, exchangeOwnerEmail, deps.deliveryLogger),
     };
