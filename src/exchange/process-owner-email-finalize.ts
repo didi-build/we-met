@@ -51,6 +51,25 @@ export async function processOwnerEmailFinalize(
   sinks: LeadSinkRecord[],
   deps: ProcessOwnerEmailFinalizeDeps,
 ): Promise<ProcessOwnerEmailFinalizeResult> {
+  let visitorEmailMode: VisitorEmailMode = "direct";
+  try {
+    visitorEmailMode = await deps.resolveVisitorEmailMode();
+  } catch {
+    visitorEmailMode = "direct";
+  }
+
+  let relayContactCardToken: string | undefined;
+  try {
+    relayContactCardToken = relayContactCardTokenForEnqueue(
+      deps.tokenSecret,
+      visitorEmailMode,
+      lead.leadId,
+      card.id,
+    );
+  } catch {
+    relayContactCardToken = undefined;
+  }
+
   const triggeredAt = deps.now().toISOString();
   await deps.exchangeOwnerEmail.ensurePending({
     leadId: lead.leadId,
@@ -66,14 +85,6 @@ export async function processOwnerEmailFinalize(
   }
 
   const cardSnapshot = buildCardEmailSnapshot(card);
-  const visitorEmailMode = await deps.resolveVisitorEmailMode();
-  const relayContactCardToken = relayContactCardTokenForEnqueue(
-    deps.tokenSecret,
-    visitorEmailMode,
-    lead.leadId,
-    card.id,
-    card.slug,
-  );
   try {
     await deps.followupQueue.enqueueVisitorLetter({
       type: "visitor_followup",

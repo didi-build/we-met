@@ -6,7 +6,6 @@ export function relayContactCardTokenForEnqueue(
   visitorEmailMode: VisitorEmailMode,
   leadId: string,
   cardId: string,
-  cardSlug: string,
 ): string | undefined {
   if (visitorEmailMode !== "owner_relay") {
     return undefined;
@@ -14,6 +13,5 @@ export function relayContactCardTokenForEnqueue(
   return createExchangeContactCardToken(masterSecret, {
     leadId,
     cardId,
-    cardSlug,
   });
 }

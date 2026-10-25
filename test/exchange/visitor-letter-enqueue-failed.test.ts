@@ -63,4 +63,60 @@ describe("exchange_visitor_letter_enqueue_failed (unit)", () => {
     expect(logEnqueueFailed).toHaveBeenCalledOnce();
     expect(logEnqueueFailed).toHaveBeenCalledWith(lead.leadId);
   });
+
+  it("finalizes without relay token when resolveVisitorEmailMode rejects", async () => {
+    const repo = new MemoryCardRepository();
+    const card = await repo.upsertCard(exampleCardInput());
+    const exchangeOwnerEmail = new MemoryExchangeOwnerEmailStore();
+    let enqueued: { relayContactCardToken?: string } | undefined;
+
+    const result = await processOwnerEmailFinalize(lead, null, card, [sink()], {
+      tokenSecret: "test-secret",
+      resolveVisitorEmailMode: async () => {
+        throw new Error("d1 unavailable");
+      },
+      followupQueue: {
+        enqueueVisitorLetter: async (message) => {
+          enqueued = message;
+        },
+      },
+      leadSinkQueue: { enqueueLeadSink: async () => undefined },
+      deliveryLedger: new MemoryLeadDeliveryLedger(),
+      deliveryLogger: {
+        logLedgerWriteFailed: vi.fn(),
+        logLedgerEnqueueFailed: vi.fn(),
+      },
+      leadSinkLogger: { logSinkEnqueueFailure: vi.fn() },
+      exchangeOwnerEmail,
+      createLedgerId: () => "ledger-1",
+      now: () => new Date("2026-10-12T12:00:00.000Z"),
+      baseUrl: "https://we-met.link",
+      logExchangeVisitorLetterEnqueueFailed: vi.fn(),
+    });
+
+    expect(result.status).toBe("success");
+    expect(enqueued?.relayContactCardToken).toBeUndefined();
+    const retry = await processOwnerEmailFinalize(lead, null, card, [sink()], {
+      tokenSecret: "test-secret",
+      resolveVisitorEmailMode: async () => {
+        throw new Error("d1 unavailable");
+      },
+      followupQueue: {
+        enqueueVisitorLetter: async () => undefined,
+      },
+      leadSinkQueue: { enqueueLeadSink: async () => undefined },
+      deliveryLedger: new MemoryLeadDeliveryLedger(),
+      deliveryLogger: {
+        logLedgerWriteFailed: vi.fn(),
+        logLedgerEnqueueFailed: vi.fn(),
+      },
+      leadSinkLogger: { logSinkEnqueueFailure: vi.fn() },
+      exchangeOwnerEmail,
+      createLedgerId: () => "ledger-2",
+      now: () => new Date("2026-10-12T12:01:00.000Z"),
+      baseUrl: "https://we-met.link",
+      logExchangeVisitorLetterEnqueueFailed: vi.fn(),
+    });
+    expect(retry.status).toBe("already_finalized");
+  });
 });

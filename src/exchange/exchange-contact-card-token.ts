@@ -7,7 +7,8 @@ export type ExchangeContactCardTokenPayload = {
   v: number;
   leadId: string;
   cardId: string;
-  cardSlug: string;
+  /** Legacy field on tokens minted before cardId-only lookup; not validated. */
+  cardSlug?: string;
 };
 
 function base64UrlEncode(data: Buffer | string): string {
@@ -32,7 +33,7 @@ function signPayload(signingKey: Buffer, payloadB64: string): string {
 
 export function createExchangeContactCardToken(
   masterSecret: string,
-  payload: Omit<ExchangeContactCardTokenPayload, "v">,
+  payload: Pick<ExchangeContactCardTokenPayload, "leadId" | "cardId">,
 ): string {
   const signingKey = exchangeContactCardSigningKey(masterSecret);
   const full: ExchangeContactCardTokenPayload = {
@@ -59,9 +60,10 @@ export function verifyExchangeContactCardToken(
 
   const signingKey = exchangeContactCardSigningKey(masterSecret);
   const expectedSig = signPayload(signingKey, payloadB64);
-  const sigBuf = base64UrlDecode(sig);
-  const expectedBuf = base64UrlDecode(expectedSig);
-  if (sigBuf.length !== expectedBuf.length || !timingSafeEqual(sigBuf, expectedBuf)) {
+  if (sig.length !== expectedSig.length) {
+    return { ok: false };
+  }
+  if (!timingSafeEqual(Buffer.from(sig, "utf8"), Buffer.from(expectedSig, "utf8"))) {
     return { ok: false };
   }
 
@@ -77,14 +79,16 @@ export function verifyExchangeContactCardToken(
   if (parsed.v !== TOKEN_VERSION) {
     return { ok: false };
   }
-  if (
-    typeof parsed.leadId !== "string" ||
-    typeof parsed.cardId !== "string" ||
-    typeof parsed.cardSlug !== "string"
-  ) {
+  if (typeof parsed.leadId !== "string" || typeof parsed.cardId !== "string") {
     return { ok: false };
   }
-  if (!parsed.leadId.trim() || !parsed.cardId.trim() || !parsed.cardSlug.trim()) {
+  if (!parsed.leadId.trim() || !parsed.cardId.trim()) {
+    return { ok: false };
+  }
+  if (
+    parsed.cardSlug !== undefined &&
+    (typeof parsed.cardSlug !== "string" || !parsed.cardSlug.trim())
+  ) {
     return { ok: false };
   }
 

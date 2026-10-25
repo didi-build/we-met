@@ -134,14 +134,23 @@ export async function processExchange(
     createdAt,
   });
 
-  const visitorEmailMode = await deps.resolveVisitorEmailMode();
-  const relayContactCardToken = relayContactCardTokenForEnqueue(
-    deps.tokenSecret,
-    visitorEmailMode,
-    lead.leadId,
-    card.id,
-    card.slug,
-  );
+  let visitorEmailMode: VisitorEmailMode = "direct";
+  try {
+    visitorEmailMode = await deps.resolveVisitorEmailMode();
+  } catch {
+    visitorEmailMode = "direct";
+  }
+  let relayContactCardToken: string | undefined;
+  try {
+    relayContactCardToken = relayContactCardTokenForEnqueue(
+      deps.tokenSecret,
+      visitorEmailMode,
+      lead.leadId,
+      card.id,
+    );
+  } catch {
+    relayContactCardToken = undefined;
+  }
 
   try {
     await deps.followupQueue.enqueueVisitorLetter(

@@ -57,7 +57,7 @@ export async function GET(
   );
 
   const result = await processExchangeContactCardDownload(
-    { hostname, hostConfig, routeLeadId, token },
+    { routeLeadId, token },
     repo,
     deps,
   );
@@ -71,7 +71,8 @@ export async function GET(
     headers: {
       "Content-Type": "text/vcard; charset=utf-8",
       "Content-Disposition": `attachment; filename="${result.filename}"`,
-      "Cache-Control": "no-store",
+      "Cache-Control": "private, no-store",
+      "X-Content-Type-Options": "nosniff",
     },
   });
 }

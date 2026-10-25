@@ -1,6 +1,5 @@
-import { lookupCard } from "@/card-data/lookup";
+import { isVisitorVisibleCard } from "@/card-data/live-card";
 import type { CardRepository } from "@/card-data/repository";
-import type { WeMetHostConfig } from "@/config/we-met";
 import { verifyExchangeContactCardToken } from "@/exchange/exchange-contact-card-token";
 import type { ExchangeRateLimiter } from "@/exchange/rate-limit";
 import {
@@ -17,8 +16,6 @@ export type ProcessExchangeContactCardDeps = {
 };
 
 export type ProcessExchangeContactCardContext = {
-  hostname: string;
-  hostConfig: WeMetHostConfig;
   routeLeadId: string;
   token: string;
 };
@@ -62,17 +59,8 @@ export async function processExchangeContactCardDownload(
     return { status: "not_found" };
   }
 
-  const card = await lookupCard(
-    { hostname: ctx.hostname, pathname: `/hi/${verified.payload.cardSlug}` },
-    repo,
-    ctx.hostConfig,
-  );
-
-  if (!card) {
-    return { status: "not_found" };
-  }
-
-  if (card.id !== verified.payload.cardId || card.slug !== verified.payload.cardSlug) {
+  const card = await repo.getById(verified.payload.cardId);
+  if (!card || !(await isVisitorVisibleCard(repo, card))) {
     return { status: "not_found" };
   }
 

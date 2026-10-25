@@ -58,6 +58,26 @@ async function getContactCard(leadId: string, token?: string): Promise<Response>
   return GET(request, { params: Promise.resolve({ leadId }) });
 }
 
+function headerSnapshot(response: Response): string {
+  return [...response.headers.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, v]) => `${k}: ${v}`)
+    .join("\n");
+}
+
+async function expectUniform404(
+  response: Response,
+  baselineHeaders: string | null,
+): Promise<string> {
+  expect(response.status).toBe(404);
+  expect(await response.text()).toBe("");
+  const headers = headerSnapshot(response);
+  if (baselineHeaders !== null) {
+    expect(headers).toBe(baselineHeaders);
+  }
+  return headers;
+}
+
 function listRouteFiles(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
     const path = join(dir, entry);
@@ -93,7 +113,6 @@ describe("GET /api/exchange/[leadId]/contact-card", () => {
     const token = createExchangeContactCardToken("test-token-secret", {
       leadId: "lead-relay-1",
       cardId: card!.id,
-      cardSlug: card!.slug,
     });
     const expected = await buildOwnerVCardAttachment(
       card!.contact,
@@ -106,6 +125,8 @@ describe("GET /api/exchange/[leadId]/contact-card", () => {
     const response = await getContactCard("lead-relay-1", token);
     expect(response.status).toBe(200);
     expect(response.headers.get("Content-Type")).toBe("text/vcard; charset=utf-8");
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+    expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff");
     expect(await response.text()).toBe(expected.vcardBody);
   });
 
@@ -114,7 +135,6 @@ describe("GET /api/exchange/[leadId]/contact-card", () => {
     const token = createExchangeContactCardToken("test-token-secret", {
       leadId: "lead-a",
       cardId: card!.id,
-      cardSlug: card!.slug,
     });
 
     expect((await getContactCard("lead-a")).status).toBe(404);
@@ -129,6 +149,98 @@ describe("GET /api/exchange/[leadId]/contact-card", () => {
       visitorName: "Alex",
     });
     expect((await getContactCard("lead-a", detailsToken)).status).toBe(404);
+  });
+
+  it("still serves the card after the owner renames their slug", async () => {
+    const card = await routeMocks.repo.getBySlug("relay-card");
+    expect(card).toBeTruthy();
+    const token = createExchangeContactCardToken("test-token-secret", {
+      leadId: "lead-after-rename",
+      cardId: card!.id,
+    });
+    routeMocks.repo.renameSlugForTest(card!.id, "relay-card-renamed");
+    expect(await routeMocks.repo.getBySlug("relay-card")).toBeNull();
+    expect(await routeMocks.repo.getBySlug("relay-card-renamed")).toBeTruthy();
+
+    const renamed = await routeMocks.repo.getBySlug("relay-card-renamed");
+    const expected = await buildOwnerVCardAttachment(
+      renamed!.contact,
+      renamed!.email,
+      renamed!.photoKey,
+      { get: async () => null },
+      { logMissingPhoto: () => undefined, logNonJpegPhoto: () => undefined },
+    );
+
+    const response = await getContactCard("lead-after-rename", token);
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe(expected.vcardBody);
+  });
+
+  it("returns uniform 404 for deleted, unpublished, missing sink, wrong card, and rate limit", async () => {
+    const card = await routeMocks.repo.getBySlug("relay-card");
+    expect(card).toBeTruthy();
+    const leadId = "lead-uniform-404";
+    const goodToken = createExchangeContactCardToken("test-token-secret", {
+      leadId,
+      cardId: card!.id,
+    });
+
+    routeMocks.repo.setCardStatusForTest(card!.id, "retired");
+    const baseline = await expectUniform404(
+      await getContactCard(leadId, goodToken),
+      null,
+    );
+
+    await upsertCardWithEmailSink(routeMocks.repo, {
+      ...exampleCardInput(),
+      slug: "relay-card-live-again",
+    });
+    const liveCard = await routeMocks.repo.getBySlug("relay-card-live-again");
+    expect(liveCard).toBeTruthy();
+    const liveToken = createExchangeContactCardToken("test-token-secret", {
+      leadId,
+      cardId: liveCard!.id,
+    });
+    routeMocks.repo.setCardStatusForTest(liveCard!.id, "suspended");
+    await expectUniform404(await getContactCard(leadId, liveToken), baseline);
+
+    const noSinkRepo = new MemoryCardRepository();
+    const noSinkCard = await noSinkRepo.upsertCard({
+      ...exampleCardInput(),
+      slug: "no-sink-card",
+    });
+    routeMocks.repo = noSinkRepo;
+    const noSinkToken = createExchangeContactCardToken("test-token-secret", {
+      leadId,
+      cardId: noSinkCard.id,
+    });
+    await expectUniform404(await getContactCard(leadId, noSinkToken), baseline);
+
+    routeMocks.repo = new MemoryCardRepository();
+    await upsertCardWithEmailSink(routeMocks.repo, {
+      ...exampleCardInput(),
+      slug: "other-card",
+    });
+    const wrongCardToken = createExchangeContactCardToken("test-token-secret", {
+      leadId,
+      cardId: "00000000-0000-4000-8000-000000000099",
+    });
+    await expectUniform404(await getContactCard(leadId, wrongCardToken), baseline);
+
+    routeMocks.repo = new MemoryCardRepository();
+    await upsertCardWithEmailSink(routeMocks.repo, {
+      ...exampleCardInput(),
+      slug: "rate-limit-card",
+    });
+    const rateCard = await routeMocks.repo.getBySlug("rate-limit-card");
+    const rateToken = createExchangeContactCardToken("test-token-secret", {
+      leadId,
+      cardId: rateCard!.id,
+    });
+    routeMocks.deps = defaultDeps({
+      rateLimiter: { check: async () => ({ allowed: false }) },
+    });
+    await expectUniform404(await getContactCard(leadId, rateToken), baseline);
   });
 
   it("returns 404 when the card is suspended", async () => {
@@ -147,7 +259,6 @@ describe("GET /api/exchange/[leadId]/contact-card", () => {
     const token = createExchangeContactCardToken("test-token-secret", {
       leadId: "lead-suspended",
       cardId: suspended.id,
-      cardSlug: suspended.slug,
     });
     const response = await getContactCard("lead-suspended", token);
     expect(response.status).toBe(404);
@@ -161,7 +272,6 @@ describe("GET /api/exchange/[leadId]/contact-card", () => {
     const token = createExchangeContactCardToken("test-token-secret", {
       leadId: "lead-log-1",
       cardId: card!.id,
-      cardSlug: card!.slug,
     });
     await getContactCard("lead-log-1", token);
     expect(logDownload).toHaveBeenCalledWith("lead-log-1");
