@@ -1,0 +1,154 @@
+import { useState } from "react";
+import { ContactCardIcon, DIRECT_LINE, ExchangeFormVignette, FinalCta, Hero, HowItWorks, Icon, LandingFrame, ModeSwitch, ShareLinkVignette, type Step } from "./wm-parts";
+
+/* DIDI-822 final: variant A, approved by Diadem Oct 25, 2026, 1:33 AM ET.
+   Relay is the default story (DIDI-739 locked block + DIDI-826 answers). Direct mode stays as it appears in variant A
+   (Diadem, 1:39 AM ET) with a "Coming soon" badge, because the owner setting (DIDI-831) isn't built yet.
+
+   COMING SOON BADGE (Diadem, 1:50 and 1:55 AM ET): shown ONLY when Direct is toggled on, never in relay.
+   In direct it IS step 3's chip (the chip slot), the only "Coming soon" on the page.
+   One switch: set SHOW_DIRECT_COMING_SOON to false (or delete the single <span data-slot="direct-coming-soon">).
+   The chip slot keeps a text chip's height either way and the badge is absolutely positioned in it, so nothing moves.
+   Review overrides: ?soon=0 / ?soon=1, and ?mode=direct opens the direct state. */
+export const SHOW_DIRECT_COMING_SOON = true;
+export const COMING_SOON = "Coming soon";
+
+type Mode = "relay" | "direct";
+
+export const COPY = {
+  heroLead:
+    "Share one link or QR code. They save your card on the spot, and you get a follow-up letter ready to send, plus all their details, in your inbox.",
+  step3Title: "Two emails land in your inbox",
+  step3Body:
+    "A \u201cGreat meeting you\u201d letter for them, ready to send on, and a \u201cYou met\u201d email with every detail they shared, just for you.",
+  step3Chip: "You choose when the letter goes",
+  /* Direct view only: one email reaches the owner. */
+  step3TitleDirect: "Your copy lands in your inbox",
+  step3BodyDirect:
+    "The \u201cGreat meeting you\u201d letter goes straight to them. Your copy, \u201cYou met\u201d, comes to you with every detail they shared.",
+  replyNote: "To send it on, just hit Reply. When you hit Reply, your contact card goes with it, so they can save you in one tap.",
+  nothingNote: "We Met sends them nothing, so the letter waits for you until you send it on.",
+  directLine: DIRECT_LINE,
+  directStateLine: "Direct mode: the letter goes directly to their inbox, and you still get \u201cYou met\u201d with all the details.",
+};
+
+function useReviewParams() {
+  const [p] = useState(() => {
+    const q = typeof window === "undefined" ? new URLSearchParams() : new URLSearchParams(window.location.search);
+    const soon = q.get("soon");
+    return {
+      soon: soon === null ? SHOW_DIRECT_COMING_SOON : soon === "1",
+      mode: (q.get("mode") === "direct" ? "direct" : "relay") as Mode,
+    };
+  });
+  return p;
+}
+
+function ReplyIcon({ size }: { size: number }) {
+  return (
+    <svg aria-hidden width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 14L4 9l5-5" />
+      <path d="M4 9h10a6 6 0 016 6v5" />
+    </svg>
+  );
+}
+
+function LetterRow({ toSam }: { toSam: boolean }) {
+  return (
+    <div className="lp-inbox-row" data-unread>
+      {toSam ? <span className="lp-vig-av lp-vig-av-soft">YN</span> : <span className="lp-vig-av">WM</span>}
+      <div className="lp-vig-msg">
+        <div className="lp-vig-meta"><span>{toSam ? "Your Name via We Met" : "We Met"}</span><span>now</span></div>
+        <span className="lp-vig-subj">Great meeting you, Sam</span>
+        <span className="lp-snip">Hi Sam, great meeting you, and thanks for sharing your details with me.</span>
+        <div className="lp-tags">
+          {toSam ? (
+            <>
+              <span className="lp-tag lp-tag-soft"><Icon><ContactCardIcon size={12} /></Icon>Contact card</span>
+              <span className="lp-tag">Sent to Sam</span>
+            </>
+          ) : (
+            <>
+              <span className="lp-tag lp-tag-solid"><Icon><ReplyIcon size={12} /></Icon>Hit Reply to send</span>
+              <span className="lp-tag lp-tag-soft"><Icon><ContactCardIcon size={12} /></Icon>Your card goes with it</span>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function YouMetRow() {
+  return (
+    <div className="lp-inbox-row" data-unread>
+      <span className="lp-vig-av">WM</span>
+      <div className="lp-vig-msg">
+        <div className="lp-vig-meta"><span>We Met</span><span>now</span></div>
+        <span className="lp-vig-subj">You met Sam Rivera</span>
+        <span className="lp-snip">sam@studio.co · Product designer · Studio Co · "Met at the design meetup"</span>
+        <div className="lp-tags"><span className="lp-tag">All the details, just for you</span></div>
+      </div>
+    </div>
+  );
+}
+
+function InboxVignette({ mode }: { mode: Mode }) {
+  return (
+    <div className="lp-vig lp-vig-wide">
+      <div className="lp-inbox lp-fade" key={mode}>
+        <div className="lp-inbox-head">
+          <span>Your inbox</span>
+          <span className="lp-inbox-count">{mode === "relay" ? "2 new" : "1 new"}</span>
+        </div>
+        {mode === "relay" && <LetterRow toSam={false} />}
+        <YouMetRow />
+      </div>
+      {mode === "direct" && (
+        <div className="lp-vig-mail lp-fade" style={{ marginTop: 14 }}>
+          <span className="lp-vig-to">Sam's inbox</span>
+          <div className="lp-inbox"><LetterRow toSam /></div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export const VariantATwoEmails = () => {
+  const review = useReviewParams();
+  const [mode, setMode] = useState<Mode>(review.mode);
+  const steps: Step[] = [
+    { title: "Share your link", body: "Show your QR code or send your link. Your card lives at we-met.link/hi/your-name.", chip: "Works from a QR code or a link", vignette: <ShareLinkVignette /> },
+    { title: "They exchange contact details", body: "The person you met taps Exchange contact, adds their name and email, and saves your contact card on the spot.", chip: "No app needed", vignette: <ExchangeFormVignette /> },
+    {
+      title: mode === "direct" ? COPY.step3TitleDirect : COPY.step3Title,
+      body: mode === "direct" ? COPY.step3BodyDirect : COPY.step3Body,
+      chip: COPY.step3Chip,
+      /* Direct view: the chip slot is the Coming soon badge (or empty, same height, when the flag is off). */
+      chipSlot:
+        mode === "direct" ? (review.soon ? <span className="lp-soon-badge" data-slot="direct-coming-soon">{COMING_SOON}</span> : null) : undefined,
+      vignette: <InboxVignette mode={mode} />,
+      extra: (
+        <div className="lp-notes">
+          {mode === "relay" ? (
+            <>
+              <p className="lp-note"><span className="lp-dot" aria-hidden="true"><ReplyIcon size={10} /></span><span>{COPY.replyNote}</span></p>
+              <p className="lp-note"><span className="lp-dot" aria-hidden="true">i</span><span>{COPY.nothingNote}</span></p>
+              <p className="lp-note"><span className="lp-dot" aria-hidden="true">i</span><span>{COPY.directLine}</span></p>
+            </>
+          ) : (
+            <p className="lp-note"><span className="lp-dot" aria-hidden="true">i</span><span>{COPY.directStateLine}</span></p>
+          )}
+          <ModeSwitch mode={mode} onChange={setMode} small />
+        </div>
+      ),
+    },
+  ];
+  return (
+    <LandingFrame>
+      <Hero lead={COPY.heroLead} />
+      <HowItWorks steps={steps} />
+      <FinalCta />
+    </LandingFrame>
+  );
+};

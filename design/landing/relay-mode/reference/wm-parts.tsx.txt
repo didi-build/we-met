@@ -1,0 +1,283 @@
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import "./wm-landing.css";
+
+/* Shared pieces for the DIDI-822 landing mockups. Mirrors didi-build/we-met main (f629138):
+   LandingHeader, LandingPhonePreview, HowItWorksSection, HowItWorksVignettes, LandingFooter. */
+
+export function useStaticCapture() {
+  const [isStatic] = useState(() =>
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).has("static"),
+  );
+  return isStatic;
+}
+
+export function Icon({ children }: { children: ReactNode }) {
+  return <span className="lp-icon">{children}</span>;
+}
+
+export function WeMetMark({ size }: { size: number }) {
+  return (
+    <svg aria-hidden width={size} height={size} viewBox="0 0 32 32" fill="currentColor">
+      <defs>
+        <mask id={`wm-mask-${size}`}>
+          <rect width="32" height="32" fill="#fff" />
+          <rect x="9.8" y="9" width="3.4" height="6.4" rx="1.7" fill="#000" />
+          <rect x="18.8" y="9" width="3.4" height="6.4" rx="1.7" fill="#000" />
+          <path d="M9.5 19.5Q16 26 22.5 19.5" fill="none" stroke="#000" strokeWidth="3.2" strokeLinecap="round" />
+        </mask>
+      </defs>
+      <rect x="1" y="1" width="30" height="30" rx="9" mask={`url(#wm-mask-${size})`} />
+    </svg>
+  );
+}
+
+export function CopyIcon({ size }: { size: number }) {
+  return (
+    <svg aria-hidden width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="9" y="9" width="12" height="12" rx="2" />
+      <path d="M5 15V5a2 2 0 012-2h10" />
+    </svg>
+  );
+}
+
+export function ContactCardIcon({ size }: { size: number }) {
+  return (
+    <svg aria-hidden width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <circle cx="9" cy="11" r="2" />
+      <path d="M6 16c.6-1.4 1.7-2 3-2s2.4.6 3 2M14 10h4M14 14h3" />
+    </svg>
+  );
+}
+
+export function QrSampleIcon({ size }: { size: number }) {
+  return (
+    <svg aria-hidden width={size} height={size} viewBox="0 0 21 21" fill="currentColor" shapeRendering="crispEdges">
+      <rect x="0.5" y="0.5" width="6" height="6" rx="1.4" fill="none" stroke="currentColor" strokeWidth="1" />
+      <rect x="2" y="2" width="3" height="3" rx="0.6" />
+      <rect x="14.5" y="0.5" width="6" height="6" rx="1.4" fill="none" stroke="currentColor" strokeWidth="1" />
+      <rect x="16" y="2" width="3" height="3" rx="0.6" />
+      <rect x="0.5" y="14.5" width="6" height="6" rx="1.4" fill="none" stroke="currentColor" strokeWidth="1" />
+      <rect x="2" y="16" width="3" height="3" rx="0.6" />
+      <path d="M8 0h1v1h-1zM7 1h1v1h-1zM8 1h1v1h-1zM11 1h1v1h-1zM12 1h1v1h-1zM9 2h1v1h-1zM11 2h1v1h-1zM8 3h1v1h-1zM9 3h1v1h-1zM12 3h1v1h-1zM8 4h1v1h-1zM9 4h1v1h-1zM12 4h1v1h-1zM8 5h1v1h-1zM11 5h1v1h-1zM8 6h1v1h-1zM10 6h1v1h-1zM13 6h1v1h-1zM1 7h1v1h-1zM2 7h1v1h-1zM9 7h1v1h-1zM10 7h1v1h-1zM11 7h1v1h-1zM16 7h1v1h-1zM0 8h1v1h-1zM3 8h1v1h-1zM4 8h1v1h-1zM5 8h1v1h-1zM6 8h1v1h-1zM7 8h1v1h-1zM8 8h1v1h-1zM9 8h1v1h-1zM10 8h1v1h-1zM16 8h1v1h-1zM17 8h1v1h-1zM19 8h1v1h-1zM1 9h1v1h-1zM4 9h1v1h-1zM6 9h1v1h-1zM7 9h1v1h-1zM10 9h1v1h-1zM11 9h1v1h-1zM15 9h1v1h-1zM16 9h1v1h-1zM17 9h1v1h-1zM18 9h1v1h-1zM20 9h1v1h-1zM4 10h1v1h-1zM5 10h1v1h-1zM6 10h1v1h-1zM16 10h1v1h-1zM20 10h1v1h-1zM6 11h1v1h-1zM8 11h1v1h-1zM10 11h1v1h-1zM11 11h1v1h-1zM12 11h1v1h-1zM16 11h1v1h-1zM1 12h1v1h-1zM4 12h1v1h-1zM5 12h1v1h-1zM6 12h1v1h-1zM9 12h1v1h-1zM10 12h1v1h-1zM12 12h1v1h-1zM13 12h1v1h-1zM15 12h1v1h-1zM16 12h1v1h-1zM19 12h1v1h-1zM20 12h1v1h-1zM0 13h1v1h-1zM1 13h1v1h-1zM2 13h1v1h-1zM3 13h1v1h-1zM4 13h1v1h-1zM7 13h1v1h-1zM8 13h1v1h-1zM9 13h1v1h-1zM11 13h1v1h-1zM12 13h1v1h-1zM15 13h1v1h-1zM16 13h1v1h-1zM20 13h1v1h-1zM7 14h1v1h-1zM9 14h1v1h-1zM12 14h1v1h-1zM15 14h1v1h-1zM20 14h1v1h-1zM8 15h1v1h-1zM10 15h1v1h-1zM11 15h1v1h-1zM13 15h1v1h-1zM17 15h1v1h-1zM18 15h1v1h-1zM14 16h1v1h-1zM16 16h1v1h-1zM17 16h1v1h-1zM10 17h1v1h-1zM11 17h1v1h-1zM13 17h1v1h-1zM17 17h1v1h-1zM20 17h1v1h-1zM7 18h1v1h-1zM8 18h1v1h-1zM10 18h1v1h-1zM11 18h1v1h-1zM16 18h1v1h-1zM17 18h1v1h-1zM18 18h1v1h-1zM9 19h1v1h-1zM10 19h1v1h-1zM11 19h1v1h-1zM12 19h1v1h-1zM14 19h1v1h-1zM16 19h1v1h-1zM17 19h1v1h-1zM18 19h1v1h-1zM7 20h1v1h-1zM8 20h1v1h-1zM11 20h1v1h-1zM12 20h1v1h-1zM13 20h1v1h-1zM14 20h1v1h-1zM15 20h1v1h-1zM20 20h1v1h-1z" />
+    </svg>
+  );
+}
+
+export function SunIcon({ size }: { size: number }) {
+  return (
+    <svg aria-hidden width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+    </svg>
+  );
+}
+
+/* ---------- Page chrome ---------- */
+
+export function LandingFrame({ children }: { children: ReactNode }) {
+  const isStatic = useStaticCapture();
+  return (
+    <div className={`lp${isStatic ? " lp-static" : ""}`} data-palette="mono" data-theme="light">
+      <div className="lp-glow" aria-hidden="true" />
+      <header className="lp-wrap lp-header">
+        <a className="lp-brand" href="#top" aria-label="We Met home">
+          <Icon><WeMetMark size={26} /></Icon>
+          We Met
+        </a>
+        <a className="lp-btn lp-btn-sm" href="#start">Get started</a>
+      </header>
+      <main>{children}</main>
+      <footer className="lp-wrap">
+        <div className="lp-footer-in">
+          <div className="lp-footer-left">
+            <span className="lp-footer-brand"><Icon><WeMetMark size={20} /></Icon>We Met</span>
+            <nav className="lp-footer-nav" aria-label="Legal">
+              <a href="#privacy">Privacy</a>
+              <a href="#terms">Terms</a>
+            </nav>
+            <span className="lp-credit">
+              Free digital business cards, made by <a className="lp-credit-link" href="#didi">Didi Build</a>.
+            </span>
+          </div>
+          <button type="button" className="lp-toggle" role="switch" aria-checked="false" aria-label="Dark mode">
+            <span className="lp-track" aria-hidden="true"><span className="lp-knob"><span className="lp-icon lp-sun"><SunIcon size={13} /></span></span></span>
+          </button>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+export function Hero({ lead, extra }: { lead: ReactNode; extra?: ReactNode }) {
+  return (
+    <section className="lp-wrap lp-hero" aria-labelledby="hero-title">
+      <div className="lp-hero-text">
+        <p className="lp-eyebrow lp-rise">Free digital business card</p>
+        <h1 className="lp-h1 lp-rise lp-rise-1" id="hero-title">
+          <span>Meet someone.</span>
+          <span>Swap details.</span>
+          <span>Easy.</span>
+        </h1>
+        <p className="lp-lead lp-rise lp-rise-2">{lead}</p>
+        <div className="lp-actions lp-rise lp-rise-3">
+          <a className="lp-btn" href="#start">Get started<span aria-hidden="true">→</span></a>
+          <a className="lp-link" href="#example">See an example</a>
+        </div>
+        {extra}
+      </div>
+      <PhonePreview />
+    </section>
+  );
+}
+
+export function PhonePreview() {
+  return (
+    <div className="lp-phone lp-rise-phone" aria-hidden="true">
+      <div className="lp-phone-screen">
+        <div className="lp-phone-content">
+          <div className="lp-fb">
+            <div className="lp-fb-card">
+              <div className="lp-fb-photo"><span>DS</span></div>
+              <div>
+                <p className="lp-fb-greet">I'm Didi</p>
+                <p className="lp-fb-role">Software Engineer and Technical Advisor</p>
+              </div>
+              <span className="lp-fb-btn">Exchange contact</span>
+              <span className="lp-fb-rule" />
+              <div>
+                <p className="lp-fb-h">About me</p>
+                <p className="lp-fb-p">I'm a software engineer in Toronto. I help founders who built their app with AI get it ready for real users, paying customers, or investors.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function FinalCta() {
+  return (
+    <section className="lp-wrap lp-final" aria-labelledby="cta-title">
+      <div className="lp-final-panel">
+        <h2 className="lp-h2" id="cta-title">Make your card before your next event.</h2>
+        <p className="lp-body">It's free to start, and it takes one link to share.</p>
+        <a className="lp-btn" href="#start">Get started</a>
+      </div>
+    </section>
+  );
+}
+
+/* ---------- How it works (sticky panel on desktop, inline vignettes on phone) ---------- */
+
+/* chipSlot replaces the text chip with custom content inside a fixed-height chip row (used by the direct view's Coming soon badge). */
+export type Step = { title: string; body: ReactNode; chip: string; chipSlot?: ReactNode; vignette: ReactNode; extra?: ReactNode };
+
+export function HowItWorks({ steps, after }: { steps: Step[]; after?: ReactNode }) {
+  const [active, setActive] = useState(0);
+  const refs = useRef<(HTMLLIElement | null)[]>([]);
+  useEffect(() => {
+    const els = refs.current.filter(Boolean) as HTMLLIElement[];
+    if (!els.length || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) {
+            const i = els.indexOf(e.target as HTMLLIElement);
+            if (i >= 0) setActive(i);
+          }
+        }
+      },
+      { rootMargin: "-45% 0px -45% 0px", threshold: 0 },
+    );
+    els.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, []);
+  return (
+    <section className="lp-band" aria-labelledby="how-title">
+      <div className="lp-wrap lp-how">
+        <div className="lp-sechead">
+          <p className="lp-eyebrow">How it works</p>
+          <h2 className="lp-h2" id="how-title">Three steps, from hello to follow-up.</h2>
+          <p className="lp-body">Free to start, with nothing to install on either side.</p>
+        </div>
+        <div className="lp-how-grid">
+          <div className="lp-panel" aria-hidden="true">
+            {steps.map((s, i) => (
+              <div key={i} className="lp-layer" data-active={i === active ? "true" : "false"}>
+                {s.vignette}
+              </div>
+            ))}
+          </div>
+          <ol className="lp-steps">
+            {steps.map((s, i) => (
+              <li
+                key={i}
+                className="lp-step"
+                data-active={i === active ? "true" : "false"}
+                ref={(el) => {
+                  refs.current[i] = el;
+                }}
+                onMouseEnter={() => setActive(i)}
+              >
+                <span className="lp-num" aria-hidden="true">{i + 1}</span>
+                <h3>{s.title}</h3>
+                <p className="lp-body">{s.body}</p>
+                {s.chipSlot !== undefined ? (
+                  <ul className="lp-chips"><li className="lp-chip-slot">{s.chipSlot}</li></ul>
+                ) : (
+                  <ul className="lp-chips"><li><span className="lp-chip">{s.chip}</span></li></ul>
+                )}
+                {s.extra}
+                <div className="lp-vig-box" aria-hidden="true">{s.vignette}</div>
+              </li>
+            ))}
+          </ol>
+        </div>
+        {after}
+      </div>
+    </section>
+  );
+}
+
+/* ---------- Vignettes shared by every version ---------- */
+
+export function ShareLinkVignette() {
+  return (
+    <div className="lp-vig">
+      <div className="lp-vig-card lp-vig-link">
+        <div className="lp-vig-qr"><Icon><QrSampleIcon size={104} /></Icon></div>
+        <div className="lp-vig-url">
+          <span>we-met.link/hi/your-name</span>
+          <span className="lp-vig-urlbtn"><Icon><CopyIcon size={14} /></Icon></span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function ExchangeFormVignette() {
+  return (
+    <div className="lp-vig">
+      <div className="lp-vig-card lp-vig-form">
+        <span className="lp-vig-grab" />
+        <p className="lp-vig-title">Let's stay in touch</p>
+        <div className="lp-vig-field"><span>Full name</span><span>Sam Rivera</span></div>
+        <div className="lp-vig-field" data-focus><span>Email</span><span>sam@studio.co</span></div>
+        <span className="lp-vig-btn">Exchange contact</span>
+      </div>
+    </div>
+  );
+}
+
+export function ModeSwitch({ mode, onChange, small }: { mode: "relay" | "direct"; onChange: (m: "relay" | "direct") => void; small?: boolean }) {
+  return (
+    <div className={`lp-mode${small ? " lp-mode-small" : ""}`} role="group" aria-label="Follow-up mode">
+      <button type="button" aria-pressed={mode === "relay"} onClick={() => onChange("relay")}>Relay (default)</button>
+      <button type="button" aria-pressed={mode === "direct"} onClick={() => onChange("direct")}>Direct</button>
+    </div>
+  );
+}
+
+export const DIRECT_LINE = "Prefer it automatic? Switch to direct and the letter goes straight to them.";

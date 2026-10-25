@@ -25,3 +25,4 @@ design/<area>/<feature>/
 | emails | Owner new lead email (retired) | [emails/owner-new-lead/spec.md](emails/owner-new-lead/spec.md) |
 | emails | Owner details update email (retired) | [emails/owner-details-update/spec.md](emails/owner-details-update/spec.md) |
 | emails | Visitor follow-up email | [emails/visitor-followup/spec.md](emails/visitor-followup/spec.md) |
+| landing | Relay mode (How it works step 3) | [landing/relay-mode/spec.md](landing/relay-mode/spec.md) |
