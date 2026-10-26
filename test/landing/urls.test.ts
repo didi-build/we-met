@@ -1,7 +1,15 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { parseJsonc } from "../../scripts/lib/parse-jsonc.mjs";
 import { resolveLandingBrowseOrigin, resolveLandingUrls } from "@/lib/landing/urls";
 
-const previewHostSuffix = "-we-met.diademshoukralla.workers.dev";
+const wranglerPreviewsVars = (
+  parseJsonc(readFileSync("wrangler.jsonc", "utf8")) as {
+    previews: { vars: Record<string, string> };
+  }
+).previews.vars;
+
+const previewHostSuffix = wranglerPreviewsVars.WE_MET_PREVIEW_HOST_SUFFIX;
 
 const productionCardConfig = {
   baseUrl: "https://we-met.link",
@@ -10,9 +18,9 @@ const productionCardConfig = {
 };
 
 const previewWorkerConfig = {
-  baseUrl: "https://we-met.link",
+  baseUrl: wranglerPreviewsVars.WE_MET_BASE_URL,
   previewHostSuffix,
-  weMetEnv: "preview",
+  weMetEnv: wranglerPreviewsVars.WE_MET_ENV,
 };
 
 const stagingCardConfig = {
@@ -38,7 +46,7 @@ describe("resolveLandingBrowseOrigin (unit)", () => {
   it("keeps the configured card origin on the app host (legal pages are not served there)", () => {
     expect(
       resolveLandingBrowseOrigin(previewWorkerConfig, "app.we-met.link", "https"),
-    ).toBe("https://we-met.link");
+    ).toBe(wranglerPreviewsVars.WE_MET_BASE_URL);
   });
 });
 
@@ -59,7 +67,9 @@ describe("resolveLandingUrls (unit)", () => {
     expect(urls.terms).toBe(`${previewOrigin}/terms`);
     expect(urls.privacy).not.toBe("/privacy");
     expect(urls.terms).not.toBe("/terms");
-    expect(urls.appHome).toBe("https://app.we-met.link");
+    expect(urls.appHome).toBe(`${previewOrigin}/app`);
+    expect(urls.appHome).not.toContain("app.we-met.didi.build");
+    expect(urls.appHome).not.toContain("we-met.link");
   });
 
   it("uses /app on the staging card origin for appHome", () => {

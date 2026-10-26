@@ -865,6 +865,12 @@ function checkProductionBlock(config) {
   if (config.vars?.WE_MET_ENV !== "production") {
     fail('top-level WE_MET_ENV must be "production"');
   }
+  const topLevelBaseUrl = config.vars?.WE_MET_BASE_URL;
+  if (topLevelBaseUrl !== PRODUCTION_RESOURCE_MARKERS.baseUrl) {
+    fail(
+      `top-level vars.WE_MET_BASE_URL must be "${PRODUCTION_RESOURCE_MARKERS.baseUrl}"`,
+    );
+  }
   if (previewLoginReachableForWorkerEnv(config.vars?.WE_MET_ENV, true)) {
     fail(
       "preview-login route must not be reachable with top-level WE_MET_ENV; only previews.vars.WE_MET_ENV=preview with a secret",

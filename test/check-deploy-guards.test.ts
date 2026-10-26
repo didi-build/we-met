@@ -263,6 +263,18 @@ describe("check-deploy-guards (unit)", () => {
     expect(result.stderr).toContain("app.we-met.link");
   });
 
+  it("fails when top-level WE_MET_BASE_URL is the staging origin", () => {
+    const { path } = writeTempConfig((config) => {
+      const vars = config.vars as Record<string, string>;
+      vars.WE_MET_BASE_URL = "https://we-met.didi.build";
+    });
+    const result = runGuards("production", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      'top-level vars.WE_MET_BASE_URL must be "https://we-met.link"',
+    );
+  });
+
   it("fails when previews.routes includes app.we-met.link", () => {
     const { path } = writeTempConfig((config) => {
       const previews = config.previews as Record<string, unknown>;
