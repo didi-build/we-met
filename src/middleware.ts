@@ -1,6 +1,7 @@
 import {
   isAppServingHost,
   isCardServingHost,
+  isStagingSingleHost,
   readWeMetHostConfig,
 } from "@/config/we-met";
 import { NextResponse } from "next/server";
@@ -27,7 +28,7 @@ export function middleware(request: NextRequest) {
   const hostname = requestHostname(request);
   const onAppHost = isAppServingHost(hostname, hostConfig);
 
-  if (onAppHost && pathname === "/") {
+  if (onAppHost && pathname === "/" && !isStagingSingleHost(hostConfig)) {
     const url = request.nextUrl.clone();
     url.pathname = "/app";
     return NextResponse.rewrite(url);

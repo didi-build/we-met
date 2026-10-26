@@ -68,7 +68,7 @@ describe("app API host helpers (unit)", () => {
         WE_MET_APP_ORIGIN: "http://localhost:3000",
       }),
     ).toBe("https://we-met.didi.build");
-    expect(appSpaPath(staging, "we-met.didi.build")).toBe("/");
+    expect(appSpaPath(staging, "we-met.didi.build")).toBe("/app");
   });
 
   it("production app host and OAuth origin are unchanged", () => {

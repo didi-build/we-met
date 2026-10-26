@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GET as sessionGet } from "@/app/api/app/session/route";
 import { POST as logoutPost } from "@/app/api/auth/logout/route";
 import { POST as previewLoginPost } from "@/app/api/auth/preview-login/route";
@@ -55,19 +55,31 @@ function setRequestHeaders(init: Record<string, string>) {
   }
 }
 
+function defaultRouteEnv(): Record<string, unknown> {
+  return {
+    WE_MET_BASE_URL: "https://we-met.link",
+    WE_MET_ENV: "local",
+    WE_MET_APP_ORIGIN: "http://localhost:3000",
+    WE_MET_PREVIEW_HOST_SUFFIX: "",
+    GOOGLE_CLIENT_ID: "client",
+    GOOGLE_CLIENT_SECRET: "secret",
+  };
+}
+
+function restoreDefaultRouteEnv() {
+  routeMocks.env = defaultRouteEnv();
+  setRequestHeaders({ host: "localhost:3000" });
+}
+
 describe("auth API routes (integration)", () => {
   beforeEach(() => {
     googleOAuthMocks.exchangeGoogleCode.mockReset();
     googleOAuthMocks.verifyGoogleIdToken.mockReset();
-    routeMocks.env = {
-      WE_MET_BASE_URL: "https://we-met.link",
-      WE_MET_ENV: "local",
-      WE_MET_APP_ORIGIN: "http://localhost:3000",
-      WE_MET_PREVIEW_HOST_SUFFIX: "",
-      GOOGLE_CLIENT_ID: "client",
-      GOOGLE_CLIENT_SECRET: "secret",
-    };
-    setRequestHeaders({ host: "localhost:3000" });
+    restoreDefaultRouteEnv();
+  });
+
+  afterEach(() => {
+    restoreDefaultRouteEnv();
   });
 
   it("session returns 404 on production card host", async () => {
@@ -307,82 +319,86 @@ describe("auth API routes (integration)", () => {
   });
 
   it("google start returns 404 on preview env", async () => {
-    routeMocks.env.WE_MET_ENV = "preview";
-    routeMocks.env.WE_MET_PREVIEW_HOST_SUFFIX = "-we-met.example.workers.dev";
-    setRequestHeaders({ host: "pr-1-we-met.example.workers.dev" });
-    const response = await googleStartGet(
-      new Request(
-        "https://pr-1-we-met.example.workers.dev/api/auth/google/start?mode=redirect",
-      ),
-    );
-    expect(response.status).toBe(404);
-    routeMocks.env.WE_MET_ENV = "local";
-    routeMocks.env.WE_MET_PREVIEW_HOST_SUFFIX = "";
-    setRequestHeaders({ host: "localhost:3000" });
+    try {
+      routeMocks.env.WE_MET_ENV = "preview";
+      routeMocks.env.WE_MET_PREVIEW_HOST_SUFFIX = "-we-met.example.workers.dev";
+      setRequestHeaders({ host: "pr-1-we-met.example.workers.dev" });
+      const response = await googleStartGet(
+        new Request(
+          "https://pr-1-we-met.example.workers.dev/api/auth/google/start?mode=redirect",
+        ),
+      );
+      expect(response.status).toBe(404);
+    } finally {
+      restoreDefaultRouteEnv();
+    }
   });
 
   it("google start on staging uses the card host OAuth redirect URI", async () => {
     await withIsolatedLocalD1(async (db) => {
-      routeMocks.env.WE_MET_DB = db;
-      routeMocks.env.WE_MET_BASE_URL = "https://we-met.didi.build";
-      routeMocks.env.WE_MET_ENV = "staging";
-      routeMocks.env.WE_MET_AUTH_RATE_LIMITER = {
-        async limit() {
-          return { success: true };
-        },
-      };
-      setRequestHeaders({ host: "we-met.didi.build" });
-      const response = await googleStartGet(
-        new Request("https://we-met.didi.build/api/auth/google/start?mode=redirect"),
-      );
-      expect(response.status).toBe(302);
-      const location = response.headers.get("location") ?? "";
-      const redirectUri = new URL(location).searchParams.get("redirect_uri");
-      expect(redirectUri).toBe("https://we-met.didi.build/api/auth/google/callback");
-      routeMocks.env.WE_MET_BASE_URL = "https://we-met.link";
-      routeMocks.env.WE_MET_ENV = "local";
-      setRequestHeaders({ host: "localhost:3000" });
+      try {
+        routeMocks.env.WE_MET_DB = db;
+        routeMocks.env.WE_MET_BASE_URL = "https://we-met.didi.build";
+        routeMocks.env.WE_MET_ENV = "staging";
+        routeMocks.env.WE_MET_AUTH_RATE_LIMITER = {
+          async limit() {
+            return { success: true };
+          },
+        };
+        setRequestHeaders({ host: "we-met.didi.build" });
+        const response = await googleStartGet(
+          new Request("https://we-met.didi.build/api/auth/google/start?mode=redirect"),
+        );
+        expect(response.status).toBe(302);
+        const location = response.headers.get("location") ?? "";
+        const redirectUri = new URL(location).searchParams.get("redirect_uri");
+        expect(redirectUri).toBe("https://we-met.didi.build/api/auth/google/callback");
+      } finally {
+        restoreDefaultRouteEnv();
+      }
     });
   });
 
   it("session GET is served on the staging card host", async () => {
     await withIsolatedLocalD1(async (db) => {
-      routeMocks.env.WE_MET_DB = db;
-      routeMocks.env.WE_MET_BASE_URL = "https://we-met.didi.build";
-      routeMocks.env.WE_MET_ENV = "staging";
-      routeMocks.env.WE_MET_AUTH_RATE_LIMITER = {
-        async limit() {
-          return { success: true };
-        },
-      };
-      setRequestHeaders({ host: "we-met.didi.build" });
-      const response = await sessionGet();
-      expect(response.status).toBe(200);
-      routeMocks.env.WE_MET_BASE_URL = "https://we-met.link";
-      routeMocks.env.WE_MET_ENV = "local";
-      setRequestHeaders({ host: "localhost:3000" });
+      try {
+        routeMocks.env.WE_MET_DB = db;
+        routeMocks.env.WE_MET_BASE_URL = "https://we-met.didi.build";
+        routeMocks.env.WE_MET_ENV = "staging";
+        routeMocks.env.WE_MET_AUTH_RATE_LIMITER = {
+          async limit() {
+            return { success: true };
+          },
+        };
+        setRequestHeaders({ host: "we-met.didi.build" });
+        const response = await sessionGet();
+        expect(response.status).toBe(200);
+      } finally {
+        restoreDefaultRouteEnv();
+      }
     });
   });
 
   it("preview-login is 404 on staging env", async () => {
-    routeMocks.env.WE_MET_BASE_URL = "https://we-met.didi.build";
-    routeMocks.env.WE_MET_ENV = "staging";
-    routeMocks.env.WE_MET_PREVIEW_LOGIN_SECRET = "sekrit";
-    setRequestHeaders({ host: "we-met.didi.build" });
-    const response = await previewLoginPost(
-      new Request("https://we-met.didi.build/api/auth/preview-login", {
-        method: "POST",
-        headers: {
-          origin: "https://we-met.didi.build",
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({ secret: "sekrit" }),
-      }),
-    );
-    expect(response.status).toBe(404);
-    routeMocks.env.WE_MET_BASE_URL = "https://we-met.link";
-    routeMocks.env.WE_MET_ENV = "local";
-    setRequestHeaders({ host: "localhost:3000" });
+    try {
+      routeMocks.env.WE_MET_BASE_URL = "https://we-met.didi.build";
+      routeMocks.env.WE_MET_ENV = "staging";
+      routeMocks.env.WE_MET_PREVIEW_LOGIN_SECRET = "sekrit";
+      setRequestHeaders({ host: "we-met.didi.build" });
+      const response = await previewLoginPost(
+        new Request("https://we-met.didi.build/api/auth/preview-login", {
+          method: "POST",
+          headers: {
+            origin: "https://we-met.didi.build",
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ secret: "sekrit" }),
+        }),
+      );
+      expect(response.status).toBe(404);
+    } finally {
+      restoreDefaultRouteEnv();
+    }
   });
 
   it("logout rejects missing Origin and accepts valid mutation", async () => {
