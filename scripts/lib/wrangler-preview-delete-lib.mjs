@@ -2,14 +2,20 @@ import { spawnSync } from "node:child_process";
 
 /**
  * @param {string} detail
+ * @param {string} previewName
  * @returns {boolean}
  */
-export function isPreviewMissingError(detail) {
-  const lower = detail.toLowerCase();
-  if (/\b404\b/.test(lower)) {
-    return true;
-  }
-  return /preview[^\n]{0,120}not found/i.test(detail);
+export function isPreviewMissingError(detail, previewName) {
+  const raw = previewName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const encoded = encodeURIComponent(previewName).replace(
+    /[.*+?^${}()|[\]\\]/g,
+    "\\$&",
+  );
+  const nameInUrl = raw === encoded ? raw : `(?:${raw}|${encoded})`;
+  const apiLine = new RegExp(
+    `A request to the Cloudflare API \\(/accounts/[^)]+/workers/workers/[^/]+/previews/${nameInUrl}\\) failed\\.`,
+  );
+  return apiLine.test(detail) && /\[code:\s*10025\]/.test(detail);
 }
 
 /**
@@ -42,7 +48,7 @@ export function deletePreviewByName(name, spawnOptions = {}) {
 
   const detail = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
 
-  if (isPreviewMissingError(detail)) {
+  if (isPreviewMissingError(detail, name)) {
     console.log(`Preview ${name} was not present; nothing to delete.`);
     return 0;
   }

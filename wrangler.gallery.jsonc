@@ -1,3 +1,4 @@
+// Preview-only: static component gallery assets. Never run `wrangler deploy` with this file.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "we-met",

@@ -51,6 +51,9 @@ jobs:
       - name: npm ci
         if: steps.creds.outputs.ready == 'true'
         run: npm ci
+      - name: Gallery deploy guards
+        if: steps.creds.outputs.ready == 'true'
+        run: npm run gallery:guards
       - name: Build gallery assets
         if: steps.creds.outputs.ready == 'true'
         run: npm run gallery:build
@@ -84,8 +87,14 @@ jobs:
         run: |
           set -euo pipefail
           curl_common=(--fail --show-error --silent --location --retry 3 --retry-delay 5 --retry-all-errors)
+          gallery_headers="$(curl "${curl_common[@]}" -sSI "${PREVIEW_URL}/gallery/")"
+          if ! grep -qi 'x-robots-tag:.*nofollow' <<<"$gallery_headers"; then
+            echo "Expected X-Robots-Tag with nofollow on /gallery/."
+            printf '%s\n' "$gallery_headers"
+            exit 1
+          fi
           gallery_html="$(curl "${curl_common[@]}" "${PREVIEW_URL}/gallery/")"
-          if printf '%s' "$gallery_html" | grep -q "${GALLERY_PROBE_MARKER}"; then
+          if grep -q "${GALLERY_PROBE_MARKER}" <<<"$gallery_html"; then
             echo "Gallery probe marker must not appear in SPA HTML (only in built assets)."
             exit 1
           fi
@@ -95,7 +104,7 @@ jobs:
             exit 1
           fi
           js_body="$(curl "${curl_common[@]}" "${PREVIEW_URL%/}${js_path}")"
-          printf '%s' "$js_body" | grep -q "${GALLERY_PROBE_MARKER}"
+          grep -q "${GALLERY_PROBE_MARKER}" <<<"$js_body"
         env:
           PREVIEW_URL: ${{ steps.preview.outputs.preview_url }}
       - name: Gallery preview check (deployed)
@@ -134,24 +143,6 @@ jobs:
                 title: 'Gallery preview not configured',
                 summary:
                   'Set repository secrets `CLOUDFLARE_API_TOKEN_NONPROD` and `CLOUDFLARE_ACCOUNT_ID` on the preview environment to enable gallery previews.',
-              },
-            });
-      - name: Gallery preview check (failed)
-        if: ${{ !cancelled() && steps.creds.outputs.ready == 'true' && (steps.preview.outcome != 'success' || steps.probe.outcome == 'failure') }}
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
-        with:
-          script: |
-            await github.rest.checks.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              name: 'gallery-preview',
-              head_sha: context.payload.pull_request.head.sha,
-              status: 'completed',
-              conclusion: 'failure',
-              output: {
-                title: 'Gallery preview failed',
-                summary:
-                  'Deploy or the /gallery probe did not pass. See the Gallery preview workflow log for this pull request.',
               },
             });
       - name: Set preview summary mode

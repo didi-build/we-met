@@ -8,8 +8,10 @@ export type GalleryVariant = {
 export type GalleryEntry = {
   id: string;
   title: string;
-  specPath: string;
-  specMarkdown: string;
+  sourcePath: string;
+  /** Unspecced pipeline seed note (no design spec in repo). */
+  pipelineNote?: string;
+  pipelineUrl?: string;
   component: ComponentType<Record<string, unknown>>;
   variants: GalleryVariant[];
 };

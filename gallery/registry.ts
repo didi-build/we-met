@@ -1,4 +1,4 @@
-import { weMetButtonGallery } from "../components/we-met-button/we-met-button.gallery.js";
+import { uiButtonGallery } from "../components/ui-button/ui-button.gallery.js";
 import type { GalleryEntry } from "./lib/types.js";
 
-export const galleryEntries: GalleryEntry[] = [weMetButtonGallery];
+export const galleryEntries: GalleryEntry[] = [uiButtonGallery];

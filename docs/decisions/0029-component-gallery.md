@@ -5,29 +5,27 @@
 
 ## Context
 
-Design workflow v2 ([DIDI-848](https://linear.app/didi-build/issue/DIDI-848)) needs a per-repo component gallery with PR previews, separate designer specs from implementations, and no impact on production app Workers.
+Design workflow v2 ([DIDI-848](https://linear.app/didi-build/issue/DIDI-848)) needs a per-repo component gallery with PR previews, separate from production app deploys. Design specs live under `design/<area>/<feature>/spec.md` (Designer only), not in the gallery tree.
 
 ## Decision
 
-1. **Hosting:** A static React gallery built with Vite and served via Wrangler **static assets** (`wrangler.gallery.jsonc`, `not_found_handling: single-page-application`). Not part of the OpenNext app bundle or production deploy.
-2. **Preview alias (not a separate Worker script):** Gallery previews use preview name `gallery-pr-<pr-number>` on the existing **`we-met`** Worker script (separate workers.dev URL from app previews `pr-<pr-number>`). The non-prod API token is scoped to Worker **`we-met`** only ([0017](./0017-cloudflare-api-credentials.md)), so the gallery cannot target a new Worker name without widening the token. Gallery CI never runs production deploy (`wrangler deploy` / OpenNext production paths); it only runs `wrangler preview` with the gallery config.
-3. **Gallery Wrangler config:** `wrangler.gallery.jsonc` includes an empty top-level `"previews": {}` block (required by Wrangler for `wrangler preview` on this Worker). The file has static assets only and no `d1_databases`, `r2_buckets`, `queues`, `services`, or email bindings in `previews` or at the top level.
-4. **`--ignore-base-config`:** Gallery preview deploy passes `--ignore-base-config` so Wrangler does **not** apply the dashboard **Preview base config** shared by app previews (which would attach D1, R2, queues, and vars from the OpenNext app). Combined with `--config wrangler.gallery.jsonc`, only this assets-only file (including empty `previews`) is used; app `wrangler.jsonc` is not read for gallery deploy.
-5. **Preview URLs:** `preview_urls: true` and `workers_dev: false` in `wrangler.gallery.jsonc` so `wrangler preview --json` returns a workers.dev URL ([0019](./0019-pr-preview-github-action.md)).
-6. **Routes:** The gallery SPA lives at `/gallery` (root redirects there). Variants and props come from per-component `*.gallery.ts` beside each gallery component.
-7. **Directories:** `specs/` (designer-only) and `components/` (gallery implementations: Designer builds from the approved spec; Developer edits only for props or tiny non-design wiring fixes). The gallery UI lives under `gallery/`.
-8. **PR previews:** `.github/workflows/gallery-preview.yml` runs on same-repo pull requests using existing `CLOUDFLARE_API_TOKEN_NONPROD` and `CLOUDFLARE_ACCOUNT_ID` (preview environment). No new secrets. Deletes the gallery preview when the PR closes.
-9. **Robots:** Gallery responses send `X-Robots-Tag: noindex, nofollow` via static asset `_headers`.
-10. **Bindings:** Gallery preview deployments have no D1, R2, queue, KV, or email bindings.
+1. **Hosting:** Static React gallery (Vite) uploaded via `wrangler preview` using `wrangler.gallery.jsonc` (assets only). **Never** `wrangler deploy` with this config.
+2. **Preview alias on Worker `we-met`:** Gallery uses Workers Preview name `gallery-pr-<pr-number>` on the **`we-met`** Worker script. The non-prod token is scoped to **`we-met`** only ([0017](./0017-cloudflare-api-credentials.md)), so the gallery is not a separate Worker script. This is not a production deploy; production routes and versions are unchanged.
+3. **Config guards:** `wrangler.gallery.jsonc` keeps `name: "we-met"`, empty `previews: {}`, no `main`, `routes`, `vars`, or bindings. CI runs `npm run gallery:guards` in `npm run check` and in `gallery-preview.yml` before preview deploy.
+4. **`--ignore-base-config`:** Skips the Cloudflare dashboard **Preview base config** for Worker `we-met` (the D1/R2/queue/vars bundle used by OpenNext app previews). Gallery deploy uses only `wrangler.gallery.jsonc` plus `--config`; app `wrangler.jsonc` is not merged in.
+5. **Routes:** Gallery SPA is served at `/gallery/` on the preview hostname. The preview root `/` is not the gallery.
+6. **Registry:** `components/*.gallery.ts` imports app components from `src/`; no duplicate CSS or shadow implementations for seeded entries.
+7. **PR workflow:** `.github/workflows/gallery-preview.yml` on the **`preview` environment** (`CLOUDFLARE_API_TOKEN_NONPROD`, `CLOUDFLARE_ACCOUNT_ID`). Deletes `gallery-pr-<n>` when the PR closes.
+8. **Robots:** `dist/gallery/_headers` applies `X-Robots-Tag: noindex, nofollow` to `/*` on the uploaded asset root.
 
 ## Reasons
 
-- Keeps gallery deploy isolated from app preview and production Workers ([0006](./0006-non-prod-safety.md), [0019](./0019-pr-preview-github-action.md)).
-- Reuses the existing non-prod preview token scope; no token widening.
-- Matches the Launchpad gallery pattern ([DIDI-849](https://linear.app/didi-build/issue/DIDI-849)) adapted for We Met.
+- Reuses the existing non-prod preview token without widening scope.
+- Isolates gallery assets from app preview bindings via `ignore-base-config` and an assets-only config.
+- Matches Launchpad gallery UX at `/gallery/` ([DIDI-849](https://linear.app/didi-build/issue/DIDI-849)) within We Met constraints.
 
 ## Consequences
 
-- `npm run check` includes `npm run gallery:build`.
-- App `wrangler.jsonc` and production behavior are unchanged.
-- One seeded component (`WeMetButton`) demonstrates the pattern; migrating all UI is out of scope.
+- `npm run check` includes `gallery:guards` and `gallery:build`.
+- App production Worker and OpenNext preview workflow are unchanged.
+- One unspecced pipeline seed (`Button` from `src/components/ui/Button.tsx`) demonstrates the registry; full migration is out of scope.

@@ -40,8 +40,9 @@ export function App() {
       <header className="gallery-header">
         <h1>We Met component gallery</h1>
         <p className="gallery-muted">
-          Specs live in <code>specs/</code>; implementations in <code>components/</code>
-          . See <code>docs/component-gallery.md</code>.
+          Registry entries import app components from <code>src/</code>. Design specs
+          live under <code>design/&lt;area&gt;/&lt;feature&gt;/spec.md</code> (Designer
+          only). See <code>docs/component-gallery.md</code>.
         </p>
       </header>
       <main className="gallery-main">
@@ -52,13 +53,20 @@ export function App() {
               <div className="gallery-card-head">
                 <h2>{entry.title}</h2>
                 <p className="gallery-muted">
-                  Spec: <code>{entry.specPath}</code>
+                  Source: <code>{entry.sourcePath}</code>
                 </p>
+                {entry.pipelineNote ? (
+                  <p className="gallery-muted">
+                    {entry.pipelineNote}
+                    {entry.pipelineUrl ? (
+                      <>
+                        {" "}
+                        <a href={entry.pipelineUrl}>DIDI-849</a>
+                      </>
+                    ) : null}
+                  </p>
+                ) : null}
               </div>
-              <details className="gallery-spec">
-                <summary>Spec excerpt</summary>
-                <pre>{entry.specMarkdown}</pre>
-              </details>
               <div className="gallery-variants">
                 {entry.variants.map((variant) => (
                   <div key={variant.name} className="gallery-variant">

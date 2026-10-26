@@ -302,7 +302,7 @@ After the production follow-up email consumer shipped (**2026-10-14**), the firs
 ## 3. GitHub secrets and variables
 
 1. Create the **`preview`** environment (Settings → Environments → New environment): **no** required reviewers, **no** branch restriction (PR workflows run on `refs/pull/N/merge` and must not wait for approval). Security is equivalent to repository scope for these values; the environment exists for deployment history and symmetry with `production`. Add:
-   - **Secret:** `CLOUDFLARE_API_TOKEN_NONPROD` (value from `we-met-ci-nonprod`)
+   - **Secret:** `CLOUDFLARE_API_TOKEN_NONPROD` (value from `we-met-ci-nonprod`; also used by **Gallery preview** for `gallery-pr-<n>` on Worker `we-met` via `wrangler.gallery.jsonc`, not a separate Worker token)
    - **Secrets:** `WE_MET_D1_DATABASE_ID_NONPROD` (same UUID as non-prod D1; masked in Actions logs)
    - **Variables:** `WE_MET_TURNSTILE_SITE_KEY_NONPROD` (widget **we-met nonprod**)
 2. Create the **`production`** environment with yourself as a required reviewer. Under **Deployment branches**, choose **Selected branches** and allow **`main` only**.

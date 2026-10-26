@@ -40,6 +40,7 @@
     "gallery/**/*.tsx",
     "components/**/*.ts",
     "components/**/*.tsx",
+    "gallery/stubs/**/*.tsx",
     "vite.config.ts",
     "src/**/*.ts",
     "src/**/*.tsx",
