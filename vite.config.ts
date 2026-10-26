@@ -3,10 +3,11 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [react()],
+  base: "/gallery/",
   root: "gallery",
   publicDir: "public",
   build: {
-    outDir: "../dist/gallery",
+    outDir: "../dist/gallery/gallery",
     emptyOutDir: true,
   },
   server: {

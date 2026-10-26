@@ -1,6 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
 import "../src/theme/tokens/mono.light.css";
 import { App } from "./App.js";
 
@@ -11,11 +11,9 @@ if (!root) {
 
 createRoot(root).render(
   <StrictMode>
-    <BrowserRouter>
+    <BrowserRouter basename="/gallery">
       <Routes>
-        <Route path="/gallery" element={<App />} />
-        <Route path="/" element={<Navigate to="/gallery" replace />} />
-        <Route path="*" element={<Navigate to="/gallery" replace />} />
+        <Route path="/" element={<App />} />
       </Routes>
     </BrowserRouter>
   </StrictMode>,
