@@ -17,6 +17,7 @@ export const LANDING_RELAY_COPY = {
     "The \u201cGreat meeting you\u201d letter goes straight to them. Your copy, \u201cYou met\u201d, comes to you with every detail they shared.",
   replyNote:
     "To send it on, just hit Reply. When you hit Reply, they can save your contact card.",
+  relayInboxCardTag: "They can save your card",
   nothingNote:
     "We Met sends them nothing, so the letter waits for you until you send it on.",
   directLine:

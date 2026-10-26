@@ -5,7 +5,10 @@ import {
   QrSampleIcon,
   ReplyIcon,
 } from "@/components/landing/LandingIcons";
-import type { FollowUpMode } from "@/lib/landing/landing-relay-mode";
+import {
+  LANDING_RELAY_COPY,
+  type FollowUpMode,
+} from "@/lib/landing/landing-relay-mode";
 
 export function ShareLinkVignette() {
   return (
@@ -89,7 +92,7 @@ function LetterInboxRow({ toSam }: { toSam: boolean }) {
                 <LandingIcon>
                   <ContactCardIcon size={12} />
                 </LandingIcon>
-                Your card goes with it
+                {LANDING_RELAY_COPY.relayInboxCardTag}
               </span>
             </>
           )}

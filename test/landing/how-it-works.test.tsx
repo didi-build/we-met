@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { HOW_IT_WORKS_INTERSECTION_OPTIONS } from "@/components/landing/how-it-works-observer";
@@ -96,26 +95,22 @@ describe("HowItWorksSection (unit)", () => {
 
     expect(screen.getAllByText(LANDING_RELAY_COPY.replyNote).length).toBeGreaterThan(0);
     expect(screen.queryByText(/save you in one tap/i)).toBeNull();
-    expect(screen.queryByText(/contact card goes with it/i)).toBeNull();
+    expect(
+      screen.getAllByText(LANDING_RELAY_COPY.relayInboxCardTag).length,
+    ).toBeGreaterThan(0);
+    expect(screen.queryByText(/goes with it/i)).toBeNull();
   });
 
-  it("matches the DIDI-823 design reference reply note (we-met#101)", () => {
-    const approvedReplyNote =
-      "To send it on, just hit Reply. When you hit Reply, they can save your contact card.";
-    expect(LANDING_RELAY_COPY.replyNote).toBe(approvedReplyNote);
-
-    try {
-      execSync("git fetch origin design/DIDI-823-landing-copy --depth=1", {
-        stdio: "ignore",
-      });
-    } catch {
-      // Ref may already exist locally.
-    }
-    const referenceHtml = execSync(
-      "git show origin/design/DIDI-823-landing-copy:design/landing/index.html",
-      { encoding: "utf8" },
+  it("matches design/landing/relay-mode/spec.md relay reply note and inbox tag", () => {
+    const spec = readFileSync("design/landing/relay-mode/spec.md", "utf8");
+    expect(LANDING_RELAY_COPY.replyNote).toBe(
+      "To send it on, just hit Reply. When you hit Reply, they can save your contact card.",
     );
-    expect(referenceHtml).toContain(approvedReplyNote);
+    expect(LANDING_RELAY_COPY.relayInboxCardTag).toBe("They can save your card");
+    expect(spec).toContain(LANDING_RELAY_COPY.replyNote);
+    expect(spec).toContain(
+      `soft tag with card icon "${LANDING_RELAY_COPY.relayInboxCardTag}"`,
+    );
   });
 
   it("switches to direct view and shows Coming soon badge when enabled", () => {
