@@ -33,7 +33,7 @@ The site root `/` on a gallery preview URL is not the gallery; open `/gallery/` 
 
 ```bash
 npm run dev:gallery    # Vite dev server; open /gallery/
-npm run gallery:build  # static assets + dist/gallery/_headers (also in npm run check)
+npm run gallery:build  # static assets under dist/gallery/ plus dist/_headers (also in npm run check)
 npm run gallery:guards
 ```
 
@@ -43,6 +43,6 @@ Same-repo pull requests run **Gallery preview** (`.github/workflows/gallery-prev
 
 Credentials are on the GitHub **`preview` environment** ([ADR 0017](./decisions/0017-cloudflare-api-credentials.md)): `CLOUDFLARE_API_TOKEN_NONPROD` and `CLOUDFLARE_ACCOUNT_ID` (not repository-level secrets for the token). Fork PRs skip gallery deploy.
 
-`dist/gallery/_headers` sets `X-Robots-Tag: noindex, nofollow` for all paths on the gallery asset bundle.
+`wrangler.gallery.jsonc` serves `./dist`; `dist/_headers` sets `X-Robots-Tag: noindex, nofollow` for `/gallery/*` and `/*` (overriding preview defaults that only send `noindex`).
 
 See [ADR 0029](./decisions/0029-component-gallery.md).

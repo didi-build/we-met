@@ -16,7 +16,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: "../dist/gallery/gallery",
+    outDir: "../dist/gallery",
     emptyOutDir: true,
   },
   server: {

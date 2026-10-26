@@ -1,11 +1,21 @@
 #!/usr/bin/env node
-import { existsSync, rmSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
+import { join } from "node:path";
+import {
+  getGalleryAssetsRoot,
+  getGalleryUrlPrefix,
+} from "./lib/gallery-assets-root.mjs";
 
-const rootHeaders = "dist/gallery/_headers";
-const nestedHeaders = "dist/gallery/gallery/_headers";
+const prefix = getGalleryUrlPrefix();
+const assetsRoot = getGalleryAssetsRoot();
+const headersPath = join(assetsRoot, "_headers");
 
-writeFileSync(rootHeaders, "/*\n  X-Robots-Tag: noindex, nofollow\n\n", "utf8");
+const blocks = [
+  `${prefix}/*`,
+  `${prefix}`,
+  `${prefix}/`,
+  `${prefix}/assets/*`,
+  "/*",
+].map((pattern) => `${pattern}\n\tX-Robots-Tag: noindex, nofollow`);
 
-if (existsSync(nestedHeaders)) {
-  rmSync(nestedHeaders);
-}
+writeFileSync(headersPath, `${blocks.join("\n\n")}\n`, "utf8");

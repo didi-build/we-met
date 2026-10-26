@@ -19,7 +19,7 @@
     "next:build": "next build",
     "build": "opennextjs-cloudflare build",
     "gallery:guards": "node scripts/check-gallery-guards.mjs",
-    "gallery:build": "vite build && node scripts/write-gallery-root-headers.mjs",
+    "gallery:build": "node scripts/clean-gallery-dist.mjs && vite build && node scripts/write-gallery-root-headers.mjs",
     "dev:gallery": "vite",
     "worker:dry-run": "wrangler deploy --dry-run",
     "worker:dry-run:generated": "node scripts/dry-run-generated-config.mjs",

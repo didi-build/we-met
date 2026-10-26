@@ -16,7 +16,7 @@ Design workflow v2 ([DIDI-848](https://linear.app/didi-build/issue/DIDI-848)) ne
 5. **Routes:** Gallery SPA is served at `/gallery/` on the preview hostname. The preview root `/` is not the gallery.
 6. **Registry:** `components/*.gallery.ts` imports app components from `src/`; no duplicate CSS or shadow implementations for seeded entries.
 7. **PR workflow:** `.github/workflows/gallery-preview.yml` on the **`preview` environment** (`CLOUDFLARE_API_TOKEN_NONPROD`, `CLOUDFLARE_ACCOUNT_ID`). Deletes `gallery-pr-<n>` when the PR closes.
-8. **Robots:** `dist/gallery/_headers` applies `X-Robots-Tag: noindex, nofollow` to `/*` on the uploaded asset root.
+8. **Robots:** `wrangler.gallery.jsonc` uses `assets.directory` `./dist`; `dist/_headers` applies `X-Robots-Tag: noindex, nofollow` to `/gallery/*` and `/*` (gallery files live under `dist/gallery/`).
 
 ## Reasons
 
