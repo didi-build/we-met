@@ -32,6 +32,7 @@ export const PRODUCTION_RESOURCE_MARKERS = {
   authRateLimiterNamespaceId: "2004",
   appRateLimiterNamespaceId: "2006",
   workerName: "we-met",
+  baseUrl: "https://we-met.link",
 };
 
 export const STAGING_RESOURCE_MARKERS = {
@@ -48,6 +49,7 @@ export const NONPROD_RESOURCE_MARKERS = {
   authRateLimiterNamespaceId: "2003",
   appRateLimiterNamespaceId: "2005",
   consumerWorkerName: "we-met-followup-email-consumer-nonprod",
+  baseUrl: STAGING_RESOURCE_MARKERS.baseUrl,
 };
 
 export const RATE_LIMIT_BINDINGS = {

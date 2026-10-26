@@ -73,6 +73,15 @@ describe("follow-up email consumer wrangler configs (unit)", () => {
     ]);
   });
 
+  it("pins WE_MET_BASE_URL per environment", () => {
+    expect((nonprod.vars as { WE_MET_BASE_URL: string }).WE_MET_BASE_URL).toBe(
+      NONPROD_RESOURCE_MARKERS.baseUrl,
+    );
+    expect((production.vars as { WE_MET_BASE_URL: string }).WE_MET_BASE_URL).toBe(
+      PRODUCTION_RESOURCE_MARKERS.baseUrl,
+    );
+  });
+
   it("sets max_retries on queue consumers to match the shared attempt limit", () => {
     const nonprodConsumer = (nonprod.queues as { consumers: { max_retries: number }[] })
       .consumers[0];

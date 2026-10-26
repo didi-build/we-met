@@ -370,6 +370,11 @@ function checkPreviewBlock(previews) {
     fail('previews.vars.WE_MET_PREVIEW_HOST_SUFFIX must start with "-we-met."');
   }
 
+  const previewBaseUrl = previewVars?.WE_MET_BASE_URL;
+  if (previewBaseUrl !== NONPROD_RESOURCE_MARKERS.baseUrl) {
+    fail(`previews.vars.WE_MET_BASE_URL must be "${NONPROD_RESOURCE_MARKERS.baseUrl}"`);
+  }
+
   assertEveryPreviewD1(
     previews,
     (row) => row.database_name === NONPROD_RESOURCE_MARKERS.d1Name,
@@ -461,6 +466,12 @@ function checkConsumerNonprod(config) {
   }
   if (config.vars?.WE_MET_ENV === "production") {
     fail("non-prod consumer WE_MET_ENV must not be production");
+  }
+  const nonprodBaseUrl = config.vars?.WE_MET_BASE_URL;
+  if (nonprodBaseUrl !== NONPROD_RESOURCE_MARKERS.baseUrl) {
+    fail(
+      `non-prod consumer vars.WE_MET_BASE_URL must be "${NONPROD_RESOURCE_MARKERS.baseUrl}"`,
+    );
   }
   const strings = collectStrings(config);
   for (const marker of [
@@ -575,6 +586,12 @@ function checkConsumerProduction(config) {
   }
   if (config.vars?.WE_MET_ENV !== "production") {
     fail('production consumer WE_MET_ENV must be "production"');
+  }
+  const productionBaseUrl = config.vars?.WE_MET_BASE_URL;
+  if (productionBaseUrl !== PRODUCTION_RESOURCE_MARKERS.baseUrl) {
+    fail(
+      `production consumer vars.WE_MET_BASE_URL must be "${PRODUCTION_RESOURCE_MARKERS.baseUrl}"`,
+    );
   }
   const strings = collectStrings(config);
   if (strings.some((s) => s.includes("WE_MET_TEST_MAIL_TO"))) {

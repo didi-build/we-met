@@ -14,7 +14,7 @@ describe("app API host helpers (unit)", () => {
   });
 
   const preview = readWeMetHostConfig({
-    WE_MET_BASE_URL: "https://we-met.link",
+    WE_MET_BASE_URL: "https://we-met.didi.build",
     WE_MET_ENV: "preview",
     WE_MET_PREVIEW_HOST_SUFFIX: "-we-met.example.workers.dev",
   });
