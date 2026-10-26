@@ -9,6 +9,7 @@ export const OWNER_EMAIL_SEND_CLAIM_STALE_MS = 30 * 60 * 1000;
 export const VISITOR_LETTER_SEND_CLAIM_STALE_MS = OWNER_EMAIL_SEND_CLAIM_STALE_MS;
 
 export type ExchangeOwnerEmailSendState = {
+  cardId: string;
   triggeredAt: string | null;
   ownerEmailSentAt: string | null;
   visitorLetterSentAt: string | null;

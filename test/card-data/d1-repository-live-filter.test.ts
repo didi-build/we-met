@@ -19,6 +19,7 @@ describe("D1CardRepository live card filter (integration)", () => {
 
       expect(await repo.getBySlug(slug)).not.toBeNull();
       expect(await repo.getByHostname(hostname)).not.toBeNull();
+      expect(await repo.getById(card.id)).not.toBeNull();
 
       for (const status of ["suspended", "retired"] as const) {
         await db
@@ -27,6 +28,7 @@ describe("D1CardRepository live card filter (integration)", () => {
           .run();
         expect(await repo.getBySlug(slug)).toBeNull();
         expect(await repo.getByHostname(hostname)).toBeNull();
+        expect(await repo.getById(card.id)).toBeNull();
         await db
           .prepare(`UPDATE cards SET status = 'live' WHERE id = ?`)
           .bind(card.id)
@@ -40,6 +42,7 @@ describe("D1CardRepository live card filter (integration)", () => {
           .run();
         expect(await repo.getBySlug(slug)).toBeNull();
         expect(await repo.getByHostname(hostname)).toBeNull();
+        expect(await repo.getById(card.id)).toBeNull();
         await db
           .prepare(`UPDATE accounts SET status = 'active' WHERE id = ?`)
           .bind(card.accountId)

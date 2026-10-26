@@ -117,10 +117,12 @@ The consumer registers on the queue in **its own** Wrangler config; it is not an
 
 **App Worker logs (exchange and details):**
 
-| Event                                    | Fields                                                                             |
-| ---------------------------------------- | ---------------------------------------------------------------------------------- |
-| `exchange_visitor_letter_enqueue_failed` | `leadId` (when visitor letter queue enqueue fails on exchange or finalize; no PII) |
-| `exchange_contact_card_download`         | `leadId` (successful GET `/api/exchange/<leadId>/contact-card`; no PII)            |
+| Event                                    | Fields                                                                                    |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `exchange_visitor_letter_enqueue_failed` | `leadId` (when visitor letter queue enqueue fails on exchange or finalize; no PII)        |
+| `visitor_email_mode_read_failed`         | `leadId` (when `visitor_email_mode` read fails; mode resolves to `direct`, no token mint) |
+| `relay_contact_card_token_failed`        | `leadId` (when relay contact-card token mint fails in `owner_relay`)                      |
+| `exchange_contact_card_download`         | `leadId` (successful GET `/api/exchange/<leadId>/contact-card`; no PII)                   |
 
 **Consumer logs (debugging live mail):**
 
@@ -130,6 +132,7 @@ The consumer registers on the queue in **its own** Wrangler config; it is not an
 | `visitor_followup_permanent_failure`           | `leadId`, `errorCode`; `secretName` when `errorCode` is `cloudflare_from_email_missing` or `from_display_name_missing`                         |
 | `visitor_followup_malformed`                   | `leadId` (may be null)                                                                                                                         |
 | `visitor_followup_dropped_paused`              | `leadId` (when `lead_email_enabled` is off)                                                                                                    |
+| `relay_letter_missing_contact_card_link`       | `leadId`; `cardId` when exchange row lookup succeeds (`owner_relay` letter with no contact-card link)                                          |
 | `exchange_visitor_letter_row_missing`          | `leadId`                                                                                                                                       |
 | `exchange_visitor_letter_confirm_failed`       | `leadId`                                                                                                                                       |
 | `exchange_visitor_letter_contention_exhausted` | `leadId`                                                                                                                                       |

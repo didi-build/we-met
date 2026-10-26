@@ -14,7 +14,7 @@ import type {
   LeadSinkQueueProducer,
 } from "@/exchange/queue/producer";
 import type { ExchangeRateLimiter } from "@/exchange/rate-limit";
-import { relayContactCardTokenForEnqueue } from "@/exchange/relay-contact-card-token";
+import { resolveRelayContactCardTokenForEnqueue } from "@/exchange/resolve-relay-contact-card-token-for-enqueue";
 import { createDetailsToken } from "@/exchange/token";
 import type { VisitorEmailMode } from "@/app-settings/defaults";
 import type { TurnstileVerifier } from "@/exchange/turnstile";
@@ -134,23 +134,12 @@ export async function processExchange(
     createdAt,
   });
 
-  let visitorEmailMode: VisitorEmailMode = "direct";
-  try {
-    visitorEmailMode = await deps.resolveVisitorEmailMode();
-  } catch {
-    visitorEmailMode = "direct";
-  }
-  let relayContactCardToken: string | undefined;
-  try {
-    relayContactCardToken = relayContactCardTokenForEnqueue(
-      deps.tokenSecret,
-      visitorEmailMode,
-      lead.leadId,
-      card.id,
-    );
-  } catch {
-    relayContactCardToken = undefined;
-  }
+  const relayContactCardToken = await resolveRelayContactCardTokenForEnqueue(
+    deps.tokenSecret,
+    () => deps.resolveVisitorEmailMode(),
+    lead.leadId,
+    card.id,
+  );
 
   try {
     await deps.followupQueue.enqueueVisitorLetter(

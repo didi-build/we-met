@@ -16,7 +16,7 @@ import type {
 } from "@/exchange/queue/producer";
 import { absoluteUrl } from "@/config/we-met";
 import type { VisitorEmailMode } from "@/app-settings/defaults";
-import { relayContactCardTokenForEnqueue } from "@/exchange/relay-contact-card-token";
+import { resolveRelayContactCardTokenForEnqueue } from "@/exchange/resolve-relay-contact-card-token-for-enqueue";
 import type { VisitorLead, VisitorLeadDetails } from "@/exchange/types";
 
 export type ProcessOwnerEmailFinalizeDeps = {
@@ -51,24 +51,12 @@ export async function processOwnerEmailFinalize(
   sinks: LeadSinkRecord[],
   deps: ProcessOwnerEmailFinalizeDeps,
 ): Promise<ProcessOwnerEmailFinalizeResult> {
-  let visitorEmailMode: VisitorEmailMode = "direct";
-  try {
-    visitorEmailMode = await deps.resolveVisitorEmailMode();
-  } catch {
-    visitorEmailMode = "direct";
-  }
-
-  let relayContactCardToken: string | undefined;
-  try {
-    relayContactCardToken = relayContactCardTokenForEnqueue(
-      deps.tokenSecret,
-      visitorEmailMode,
-      lead.leadId,
-      card.id,
-    );
-  } catch {
-    relayContactCardToken = undefined;
-  }
+  const relayContactCardToken = await resolveRelayContactCardTokenForEnqueue(
+    deps.tokenSecret,
+    () => deps.resolveVisitorEmailMode(),
+    lead.leadId,
+    card.id,
+  );
 
   const triggeredAt = deps.now().toISOString();
   await deps.exchangeOwnerEmail.ensurePending({
