@@ -4,6 +4,7 @@ import { MemoryCardRepository } from "@/card-data/memory-repository";
 import { MemoryExchangeOwnerEmailStore } from "@/exchange-owner-email/memory-store";
 import { MemoryLeadDeliveryLedger } from "@/lead-delivery-ledger/memory-repository";
 import { processOwnerEmailFinalize } from "@/exchange/process-owner-email-finalize";
+import * as relayContactCardToken from "@/exchange/relay-contact-card-token";
 import type { LeadSinkRecord } from "@/card-data/types";
 import type { VisitorLead } from "@/exchange/types";
 import { exampleCardInput } from "../helpers/example-card";
@@ -118,5 +119,86 @@ describe("exchange_visitor_letter_enqueue_failed (unit)", () => {
       logExchangeVisitorLetterEnqueueFailed: vi.fn(),
     });
     expect(retry.status).toBe("already_finalized");
+  });
+});
+
+function logPayloadDoesNotLeakSecrets(calls: unknown[][], secrets: string[]): void {
+  const serialized = JSON.stringify(calls);
+  for (const secret of secrets) {
+    expect(serialized).not.toContain(secret);
+  }
+}
+
+describe("relay_contact_card_token_failed (unit)", () => {
+  it("logs once in owner_relay when relay token mint throws and omits secrets", async () => {
+    const repo = new MemoryCardRepository();
+    const card = await repo.upsertCard(exampleCardInput());
+    const exchangeOwnerEmail = new MemoryExchangeOwnerEmailStore();
+    const tokenSecret = "finalize-token-secret";
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(
+      relayContactCardToken,
+      "relayContactCardTokenForEnqueue",
+    ).mockImplementation(() => {
+      throw new Error("mint failed");
+    });
+
+    await processOwnerEmailFinalize(lead, null, card, [sink()], {
+      tokenSecret,
+      resolveVisitorEmailMode: async (): Promise<VisitorEmailMode> => "owner_relay",
+      followupQueue: { enqueueVisitorLetter: async () => undefined },
+      leadSinkQueue: { enqueueLeadSink: async () => undefined },
+      deliveryLedger: new MemoryLeadDeliveryLedger(),
+      deliveryLogger: {
+        logLedgerWriteFailed: vi.fn(),
+        logLedgerEnqueueFailed: vi.fn(),
+      },
+      leadSinkLogger: { logSinkEnqueueFailure: vi.fn() },
+      exchangeOwnerEmail,
+      createLedgerId: () => "ledger-1",
+      now: () => new Date("2026-10-12T12:00:00.000Z"),
+      baseUrl: "https://we-met.link",
+      logExchangeVisitorLetterEnqueueFailed: vi.fn(),
+    });
+
+    const relayLogs = errorSpy.mock.calls.filter(
+      (call) => call[0] === "relay_contact_card_token_failed",
+    );
+    expect(relayLogs).toHaveLength(1);
+    expect(relayLogs[0]?.[1]).toEqual({ leadId: lead.leadId, cardId: card.id });
+    logPayloadDoesNotLeakSecrets(errorSpy.mock.calls, [tokenSecret, "mint failed"]);
+    errorSpy.mockRestore();
+    vi.restoreAllMocks();
+  });
+
+  it("does not log when visitor email mode is direct", async () => {
+    const repo = new MemoryCardRepository();
+    const card = await repo.upsertCard(exampleCardInput());
+    const exchangeOwnerEmail = new MemoryExchangeOwnerEmailStore();
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await processOwnerEmailFinalize(lead, null, card, [sink()], {
+      tokenSecret: "finalize-token-secret",
+      resolveVisitorEmailMode: async (): Promise<VisitorEmailMode> => "direct",
+      followupQueue: { enqueueVisitorLetter: async () => undefined },
+      leadSinkQueue: { enqueueLeadSink: async () => undefined },
+      deliveryLedger: new MemoryLeadDeliveryLedger(),
+      deliveryLogger: {
+        logLedgerWriteFailed: vi.fn(),
+        logLedgerEnqueueFailed: vi.fn(),
+      },
+      leadSinkLogger: { logSinkEnqueueFailure: vi.fn() },
+      exchangeOwnerEmail,
+      createLedgerId: () => "ledger-1",
+      now: () => new Date("2026-10-12T12:00:00.000Z"),
+      baseUrl: "https://we-met.link",
+      logExchangeVisitorLetterEnqueueFailed: vi.fn(),
+    });
+
+    const relayLogs = errorSpy.mock.calls.filter(
+      (call) => call[0] === "relay_contact_card_token_failed",
+    );
+    expect(relayLogs).toHaveLength(0);
+    errorSpy.mockRestore();
   });
 });

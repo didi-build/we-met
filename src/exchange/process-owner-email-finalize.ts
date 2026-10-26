@@ -67,6 +67,12 @@ export async function processOwnerEmailFinalize(
       card.id,
     );
   } catch {
+    if (visitorEmailMode === "owner_relay") {
+      console.error("relay_contact_card_token_failed", {
+        leadId: lead.leadId,
+        cardId: card.id,
+      });
+    }
     relayContactCardToken = undefined;
   }
 

@@ -331,6 +331,16 @@ async function sendVisitorLetter(
         )
       : undefined;
 
+  if (visitorEmailMode === "owner_relay" && !contactCardDownloadUrl) {
+    const sendState = await deps.exchangeOwnerEmail.getSendState(message.lead.leadId);
+    if (sendState) {
+      console.error("relay_letter_missing_contact_card_link", {
+        leadId: message.lead.leadId,
+        cardId: sendState.cardId,
+      });
+    }
+  }
+
   const content = buildVisitorFollowUpEmail({
     card: message.card,
     visitorName: message.lead.name,
