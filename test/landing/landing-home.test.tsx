@@ -5,6 +5,7 @@ import { render, screen } from "@testing-library/react";
 import { LandingHome } from "@/components/landing/LandingHome";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { HOW_IT_WORKS_STEPS } from "@/components/landing/how-it-works-steps";
+import { LANDING_RELAY_COPY } from "@/lib/landing/landing-relay-mode";
 import { resolveLandingUrls } from "@/lib/landing/urls";
 
 const urls = resolveLandingUrls(
@@ -67,11 +68,15 @@ describe("LandingHome (unit)", () => {
     expect(example.getAttribute("href")).toBe(urls.exampleCard);
   });
 
-  it("renders how-it-works chip copy", () => {
+  it("renders relay hero lead and how-it-works chip copy for steps 1 and 2", () => {
     renderLandingHome();
 
+    expect(screen.getAllByText(LANDING_RELAY_COPY.heroLead).length).toBeGreaterThan(0);
     for (const step of HOW_IT_WORKS_STEPS) {
-      expect(screen.getAllByText(step.chip).length).toBeGreaterThan(0);
+      if (step.chip) {
+        expect(screen.getAllByText(step.chip).length).toBeGreaterThan(0);
+      }
     }
+    expect(screen.queryByText(/you both get each other/i)).toBeNull();
   });
 });

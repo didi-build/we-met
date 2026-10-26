@@ -3,8 +3,8 @@ import type { Metadata } from "next";
 
 const LANDING_TITLE = "We Met: a free digital business card";
 const LANDING_DESCRIPTION =
-  "A free digital business card. Share one link or QR code and you both get each other's details.";
-const OG_IMAGE_ALT = "We Met — free digital business cards";
+  "A free digital business card. Share one link or QR code, they save your card on the spot, and you get a follow-up letter plus all their details.";
+const OG_IMAGE_ALT = "We Met: free digital business cards";
 
 export function resolveLandingMetadata(config: WeMetHostConfig): Metadata {
   const canonical = config.baseUrl.replace(/\/$/, "");
