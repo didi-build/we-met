@@ -52,11 +52,8 @@ jobs:
           SECRET_LIST_STDERR=$(mktemp)
           if ! npx wrangler secret list --name we-met-followup-email-consumer-nonprod \
             >"$SECRET_LIST_STDOUT" 2>"$SECRET_LIST_STDERR"; then
-            echo "::error::wrangler secret list failed for we-met-followup-email-consumer-nonprod. If the token lacks permission to list secret names, add the minimum Cloudflare permission named in the error (Workers Editor alone is UNVERIFIED for this API)."
-            if [ -s "$SECRET_LIST_STDERR" ]; then
-              echo "wrangler stderr:"
-              cat "$SECRET_LIST_STDERR"
-            fi
+            echo "::error::wrangler secret list failed for Worker we-met-followup-email-consumer-nonprod using CLOUDFLARE_API_TOKEN_CONSUMER_NONPROD. Non-prod follow-up consumer deploy was stopped. See docs/decisions/0017-cloudflare-api-credentials.md for token scoping."
+            grep -oE '\[code: [0-9]+\]' "$SECRET_LIST_STDERR" | sort -u || true
             exit 1
           fi
           export SECRET_LIST_STDOUT
@@ -68,17 +65,10 @@ jobs:
               'WE_MET_TEST_MAIL_TO',
             ];
             const raw = readFileSync(process.env.SECRET_LIST_STDOUT, 'utf8');
-            const stdoutPreview = () => {
-              console.error(
-                '::error::wrangler secret list stdout preview (first 200 chars, names/types only): ' +
-                  raw.slice(0, 200),
-              );
-            };
             const firstBracket = raw.indexOf('[');
             const lastBracket = raw.lastIndexOf(']');
             if (firstBracket === -1 || lastBracket === -1 || lastBracket < firstBracket) {
-              stdoutPreview();
-              console.error('::error::Could not locate a JSON array in wrangler secret list stdout.');
+              console.error('::error::Could not locate a JSON array in wrangler secret list stdout for we-met-followup-email-consumer-nonprod. Non-prod follow-up consumer deploy was stopped.');
               process.exit(1);
             }
             const jsonText = raw.slice(firstBracket, lastBracket + 1);
@@ -86,19 +76,18 @@ jobs:
             try {
               parsed = JSON.parse(jsonText);
             } catch {
-              stdoutPreview();
+              console.error('::error::wrangler secret list stdout was not valid JSON for we-met-followup-email-consumer-nonprod. Non-prod follow-up consumer deploy was stopped.');
               process.exit(1);
             }
             if (!Array.isArray(parsed)) {
-              stdoutPreview();
-              console.error('::error::Unexpected wrangler secret list shape; expected a JSON array.');
+              console.error('::error::Unexpected wrangler secret list shape for we-met-followup-email-consumer-nonprod; expected a JSON array. Non-prod follow-up consumer deploy was stopped.');
               process.exit(1);
             }
             const names = new Set(parsed.map((entry) => entry?.name).filter(Boolean));
             const missing = required.filter((name) => !names.has(name));
             if (missing.length > 0) {
               for (const name of missing) {
-                console.error('::error::Missing required Worker secret on we-met-followup-email-consumer-nonprod: ' + name);
+                console.error('::error::Missing required Worker secret on we-met-followup-email-consumer-nonprod: ' + name + '. Non-prod follow-up consumer deploy was stopped.');
               }
               process.exit(1);
             }
