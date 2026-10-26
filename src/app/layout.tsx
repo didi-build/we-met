@@ -4,28 +4,8 @@ import { THEME_STORAGE_KEY } from "@/lib/theme-storage-key";
 import "./globals.css";
 
 const figtree = localFont({
-  src: [
-    {
-      path: "./fonts/figtree/Figtree-Regular.woff2",
-      weight: "400",
-      style: "normal",
-    },
-    {
-      path: "./fonts/figtree/Figtree-Medium.woff2",
-      weight: "500",
-      style: "normal",
-    },
-    {
-      path: "./fonts/figtree/Figtree-SemiBold.woff2",
-      weight: "600",
-      style: "normal",
-    },
-    {
-      path: "./fonts/figtree/Figtree-Bold.woff2",
-      weight: "700",
-      style: "normal",
-    },
-  ],
+  src: "./fonts/figtree/Figtree[wght].woff2",
+  weight: "300 900",
   display: "swap",
   variable: "--font-figtree",
 });
