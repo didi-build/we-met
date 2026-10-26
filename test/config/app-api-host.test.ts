@@ -4,6 +4,7 @@ import {
   isAppApiServingHost,
   resolveAppOrigin,
 } from "@/config/app-api-host";
+import type { WeMetHostConfig } from "@/config/we-met";
 import { readWeMetHostConfig } from "@/config/we-met";
 
 describe("app API host helpers (unit)", () => {
@@ -77,6 +78,36 @@ describe("app API host helpers (unit)", () => {
         WE_MET_APP_ORIGIN: "http://localhost:3000",
       }),
     ).toBe("https://we-met.didi.build");
+  });
+
+  it("resolveAppOrigin throws for an unknown env when using a hand-built config", () => {
+    expect(() =>
+      readWeMetHostConfig({
+        WE_MET_BASE_URL: "https://we-met.link",
+        WE_MET_ENV: "not-a-real-env",
+      }),
+    ).toThrow(/Invalid WE_MET_ENV/);
+  });
+
+  it("resolveAppOrigin prefers staging over preview suffix on the request host", () => {
+    const handBuilt: WeMetHostConfig = {
+      baseUrl: "https://we-met.didi.build",
+      previewHostSuffix: "-we-met.example.workers.dev",
+      weMetEnv: "staging",
+    };
+    expect(
+      resolveAppOrigin(handBuilt, "https://pr-99-we-met.example.workers.dev/app", {}),
+    ).toBe("https://we-met.didi.build");
+  });
+
+  it("rejects staging configs that still carry a preview host suffix", () => {
+    expect(() =>
+      readWeMetHostConfig({
+        WE_MET_BASE_URL: "https://we-met.didi.build",
+        WE_MET_ENV: "staging",
+        WE_MET_PREVIEW_HOST_SUFFIX: "-we-met.example.workers.dev",
+      }),
+    ).toThrow(/WE_MET_PREVIEW_HOST_SUFFIX/);
   });
 
   it("production app host and OAuth origin are unchanged", () => {

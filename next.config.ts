@@ -2,6 +2,9 @@ import type { NextConfig } from "next";
 import { resolveNextConfigSecurityHeaders } from "./src/lib/we-met/next-config-headers";
 
 const weMetEnv = process.env.WE_MET_ENV ?? "production";
+if (weMetEnv === "staging" && !process.env.WE_MET_BASE_URL?.trim()) {
+  throw new Error("WE_MET_BASE_URL is required when WE_MET_ENV is staging");
+}
 
 const nextConfig: NextConfig = {
   env: {

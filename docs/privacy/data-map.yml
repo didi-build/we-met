@@ -1036,8 +1036,9 @@ other_items:
       - WE_MET_ASSETS
       - WE_MET_FOLLOWUP_EMAIL_QUEUE
     whose: operational
-    data: Personal data in preview, staging (Google sign-in on we-met.didi.build),
-      local-remote, and shared non-prod D1, R2, and queue bindings (separate
+    data: Personal data in preview, staging (real Google sign-in emails on
+      we-met.didi.build), local-remote, and shared non-prod D1, R2, and queue
+      bindings (separate
       resource names from production per wrangler previews block and
       wrangler.staging.jsonc)
     purpose: PR preview smoke, staging on main, and developer testing

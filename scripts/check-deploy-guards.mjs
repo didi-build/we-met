@@ -53,9 +53,26 @@ import { previewLoginReachableForWorkerEnv } from "./lib/preview-login-guard.mjs
 
 function usage() {
   console.error(
-    "Usage: check-deploy-guards.mjs --target <preview|production|staging|consumer-nonprod|consumer-production|warmup-production> --config <path> [--mail-safety-config <path>]",
+    "Usage: check-deploy-guards.mjs --target <preview|production|staging|staging-build|consumer-nonprod|consumer-production|warmup-production> --config <path> [--mail-safety-config <path>]",
   );
   process.exit(1);
+}
+
+function checkStagingBuildEnvironment() {
+  const env = process.env.WE_MET_ENV?.trim();
+  if (env !== "staging") {
+    fail('staging build requires WE_MET_ENV "staging"');
+  }
+  const baseUrl = process.env.WE_MET_BASE_URL?.trim();
+  if (baseUrl !== STAGING_RESOURCE_MARKERS.baseUrl) {
+    fail(
+      `staging build requires WE_MET_BASE_URL "${STAGING_RESOURCE_MARKERS.baseUrl}"`,
+    );
+  }
+  const previewSuffix = process.env.WE_MET_PREVIEW_HOST_SUFFIX?.trim() ?? "";
+  if (previewSuffix !== "") {
+    fail('staging build requires WE_MET_PREVIEW_HOST_SUFFIX to be unset or ""');
+  }
 }
 
 function parseArgs(argv) {
@@ -459,8 +476,13 @@ function checkConsumerNonprod(config) {
       `non-prod consumer Worker name must be "${NONPROD_RESOURCE_MARKERS.consumerWorkerName}"`,
     );
   }
-  if (config.vars?.WE_MET_ENV === "production") {
-    fail("non-prod consumer WE_MET_ENV must not be production");
+  const consumerWeMetEnv = config.vars?.WE_MET_ENV;
+  if (
+    typeof consumerWeMetEnv !== "string" ||
+    consumerWeMetEnv.trim() === "" ||
+    consumerWeMetEnv.trim() === "production"
+  ) {
+    fail("non-prod consumer vars.WE_MET_ENV must be a non-empty non-production value");
   }
   const strings = collectStrings(config);
   for (const marker of [
@@ -662,6 +684,20 @@ function checkStagingWorkerSelfReference(config) {
   }
 }
 
+function stagingBindsDurableObjects(config) {
+  const raw = config.durable_objects;
+  if (raw == null) {
+    return false;
+  }
+  if (Array.isArray(raw)) {
+    return raw.length > 0;
+  }
+  if (typeof raw === "object" && Array.isArray(raw.bindings)) {
+    return raw.bindings.length > 0;
+  }
+  return true;
+}
+
 function checkStagingForbiddenTopLevel(config) {
   if (Object.prototype.hasOwnProperty.call(config, "route")) {
     fail("staging config must use routes array, not singular route");
@@ -672,7 +708,7 @@ function checkStagingForbiddenTopLevel(config) {
   if ((config.kv_namespaces ?? []).length > 0) {
     fail("staging must not bind kv_namespaces");
   }
-  if ((config.durable_objects ?? []).length > 0) {
+  if (stagingBindsDurableObjects(config)) {
     fail("staging must not bind durable_objects");
   }
 }
@@ -714,19 +750,6 @@ function checkStagingBlock(config) {
   if (config.name !== STAGING_RESOURCE_MARKERS.workerName) {
     fail(`staging Worker name must be "${STAGING_RESOURCE_MARKERS.workerName}"`);
   }
-  checkStagingVarsAllowlist(config);
-  const stagingEnv = config.vars?.WE_MET_ENV;
-  if (stagingEnv !== "staging") {
-    fail('staging vars.WE_MET_ENV must be "staging"');
-  }
-  const previewHostSuffix = config.vars?.WE_MET_PREVIEW_HOST_SUFFIX ?? "";
-  if (previewHostSuffix.trim() !== "") {
-    fail('staging vars.WE_MET_PREVIEW_HOST_SUFFIX must be ""');
-  }
-  const baseUrl = config.vars?.WE_MET_BASE_URL;
-  if (baseUrl !== STAGING_RESOURCE_MARKERS.baseUrl) {
-    fail(`staging vars.WE_MET_BASE_URL must be "${STAGING_RESOURCE_MARKERS.baseUrl}"`);
-  }
   if (
     Object.prototype.hasOwnProperty.call(
       config.vars ?? {},
@@ -742,6 +765,22 @@ function checkStagingBlock(config) {
     )
   ) {
     fail("staging vars must not include WE_MET_PREVIEW_LOGIN_EMAIL");
+  }
+  checkStagingVarsAllowlist(config);
+  if (config.vars?.CONTACTS_SETUP_ENABLED_FOR_ALL !== "false") {
+    fail('staging vars.CONTACTS_SETUP_ENABLED_FOR_ALL must be "false"');
+  }
+  const stagingEnv = config.vars?.WE_MET_ENV;
+  if (stagingEnv !== "staging") {
+    fail('staging vars.WE_MET_ENV must be "staging"');
+  }
+  const previewHostSuffix = config.vars?.WE_MET_PREVIEW_HOST_SUFFIX ?? "";
+  if (previewHostSuffix.trim() !== "") {
+    fail('staging vars.WE_MET_PREVIEW_HOST_SUFFIX must be ""');
+  }
+  const baseUrl = config.vars?.WE_MET_BASE_URL;
+  if (baseUrl !== STAGING_RESOURCE_MARKERS.baseUrl) {
+    fail(`staging vars.WE_MET_BASE_URL must be "${STAGING_RESOURCE_MARKERS.baseUrl}"`);
   }
   if (previewLoginReachableForWorkerEnv(stagingEnv, true)) {
     fail("preview-login route must not be reachable when vars.WE_MET_ENV is staging");
@@ -868,10 +907,16 @@ function main() {
   const isConsumerTarget =
     target === "consumer-nonprod" || target === "consumer-production";
   const isWarmupTarget = target === "warmup-production";
-  const isStagingTarget = target === "staging";
-  if (!isConsumerTarget && !isWarmupTarget && !isStagingTarget) {
+  const isStagingFamily = target === "staging" || target === "staging-build";
+  if (!isConsumerTarget && !isWarmupTarget && !isStagingFamily) {
     checkWranglerDomainSettings(config);
     checkDistinctD1Ids(config);
+  }
+
+  if (target === "staging-build") {
+    checkStagingBuildEnvironment();
+    console.log("deploy-time guards passed (staging-build)");
+    return;
   }
 
   if (target === "staging") {

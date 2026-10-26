@@ -4,6 +4,7 @@ import {
   appHostForBaseUrl,
   isAppServingHost,
   isCardServingHost,
+  isStagingSingleHost,
   readWeMetHostConfig,
 } from "@/config/we-met";
 
@@ -77,6 +78,29 @@ describe("readWeMetHostConfig (unit)", () => {
         WE_MET_PREVIEW_HOST_SUFFIX: "-we-met.example.workers.dev",
       }),
     ).toThrow(/WE_MET_PREVIEW_HOST_SUFFIX/);
+  });
+});
+
+describe("isStagingSingleHost (unit)", () => {
+  it("is true only for staging env", () => {
+    expect(
+      isStagingSingleHost({
+        baseUrl: "https://we-met.didi.build",
+        previewHostSuffix: null,
+        weMetEnv: "staging",
+      }),
+    ).toBe(true);
+  });
+
+  it("is false for preview and local configs", () => {
+    expect(
+      isStagingSingleHost({
+        baseUrl: "https://we-met.link",
+        previewHostSuffix: PREVIEW_SUFFIX,
+        weMetEnv: "preview",
+      }),
+    ).toBe(false);
+    expect(isStagingSingleHost(localConfig)).toBe(false);
   });
 });
 

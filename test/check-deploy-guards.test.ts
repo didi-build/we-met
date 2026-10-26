@@ -491,10 +491,19 @@ describe("check-deploy-guards (unit)", () => {
       },
     },
     {
-      label: "staging binds durable_objects",
+      label: "staging binds durable_objects (array form)",
       message: "durable_objects",
       mutate: (config: Record<string, unknown>) => {
         config.durable_objects = [{ name: "DO", class_name: "Example" }];
+      },
+    },
+    {
+      label: "staging binds durable_objects (Wrangler bindings object)",
+      message: "durable_objects",
+      mutate: (config: Record<string, unknown>) => {
+        config.durable_objects = {
+          bindings: [{ name: "DO", class_name: "Example" }],
+        };
       },
     },
     {
@@ -760,6 +769,140 @@ describe("check-deploy-guards (unit)", () => {
     });
   }
 
+  it("fails staging guards when two routes are configured", () => {
+    const { path } = writeTempStagingConfig((config) => {
+      config.routes = [
+        { pattern: "we-met.didi.build", custom_domain: true },
+        { pattern: "extra.didi.build", custom_domain: true },
+      ];
+    });
+    const result = runGuards("staging", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      "staging routes must be only custom domain we-met.didi.build",
+    );
+  });
+
+  it("fails staging guards when D1 bindings are missing", () => {
+    const { path } = writeTempStagingConfig((config) => {
+      delete config.d1_databases;
+    });
+    const result = runGuards("staging", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("staging must bind exactly one D1 database");
+  });
+
+  it("fails staging guards when two D1 bindings are present", () => {
+    const { path } = writeTempStagingConfig((config) => {
+      const rows = config.d1_databases as Record<string, unknown>[];
+      config.d1_databases = [...rows, { ...rows[0] }];
+    });
+    const result = runGuards("staging", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("staging must bind exactly one D1 database");
+  });
+
+  it("fails staging guards when D1 database_id is not the non-prod placeholder without substitution", () => {
+    const { path } = writeTempStagingConfig((config) => {
+      const d1 = config.d1_databases as { database_id: string }[];
+      d1[0].database_id = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+    });
+    const result = runGuards("staging", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      "staging D1 database_id must use non-prod placeholder",
+    );
+  });
+
+  it("fails staging guards when services bindings are missing", () => {
+    const { path } = writeTempStagingConfig((config) => {
+      delete config.services;
+    });
+    const result = runGuards("staging", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      "staging must declare exactly one services binding",
+    );
+  });
+
+  it("fails staging guards when services binding name is wrong", () => {
+    const { path } = writeTempStagingConfig((config) => {
+      const services = config.services as { binding: string; service: string }[];
+      services[0].binding = "WRONG_BINDING";
+    });
+    const result = runGuards("staging", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      'staging services binding must be "WORKER_SELF_REFERENCE"',
+    );
+  });
+
+  it("fails staging guards with exact preview-login var error messages", () => {
+    const secretPath = writeTempStagingConfig((config) => {
+      const vars = config.vars as Record<string, string>;
+      vars.WE_MET_PREVIEW_LOGIN_SECRET = "secret";
+    }).path;
+    const secretResult = runGuards("staging", secretPath);
+    expect(secretResult.stderr).toContain(
+      "staging vars must not include WE_MET_PREVIEW_LOGIN_SECRET",
+    );
+
+    const emailPath = writeTempStagingConfig((config) => {
+      const vars = config.vars as Record<string, string>;
+      vars.WE_MET_PREVIEW_LOGIN_EMAIL = "preview@example.com";
+    }).path;
+    const emailResult = runGuards("staging", emailPath);
+    expect(emailResult.stderr).toContain(
+      "staging vars must not include WE_MET_PREVIEW_LOGIN_EMAIL",
+    );
+  });
+
+  it("fails staging guards when CONTACTS_SETUP_ENABLED_FOR_ALL is not false", () => {
+    const { path } = writeTempStagingConfig((config) => {
+      const vars = config.vars as Record<string, string>;
+      vars.CONTACTS_SETUP_ENABLED_FOR_ALL = "true";
+    });
+    const result = runGuards("staging", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      'staging vars.CONTACTS_SETUP_ENABLED_FOR_ALL must be "false"',
+    );
+  });
+
+  it("passes staging-build guards when build env is correct", () => {
+    const result = spawnSync(
+      "node",
+      [SCRIPT, "--target", "staging-build", "--config", "wrangler.staging.jsonc"],
+      {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          WE_MET_ENV: "staging",
+          WE_MET_BASE_URL: "https://we-met.didi.build",
+          WE_MET_PREVIEW_HOST_SUFFIX: "",
+        },
+      },
+    );
+    expect(result.status).toBe(0);
+  });
+
+  it("fails staging-build guards when WE_MET_ENV is missing", () => {
+    const result = spawnSync(
+      "node",
+      [SCRIPT, "--target", "staging-build", "--config", "wrangler.staging.jsonc"],
+      {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          WE_MET_ENV: "",
+          WE_MET_BASE_URL: "https://we-met.didi.build",
+        },
+      },
+    );
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('staging build requires WE_MET_ENV "staging"');
+  });
+
   it("fails staging guards when D1 database_id does not match non-prod id after substitution", () => {
     const { path } = writeTempStagingConfig((config) => {
       const d1 = config.d1_databases as { database_id: string }[];
@@ -873,6 +1016,40 @@ describe("check-deploy-guards (unit)", () => {
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("email-events");
     expect(result.stderr).toContain("placeholder");
+  });
+
+  it("fails consumer-nonprod when vars.WE_MET_ENV is missing or empty", () => {
+    const pathMissing = writeTempConsumerConfig(CONSUMER_NONPROD, (config) => {
+      const vars = config.vars as Record<string, string>;
+      delete vars.WE_MET_ENV;
+    });
+    const missingResult = runGuards("consumer-nonprod", pathMissing);
+    expect(missingResult.status).toBe(1);
+    expect(missingResult.stderr).toContain(
+      "non-prod consumer vars.WE_MET_ENV must be a non-empty non-production value",
+    );
+
+    const pathEmpty = writeTempConsumerConfig(CONSUMER_NONPROD, (config) => {
+      const vars = config.vars as Record<string, string>;
+      vars.WE_MET_ENV = "   ";
+    });
+    const emptyResult = runGuards("consumer-nonprod", pathEmpty);
+    expect(emptyResult.status).toBe(1);
+    expect(emptyResult.stderr).toContain(
+      "non-prod consumer vars.WE_MET_ENV must be a non-empty non-production value",
+    );
+  });
+
+  it("fails consumer-nonprod when vars.WE_MET_ENV is production", () => {
+    const path = writeTempConsumerConfig(CONSUMER_NONPROD, (config) => {
+      const vars = config.vars as Record<string, string>;
+      vars.WE_MET_ENV = "production";
+    });
+    const result = runGuards("consumer-nonprod", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      "non-prod consumer vars.WE_MET_ENV must be a non-empty non-production value",
+    );
   });
 
   it("fails consumer-nonprod when vars contain WE_MET_TEST_MAIL_TO key", () => {
