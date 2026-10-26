@@ -7,7 +7,7 @@ Project docs live here so humans and agents share the same map.
 | Path                                                           | Purpose                                                               |
 | -------------------------------------------------------------- | --------------------------------------------------------------------- |
 | [architecture/overview.md](./architecture/overview.md)         | Purpose, boundaries, seams, routes, theming, pipeline, open questions |
-| [architecture/environments.md](./architecture/environments.md) | Local, preview, and production bindings and config names              |
+| [architecture/environments.md](./architecture/environments.md) | Local, preview, staging, and production bindings and config names   |
 
 ## Decisions
 
@@ -22,7 +22,8 @@ Project docs live here so humans and agents share the same map.
 | [decisions/0006-non-prod-safety.md](./decisions/0006-non-prod-safety.md)                                             | Non-prod queue, mail redirect, previews          |
 | [decisions/0007-production-deploy-manual.md](./decisions/0007-production-deploy-manual.md)                           | Production deploy with approval                  |
 | [decisions/0008-api-routes-exchange-and-details.md](./decisions/0008-api-routes-exchange-and-details.md)             | `/api/exchange`, `/api/details`                  |
-| [decisions/0009-environments-local-preview-production.md](./decisions/0009-environments-local-preview-production.md) | No staging; `we-met` + previews block            |
+| [decisions/0009-environments-local-preview-production.md](./decisions/0009-environments-local-preview-production.md) | Superseded by 0028; was no staging               |
+| [decisions/0028-staging-we-met-didi-build.md](./decisions/0028-staging-we-met-didi-build.md)                         | Staging Worker `we-met-staging` on we-met.didi.build ([DIDI-873](https://linear.app/didi-build/issue/DIDI-873)) |
 | [decisions/0010-card-data-d1-and-load-script.md](./decisions/0010-card-data-d1-and-load-script.md)                   | D1 schema; gitignored load file                  |
 | [decisions/0011-d1-migrations.md](./decisions/0011-d1-migrations.md)                                                 | Migration policy                                 |
 | [decisions/0012-r2-images-single-ingestion.md](./decisions/0012-r2-images-single-ingestion.md)                       | R2 + single image function                       |

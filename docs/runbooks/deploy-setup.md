@@ -77,6 +77,20 @@ npx wrangler preview base-config secret put TURNSTILE_SECRET_KEY
 
 **Local development:** copy `WE_MET_APP_ORIGIN` from `.env.example` into `.env.local` (typically `http://localhost:3000`). Google OAuth uses a separate dev client with redirect URI on that origin.
 
+**Staging (`we-met-staging`):** after the Worker exists, set the same app secret **names** as production on **`we-met-staging`** (values differ per environment; never commit values):
+
+- `WE_MET_TOKEN_SECRET`
+- `TURNSTILE_SECRET_KEY`
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+
+Register these **authorized redirect URIs** on the Google OAuth client used for staging (exact match; no wildcards):
+
+- `https://we-met.didi.build/api/auth/google/callback`
+- `https://we-met.didi.build/api/auth/google/contacts/callback`
+
+Confirm with `npx wrangler secret list --name we-met-staging` (names only).
+
 ### App host (`app.we-met.link`)
 
 Production `wrangler.jsonc` attaches **two** custom domains to Worker **`we-met`**: `we-met.link` (public cards) and **`app.we-met.link`** (editor SPA and `/api/app/*` + `/api/auth/*`). That route has been on the production Worker since commit **4bab8b5** (last production deploy before MVP backend work); **`app.we-met.link` already resolves to the same Worker** and today serves the **placeholder** shipped in that deploy. PR previews use **workers.dev** only; they never receive the `app.we-met.link` route (`check-deploy-guards.mjs` enforces this).
@@ -137,6 +151,7 @@ Cloudflare supports **resource-scoped Workers roles** ([Workers granular authori
 | `we-met-ci-consumer-production` | `CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION` | **Workers Editor** on **`we-met-followup-email-consumer`** only, plus account-level **Queues Edit** (dashboard **Queues** → **Edit**). Wrangler lists queues during deploy (verified **2026-10-14** — first CI consumer deploy failed with `Authentication error [code: 10000]` on queue list until **Queues Edit** was added; D1 was not required despite a D1 binding). Stored only on the GitHub **`production`** environment. Do not widen `we-met-ci-production`. **Not tested:** minimal queue permission vs **Queues Edit**. |
 | `we-met-ci-consumer-nonprod`    | `CLOUDFLARE_API_TOKEN_CONSUMER_NONPROD`    | **Workers Editor** on **`we-met-followup-email-consumer-nonprod`** only, plus account-level **Queues Edit** (same pattern as the production consumer token). Stored only on the GitHub **`consumer-nonprod`** environment. **Workers Editor** plus **Queues Edit** is sufficient for `wrangler secret list` (names only) before deploy (verified **2026-10-17** on [Deploy consumer non-prod run 39083067044](https://github.com/didi-build/we-met/actions/runs/39083067044)).                                                      |
 | `we-met-ci-migrate-nonprod`     | `CLOUDFLARE_API_TOKEN_MIGRATE_NONPROD`     | **D1 Edit** only (account-level). Verified **2026-10-13:** the Cloudflare token builder only offered account-level D1 (**Entire account**, **D1 Write** and **D1 Read**); no per-database scope was available. One-year expiry; calendar reminder.                                                                                                                                                                                                                                                                                  |
+| `we-met-ci-staging`             | `CLOUDFLARE_API_TOKEN_STAGING`             | **Workers Editor** on Worker **`we-met-staging`** only, plus account-level **D1 Edit** for `wrangler d1 migrations apply` on non-prod, plus a **zone** policy on **`we-met.didi.build`** with **Workers Routes Write** and **Zone Read** when the custom domain is attached ([0028](../decisions/0028-staging-we-met-didi-build.md)).                                                                                                                                                                                              |
 
 ### GitHub Actions policy (pull_request_target)
 
@@ -283,6 +298,10 @@ After the production follow-up email consumer shipped (**2026-10-14**), the firs
 7. Create the **`consumer-nonprod`** environment: **no** required reviewers (non-prod, like `preview`). **Deployment branches:** **`main` only**. Add:
    - **Secret:** `CLOUDFLARE_API_TOKEN_CONSUMER_NONPROD` (from `we-met-ci-consumer-nonprod`)
    - **Secret:** `WE_MET_D1_DATABASE_ID_NONPROD` (same value as `preview`)
+8. Create the **`staging`** environment ([0028](../decisions/0028-staging-we-met-didi-build.md)): **no** required reviewers. **Deployment branches:** **`main` only**. Add:
+   - **Secret:** `CLOUDFLARE_API_TOKEN_STAGING` (from `we-met-ci-staging`)
+   - **Secret:** `WE_MET_D1_DATABASE_ID_NONPROD` (same value as `preview`)
+   - **Variable:** `WE_MET_TURNSTILE_SITE_KEY_STAGING` (non-prod Turnstile site key; widget hostnames must include **`we-met.didi.build`**)
 
 Remove or rename any legacy unsuffixed `CLOUDFLARE_API_TOKEN` secrets. Do **not** duplicate `CLOUDFLARE_ACCOUNT_ID` on the `preview` or `production` environments unless you intentionally use a different account (the repo uses one repo-level `CLOUDFLARE_ACCOUNT_ID` for both workflows).
 
