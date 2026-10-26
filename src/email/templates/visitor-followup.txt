@@ -4,12 +4,13 @@
 
 Great meeting you, and thanks for sharing your details with me.
 
-My contact card is attached to this email, so you can save it to your phone in one tap.
-{{#if contact_card_download_url}}
-Save my contact card: {{contact_card_download_url}}
-{{/if}}
+{{#if contact_card_download_url}}Tap below to save my contact card to your phone in one tap.
 
-{{owner_name}}{{#if owner_role}}
+Save my contact card: {{contact_card_download_url}}
+
+{{else}}My contact card is attached, open it to save me to your phone.
+
+{{/if}}{{owner_name}}{{#if owner_role}}
 {{owner_role}}{{/if}}
 
 --

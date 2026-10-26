@@ -4,12 +4,18 @@
       (the same key the public card uses, so the choice carries over).
    3. How it works (860px and up): the sticky panel shows the vignettes of the step nearest the middle of the viewport.
       Uses IntersectionObserver with a 1px band at the vertical centre. Under prefers-reduced-motion the swap is instant (CSS).
-   4. Phone preview slot: DESIGN-ONLY. Mounts design/card/card.html over the static fallback. Delete this block in production
+   4. How it works step 3: the Relay/Direct switch sets data-mode on #lp-root ("relay" default, "direct" previews the owner option).
+      It only changes the illustration, never a setting. SHOW_DIRECT_COMING_SOON controls the direct view's Coming soon chip.
+   5. Phone preview slot: DESIGN-ONLY. Mounts design/card/card.html over the static fallback. Delete this block in production
       and render the real card component in its preview mode instead. */
 (function () {
   'use strict';
+  /* Coming soon chip in the direct view's step 3 chip slot. True until DIDI-831 ships the owner setting.
+     Flip to false (or delete the span[data-slot="direct-coming-soon"] in index.html): the slot stays, same height, nothing moves. */
+  var SHOW_DIRECT_COMING_SOON = true;
   var root = document.getElementById('lp-root');
   var $ = function (s, el) { return (el || root).querySelector(s); };
+  var params = new URLSearchParams(location.search);
   var $$ = function (s, el) { return Array.prototype.slice.call((el || root).querySelectorAll(s)); };
 
   /* 1. Icons */
@@ -29,7 +35,6 @@
   }
 
   /* 2. Theme */
-  var params = new URLSearchParams(location.search);
   var mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
   var toggle = $('[data-theme-toggle]');
   function theme() { return root.getAttribute('data-theme') || (mq && mq.matches ? 'dark' : 'light'); }
@@ -70,9 +75,23 @@
       steps.forEach(function (s) { io.observe(s); });
     }
   }
+  /* 4. Step 3 mode switch. Review overrides (design canvas only): ?mode=direct opens the direct state, ?soon=0 / ?soon=1
+     override SHOW_DIRECT_COMING_SOON, ?static=1 shows every step's vignette inline (mockup capture). */
+  var soonParam = params.get('soon');
+  var showSoon = soonParam === null ? SHOW_DIRECT_COMING_SOON : soonParam === '1';
+  if (!showSoon) $$('[data-slot="direct-coming-soon"]').forEach(function (el) { el.parentNode.removeChild(el); });
+  if (params.has('static')) root.classList.add('lp-static');
+  var modeBtns = $$('[data-mode-btn]');
+  function setMode(m) {
+    root.setAttribute('data-mode', m);
+    modeBtns.forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-mode-btn') === m)); });
+  }
+  modeBtns.forEach(function (b) { b.addEventListener('click', function () { setMode(b.getAttribute('data-mode-btn')); }); });
+  setMode(params.get('mode') === 'direct' ? 'direct' : 'relay');
+
   fillIcons();
 
-  /* 4. Phone preview slot (DESIGN-ONLY, delete in production) */
+  /* 5. Phone preview slot (DESIGN-ONLY, delete in production) */
   var slot = $('[data-phone-slot]');
   function mountPhone() {
     if (!slot || params.get('fallback') === '1') return;
@@ -91,10 +110,10 @@
   }
   sync();
 
-  /* Preview-only (design canvas): ?at=how|step2|step3|privacy|footer scrolls there on load. Safe to delete. */
+  /* Preview-only (design canvas): ?at=how|step2|step3|footer scrolls there on load. Safe to delete. */
   var at = params.get('at');
   if (at) window.addEventListener('load', function () {
-    var el = at === 'how' ? $('.lp-band') : at === 'step2' ? steps[1] : at === 'step3' ? steps[2] : at === 'privacy' ? $('.lp-privacy') : $('footer');
+    var el = at === 'how' ? $('.lp-band') : at === 'step2' ? steps[1] : at === 'step3' ? steps[2] : $('footer');
     if (el) window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - (/^step/.test(at) ? window.innerHeight / 2 - 120 : 0));
   });
 })();
