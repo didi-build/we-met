@@ -3,6 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_WE_MET_ENV: process.env.WE_MET_ENV ?? "production",
+    NEXT_PUBLIC_WE_MET_BASE_URL: process.env.WE_MET_BASE_URL ?? "https://we-met.link",
   },
 };
 

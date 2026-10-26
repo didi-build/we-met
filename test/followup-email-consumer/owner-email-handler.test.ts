@@ -138,4 +138,49 @@ describe("createEmailLeadSinkHandler owner email (unit)", () => {
     expect(outbound.replyTo).toBe("test-inbox@example.com");
     expect(outbound.subject).toContain("[we-met test → owner@example.com]");
   });
+
+  it("staging redirects owner sink mail to the test inbox with delivery stamp", async () => {
+    const sendEmail = vi.fn(async (_message: OutboundEmail) => ({
+      messageId: "msg-staging",
+      threadId: null,
+    }));
+    const handler = createEmailLeadSinkHandler({
+      weMetEnv: "staging",
+      testMailTo: "test-inbox@example.com",
+      outboundFrom: { cloudflareFromEmail: "hello@mail.we-met.link" },
+      fromDisplayName: "We Met",
+      sendEmail,
+      logMalformedLeadSink: vi.fn(),
+    });
+
+    await handler.deliverOwnerEmail(
+      {
+        type: "lead_sink_owner_email",
+        sinkId: "sink-1",
+        sinkKind: "email",
+        sinkConfig: { to: "owner@example.com" },
+        lead: {
+          leadId: "lead-1",
+          submittedAt: "2026-10-12T12:00:00.000Z",
+          environment: "staging",
+          isTestLead: true,
+          name: "Sam Rivera",
+          email: "visitor@example.com",
+          phone: null,
+        },
+        details: { phone: null, jobTitle: null, company: null, note: null },
+        cardId: "card-1",
+        cardSlug: "demo",
+        sourceUrl: "https://we-met.didi.build/hi/demo",
+      },
+      { messageAttempts: 1 },
+    );
+
+    const outbound = sendEmail.mock.calls[0]![0]! as OutboundEmail;
+    expect(outbound.to).toBe("test-inbox@example.com");
+    expect(outbound.subject).toContain("[we-met test → owner@example.com]");
+    expect(outbound.textPlain).toContain(
+      "Test delivery (sink destination): owner@example.com",
+    );
+  });
 });

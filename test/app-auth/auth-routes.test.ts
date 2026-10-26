@@ -334,6 +334,31 @@ describe("auth API routes (integration)", () => {
     }
   });
 
+  it("google callback access_denied on staging redirects to /app on the staging origin", async () => {
+    try {
+      routeMocks.env.WE_MET_DB = undefined;
+      routeMocks.env.WE_MET_BASE_URL = "https://we-met.didi.build";
+      routeMocks.env.WE_MET_ENV = "staging";
+      routeMocks.env.WE_MET_AUTH_RATE_LIMITER = {
+        async limit() {
+          return { success: true };
+        },
+      };
+      setRequestHeaders({ host: "we-met.didi.build" });
+      const response = await googleCallbackGet(
+        new Request(
+          "https://we-met.didi.build/api/auth/google/callback?error=access_denied&state=declined",
+        ),
+      );
+      expect(response.status).toBe(302);
+      const location = response.headers.get("location") ?? "";
+      expect(location.startsWith("https://we-met.didi.build/app")).toBe(true);
+      expect(location).toContain("auth_error=canceled");
+    } finally {
+      restoreDefaultRouteEnv();
+    }
+  });
+
   it("google start on staging uses the card host OAuth redirect URI", async () => {
     await withIsolatedLocalD1(async (db) => {
       try {
