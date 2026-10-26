@@ -58,6 +58,7 @@ function createDeps(
     now: () => new Date("2026-10-12T12:00:00.000Z"),
     baseUrl: "https://we-met.link",
     logExchangeVisitorLetterEnqueueFailed: vi.fn(),
+    resolveVisitorEmailMode: async () => "owner_relay",
     ...leadEmailCapacityAlwaysAllowed,
     ...overrides,
   };
@@ -271,6 +272,34 @@ describe("processExchange (unit)", () => {
     expect(result.status).toBe("success");
     expect(logSinkEnqueueFailure).toHaveBeenCalledOnce();
     expect(sinkMessages).toHaveLength(1);
+  });
+
+  it("enqueues relay contact card token on visitor_letter_due when mode is owner_relay", async () => {
+    const repo = new MemoryCardRepository();
+    const card = await repo.upsertCard(exampleCardInput());
+    const deps = createDeps({
+      resolveVisitorEmailMode: async () => "owner_relay",
+    });
+    const result = await processExchange(baseInput(), card, [], deps);
+    expect(result.status).toBe("success");
+    const message = deps.followupMessages[0] as {
+      relayContactCardToken?: string;
+    };
+    expect(message.relayContactCardToken).toBeTruthy();
+  });
+
+  it("does not enqueue relay contact card token when mode is direct", async () => {
+    const repo = new MemoryCardRepository();
+    const card = await repo.upsertCard(exampleCardInput());
+    const deps = createDeps({
+      resolveVisitorEmailMode: async () => "direct",
+    });
+    const result = await processExchange(baseInput(), card, [], deps);
+    expect(result.status).toBe("success");
+    const message = deps.followupMessages[0] as {
+      relayContactCardToken?: string;
+    };
+    expect(message.relayContactCardToken).toBeUndefined();
   });
 
   it("in owner_relay enqueues delayed visitor letter, reserves two cap slots, and counts owner and visitor", async () => {

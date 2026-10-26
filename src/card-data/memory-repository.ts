@@ -61,6 +61,30 @@ export class MemoryCardRepository implements CardRepository {
     return card.status === "live" && account?.status === "active";
   }
 
+  /** Test helper: set card status without going through publish flows. */
+  setCardStatusForTest(cardId: string, status: CardStatus): void {
+    for (const card of this.cardsBySlug.values()) {
+      if (card.id === cardId) {
+        const updated = { ...card, status };
+        this.cardsBySlug.set(card.slug, updated);
+        return;
+      }
+    }
+    throw new Error(`Unknown card id: ${cardId}`);
+  }
+
+  /** Test helper: change slug while keeping the same card id. */
+  renameSlugForTest(cardId: string, newSlug: string): void {
+    for (const [oldSlug, card] of this.cardsBySlug.entries()) {
+      if (card.id === cardId) {
+        this.cardsBySlug.delete(oldSlug);
+        this.cardsBySlug.set(newSlug, { ...card, slug: newSlug });
+        return;
+      }
+    }
+    throw new Error(`Unknown card id: ${cardId}`);
+  }
+
   /** Test helper: set account status without going through sign-in. */
   setAccountStatus(accountId: string, status: MemoryAccount["status"]): void {
     const account = this.accounts.get(accountId);
@@ -76,6 +100,15 @@ export class MemoryCardRepository implements CardRepository {
       return null;
     }
     return card;
+  }
+
+  async getById(cardId: string): Promise<CardRecord | null> {
+    for (const card of this.cardsBySlug.values()) {
+      if (card.id === cardId) {
+        return this.isPublicCard(card) ? card : null;
+      }
+    }
+    return null;
   }
 
   async getByHostname(hostname: string): Promise<CardRecord | null> {

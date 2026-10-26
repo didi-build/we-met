@@ -120,6 +120,7 @@ The consumer registers on the queue in **its own** Wrangler config; it is not an
 | Event                                    | Fields                                                                             |
 | ---------------------------------------- | ---------------------------------------------------------------------------------- |
 | `exchange_visitor_letter_enqueue_failed` | `leadId` (when visitor letter queue enqueue fails on exchange or finalize; no PII) |
+| `exchange_contact_card_download`         | `leadId` (successful GET `/api/exchange/<leadId>/contact-card`; no PII)            |
 
 **Consumer logs (debugging live mail):**
 

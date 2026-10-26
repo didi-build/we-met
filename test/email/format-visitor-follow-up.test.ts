@@ -51,6 +51,53 @@ describe("format visitor follow-up email (unit)", () => {
     expect(content.textHtml).toContain("Hi Alex,");
   });
 
+  it("includes relay contact card link when contactCardDownloadUrl is set", () => {
+    const url = "https://we-met.link/api/exchange/lead-1/contact-card?token=abc";
+    const content = buildVisitorFollowUpEmail({
+      card,
+      visitorName: "Alex",
+      baseUrl,
+      contactCardDownloadUrl: url,
+    });
+    expect(content.textPlain).toContain("Save my contact card:");
+    expect(content.textPlain).toContain(url);
+    expect(content.textHtml).toContain("Save my contact card");
+    expect(content.textHtml).toContain(url);
+  });
+
+  it("omits relay contact card link in direct mode style builds", () => {
+    const content = buildVisitorFollowUpEmail({
+      card,
+      visitorName: "Alex",
+      baseUrl,
+    });
+    expect(content.textPlain).not.toContain("Save my contact card");
+    expect(content.textHtml).not.toContain("Save my contact card");
+  });
+
+  it("never leaves raw template tags in HTML or text (relay and direct)", () => {
+    const relayUrl = "https://we-met.link/api/exchange/lead-1/contact-card?token=abc";
+    const relay = buildVisitorFollowUpEmail({
+      card,
+      visitorName: "Sam",
+      baseUrl,
+      contactCardDownloadUrl: relayUrl,
+    });
+    const direct = buildVisitorFollowUpEmail({
+      card,
+      visitorName: "Sam",
+      baseUrl,
+    });
+    const handlebarsLeftover = /\{\{#(if|unless)|\{\{\/(if|unless)|\{\{[a-z_]+\}\}/;
+    for (const content of [relay, direct]) {
+      expect(content.textHtml).not.toContain("{{");
+      expect(content.textHtml).not.toMatch(handlebarsLeftover);
+      expect(content.textPlain).not.toContain("{{");
+      expect(content.textPlain).not.toContain("}}");
+      expect(content.textPlain).not.toMatch(handlebarsLeftover);
+    }
+  });
+
   it("links only to the card page and We Met site", () => {
     const content = buildVisitorFollowUpEmail({
       card,

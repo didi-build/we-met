@@ -16,6 +16,9 @@ import {
 import type { ProcessDetailsDeps } from "@/exchange/process-details";
 import type { ProcessExchangeDeps } from "@/exchange/process-exchange";
 import type { ProcessVCardDeps } from "@/exchange/process-vcard";
+import type { ProcessExchangeContactCardDeps } from "@/exchange/process-exchange-contact-card";
+import { readLeadEmailControls } from "@/app-settings/caps";
+import type { VisitorEmailMode } from "@/app-settings/defaults";
 import { createReadOnlyR2Assets } from "@/assets/read-only-r2-assets";
 import type { R2Bucket } from "@cloudflare/workers-types";
 import type { TurnstileLogger } from "@/exchange/turnstile";
@@ -129,11 +132,47 @@ export async function createProcessExchangeDeps(
     createLedgerId: () => crypto.randomUUID(),
     now,
     baseUrl: hostConfig.baseUrl,
+    resolveVisitorEmailMode: async (): Promise<VisitorEmailMode> => {
+      const controls = await readLeadEmailControls(db);
+      return controls.visitorEmailMode;
+    },
     assertLeadEmailCapacity: (cardId, needed) =>
       assertLeadEmailCapacity(db, cardId, needed, now()),
     incrementDailySendCounts: (cardId, kinds) =>
       incrementDailySendCounts(db, utcDayFromDate(now()), cardId, kinds),
     logExchangeVisitorLetterEnqueueFailed: consoleExchangeVisitorLetterEnqueueFailed,
+  };
+}
+
+export async function createProcessExchangeContactCardDeps(
+  clientIp: string,
+): Promise<ProcessExchangeContactCardDeps> {
+  const { env } = await getCloudflareContext({ async: true });
+  const bindings = env as ExchangeBindings;
+  const hostConfig = readWeMetHostConfig(env);
+
+  const rateLimiter = selectExchangeRateLimiter(
+    hostConfig.weMetEnv,
+    bindings.WE_MET_EXCHANGE_RATE_LIMITER,
+  );
+
+  const tokenSecret = requireSecret(
+    "WE_MET_TOKEN_SECRET",
+    bindings.WE_MET_TOKEN_SECRET,
+  );
+
+  if (!bindings.WE_MET_ASSETS) {
+    throw new Error("WE_MET_ASSETS binding is not configured");
+  }
+
+  return {
+    tokenSecret,
+    rateLimiter,
+    clientIp,
+    assets: createReadOnlyR2Assets(bindings.WE_MET_ASSETS),
+    logDownload(leadId: string) {
+      console.info("exchange_contact_card_download", { leadId });
+    },
   };
 }
 
@@ -205,6 +244,10 @@ export async function createProcessDetailsDeps(): Promise<ProcessDetailsDeps> {
     createLedgerId: () => crypto.randomUUID(),
     now,
     baseUrl: hostConfig.baseUrl,
+    resolveVisitorEmailMode: async (): Promise<VisitorEmailMode> => {
+      const controls = await readLeadEmailControls(db);
+      return controls.visitorEmailMode;
+    },
     logExchangeVisitorLetterEnqueueFailed: consoleExchangeVisitorLetterEnqueueFailed,
   };
 }
