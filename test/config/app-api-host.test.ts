@@ -25,6 +25,12 @@ describe("app API host helpers (unit)", () => {
     WE_MET_PREVIEW_HOST_SUFFIX: "",
   });
 
+  const staging = readWeMetHostConfig({
+    WE_MET_BASE_URL: "https://we-met.didi.build",
+    WE_MET_ENV: "staging",
+    WE_MET_PREVIEW_HOST_SUFFIX: "",
+  });
+
   it("allows app, preview, and local hosts for app API routes", () => {
     expect(isAppApiServingHost("app.we-met.link", production)).toBe(true);
     expect(isAppApiServingHost("we-met.link", production)).toBe(false);
@@ -52,5 +58,26 @@ describe("app API host helpers (unit)", () => {
   it("chooses SPA paths for redirect targets", () => {
     expect(appSpaPath(production, "app.we-met.link")).toBe("/");
     expect(appSpaPath(preview, "pr-1-we-met.example.workers.dev")).toBe("/app");
+  });
+
+  it("staging uses the card host as the single app and API host", () => {
+    expect(isAppApiServingHost("we-met.didi.build", staging)).toBe(true);
+    expect(isAppApiServingHost("app.we-met.didi.build", staging)).toBe(false);
+    expect(
+      resolveAppOrigin(staging, "https://we-met.didi.build/app", {
+        WE_MET_APP_ORIGIN: "http://localhost:3000",
+      }),
+    ).toBe("https://we-met.didi.build");
+    expect(appSpaPath(staging, "we-met.didi.build")).toBe("/app");
+  });
+
+  it("production app host and OAuth origin are unchanged", () => {
+    expect(isAppApiServingHost("we-met.link", production)).toBe(false);
+    expect(isAppApiServingHost("app.we-met.link", production)).toBe(true);
+    expect(
+      resolveAppOrigin(production, "https://app.we-met.link/x", {
+        WE_MET_APP_ORIGIN: "http://localhost:3000",
+      }),
+    ).toBe("https://app.we-met.link");
   });
 });

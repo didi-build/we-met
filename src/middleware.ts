@@ -1,6 +1,7 @@
 import {
   isAppServingHost,
   isCardServingHost,
+  isStagingSingleHost,
   readWeMetHostConfig,
 } from "@/config/we-met";
 import { applyNonProductionXRobotsTag } from "@/lib/we-met/non-production";
@@ -36,7 +37,7 @@ export function middleware(request: NextRequest) {
   const hostname = requestHostname(request);
   const onAppHost = isAppServingHost(hostname, hostConfig);
 
-  if (onAppHost && pathname === "/") {
+  if (onAppHost && pathname === "/" && !isStagingSingleHost(hostConfig)) {
     const url = request.nextUrl.clone();
     url.pathname = "/app";
     return finalizeMiddlewareResponse(NextResponse.rewrite(url), hostConfig.weMetEnv);
