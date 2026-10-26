@@ -53,6 +53,10 @@ body {
   line-height: 1.6;
 }
 
+body.we-met-env-banner {
+  padding-top: var(--we-met-environment-banner-offset);
+}
+
 a {
   color: var(--ink);
   text-decoration-thickness: 1px;

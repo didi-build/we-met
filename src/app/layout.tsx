@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import {
+  WeMetEnvironmentChrome,
+  weMetEnvironmentBodyClassName,
+} from "@/components/we-met/WeMetEnvironmentChrome";
 import { THEME_STORAGE_KEY } from "@/lib/theme-storage-key";
 import "./globals.css";
 
@@ -27,7 +31,18 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeBootstrapScript }} />
       </head>
-      <body className={`${figtree.variable} min-h-dvh antialiased`}>{children}</body>
+      <body
+        className={[
+          figtree.variable,
+          "min-h-dvh antialiased",
+          weMetEnvironmentBodyClassName(),
+        ]
+          .filter(Boolean)
+          .join(" ")}
+      >
+        <WeMetEnvironmentChrome />
+        {children}
+      </body>
     </html>
   );
 }

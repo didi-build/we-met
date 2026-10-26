@@ -68,6 +68,14 @@ describe("landing middleware host routing (unit)", () => {
     expect(response?.status).toBe(404);
   });
 
+  it("does not return middleware 404 for /app/foo or /app-preview on the production card host", () => {
+    for (const path of ["/app/foo", "/app-preview"]) {
+      const response = middleware(request(path, "we-met.link"));
+      expect(response?.status).not.toBe(404);
+      expect(response?.headers.get("x-middleware-rewrite")).toBeNull();
+    }
+  });
+
   it("allows /app on preview hosts", () => {
     process.env.WE_MET_ENV = "preview";
     const response = middleware(request("/app", "pr-42-we-met.example.workers.dev"));

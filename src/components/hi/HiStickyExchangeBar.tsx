@@ -31,7 +31,7 @@ export function HiStickyExchangeBar({
   return (
     <div
       aria-hidden={!visible}
-      className={`fixed inset-x-0 top-0 z-10 flex justify-center border-b border-line bg-bg transition-transform duration-200 ${
+      className={`fixed inset-x-0 top-[var(--we-met-environment-banner-offset,0px)] z-10 flex justify-center border-b border-line bg-bg transition-transform duration-200 ${
         visible ? "translate-y-0 visible" : "-translate-y-full invisible"
       }`}
     >

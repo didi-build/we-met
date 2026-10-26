@@ -18,4 +18,16 @@ describe("resolveHiCardMetadata", () => {
     expect(metadata.alternates?.canonical).toBe(expected);
     expect(metadata.openGraph?.url).toBe(expected);
   });
+
+  it("keeps card pages noindex with follow allowed", () => {
+    const metadata = resolveHiCardMetadata(
+      exampleCardRecord({ id: "id", slug: "demo", updatedAt: "2026-01-01T00:00:00Z" }),
+      {
+        baseUrl: "https://we-met.link",
+        previewHostSuffix: null,
+        weMetEnv: "staging",
+      },
+    );
+    expect(metadata.robots).toEqual({ index: false, follow: true });
+  });
 });
