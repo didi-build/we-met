@@ -9,7 +9,7 @@
     "node": ">=22.13.0"
   },
   "scripts": {
-    "check": "npm run format:check && npm run lint && npm run typecheck && npm run email-templates:check && npm run test && npm run theme-colors && npm run nodrift:check && npm run build && npm run worker:dry-run && npm run worker:dry-run:generated && npm run worker:consumer-dry-run:nonprod && npm run worker:consumer-dry-run:production && npm run worker:warmup-dry-run && npm run warmup-no-emails && npm run consumer-email-bundle:check && npm run deploy:guards && npm run workflow-provision-policy && npm run workflow-d1-id-secrets && npm run secrets && npm run secret-usage && npm run actions-policy-workflows && npm run placeholders && npm run attribution",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run email-templates:check && npm run test && npm run theme-colors && npm run nodrift:check && npm run gallery:build && npm run build && npm run worker:dry-run && npm run worker:dry-run:generated && npm run worker:consumer-dry-run:nonprod && npm run worker:consumer-dry-run:production && npm run worker:warmup-dry-run && npm run warmup-no-emails && npm run consumer-email-bundle:check && npm run deploy:guards && npm run workflow-provision-policy && npm run workflow-d1-id-secrets && npm run secrets && npm run secret-usage && npm run actions-policy-workflows && npm run placeholders && npm run attribution",
     "nodrift:check": "nodrift check",
     "email-templates:generate": "node scripts/generate-email-templates.mjs",
     "email-templates:check": "node scripts/check-email-templates-generated.mjs",
@@ -18,6 +18,8 @@
     "dev": "next dev --turbopack",
     "next:build": "next build",
     "build": "opennextjs-cloudflare build",
+    "gallery:build": "vite build",
+    "dev:gallery": "vite",
     "worker:dry-run": "wrangler deploy --dry-run",
     "worker:dry-run:generated": "node scripts/dry-run-generated-config.mjs",
     "worker:consumer-dry-run:nonprod": "wrangler deploy --dry-run --config workers/we-met-followup-email-consumer/wrangler.nonprod.jsonc",
@@ -74,6 +76,7 @@
     "@types/node": "22.20.5",
     "@types/react": "^19.1.13",
     "@types/react-dom": "^19.1.9",
+    "@vitejs/plugin-react": "^5.1.0",
     "eslint": "9.37.0",
     "eslint-config-next": "15.5.28",
     "eslint-config-prettier": "^10.1.8",
@@ -82,11 +85,13 @@
     "jsdom": "^29.1.1",
     "lint-staged": "16.4.0",
     "prettier": "3.9.10",
+    "react-router-dom": "^7.18.4",
     "secretlint": "10.2.2",
     "tailwindcss": "^4.1.13",
     "tsx": "^4.20.5",
     "typescript": "5.9.3",
     "typescript-eslint": "8.71.2",
+    "vite": "^7.3.7",
     "vitest": "3.2.7",
     "wrangler": "^4.151.1"
   }

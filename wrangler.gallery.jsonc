@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "we-met-gallery",
+  "compatibility_date": "2026-09-24",
+  "assets": {
+    "directory": "./dist/gallery",
+    "not_found_handling": "single-page-application",
+  },
+  "observability": {
+    "enabled": true,
+  },
+}

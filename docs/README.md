@@ -8,6 +8,7 @@ Project docs live here so humans and agents share the same map.
 | -------------------------------------------------------------- | --------------------------------------------------------------------- |
 | [architecture/overview.md](./architecture/overview.md)         | Purpose, boundaries, seams, routes, theming, pipeline, open questions |
 | [architecture/environments.md](./architecture/environments.md) | Local, preview, and production bindings and config names              |
+| [component-gallery.md](./component-gallery.md)                 | Spec vs component directories and `/gallery` PR previews              |
 
 ## Decisions
 
@@ -34,6 +35,7 @@ Project docs live here so humans and agents share the same map.
 | [decisions/0018-lead-sink.md](./decisions/0018-lead-sink.md)                                                         | `lead_sinks` list; dispatch in step 1            |
 | [decisions/0019-pr-preview-github-action.md](./decisions/0019-pr-preview-github-action.md)                           | PR previews via GitHub Actions                   |
 | [decisions/0020-d1-database-id-injection.md](./decisions/0020-d1-database-id-injection.md)                           | D1 IDs from GitHub environment secrets at deploy |
+| [decisions/0028-component-gallery.md](./decisions/0028-component-gallery.md)                                         | Dedicated gallery Worker and PR previews         |
 
 ## Runbooks
 
