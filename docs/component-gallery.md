@@ -43,6 +43,8 @@ Same-repo pull requests run **Gallery preview** (`.github/workflows/gallery-prev
 
 Credentials are on the GitHub **`preview` environment** ([ADR 0017](./decisions/0017-cloudflare-api-credentials.md)): `CLOUDFLARE_API_TOKEN_NONPROD` and `CLOUDFLARE_ACCOUNT_ID` (not repository-level secrets for the token). Fork PRs skip gallery deploy.
 
-`wrangler.gallery.jsonc` serves `./dist`; `dist/_headers` sets `X-Robots-Tag: noindex, nofollow` for `/gallery/*` and `/*` (overriding preview defaults that only send `noindex`).
+`wrangler.gallery.jsonc` serves `./dist`; `dist/_headers` sets `X-Robots-Tag: noindex, nofollow` for `/gallery/*` and `/*` on static asset responses.
+
+**Robots on PR previews:** Gallery previews use a `workers.dev` Preview URL (`gallery-pr-<n>-we-met.<account>.workers.dev`). Cloudflare [adds `X-Robots-Tag: noindex` automatically](https://developers.cloudflare.com/workers/previews/custom-domains/#protect-preview-content) on those URLs; the response header will not include `nofollow` even when `_headers` requests it (CI job log: probe sees only `x-robots-tag: noindex` while Wrangler uploads `dist/_headers` with the asset bundle). We still ship `_headers` for custom-domain previews and consistency with [Workers static asset headers](https://developers.cloudflare.com/workers/static-assets/headers/). **`nofollow` is enforced in HTML:** `gallery/index.html` includes `<meta name="robots" content="noindex, nofollow" />`, and the gallery-preview workflow probes for that meta tag plus the platform `noindex` header.
 
 See [ADR 0029](./decisions/0029-component-gallery.md).

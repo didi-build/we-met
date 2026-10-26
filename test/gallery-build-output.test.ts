@@ -17,6 +17,7 @@ describe("gallery build output (unit)", () => {
     expect(indexHtml).toMatch(
       new RegExp(`${prefix.replace("/", "\\/")}/assets/index-[^"]+\\.js`),
     );
+    expect(indexHtml).toContain('<meta name="robots" content="noindex, nofollow" />');
     const headers = readFileSync(join(assetsRoot, "_headers"), "utf8");
     expect(headers).toContain("X-Robots-Tag: noindex, nofollow");
     expect(headers).toContain(`${prefix}/*`);
