@@ -18,7 +18,7 @@ describe("resolveLandingMetadata (unit)", () => {
 
     expect(meta.title).toBe("We Met: a free digital business card");
     expect(meta.description).toBe(
-      "A free digital business card. Share one link or QR code and you both get each other's details.",
+      "A free digital business card. Share one link or QR code, they save your card on the spot, and you get a follow-up letter plus all their details.",
     );
     expect(meta.alternates?.canonical).toBe(previewConfig.baseUrl);
     expect(meta.metadataBase?.toString()).toBe(`${previewConfig.baseUrl}/`);
@@ -29,7 +29,7 @@ describe("resolveLandingMetadata (unit)", () => {
       url: `${previewConfig.baseUrl}/og-image.png`,
       width: 1200,
       height: 630,
-      alt: "We Met — free digital business cards",
+      alt: "We Met: free digital business cards",
     });
     expect(meta.openGraph && "type" in meta.openGraph && meta.openGraph.type).toBe(
       "website",
