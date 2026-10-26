@@ -1036,10 +1036,11 @@ other_items:
       - WE_MET_ASSETS
       - WE_MET_FOLLOWUP_EMAIL_QUEUE
     whose: operational
-    data: Personal data in preview, local-remote, and shared non-prod D1, R2, and
-      queue bindings (separate resource names from production per wrangler
-      previews block)
-    purpose: PR preview smoke and developer testing
+    data: Personal data in preview, staging (Google sign-in on we-met.didi.build),
+      local-remote, and shared non-prod D1, R2, and queue bindings (separate
+      resource names from production per wrangler previews block and
+      wrangler.staging.jsonc)
+    purpose: PR preview smoke, staging on main, and developer testing
     storage: D1 we-met-db-nonprod; R2 we-met-assets-nonprod; Queue
       we-met-followup-email-nonprod
     processors:
