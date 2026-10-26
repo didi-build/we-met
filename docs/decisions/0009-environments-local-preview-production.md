@@ -1,6 +1,6 @@
 # 0009. Three environments: local, preview, and production
 
-- **Status:** accepted
+- **Status:** superseded by [0028](./0028-staging-we-met-didi-build.md)
 - **Date:** 2026-10-11
 - **Updates:** [0002](./0002-hosting-workers-opennext.md), [0006](./0006-non-prod-safety.md)
 
@@ -23,5 +23,5 @@ Early docs assumed a **staging** Worker (`we-met-staging`, `we-met.didi.build`).
 
 ## Consequences
 
-- Docs and runbooks must not refer to staging, `we-met-staging`, or `we-met.didi.build`.
+- Docs and runbooks must not refer to staging, `we-met-staging`, or `we-met.didi.build`. **Superseded (2026-10-26):** [0028](./0028-staging-we-met-didi-build.md) reintroduces staging; this bullet no longer applies.
 - Local dev uses non-prod binding names (same resources previews use for remote D1/R2 when not emulated locally).
