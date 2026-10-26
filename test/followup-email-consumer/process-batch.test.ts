@@ -15,7 +15,10 @@ import {
   type FollowupQueueMessage,
 } from "@/followup-email-consumer/process-batch";
 import { MemoryConsumerLeadDeliveryLedger } from "../followup-email-consumer/memory-consumer-ledger";
-import { leadEmailConsumerEnabled } from "../helpers/lead-email-deps";
+import {
+  defaultLeadEmailControls,
+  leadEmailConsumerEnabled,
+} from "../helpers/lead-email-deps";
 import { MemoryExchangeOwnerEmailStore } from "@/exchange-owner-email/memory-store";
 
 const card: CardEmailSnapshot = {
@@ -451,6 +454,38 @@ describe("processFollowupQueueBatch (unit)", () => {
     expect(sent.to).toBe("visitor@example.com");
     expect(sent.subject).not.toContain("[we-met test");
     expect(sent.textPlain).not.toContain("Test delivery (visitor typed)");
+  });
+
+  it("includes the contact card link only in owner_relay when a token is present", async () => {
+    const message = createMessage(
+      visitorBody({ relayContactCardToken: "relay-token-abc" }),
+    );
+    const deps = createDeps({
+      readLeadEmailControls: vi.fn(async () => ({
+        ...defaultLeadEmailControls,
+        visitorEmailMode: "owner_relay" as const,
+      })),
+    });
+    await processFollowupQueueBatch({ messages: [message] }, deps);
+    const sent = vi.mocked(deps.sendEmail).mock.calls[0][0];
+    expect(sent.textPlain).toMatch(/\/api\/exchange\/[^/\s]+\/contact-card\?token=/);
+    expect(sent.textHtml).toContain("Save my contact card");
+  });
+
+  it("omits the contact card link in direct mode even when the payload carries a token", async () => {
+    const message = createMessage(
+      visitorBody({ relayContactCardToken: "should-not-appear" }),
+    );
+    const deps = createDeps({
+      readLeadEmailControls: vi.fn(async () => ({
+        ...defaultLeadEmailControls,
+        visitorEmailMode: "direct" as const,
+      })),
+    });
+    await processFollowupQueueBatch({ messages: [message] }, deps);
+    const sent = vi.mocked(deps.sendEmail).mock.calls[0][0];
+    expect(sent.textPlain).not.toContain("contact-card");
+    expect(sent.textHtml).not.toContain("Save my contact card");
   });
 
   it("acks malformed visitor_followup messages", async () => {

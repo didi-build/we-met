@@ -53,6 +53,19 @@ export class D1CardRepository implements CardRepository {
     return row ? mapCardRow(row) : null;
   }
 
+  async getById(cardId: string): Promise<CardRecord | null> {
+    const row = await this.db
+      .prepare(
+        `SELECT ${CARD_COLUMNS}
+         FROM cards c
+         INNER JOIN accounts a ON a.id = c.account_id
+         WHERE c.id = ? AND ${LIVE_CARD_WHERE}`,
+      )
+      .bind(cardId)
+      .first<CardsRow>();
+    return row ? mapCardRow(row) : null;
+  }
+
   async getByHostname(hostname: string): Promise<CardRecord | null> {
     const row = await this.db
       .prepare(

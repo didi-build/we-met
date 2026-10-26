@@ -607,6 +607,32 @@ other_items:
     who_can_see: visitor who holds a valid details token within TTL
     source: src/app/api/exchange/vcard/route.ts
     verified: false
+  - id: api.exchange_contact_card_response
+    whose: card_owner
+    data: Owner vCard (same fields as api.exchange_vcard_response) returned after a
+      valid relay contact-card token on GET
+      /api/exchange/<leadId>/contact-card
+    purpose: let a visitor who received the owner relay letter save the owner's
+      current card when the .vcf attachment was dropped on Reply
+    storage: not persisted; streamed in HTTP response only
+    processors:
+      - Cloudflare
+    retention: none (private, no-store response)
+    who_can_see: holder of the relay letter link (no time expiry; see ADR 0027
+      addendum)
+    source: src/app/api/exchange/[leadId]/contact-card/route.ts
+    verified: false
+  - id: log.exchange_contact_card_download
+    whose: operational
+    data: Exchange leadId only when a relay contact-card download succeeds
+    purpose: abuse and delivery debugging without PII in logs
+    storage: Cloudflare Workers observability logs (not D1)
+    processors:
+      - Cloudflare
+    retention: unknown (Cloudflare log retention not documented in repo)
+    who_can_see: operator
+    source: src/exchange/runtime.ts
+    verified: false
   - id: auth.google_contacts
     whose: card_owner
     data: One-time Google OAuth contacts scope and People API calls; searchContacts

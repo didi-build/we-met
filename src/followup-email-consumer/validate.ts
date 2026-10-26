@@ -79,6 +79,17 @@ function parseLead(value: unknown): VisitorLead | null {
 export type ParsedVisitorFollowup =
   import("@/exchange/queue/types").VisitorLetterQueueMessage;
 
+function parseRelayContactCardToken(body: Record<string, unknown>): string | undefined {
+  if (typeof body.relayContactCardToken !== "string") {
+    return undefined;
+  }
+  const trimmed = body.relayContactCardToken.trim();
+  if (!trimmed || trimmed.length > 4096) {
+    return undefined;
+  }
+  return trimmed;
+}
+
 function parseVisitorLetterPayload(
   body: Record<string, unknown>,
   type: "visitor_followup" | "visitor_letter_due",
@@ -88,7 +99,13 @@ function parseVisitorLetterPayload(
   if (!lead || !card) {
     return null;
   }
-  return { type, lead, card };
+  const relayContactCardToken = parseRelayContactCardToken(body);
+  return {
+    type,
+    lead,
+    card,
+    ...(relayContactCardToken ? { relayContactCardToken } : {}),
+  };
 }
 
 export function parseVisitorFollowupMessage(

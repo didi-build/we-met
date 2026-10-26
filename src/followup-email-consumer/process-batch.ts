@@ -23,6 +23,7 @@ import {
   resolveOwnerSinkReplyTo,
   resolveSinkEmailRecipient,
 } from "@/email/recipient";
+import { exchangeContactCardDownloadUrl } from "@/exchange/exchange-contact-card-url";
 import { shouldDeferExchangeEmailForTrigger } from "@/exchange/exchange-email-trigger-defer";
 import { VISITOR_LETTER_SEND_CLAIM_STALE_MS } from "@/exchange-owner-email/types";
 import {
@@ -321,11 +322,21 @@ async function sendVisitorLetter(
       recipient.mode === "nonprod" ? recipient.visitorEmailForContent : undefined;
   }
 
+  const contactCardDownloadUrl =
+    visitorEmailMode === "owner_relay" && message.relayContactCardToken
+      ? exchangeContactCardDownloadUrl(
+          deps.baseUrl,
+          message.lead.leadId,
+          message.relayContactCardToken,
+        )
+      : undefined;
+
   const content = buildVisitorFollowUpEmail({
     card: message.card,
     visitorName: message.lead.name,
     baseUrl: deps.baseUrl,
     nonProdVisitorEmailLabel,
+    contactCardDownloadUrl,
   });
 
   const { vcardBody, filename } = await buildOwnerVCardAttachment(

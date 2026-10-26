@@ -5,6 +5,7 @@ import {
   APP_SETTING_DAILY_CAP_GLOBAL,
   APP_SETTING_DAILY_CAP_PER_CARD,
   APP_SETTING_LEAD_EMAIL_ENABLED,
+  type VisitorEmailMode,
 } from "@/app-settings/defaults";
 import type { CardRecord } from "@/card-data/types";
 import { MemoryCardRepository } from "@/card-data/memory-repository";
@@ -106,6 +107,7 @@ function buildExchangeDeps(
     incrementDailySendCounts: async () => undefined,
     exchangeOwnerEmail: createExchangeOwnerEmailStoreFromD1(db),
     logExchangeVisitorLetterEnqueueFailed: vi.fn(),
+    resolveVisitorEmailMode: async (): Promise<VisitorEmailMode> => "owner_relay",
   };
 }
 
@@ -206,6 +208,7 @@ describe("exchange and details routes lead_email_unavailable (integration)", () 
         now: exchangeDeps.now,
         baseUrl: "https://we-met.link",
         logExchangeVisitorLetterEnqueueFailed: vi.fn(),
+        resolveVisitorEmailMode: async (): Promise<VisitorEmailMode> => "owner_relay",
       };
 
       await seedSettings(db, {
@@ -268,6 +271,7 @@ describe("exchange and details routes lead_email_unavailable (integration)", () 
         now: exchangeDeps.now,
         baseUrl: "https://we-met.link",
         logExchangeVisitorLetterEnqueueFailed: vi.fn(),
+        resolveVisitorEmailMode: async (): Promise<VisitorEmailMode> => "owner_relay",
       };
 
       await seedSettings(db, {

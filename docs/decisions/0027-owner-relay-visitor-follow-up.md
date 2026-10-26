@@ -2,7 +2,7 @@
 
 - **Status:** accepted
 - **Date:** 2026-10-22 (approved by Diadem)
-- **Updates:** [0023](./0023-owner-email-lead-sink-consumer.md), [0025](./0025-we-met-mvp-accounts-sign-in-and-app-backend.md) phase 4 caps, [DIDI-656](https://linear.app/didi-build/issue/DIDI-656) (cold `mail.we-met.link` deliverability). **Amended 2026-10-24 ([DIDI-820](https://linear.app/didi-build/issue/DIDI-820)):** `visitor_email_mode` only picks who receives the visitor letter; both modes send the letter and the owner relay email (two sends per exchange).
+- **Updates:** [0023](./0023-owner-email-lead-sink-consumer.md), [0025](./0025-we-met-mvp-accounts-sign-in-and-app-backend.md) phase 4 caps, [DIDI-656](https://linear.app/didi-build/issue/DIDI-656) (cold `mail.we-met.link` deliverability). **Amended 2026-10-24 ([DIDI-820](https://linear.app/didi-build/issue/DIDI-820)):** `visitor_email_mode` only picks who receives the visitor letter; both modes send the letter and the owner relay email (two sends per exchange). **Amended 2026-10-25 ([DIDI-832](https://linear.app/didi-build/issue/DIDI-832)):** [relay contact card link addendum](./0027-addendum-relay-contact-card-link.md).
 
 ## Context
 

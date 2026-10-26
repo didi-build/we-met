@@ -159,6 +159,7 @@ describe("card editor full flow (integration)", () => {
         assertLeadEmailCapacity: async () => true,
         incrementDailySendCounts: async () => undefined,
         logExchangeVisitorLetterEnqueueFailed: vi.fn(),
+        resolveVisitorEmailMode: async () => "owner_relay",
       };
 
       const exchange = await processExchange(
