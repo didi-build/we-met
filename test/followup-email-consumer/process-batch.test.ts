@@ -10,8 +10,10 @@ import { followupRetryWindowSecondsThroughAttempt } from "../../scripts/lib/queu
 import { createEmailLeadSinkHandler } from "@/followup-email-consumer/lead-sink/email-handler";
 import { createLeadSinkHandlerRegistry } from "@/followup-email-consumer/lead-sink/registry";
 import {
+  createFollowupConsumerDepsFromEnv,
   processFollowupQueueBatch,
   type FollowupConsumerDeps,
+  type FollowupConsumerEnv,
   type FollowupQueueMessage,
 } from "@/followup-email-consumer/process-batch";
 import { MemoryConsumerLeadDeliveryLedger } from "../followup-email-consumer/memory-consumer-ledger";
@@ -1418,6 +1420,33 @@ describe("processFollowupQueueBatch (unit)", () => {
     expect(ledger.getRowState("lead-1", "sink-1", "record")?.errorCode).toBe(
       "cloudflare_send_validation_failed",
     );
+  });
+
+  it("trims WE_MET_ENV before passing it to mail handlers", () => {
+    const env = {
+      WE_MET_ENV: " preview ",
+      WE_MET_BASE_URL: "https://we-met.link",
+      WE_MET_ASSETS: {} as FollowupConsumerEnv["WE_MET_ASSETS"],
+      WE_MET_DB: {} as FollowupConsumerEnv["WE_MET_DB"],
+    };
+    const deps = createFollowupConsumerDepsFromEnv(env);
+    expect(deps.weMetEnv).toBe("preview");
+  });
+
+  it("routes mail to the test inbox when consumer WE_MET_ENV is missing", async () => {
+    const env = {
+      WE_MET_BASE_URL: "https://we-met.link",
+      WE_MET_ASSETS: {} as FollowupConsumerEnv["WE_MET_ASSETS"],
+      WE_MET_DB: {} as FollowupConsumerEnv["WE_MET_DB"],
+    } as FollowupConsumerEnv;
+    expect(createFollowupConsumerDepsFromEnv(env).weMetEnv).toBe("");
+
+    const message = createMessage(visitorBody());
+    const deps = createDeps({ weMetEnv: "" });
+    await processFollowupQueueBatch({ messages: [message] }, deps);
+    const sent = vi.mocked(deps.sendEmail).mock.calls[0][0];
+    expect(sent.to).toBe("test-inbox@example.com");
+    expect(sent.subject).toContain("[we-met test → visitor@example.com]");
   });
 
   it("acks visitor follow-up on permanent Cloudflare recipient suppression", async () => {
