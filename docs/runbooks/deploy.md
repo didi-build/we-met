@@ -33,10 +33,10 @@
 
 ## Staging (push to `main`, no approval)
 
-- **Workflow:** `deploy-staging.yml` (`name: Deploy staging`) — delivered in a separate implementation ticket; behavior is fixed in [0028](../decisions/0028-staging-we-met-didi-build.md).
+- **Workflow:** `deploy-staging.yml` (`name: Deploy staging`): delivered in a separate implementation ticket; behavior is fixed in [0028](../decisions/0028-staging-we-met-didi-build.md).
 - **Trigger:** Push to **`main`** (same docs-only path ignore pattern as production deploy where applicable).
 - **Environment:** GitHub **`staging`**: **no required reviewers**, **deployment branches `main` only**.
-- **Touches:** Worker **`we-met-staging`** on **`we-met.didi.build`**; shared non-prod D1 **`we-met-db-nonprod`**, R2 **`we-met-assets-nonprod`**, queue **`we-met-followup-email-nonprod`**, rate limiter namespaces **2001**, **2003**, and **2005**; **`IMAGES`**; **`WORKER_SELF_REFERENCE`** → **`we-met-staging`**. No new Cloudflare resources.
+- **Touches:** Worker **`we-met-staging`** on **`we-met.didi.build`**; shared non-prod D1 **`we-met-db-nonprod`**, R2 **`we-met-assets-nonprod`**, queue **`we-met-followup-email-nonprod`**, rate limiter namespaces **2001**, **2003**, and **2005**; **`IMAGES`**; **`WORKER_SELF_REFERENCE`** pointing at **`we-met-staging`**. No new Cloudflare resources.
 - **D1 migrations:** The staging job applies migrations to **`we-met-db-nonprod`** on each `main` push. It also reports which migration files on `main` are not yet on production D1 (informational for production approvers; not a substitute for the production plan job).
 - **Mail / consumer:** Outbound mail uses the existing **`we-met-followup-email-consumer-nonprod`** ([Deploy consumer non-prod](#non-prod-follow-up-email-consumer-merge-to-main-no-approval)); redirect and test stamping via **`WE_MET_TEST_MAIL_TO`**. Staging does **not** deploy the warmup Worker.
 - **Google sign-in:** Enabled on the static staging host (`/api/auth/google/callback` and contacts callback on `https://we-met.didi.build`; see [deploy-setup.md](./deploy-setup.md)).
