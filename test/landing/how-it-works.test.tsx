@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { HOW_IT_WORKS_INTERSECTION_OPTIONS } from "@/components/landing/how-it-works-observer";
@@ -10,10 +11,12 @@ import { LANDING_RELAY_COPY } from "@/lib/landing/landing-relay-mode";
 describe("HowItWorksSection (unit)", () => {
   let observerCallback: IntersectionObserverCallback | null = null;
   let observeMock: ReturnType<typeof vi.fn>;
+  let disconnectMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     observerCallback = null;
     observeMock = vi.fn();
+    disconnectMock = vi.fn();
     vi.stubGlobal(
       "IntersectionObserver",
       vi.fn(function IntersectionObserverMock(
@@ -24,7 +27,7 @@ describe("HowItWorksSection (unit)", () => {
         expect(options).toEqual(HOW_IT_WORKS_INTERSECTION_OPTIONS);
         return {
           observe: observeMock,
-          disconnect: vi.fn(),
+          disconnect: disconnectMock,
           unobserve: vi.fn(),
           takeRecords: vi.fn(),
           root: null,
@@ -90,6 +93,29 @@ describe("HowItWorksSection (unit)", () => {
 
     const relayButton = screen.getByRole("button", { name: "Relay (default)" });
     expect(relayButton.getAttribute("aria-pressed")).toBe("true");
+
+    expect(screen.getAllByText(LANDING_RELAY_COPY.replyNote).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/save you in one tap/i)).toBeNull();
+    expect(screen.queryByText(/contact card goes with it/i)).toBeNull();
+  });
+
+  it("matches the DIDI-823 design reference reply note (we-met#101)", () => {
+    const approvedReplyNote =
+      "To send it on, just hit Reply. When you hit Reply, they can save your contact card.";
+    expect(LANDING_RELAY_COPY.replyNote).toBe(approvedReplyNote);
+
+    try {
+      execSync("git fetch origin design/DIDI-823-landing-copy --depth=1", {
+        stdio: "ignore",
+      });
+    } catch {
+      // Ref may already exist locally.
+    }
+    const referenceHtml = execSync(
+      "git show origin/design/DIDI-823-landing-copy:design/landing/index.html",
+      { encoding: "utf8" },
+    );
+    expect(referenceHtml).toContain(approvedReplyNote);
   });
 
   it("switches to direct view and shows Coming soon badge when enabled", () => {
@@ -133,12 +159,14 @@ describe("HowItWorksSection (unit)", () => {
     expect(relay.getAttribute("aria-pressed")).toBe("true");
   });
 
-  it("re-subscribes the scroll observer and activates step 3 after a mode toggle", () => {
+  it("disconnects and re-subscribes the scroll observer when the mode toggle changes", () => {
     render(<HowItWorksSection />);
     expect(observeMock.mock.calls.length).toBeGreaterThan(0);
     const observesAfterMount = observeMock.mock.calls.length;
+    expect(disconnectMock).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getAllByRole("button", { name: "Direct" })[0]!);
+    expect(disconnectMock).toHaveBeenCalled();
     expect(observeMock.mock.calls.length).toBeGreaterThan(observesAfterMount);
 
     const step3 = document.querySelectorAll(".lp-step")[2]!;
