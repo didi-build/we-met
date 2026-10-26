@@ -48,6 +48,9 @@ export function resolveAppOrigin(
   if (config.previewHostSuffix && host.endsWith(config.previewHostSuffix)) {
     return url.origin;
   }
+  if (config.weMetEnv === "staging") {
+    return config.baseUrl.replace(/\/$/, "");
+  }
   return appBaseUrl(config.baseUrl);
 }
 

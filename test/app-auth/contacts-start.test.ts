@@ -81,7 +81,7 @@ describe("contacts OAuth start (integration)", () => {
     });
   });
 
-  it("returns 404 on preview env", async () => {
+  it("returns 404 on preview env and allows staging", async () => {
     routeMocks.env.WE_MET_ENV = "preview";
     setRequestHeaders({ host: "pr-1-we-met.example.workers.dev" });
     const response = await contactsStartGet(
@@ -90,6 +90,16 @@ describe("contacts OAuth start (integration)", () => {
       ),
     );
     expect(response.status).toBe(404);
+
+    routeMocks.env.WE_MET_BASE_URL = "https://we-met.didi.build";
+    routeMocks.env.WE_MET_ENV = "staging";
+    setRequestHeaders({ host: "we-met.didi.build" });
+    const stagingWithoutSession = await contactsStartGet(
+      new Request("https://we-met.didi.build/api/auth/google/contacts/start"),
+    );
+    expect(stagingWithoutSession.status).toBe(401);
+
+    routeMocks.env.WE_MET_BASE_URL = "https://we-met.link";
     routeMocks.env.WE_MET_ENV = "local";
     setRequestHeaders({ host: "localhost:3000" });
   });

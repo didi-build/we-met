@@ -74,6 +74,15 @@ describe("landing middleware host routing (unit)", () => {
     expect(response?.status).not.toBe(404);
   });
 
+  it("allows /app on the staging card host and rewrites / to the app SPA", () => {
+    process.env.WE_MET_BASE_URL = "https://we-met.didi.build";
+    process.env.WE_MET_ENV = "staging";
+    const appPath = middleware(request("/app", "we-met.didi.build"));
+    expect(appPath?.status).not.toBe(404);
+    const root = middleware(request("/", "we-met.didi.build"));
+    expect(root?.headers.get("x-middleware-rewrite")).toMatch(/\/app/);
+  });
+
   it("does not rewrite www or api hosts on /", () => {
     for (const host of ["www.we-met.link", "api.we-met.link"]) {
       const response = middleware(request("/", host));
