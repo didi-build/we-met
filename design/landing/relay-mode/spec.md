@@ -24,7 +24,7 @@ The landing described the direct flow ("you both get each other's details", one 
 | Q1 follow-up | Badge style | 1:59 AM ET: "the coming soon badge should be formatted the same way as the ship it's replacing (aka match the relay's chip)" | "Coming soon" is a regular `.lp-chip`, same as relay's chip; only the text differs. |
 | Q1 follow-up | Repeated wording, chip | 1:55 AM ET: "yes one of them replace with "directly to their inbox" and specialty the chip, put "coming soon" there instead" | Direct-mode line now says "goes directly to their inbox". In the direct view, the chip slot is the Coming soon badge, the only one on the page. |
 | Q2 | How the owner sends it on | "2: hit Reply" | "To send it on, just hit Reply."; letter tag "Hit Reply to send" |
-| Q3 | Card reaches the visitor | "3: yes, the card must reach them when I hit Reply" | CTO line verbatim: "When you hit Reply, your contact card goes with it, so they can save you in one tap." Never "attached". |
+| Q3 | Card reaches the visitor | "3: yes, the card must reach them when I hit Reply" | CTO line verbatim: "When you hit Reply, your contact card goes with it, so they can save you in one tap." Never "attached". Superseded 2026-10-25, 11:34 PM ET (see Changes). |
 | Q4 | We Met sends the visitor nothing | "4: yes, say We Met sends the visitor nothing" | "We Met sends them nothing, so the letter waits for you until you send it on." |
 | Q5 | On-screen save | "5: yes, save my card is live in both modes" | Step 2: "...and saves your contact card on the spot." |
 | Q6 | Subject | "6: Great meeting you, {first}" | "Great meeting you, Sam" |
@@ -53,12 +53,14 @@ Unchanged: header, eyebrow "Free digital business card", H1 "Meet someone. / Swa
 | Step 3 title (direct view) | Your copy lands in your inbox |
 | Step 3 body (direct view) | The "Great meeting you" letter goes straight to them. Your copy, "You met", comes to you with every detail they shared. |
 | Step 3 chip (direct view) | none; the chip slot holds the Coming soon badge |
-| Note: Reply (relay) | To send it on, just hit Reply. When you hit Reply, your contact card goes with it, so they can save you in one tap. |
+| Note: Reply (relay) | To send it on, just hit Reply. When you hit Reply, they can save your contact card. |
 | Note: nothing sent (relay) | We Met sends them nothing, so the letter waits for you until you send it on. |
 | Note: direct (relay) | Prefer it automatic? Switch to direct and the letter goes straight to them. |
 | Note (direct state) | Direct mode: the letter goes directly to their inbox, and you still get "You met" with all the details. |
 | Switch | Relay (default) / Direct |
 | Badge (direct view only, in the step 3 chip slot) | Coming soon |
+| Meta description (description and og:description) | A free digital business card. Share one link or QR code, they save your card on the spot, and you get a follow-up letter plus all their details. |
+| Share image alt (og:image:alt) | We Met: free digital business cards |
 
 Curly quotes around "Great meeting you" and "You met". No em dashes.
 
@@ -67,7 +69,7 @@ Curly quotes around "Great meeting you" and "You met". No em dashes.
 - **Step 1:** unchanged QR + URL card (`ShareLinkVignette`).
 - **Step 2:** unchanged exchange sheet (`ExchangeFormVignette`): "Let's stay in touch", Full name Sam Rivera, Email sam@studio.co, "Exchange contact".
 - **Step 3, relay:** inbox card (20px radius, 1px `--line` border, max width 380px). Head "Your inbox" + count pill "2 new". Rows separated by 1px `--line`, each with a 32px WM avatar, meta "We Met" / "now", unread dot + subject, a two-line clamped snippet, and tags:
-  - "Great meeting you, Sam" · "Hi Sam, great meeting you, and thanks for sharing your details with me." · solid tag with reply arrow "Hit Reply to send" · soft tag with card icon "Your card goes with it".
+  - "Great meeting you, Sam" · "Hi Sam, great meeting you, and thanks for sharing your details with me." · solid tag with reply arrow "Hit Reply to send" · soft tag with card icon "They can save your card".
   - "You met Sam Rivera" · sam@studio.co · Product designer · Studio Co · "Met at the design meetup" · outline tag "All the details, just for you".
 - **Step 3, direct:** the inbox shows "1 new" with only the "You met" row. Below it is the label "Sam's inbox" (no badge), then a card with the letter row: soft YN avatar, "Your Name via We Met", tags "Contact card" (soft) and "Sent to Sam".
 - **Desktop (≥860px):** the vignettes live in the existing sticky panel; mockups are captured with `?static=1`, which shows each step's vignette inline for review.
@@ -122,3 +124,6 @@ Reference source (MagicPath export, static, not built by CI): [reference/](refer
 - 2026-10-25, 1:50 AM ET: Diadem: "please make that fix. plus one more: the coming soon badge appears either relay or direct is toggled on. and the way it's positioned makes it look like the entire step 3 is coming soon. let's only show that badge when direct is toggled on". The direct view's step 3 title is now "Your copy lands in your inbox", its chip "The letter goes straight to them", and its body describes one owner email. The badge now renders in direct only, moved from beside the switch to the "Sam's inbox" label row. Revision `464982756636639232` (supersedes `464979824746848256`).
 - 2026-10-25, 1:55 AM ET: Diadem: "yes one of them replace with "directly to their inbox" and specialty the chip, put "coming soon" there instead". Direct view only: the direct-mode line now reads "Direct mode: the letter goes directly to their inbox, and you still get "You met" with all the details."; step 3's chip "The letter goes straight to them" is replaced by the Coming soon badge, in a fixed-height chip slot; the badge on the "Sam's inbox" label is removed, so there's one Coming soon on the page. Relay is unchanged. Final revision `464983961865691136` (supersedes `464982756636639232`).
 - 2026-10-25, 1:59 AM ET: Diadem: "the coming soon badge should be formatted the same way as the ship it's replacing (aka match the relay's chip)". The direct view's "Coming soon" is now a regular `.lp-chip`, identical to relay's "You choose when the letter goes" chip apart from the text (no icon, as relay has none); `.lp-soon-badge` is removed. Still one element behind `SHOW_DIRECT_COMING_SOON`, no layout shift. Final revision `464985214758825984` (supersedes `464983961865691136`).
+- 2026-10-25, 11:01 PM ET: Diadem approved the meta description and share image alt (verbatim "Yes to both"), replacing the old direct-mode description "you both get each other's details" and the em-dash alt; design/landing/index.html brought in line with this spec ([DIDI-823](https://linear.app/didi-build/issue/DIDI-823)).
+- 2026-10-25, 11:34 PM ET: Diadem: "something like: When you hit Reply, they can save your contact card". The step 3 relay Reply note now reads "To send it on, just hit Reply. When you hit Reply, they can save your contact card." (was "...your contact card goes with it, so they can save you in one tap.") ([DIDI-823](https://linear.app/didi-build/issue/DIDI-823)).
+- 2026-10-25, 11:41 PM ET: Diadem: "b" (change the inbox tag to 'They can save your card'). The step 3 inbox illustration soft tag now reads "They can save your card" (was "Your card goes with it") ([DIDI-823](https://linear.app/didi-build/issue/DIDI-823)).
