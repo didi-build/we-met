@@ -67,11 +67,11 @@ Cloudflare documents **Workers Issues** under `observability.issues.enabled` ([I
 
 Documented event names for debugging (no PII in listed fields): app `exchange_visitor_letter_enqueue_failed`, `visitor_email_mode_read_failed` (`leadId` when D1 mode read fails; mode resolves to `direct`, no token mint), `relay_contact_card_token_failed` (`leadId` when relay contact-card token mint fails); consumer `relay_letter_missing_contact_card_link` (`leadId`, optional `cardId` when an owner-relay visitor letter sends without a contact-card download link); other visitor, sink, and ledger events in the **Consumer logs** table under [Config and secret names](./architecture/environments.md#config-and-secret-names) in [environments](./architecture/environments.md).
 
-| Event                                    | Worker                           | Fields (no PII)    | Alert (proposed)                                                               |
-| ---------------------------------------- | -------------------------------- | ------------------ | ------------------------------------------------------------------------------ |
-| `visitor_email_mode_read_failed`         | `we-met`                         | `leadId`           | **P2** on any occurrence; email **hello@we-met.link** (wiring in later ticket) |
-| `relay_contact_card_token_failed`        | `we-met`                         | `leadId`           | **P2** on any occurrence; email **hello@we-met.link** (wiring in later ticket) |
-| `relay_letter_missing_contact_card_link` | `we-met-followup-email-consumer` | `leadId`, `cardId` | **P2** on any occurrence; email **hello@we-met.link** (wiring in later ticket) |
+| Event                                    | Worker                           | Fields (no PII)             | Alert (proposed)                                                               |
+| ---------------------------------------- | -------------------------------- | --------------------------- | ------------------------------------------------------------------------------ |
+| `visitor_email_mode_read_failed`         | `we-met`                         | `leadId`                    | **P2** on any occurrence; email **hello@we-met.link** (wiring in later ticket) |
+| `relay_contact_card_token_failed`        | `we-met`                         | `leadId`                    | **P2** on any occurrence; email **hello@we-met.link** (wiring in later ticket) |
+| `relay_letter_missing_contact_card_link` | `we-met-followup-email-consumer` | `leadId`, optional `cardId` | **P2** on any occurrence; email **hello@we-met.link** (wiring in later ticket) |
 
 #### Lead email kill switch and daily caps (D1 `app_settings`)
 
