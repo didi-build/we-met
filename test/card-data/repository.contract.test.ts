@@ -63,6 +63,19 @@ function defineContract(
       });
     });
 
+    it("loads live cards by stable id", async () => {
+      await withRepo(async (repo) => {
+        const slug = `contract-demo-id-${label}`;
+        const saved = await repo.upsertCard({
+          ...exampleCardInput(),
+          slug,
+        });
+        const byId = await repo.getById(saved.id);
+        expect(byId?.slug).toBe(slug);
+        expect(byId?.id).toBe(saved.id);
+      });
+    });
+
     it("lists and validates lead sinks", async () => {
       await withRepo(async (repo) => {
         registerTestSinkKind();

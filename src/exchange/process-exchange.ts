@@ -14,7 +14,9 @@ import type {
   LeadSinkQueueProducer,
 } from "@/exchange/queue/producer";
 import type { ExchangeRateLimiter } from "@/exchange/rate-limit";
+import { relayContactCardTokenForEnqueue } from "@/exchange/relay-contact-card-token";
 import { createDetailsToken } from "@/exchange/token";
+import type { VisitorEmailMode } from "@/app-settings/defaults";
 import type { TurnstileVerifier } from "@/exchange/turnstile";
 import { absoluteUrl } from "@/config/we-met";
 import { leadFirstNameFromFullName } from "@/email/email-template-vars";
@@ -46,6 +48,7 @@ export type ProcessExchangeDeps = {
     kinds: readonly DailySendKind[],
   ) => Promise<void>;
   logExchangeVisitorLetterEnqueueFailed(leadId: string): void;
+  resolveVisitorEmailMode: () => Promise<VisitorEmailMode>;
 };
 
 export type ProcessExchangeResult =
@@ -131,12 +134,31 @@ export async function processExchange(
     createdAt,
   });
 
+  let visitorEmailMode: VisitorEmailMode = "direct";
+  try {
+    visitorEmailMode = await deps.resolveVisitorEmailMode();
+  } catch {
+    visitorEmailMode = "direct";
+  }
+  let relayContactCardToken: string | undefined;
+  try {
+    relayContactCardToken = relayContactCardTokenForEnqueue(
+      deps.tokenSecret,
+      visitorEmailMode,
+      lead.leadId,
+      card.id,
+    );
+  } catch {
+    relayContactCardToken = undefined;
+  }
+
   try {
     await deps.followupQueue.enqueueVisitorLetter(
       {
         type: "visitor_letter_due",
         lead,
         card: cardSnapshot,
+        ...(relayContactCardToken ? { relayContactCardToken } : {}),
       },
       { delaySeconds: OWNER_EMAIL_FALLBACK_DELAY_SECONDS },
     );

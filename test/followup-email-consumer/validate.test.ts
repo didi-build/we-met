@@ -96,6 +96,32 @@ describe("parseVisitorFollowupMessage (unit)", () => {
     });
     expect(parsed).toBeNull();
   });
+
+  const letterBody = {
+    type: "visitor_followup",
+    lead: { ...baseLead, email: "visitor@example.com" },
+    card,
+  };
+
+  it("drops invalid relayContactCardToken values but still accepts the message", () => {
+    expect(
+      parseVisitorFollowupMessage({ ...letterBody, relayContactCardToken: 42 }),
+    ).toEqual({ type: "visitor_followup", lead: letterBody.lead, card });
+    expect(
+      parseVisitorFollowupMessage({ ...letterBody, relayContactCardToken: "   " }),
+    ).toEqual({ type: "visitor_followup", lead: letterBody.lead, card });
+    expect(
+      parseVisitorFollowupMessage({
+        ...letterBody,
+        relayContactCardToken: `t${"o".repeat(4096)}`,
+      }),
+    ).toEqual({ type: "visitor_followup", lead: letterBody.lead, card });
+    const kept = parseVisitorFollowupMessage({
+      ...letterBody,
+      relayContactCardToken: "valid-token",
+    });
+    expect(kept?.relayContactCardToken).toBe("valid-token");
+  });
 });
 
 const sinkCommon = {

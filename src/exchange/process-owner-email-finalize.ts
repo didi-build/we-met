@@ -15,9 +15,13 @@ import type {
   LeadSinkQueueProducer,
 } from "@/exchange/queue/producer";
 import { absoluteUrl } from "@/config/we-met";
+import type { VisitorEmailMode } from "@/app-settings/defaults";
+import { relayContactCardTokenForEnqueue } from "@/exchange/relay-contact-card-token";
 import type { VisitorLead, VisitorLeadDetails } from "@/exchange/types";
 
 export type ProcessOwnerEmailFinalizeDeps = {
+  tokenSecret: string;
+  resolveVisitorEmailMode: () => Promise<VisitorEmailMode>;
   followupQueue: FollowupEmailQueueProducer;
   leadSinkQueue: LeadSinkQueueProducer;
   deliveryLedger: LeadDeliveryLedger;
@@ -47,6 +51,25 @@ export async function processOwnerEmailFinalize(
   sinks: LeadSinkRecord[],
   deps: ProcessOwnerEmailFinalizeDeps,
 ): Promise<ProcessOwnerEmailFinalizeResult> {
+  let visitorEmailMode: VisitorEmailMode = "direct";
+  try {
+    visitorEmailMode = await deps.resolveVisitorEmailMode();
+  } catch {
+    visitorEmailMode = "direct";
+  }
+
+  let relayContactCardToken: string | undefined;
+  try {
+    relayContactCardToken = relayContactCardTokenForEnqueue(
+      deps.tokenSecret,
+      visitorEmailMode,
+      lead.leadId,
+      card.id,
+    );
+  } catch {
+    relayContactCardToken = undefined;
+  }
+
   const triggeredAt = deps.now().toISOString();
   await deps.exchangeOwnerEmail.ensurePending({
     leadId: lead.leadId,
@@ -67,6 +90,7 @@ export async function processOwnerEmailFinalize(
       type: "visitor_followup",
       lead,
       card: cardSnapshot,
+      ...(relayContactCardToken ? { relayContactCardToken } : {}),
     });
   } catch {
     deps.logExchangeVisitorLetterEnqueueFailed(lead.leadId);

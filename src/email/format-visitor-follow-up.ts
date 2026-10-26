@@ -24,6 +24,8 @@ export type BuildVisitorFollowUpEmailInput = {
   baseUrl: string;
   /** When set, non-prod test delivery line and subject prefix. */
   nonProdVisitorEmailLabel?: string;
+  /** Owner relay: token-gated vCard download link in the letter body. */
+  contactCardDownloadUrl?: string;
 };
 
 export function formatVisitorFollowUpSubject(
@@ -61,6 +63,7 @@ function visitorTemplateData(
     card_url: cardUrl,
     card_url_display: cardUrlDisplay(cardUrl),
     test_sink: input.nonProdVisitorEmailLabel,
+    contact_card_download_url: input.contactCardDownloadUrl,
   };
 }
 

@@ -13,6 +13,7 @@ export type LeadSinkUpsertInput = {
 
 export interface CardRepository {
   getBySlug(slug: string): Promise<CardRecord | null>;
+  getById(cardId: string): Promise<CardRecord | null>;
   getByHostname(hostname: string): Promise<CardRecord | null>;
   upsertCard(input: CardLoadInput): Promise<CardRecord>;
   upsertHostname(mapping: HostnameMapping): Promise<void>;

@@ -9,12 +9,16 @@ export type VisitorFollowupQueueMessage = {
   type: "visitor_followup";
   lead: VisitorLead;
   card: CardEmailSnapshot;
+  /** Owner relay: non-expiring signed download token for the visitor letter link. */
+  relayContactCardToken?: string;
 };
 
 export type VisitorLetterDueMessage = {
   type: "visitor_letter_due";
   lead: VisitorLead;
   card: CardEmailSnapshot;
+  /** Owner relay: non-expiring signed download token for the visitor letter link. */
+  relayContactCardToken?: string;
 };
 
 export type LeadSinkRecordLeadMessage = {

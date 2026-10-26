@@ -257,6 +257,7 @@ export async function deliverAllExchangeEmails(ctx: RelayE2EContext): Promise<vo
 function finalizeDeps(ctx: RelayE2EContext) {
   return {
     tokenSecret: ctx.exchangeDeps.tokenSecret,
+    resolveVisitorEmailMode: ctx.exchangeDeps.resolveVisitorEmailMode,
     environment: ctx.exchangeDeps.environment,
     followupQueue: ctx.exchangeDeps.followupQueue,
     leadSinkQueue: ctx.exchangeDeps.leadSinkQueue,
@@ -324,6 +325,8 @@ export async function setupRelayExchange(
     incrementDailySendCounts: (cardId, kinds) =>
       incrementDailySendCounts(db, RELAY_E2E_DAY, cardId, kinds),
     logExchangeVisitorLetterEnqueueFailed: vi.fn(),
+    resolveVisitorEmailMode: async (): Promise<VisitorEmailMode> =>
+      visitorEmailMode ?? "owner_relay",
   };
 
   const exchange = await processExchange(
@@ -443,6 +446,9 @@ export function assertVisitorLetterToOwner(email: OutboundEmail): void {
   expect(email.replyTo).toBe("visitor@example.com");
   expect(email.subject).toBe("Great meeting you, Sam");
   expect(email.attachments?.[0]?.filename).toMatch(/\.vcf$/);
+  expect(email.textPlain).toContain("Save my contact card:");
+  expect(email.textHtml).toContain("Save my contact card");
+  expect(email.textPlain).toMatch(/\/api\/exchange\/[^/\s]+\/contact-card\?token=/);
   expect(email.textPlain).not.toContain("visitor@example.com");
   expect(email.textPlain).not.toContain("Engineer");
   expect(email.textPlain).not.toContain("Acme");
