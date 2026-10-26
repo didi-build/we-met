@@ -76,6 +76,26 @@ function defineContract(
       });
     });
 
+    it("getById returns null for non-live cards and inactive accounts", async () => {
+      if (label !== "memory") {
+        return;
+      }
+      await withRepo(async (repo) => {
+        const mem = repo as MemoryCardRepository;
+        const slug = `contract-getbyid-memory`;
+        const saved = await mem.upsertCard({
+          ...exampleCardInput(),
+          slug,
+        });
+        expect(await mem.getById(saved.id)).not.toBeNull();
+        mem.setCardStatusForTest(saved.id, "retired");
+        expect(await mem.getById(saved.id)).toBeNull();
+        mem.setCardStatusForTest(saved.id, "live");
+        mem.setAccountStatus(saved.accountId, "suspended");
+        expect(await mem.getById(saved.id)).toBeNull();
+      });
+    });
+
     it("lists and validates lead sinks", async () => {
       await withRepo(async (repo) => {
         registerTestSinkKind();

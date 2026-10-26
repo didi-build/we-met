@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import * as relayContactCardToken from "@/exchange/relay-contact-card-token";
 import { MemoryCardRepository } from "@/card-data/memory-repository";
 import { MemoryExchangeOwnerEmailStore } from "@/exchange-owner-email/memory-store";
 import { MemoryLeadDeliveryLedger } from "@/lead-delivery-ledger/memory-repository";
@@ -300,6 +301,57 @@ describe("processExchange (unit)", () => {
       relayContactCardToken?: string;
     };
     expect(message.relayContactCardToken).toBeUndefined();
+  });
+
+  it("still enqueues relay token when visitor email mode read fails on exchange", async () => {
+    const repo = new MemoryCardRepository();
+    const card = await repo.upsertCard(exampleCardInput());
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const deps = createDeps({
+      resolveVisitorEmailMode: async () => {
+        throw new Error("d1 unavailable");
+      },
+    });
+    const result = await processExchange(baseInput(), card, [], deps);
+    expect(result.status).toBe("success");
+    const message = deps.followupMessages[0] as {
+      relayContactCardToken?: string;
+    };
+    expect(message.relayContactCardToken).toBeTruthy();
+    const modeLogs = errorSpy.mock.calls.filter(
+      (call) => call[0] === "visitor_email_mode_read_failed",
+    );
+    expect(modeLogs).toHaveLength(1);
+    expect(modeLogs[0]?.[1]).toEqual({ leadId: "lead-1" });
+    errorSpy.mockRestore();
+  });
+
+  it("logs relay_contact_card_token_failed when mint throws on exchange", async () => {
+    const repo = new MemoryCardRepository();
+    const card = await repo.upsertCard(exampleCardInput());
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(
+      relayContactCardToken,
+      "relayContactCardTokenForEnqueue",
+    ).mockImplementation(() => {
+      throw new Error("mint failed");
+    });
+    const deps = createDeps({
+      resolveVisitorEmailMode: async () => "owner_relay",
+    });
+    const result = await processExchange(baseInput(), card, [], deps);
+    expect(result.status).toBe("success");
+    const message = deps.followupMessages[0] as {
+      relayContactCardToken?: string;
+    };
+    expect(message.relayContactCardToken).toBeUndefined();
+    const mintLogs = errorSpy.mock.calls.filter(
+      (call) => call[0] === "relay_contact_card_token_failed",
+    );
+    expect(mintLogs).toHaveLength(1);
+    expect(mintLogs[0]?.[1]).toEqual({ leadId: "lead-1" });
+    errorSpy.mockRestore();
+    vi.restoreAllMocks();
   });
 
   it("in owner_relay enqueues delayed visitor letter, reserves two cap slots, and counts owner and visitor", async () => {

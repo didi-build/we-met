@@ -20,6 +20,7 @@ import {
   leadEmailConsumerEnabled,
 } from "../helpers/lead-email-deps";
 import { MemoryExchangeOwnerEmailStore } from "@/exchange-owner-email/memory-store";
+import { resolveRelayContactCardTokenForEnqueue } from "@/exchange/resolve-relay-contact-card-token-for-enqueue";
 
 const card: CardEmailSnapshot = {
   slug: "demo",
@@ -469,6 +470,28 @@ describe("processFollowupQueueBatch (unit)", () => {
     await processFollowupQueueBatch({ messages: [message] }, deps);
     const sent = vi.mocked(deps.sendEmail).mock.calls[0][0];
     expect(sent.textPlain).toMatch(/\/api\/exchange\/[^/\s]+\/contact-card\?token=/);
+    expect(sent.textHtml).toContain("Save my contact card");
+  });
+
+  it("includes Save my contact card when token was minted after visitor email mode read failure", async () => {
+    const token = await resolveRelayContactCardTokenForEnqueue(
+      "test-secret",
+      async () => {
+        throw new Error("d1 unavailable");
+      },
+      "lead-1",
+      "card-1",
+    );
+    expect(token).toBeTruthy();
+    const message = createMessage(visitorBody({ relayContactCardToken: token }));
+    const deps = createDeps({
+      readLeadEmailControls: vi.fn(async () => ({
+        ...defaultLeadEmailControls,
+        visitorEmailMode: "owner_relay" as const,
+      })),
+    });
+    await processFollowupQueueBatch({ messages: [message] }, deps);
+    const sent = vi.mocked(deps.sendEmail).mock.calls[0][0];
     expect(sent.textHtml).toContain("Save my contact card");
   });
 

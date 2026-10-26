@@ -120,6 +120,8 @@ The consumer registers on the queue in **its own** Wrangler config; it is not an
 | Event                                    | Fields                                                                             |
 | ---------------------------------------- | ---------------------------------------------------------------------------------- |
 | `exchange_visitor_letter_enqueue_failed` | `leadId` (when visitor letter queue enqueue fails on exchange or finalize; no PII) |
+| `visitor_email_mode_read_failed`         | `leadId` (when `visitor_email_mode` read fails; mint falls back to `owner_relay`)  |
+| `relay_contact_card_token_failed`        | `leadId` (when relay contact-card token mint fails in `owner_relay`)               |
 | `exchange_contact_card_download`         | `leadId` (successful GET `/api/exchange/<leadId>/contact-card`; no PII)            |
 
 **Consumer logs (debugging live mail):**
