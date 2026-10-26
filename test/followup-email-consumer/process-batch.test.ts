@@ -10,8 +10,10 @@ import { followupRetryWindowSecondsThroughAttempt } from "../../scripts/lib/queu
 import { createEmailLeadSinkHandler } from "@/followup-email-consumer/lead-sink/email-handler";
 import { createLeadSinkHandlerRegistry } from "@/followup-email-consumer/lead-sink/registry";
 import {
+  createFollowupConsumerDepsFromEnv,
   processFollowupQueueBatch,
   type FollowupConsumerDeps,
+  type FollowupConsumerEnv,
   type FollowupQueueMessage,
 } from "@/followup-email-consumer/process-batch";
 import { MemoryConsumerLeadDeliveryLedger } from "../followup-email-consumer/memory-consumer-ledger";
@@ -1418,6 +1420,17 @@ describe("processFollowupQueueBatch (unit)", () => {
     expect(ledger.getRowState("lead-1", "sink-1", "record")?.errorCode).toBe(
       "cloudflare_send_validation_failed",
     );
+  });
+
+  it("trims WE_MET_ENV before passing it to mail handlers", () => {
+    const env = {
+      WE_MET_ENV: " preview ",
+      WE_MET_BASE_URL: "https://we-met.link",
+      WE_MET_ASSETS: {} as FollowupConsumerEnv["WE_MET_ASSETS"],
+      WE_MET_DB: {} as FollowupConsumerEnv["WE_MET_DB"],
+    };
+    const deps = createFollowupConsumerDepsFromEnv(env);
+    expect(deps.weMetEnv).toBe("preview");
   });
 
   it("acks visitor follow-up on permanent Cloudflare recipient suppression", async () => {

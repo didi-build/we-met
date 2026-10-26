@@ -8,6 +8,7 @@ import {
   findBootstrapTokenViolations,
   findConsumerProductionCredentialViolations,
   findMigrateNonprodCredentialViolations,
+  findStagingCredentialViolations,
 } from "../scripts/check-secret-usage.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
@@ -39,6 +40,19 @@ describe("check-secret-usage (unit)", () => {
 
     writeFileSync(join(dir, "evil.yml"), "secrets.BOOTSTRAP_TOKEN\n");
     expect(findBootstrapTokenViolations(dir)).toEqual(["evil.yml"]);
+  });
+
+  it("allows staging token only in deploy-staging.yml", () => {
+    const dir = mkdtempSync(join(tmpdir(), "secret-usage-staging-"));
+    writeFileSync(
+      join(dir, "deploy-staging.yml"),
+      "secrets.CLOUDFLARE_API_TOKEN_STAGING\n",
+    );
+    writeFileSync(join(dir, "ci.yml"), "name: CI\n");
+    expect(findStagingCredentialViolations(dir)).toEqual([]);
+
+    writeFileSync(join(dir, "leak.yml"), "CLOUDFLARE_API_TOKEN_STAGING\n");
+    expect(findStagingCredentialViolations(dir)).toEqual(["leak.yml"]);
   });
 
   it("allows consumer production token only in deploy-production.yml", () => {

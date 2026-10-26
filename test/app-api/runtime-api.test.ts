@@ -22,6 +22,12 @@ describe("createRuntimeAppApi (unit)", () => {
     vi.unstubAllEnvs();
   });
 
+  it("defaults to production client env when NEXT_PUBLIC_WE_MET_ENV is unset", () => {
+    vi.unstubAllEnvs();
+    delete process.env.NEXT_PUBLIC_WE_MET_ENV;
+    expect(createRuntimeAppApi()).toBe(apiMocks.http);
+  });
+
   it("uses the HTTP API on production", () => {
     vi.stubEnv("NEXT_PUBLIC_WE_MET_ENV", "production");
     expect(createRuntimeAppApi()).toBe(apiMocks.http);

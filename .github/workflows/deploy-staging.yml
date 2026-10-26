@@ -1,0 +1,169 @@
+name: Deploy staging
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: https://we-met.didi.build
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Deploy-time guards (staging, committed config)
+        run: node scripts/check-deploy-guards.mjs --target staging --config wrangler.staging.jsonc
+      - name: Prepare Wrangler config (staging D1 ID)
+        env:
+          WE_MET_D1_DATABASE_ID_NONPROD: ${{ secrets.WE_MET_D1_DATABASE_ID_NONPROD }}
+        run: |
+          set -euo pipefail
+          node scripts/prepare-wrangler-config.mjs \
+            --target staging \
+            --output wrangler.staging.ci.jsonc
+      - name: Deploy-time guards (staging)
+        run: node scripts/check-deploy-guards.mjs --target staging --config wrangler.staging.ci.jsonc
+      - name: Require staging Worker has no preview-login secret (names only)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_STAGING }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          SECRET_LIST_STDOUT=$(mktemp)
+          SECRET_LIST_STDERR=$(mktemp)
+          if ! npx wrangler secret list --name we-met-staging \
+            >"$SECRET_LIST_STDOUT" 2>"$SECRET_LIST_STDERR"; then
+            echo "::error::wrangler secret list failed for Worker we-met-staging using CLOUDFLARE_API_TOKEN_STAGING. Staging deploy was stopped. See docs/decisions/0017-cloudflare-api-credentials.md for token scoping."
+            grep -oE '\[code: [0-9]+\]' "$SECRET_LIST_STDERR" | sort -u || true
+            exit 1
+          fi
+          export SECRET_LIST_STDOUT
+          node --input-type=module -e "
+            import { readFileSync } from 'node:fs';
+            const forbidden = 'WE_MET_PREVIEW_LOGIN_SECRET';
+            const raw = readFileSync(process.env.SECRET_LIST_STDOUT, 'utf8');
+            const firstBracket = raw.indexOf('[');
+            const lastBracket = raw.lastIndexOf(']');
+            if (firstBracket === -1 || lastBracket === -1 || lastBracket < firstBracket) {
+              console.error('::error::Could not locate a JSON array in wrangler secret list stdout for we-met-staging. Staging deploy was stopped.');
+              process.exit(1);
+            }
+            const jsonText = raw.slice(firstBracket, lastBracket + 1);
+            let parsed;
+            try {
+              parsed = JSON.parse(jsonText);
+            } catch {
+              console.error('::error::wrangler secret list stdout was not valid JSON for we-met-staging. Staging deploy was stopped.');
+              process.exit(1);
+            }
+            if (!Array.isArray(parsed)) {
+              console.error('::error::Unexpected wrangler secret list shape for we-met-staging; expected a JSON array. Staging deploy was stopped.');
+              process.exit(1);
+            }
+            const names = new Set(parsed.map((entry) => entry?.name).filter(Boolean));
+            if (names.has(forbidden)) {
+              console.error('::error::Worker we-met-staging must not have secret ' + forbidden + '. Staging deploy was stopped.');
+              process.exit(1);
+            }
+            console.log('Staging Worker has no forbidden preview-login secret names.');
+          "
+      - name: Require non-prod Turnstile site key
+        env:
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.WE_MET_TURNSTILE_SITE_KEY_NONPROD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${NEXT_PUBLIC_TURNSTILE_SITE_KEY}" ]; then
+            echo "::error::NEXT_PUBLIC_TURNSTILE_SITE_KEY (WE_MET_TURNSTILE_SITE_KEY_NONPROD) is empty"
+            exit 1
+          fi
+      - name: Deploy-time guards (staging build env)
+        env:
+          WE_MET_ENV: staging
+          WE_MET_BASE_URL: https://we-met.didi.build
+          WE_MET_PREVIEW_HOST_SUFFIX: ""
+        run: node scripts/check-deploy-guards.mjs --target staging-build --config wrangler.staging.ci.jsonc
+      - name: Build OpenNext (staging)
+        env:
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.WE_MET_TURNSTILE_SITE_KEY_NONPROD }}
+          WE_MET_ENV: staging
+          WE_MET_BASE_URL: https://we-met.didi.build
+          WE_MET_COMMIT_SHA: ${{ github.sha }}
+        run: npm run build
+      - name: Apply staging D1 migrations
+        id: migrations
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_STAGING }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npx wrangler d1 migrations apply WE_MET_DB --remote \
+            --config wrangler.staging.ci.jsonc
+          EXEC_JSON=$(mktemp)
+          npx wrangler d1 execute WE_MET_DB --remote \
+            --config wrangler.staging.ci.jsonc \
+            --command "SELECT name FROM d1_migrations ORDER BY id" \
+            --json >"$EXEC_JSON"
+          MIGRATION_REPORT=$(node scripts/staging-d1-migration-drift.mjs --wrangler-json "$EXEC_JSON")
+          {
+            echo "migration_report<<MIGRATION_EOF"
+            echo "$MIGRATION_REPORT"
+            echo "MIGRATION_EOF"
+          } >> "$GITHUB_OUTPUT"
+      - name: Deploy Worker to staging
+        id: deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_STAGING }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          DEPLOY_LOG=$(mktemp)
+          if ! npx opennextjs-cloudflare deploy --config wrangler.staging.ci.jsonc \
+            2>&1 | tee "$DEPLOY_LOG"; then
+            echo "::error::opennextjs-cloudflare deploy failed for we-met-staging"
+            exit 1
+          fi
+          VERSION_ID=$(grep -E 'Current Version ID:' "$DEPLOY_LOG" | sed -n 's/.*Current Version ID: //p' | tail -1 || true)
+          if [ -z "$VERSION_ID" ]; then
+            echo "::warning::Could not parse Current Version ID from deploy output; check the deploy step log."
+            VERSION_ID="unknown"
+          fi
+          echo "version_id=$VERSION_ID" >> "$GITHUB_OUTPUT"
+      - name: Smoke check Google OAuth client ids differ
+        run: node scripts/check-google-oauth-client-ids.mjs
+      - name: Staging deploy summary
+        env:
+          VERSION_ID: ${{ steps.deploy.outputs.version_id }}
+          MIGRATION_REPORT: ${{ steps.migrations.outputs.migration_report }}
+        run: |
+          {
+            echo "## Staging deploy"
+            echo ""
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Commit | \`${GITHUB_SHA}\` |"
+            echo "| Worker | \`we-met-staging\` |"
+            echo "| URL | https://we-met.didi.build |"
+            echo "| Version ID | \`${VERSION_ID}\` |"
+            echo ""
+            echo "### D1 migration report"
+            echo ""
+            echo "$MIGRATION_REPORT"
+          } >> "$GITHUB_STEP_SUMMARY"

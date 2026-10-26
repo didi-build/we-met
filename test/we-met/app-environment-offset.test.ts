@@ -27,6 +27,16 @@ describe("app environment banner offset (unit)", () => {
     expect(weMetEnvironmentBodyClassName()).toBe(ENVIRONMENT_BANNER_BODY_CLASS);
   });
 
+  it("uses 2.25rem for the fixed banner height constant", () => {
+    expect(ENVIRONMENT_BANNER_OFFSET_CSS).toBe("2.25rem");
+    const bannerSource = readFileSync(
+      "src/components/we-met/WeMetEnvironmentBanner.tsx",
+      "utf8",
+    );
+    expect(bannerSource).toContain("ENVIRONMENT_BANNER_OFFSET_CSS");
+    expect(bannerSource).not.toContain("h-9");
+  });
+
   it("offsets sticky app chrome via a CSS variable with a zero fallback", () => {
     const appCss = readFileSync("src/app/app-editor.css", "utf8");
     expect(appCss).toContain("top: var(--we-met-environment-banner-offset, 0);");

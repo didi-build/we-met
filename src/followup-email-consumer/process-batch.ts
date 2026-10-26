@@ -169,11 +169,15 @@ export function createFollowupConsumerDepsFromEnv(
     console.error("lead_sink_ledger_mark_failed", { leadId, sinkId, errorCode });
   };
   const now = () => new Date();
-  const { baseUrl } = readWeMetHostConfig(env);
+  const weMetEnv = env.WE_MET_ENV.trim();
+  const { baseUrl } = readWeMetHostConfig({
+    ...env,
+    WE_MET_ENV: weMetEnv,
+  });
 
   return {
     readLeadEmailControls: () => readLeadEmailControls(env.WE_MET_DB),
-    weMetEnv: env.WE_MET_ENV,
+    weMetEnv,
     baseUrl,
     testMailTo: env.WE_MET_TEST_MAIL_TO,
     sendEmail,
@@ -265,7 +269,7 @@ export function createFollowupConsumerDepsFromEnv(
     now,
     sinkHandlers: createLeadSinkHandlerRegistry({
       email: createEmailLeadSinkHandler({
-        weMetEnv: env.WE_MET_ENV,
+        weMetEnv,
         testMailTo: env.WE_MET_TEST_MAIL_TO,
         outboundFrom,
         fromDisplayName: env.WE_MET_FROM_DISPLAY_NAME,

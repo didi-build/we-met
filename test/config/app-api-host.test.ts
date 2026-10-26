@@ -79,6 +79,25 @@ describe("app API host helpers (unit)", () => {
     ).toBe("https://we-met.didi.build");
   });
 
+  it("resolveAppOrigin throws for an unknown env when using a hand-built config", () => {
+    expect(() =>
+      readWeMetHostConfig({
+        WE_MET_BASE_URL: "https://we-met.link",
+        WE_MET_ENV: "not-a-real-env",
+      }),
+    ).toThrow(/Invalid WE_MET_ENV/);
+  });
+
+  it("rejects staging configs that still carry a preview host suffix", () => {
+    expect(() =>
+      readWeMetHostConfig({
+        WE_MET_BASE_URL: "https://we-met.didi.build",
+        WE_MET_ENV: "staging",
+        WE_MET_PREVIEW_HOST_SUFFIX: "-we-met.example.workers.dev",
+      }),
+    ).toThrow(/WE_MET_PREVIEW_HOST_SUFFIX/);
+  });
+
   it("production app host and OAuth origin are unchanged", () => {
     expect(isAppApiServingHost("we-met.link", production)).toBe(false);
     expect(isAppApiServingHost("app.we-met.link", production)).toBe(true);
