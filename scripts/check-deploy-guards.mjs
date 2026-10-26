@@ -608,15 +608,21 @@ function checkStagingPublicUrlSettings(config) {
 }
 
 function checkStagingRoutes(config) {
-  const patterns = routePatterns(config);
+  const routes = config.routes ?? [];
   const allowed = STAGING_RESOURCE_MARKERS.hostname;
-  if (patterns.length !== 1 || patterns[0] !== allowed) {
+  if (routes.length !== 1) {
     fail(`staging routes must be only custom domain ${allowed}`);
   }
-  for (const pattern of patterns) {
-    if (pattern === "we-met.link" || pattern === PRODUCTION_APP_HOST) {
-      fail(`staging routes must not include ${pattern}`);
-    }
+  const row = routes[0];
+  const pattern = row?.pattern;
+  if (typeof pattern !== "string" || pattern !== allowed) {
+    fail(`staging routes must be only custom domain ${allowed}`);
+  }
+  if (row.custom_domain !== true) {
+    fail("staging route must set custom_domain true");
+  }
+  if (pattern === "we-met.link" || pattern === PRODUCTION_APP_HOST) {
+    fail(`staging routes must not include ${pattern}`);
   }
 }
 
@@ -663,6 +669,25 @@ function checkStagingBlock(config) {
   const previewHostSuffix = config.vars?.WE_MET_PREVIEW_HOST_SUFFIX ?? "";
   if (previewHostSuffix.trim() !== "") {
     fail('staging vars.WE_MET_PREVIEW_HOST_SUFFIX must be ""');
+  }
+  if (config.vars?.WE_MET_BASE_URL !== STAGING_RESOURCE_MARKERS.baseUrl) {
+    fail(`staging vars.WE_MET_BASE_URL must be "${STAGING_RESOURCE_MARKERS.baseUrl}"`);
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(
+      config.vars ?? {},
+      "WE_MET_PREVIEW_LOGIN_SECRET",
+    )
+  ) {
+    fail("staging vars must not include WE_MET_PREVIEW_LOGIN_SECRET");
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(
+      config.vars ?? {},
+      "WE_MET_PREVIEW_LOGIN_EMAIL",
+    )
+  ) {
+    fail("staging vars must not include WE_MET_PREVIEW_LOGIN_EMAIL");
   }
   if (previewLoginReachableForWorkerEnv(stagingEnv, true)) {
     fail("preview-login route must not be reachable when vars.WE_MET_ENV is staging");

@@ -508,6 +508,65 @@ describe("check-deploy-guards (unit)", () => {
       },
     },
     {
+      label: "staging vars.WE_MET_BASE_URL is wrong",
+      message: "https://we-met.didi.build",
+      mutate: (config: Record<string, unknown>) => {
+        const vars = config.vars as Record<string, string>;
+        vars.WE_MET_BASE_URL = "https://we-met.link";
+      },
+    },
+    {
+      label: "staging route custom_domain is false",
+      message: "custom_domain true",
+      mutate: (config: Record<string, unknown>) => {
+        config.routes = [{ pattern: "we-met.didi.build", custom_domain: false }];
+      },
+    },
+    {
+      label: "staging route custom_domain is missing",
+      message: "custom_domain true",
+      mutate: (config: Record<string, unknown>) => {
+        config.routes = [{ pattern: "we-met.didi.build" }];
+      },
+    },
+    {
+      label: "staging vars include WE_MET_PREVIEW_LOGIN_SECRET",
+      message: "WE_MET_PREVIEW_LOGIN_SECRET",
+      mutate: (config: Record<string, unknown>) => {
+        const vars = config.vars as Record<string, string>;
+        vars.WE_MET_PREVIEW_LOGIN_SECRET = "must-not-be-in-staging-vars";
+      },
+    },
+    {
+      label: "staging vars include WE_MET_PREVIEW_LOGIN_EMAIL",
+      message: "WE_MET_PREVIEW_LOGIN_EMAIL",
+      mutate: (config: Record<string, unknown>) => {
+        const vars = config.vars as Record<string, string>;
+        vars.WE_MET_PREVIEW_LOGIN_EMAIL = "preview@example.com";
+      },
+    },
+    {
+      label: "staging config includes a previews block",
+      message: "previews block",
+      mutate: (config: Record<string, unknown>) => {
+        config.previews = { vars: { WE_MET_ENV: "preview" } };
+      },
+    },
+    {
+      label: "staging workers_dev is true",
+      message: "workers_dev must be false",
+      mutate: (config: Record<string, unknown>) => {
+        config.workers_dev = true;
+      },
+    },
+    {
+      label: "staging preview_urls is true",
+      message: "preview_urls must be false",
+      mutate: (config: Record<string, unknown>) => {
+        config.preview_urls = true;
+      },
+    },
+    {
       label: "staging binds send_email",
       message: "send_email",
       mutate: (config: Record<string, unknown>) => {

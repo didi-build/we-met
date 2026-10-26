@@ -83,7 +83,7 @@ Attach custom domain **`we-met.didi.build`** only after Diadem approves that DNS
 
 **Build:** export **`WE_MET_ENV=staging`** and **`NEXT_PUBLIC_TURNSTILE_SITE_KEY`** from **`WE_MET_TURNSTILE_SITE_KEY_NONPROD`** before `npm run build` (see `next.config.ts`). Staging CI uses the same variable name on the GitHub **`staging`** environment.
 
-**Manual bootstrap (before `deploy-staging.yml` exists):** from `main`, with `npx wrangler login`, prepare the staging Wrangler config when [DIDI-875](https://linear.app/didi-build/issue/DIDI-875) lands, run deploy-time guards for the staging target, then deploy Worker **`we-met-staging`** and attach the custom domain. Do **not** use production `opennextjs-cloudflare deploy` against **`we-met`**.
+**Manual bootstrap (before `deploy-staging.yml` exists):** from `main`, with `npx wrangler login`, prepare the staging Wrangler config per [DIDI-879](https://linear.app/didi-build/issue/DIDI-879) (`wrangler.staging.jsonc`), run deploy-time guards for the staging target, then deploy Worker **`we-met-staging`** and attach the custom domain. Do **not** use production `opennextjs-cloudflare deploy` against **`we-met`**.
 
 **Secrets on `we-met-staging` ([DIDI-876](https://linear.app/didi-build/issue/DIDI-876)):** use a **separate** Google OAuth client (non-prod) with the redirect URIs below. **Never** copy production `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `WE_MET_TOKEN_SECRET`, or `TURNSTILE_SECRET_KEY` onto staging.
 

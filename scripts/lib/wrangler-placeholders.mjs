@@ -37,6 +37,7 @@ export const PRODUCTION_RESOURCE_MARKERS = {
 export const STAGING_RESOURCE_MARKERS = {
   workerName: "we-met-staging",
   hostname: "we-met.didi.build",
+  baseUrl: "https://we-met.didi.build",
 };
 
 export const NONPROD_RESOURCE_MARKERS = {
