@@ -472,6 +472,87 @@ describe("processFollowupQueueBatch (unit)", () => {
     expect(sent.textHtml).toContain("Save my contact card");
   });
 
+  it("logs relay_letter_missing_contact_card_link in owner_relay without a token and still sends", async () => {
+    const message = createMessage(visitorBody());
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const deps = createDeps({
+      readLeadEmailControls: vi.fn(async () => ({
+        ...defaultLeadEmailControls,
+        visitorEmailMode: "owner_relay" as const,
+      })),
+    });
+    await processFollowupQueueBatch({ messages: [message] }, deps);
+    const relayLogs = errorSpy.mock.calls.filter(
+      (call) => call[0] === "relay_letter_missing_contact_card_link",
+    );
+    expect(relayLogs).toHaveLength(1);
+    expect(relayLogs[0]?.[1]).toEqual({ leadId: "lead-1", cardId: "card-1" });
+    const serialized = JSON.stringify(errorSpy.mock.calls);
+    expect(serialized).not.toContain("relay-token");
+    expect(serialized).not.toContain("visitor@example.com");
+    expect(vi.mocked(deps.sendEmail)).toHaveBeenCalledOnce();
+    errorSpy.mockRestore();
+  });
+
+  it("still sends when getSendState rejects during missing-link logging", async () => {
+    const message = createMessage(visitorBody());
+    const store = defaultVisitorLetterExchangeStore();
+    const getSendState = vi
+      .spyOn(store, "getSendState")
+      .mockRejectedValue(new Error("d1 unavailable"));
+    const deps = createDeps({
+      exchangeOwnerEmail: store,
+      readLeadEmailControls: vi.fn(async () => ({
+        ...defaultLeadEmailControls,
+        visitorEmailMode: "owner_relay" as const,
+      })),
+    });
+    await processFollowupQueueBatch({ messages: [message] }, deps);
+    expect(getSendState).toHaveBeenCalled();
+    expect(vi.mocked(deps.sendEmail)).toHaveBeenCalledOnce();
+    getSendState.mockRestore();
+  });
+
+  it("logs relay_letter_missing_contact_card_link with leadId only when sendState is null", async () => {
+    const message = createMessage(visitorBody());
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const store = defaultVisitorLetterExchangeStore();
+    vi.spyOn(store, "getSendState").mockResolvedValue(null);
+    const deps = createDeps({
+      exchangeOwnerEmail: store,
+      readLeadEmailControls: vi.fn(async () => ({
+        ...defaultLeadEmailControls,
+        visitorEmailMode: "owner_relay" as const,
+      })),
+    });
+    await processFollowupQueueBatch({ messages: [message] }, deps);
+    const relayLogs = errorSpy.mock.calls.filter(
+      (call) => call[0] === "relay_letter_missing_contact_card_link",
+    );
+    expect(relayLogs).toHaveLength(1);
+    expect(relayLogs[0]?.[1]).toEqual({ leadId: "lead-1" });
+    expect(vi.mocked(deps.sendEmail)).toHaveBeenCalledOnce();
+    errorSpy.mockRestore();
+  });
+
+  it("does not log relay_letter_missing_contact_card_link in direct mode without a token", async () => {
+    const message = createMessage(visitorBody());
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const deps = createDeps({
+      readLeadEmailControls: vi.fn(async () => ({
+        ...defaultLeadEmailControls,
+        visitorEmailMode: "direct" as const,
+      })),
+    });
+    await processFollowupQueueBatch({ messages: [message] }, deps);
+    const relayLogs = errorSpy.mock.calls.filter(
+      (call) => call[0] === "relay_letter_missing_contact_card_link",
+    );
+    expect(relayLogs).toHaveLength(0);
+    expect(vi.mocked(deps.sendEmail)).toHaveBeenCalledOnce();
+    errorSpy.mockRestore();
+  });
+
   it("omits the contact card link in direct mode even when the payload carries a token", async () => {
     const message = createMessage(
       visitorBody({ relayContactCardToken: "should-not-appear" }),

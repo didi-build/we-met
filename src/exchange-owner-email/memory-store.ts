@@ -64,6 +64,7 @@ export class MemoryExchangeOwnerEmailStore implements ExchangeOwnerEmailStore {
       return null;
     }
     return {
+      cardId: row.cardId,
       triggeredAt: row.triggeredAt,
       ownerEmailSentAt: row.ownerEmailSentAt,
       visitorLetterSentAt: row.visitorLetterSentAt,

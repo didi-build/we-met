@@ -42,13 +42,14 @@ export function createExchangeOwnerEmailStoreFromD1(
     async getSendState(leadId) {
       const row = await db
         .prepare(
-          `SELECT triggered_at, owner_email_sent_at, visitor_letter_sent_at
+          `SELECT card_id, triggered_at, owner_email_sent_at, visitor_letter_sent_at
            FROM exchange_owner_email
            WHERE lead_id = ?
            LIMIT 1`,
         )
         .bind(leadId)
         .first<{
+          card_id: string;
           triggered_at: string | null;
           owner_email_sent_at: string | null;
           visitor_letter_sent_at: string | null;
@@ -57,6 +58,7 @@ export function createExchangeOwnerEmailStoreFromD1(
         return null;
       }
       return {
+        cardId: row.card_id,
         triggeredAt: row.triggered_at,
         ownerEmailSentAt: row.owner_email_sent_at,
         visitorLetterSentAt: row.visitor_letter_sent_at,

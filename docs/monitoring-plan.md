@@ -65,7 +65,13 @@ Cloudflare documents **Workers Issues** under `observability.issues.enabled` ([I
 
 #### Structured log events (mail and exchange)
 
-Documented event names for debugging (no PII in listed fields): app `exchange_visitor_letter_enqueue_failed`; consumer visitor, sink, and ledger events in the **Consumer logs** table under [Config and secret names](./architecture/environments.md#config-and-secret-names) in [environments](./architecture/environments.md).
+Documented event names for debugging (no PII in listed fields): app `exchange_visitor_letter_enqueue_failed`, `visitor_email_mode_read_failed` (`leadId` when D1 mode read fails; mode resolves to `direct`, no token mint), `relay_contact_card_token_failed` (`leadId` when relay contact-card token mint fails); consumer `relay_letter_missing_contact_card_link` (`leadId`, optional `cardId` when an owner-relay visitor letter sends without a contact-card download link); other visitor, sink, and ledger events in the **Consumer logs** table under [Config and secret names](./architecture/environments.md#config-and-secret-names) in [environments](./architecture/environments.md).
+
+| Event                                    | Worker                           | Fields (no PII)    | Alert (proposed)                                                               |
+| ---------------------------------------- | -------------------------------- | ------------------ | ------------------------------------------------------------------------------ |
+| `visitor_email_mode_read_failed`         | `we-met`                         | `leadId`           | **P2** on any occurrence; email **hello@we-met.link** (wiring in later ticket) |
+| `relay_contact_card_token_failed`        | `we-met`                         | `leadId`           | **P2** on any occurrence; email **hello@we-met.link** (wiring in later ticket) |
+| `relay_letter_missing_contact_card_link` | `we-met-followup-email-consumer` | `leadId`, `cardId` | **P2** on any occurrence; email **hello@we-met.link** (wiring in later ticket) |
 
 #### Lead email kill switch and daily caps (D1 `app_settings`)
 
@@ -162,11 +168,11 @@ We Met is in the first row today, moving toward the second after public cutover 
 
 #### Per Worker
 
-| Worker                           | Traffic / errors                                                                                                                                               | Saturation / dependencies                                                              | Existing hooks                                                      |
-| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| `we-met`                         | 5xx rate on `GET /hi/*`, `POST /api/exchange`, `POST /api/details`; Turnstile 403 rate (abuse, not outage); `exchange_visitor_letter_enqueue_failed` log count | D1 errors in traces; rate limiter 429 rate                                             | Logs, traces; `observability.issues.enabled` in Wrangler (see §1.4) |
-| `we-met-followup-email-consumer` | `lead_sink_permanent_failure`, `visitor_followup_permanent_failure`, `cloudflare_send_permanent_failure`                                                       | Queue backlog on `we-met-followup-email`; Email Sending bounces/complaints (dashboard) | Logs, traces; `observability.issues.enabled` in Wrangler (see §1.4) |
-| `we-met-warmup-cron`             | Cron invocation failures; `warmup_email_event_alert_*` logs                                                                                                    | KV read failures; DLQ depth on warmup DLQs                                             | Logs; `WARMUP_ALERT_TO` email                                       |
+| Worker                           | Traffic / errors                                                                                                                                                                                                                    | Saturation / dependencies                                                              | Existing hooks                                                      |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `we-met`                         | 5xx rate on `GET /hi/*`, `POST /api/exchange`, `POST /api/details`; Turnstile 403 rate (abuse, not outage); `exchange_visitor_letter_enqueue_failed`, `visitor_email_mode_read_failed`, `relay_contact_card_token_failed` log count | D1 errors in traces; rate limiter 429 rate                                             | Logs, traces; `observability.issues.enabled` in Wrangler (see §1.4) |
+| `we-met-followup-email-consumer` | `lead_sink_permanent_failure`, `visitor_followup_permanent_failure`, `cloudflare_send_permanent_failure`, `relay_letter_missing_contact_card_link`                                                                                  | Queue backlog on `we-met-followup-email`; Email Sending bounces/complaints (dashboard) | Logs, traces; `observability.issues.enabled` in Wrangler (see §1.4) |
+| `we-met-warmup-cron`             | Cron invocation failures; `warmup_email_event_alert_*` logs                                                                                                                                                                         | KV read failures; DLQ depth on warmup DLQs                                             | Logs; `WARMUP_ALERT_TO` email                                       |
 
 #### Per user-facing flow
 

@@ -12,7 +12,12 @@ describe("shouldDeferExchangeEmailForTrigger (unit)", () => {
     expect(
       shouldDeferExchangeEmailForTrigger(
         "owner_email",
-        { triggeredAt: null, ownerEmailSentAt: null, visitorLetterSentAt: null },
+        {
+          cardId: "card-1",
+          triggeredAt: null,
+          ownerEmailSentAt: null,
+          visitorLetterSentAt: null,
+        },
         nowInsideWindow,
       ),
     ).toBe(false);
@@ -23,6 +28,7 @@ describe("shouldDeferExchangeEmailForTrigger (unit)", () => {
       shouldDeferExchangeEmailForTrigger(
         "owner_email",
         {
+          cardId: "card-1",
           triggeredAt,
           ownerEmailSentAt: null,
           visitorLetterSentAt: "2026-10-12T12:01:00.000Z",
@@ -37,6 +43,7 @@ describe("shouldDeferExchangeEmailForTrigger (unit)", () => {
       shouldDeferExchangeEmailForTrigger(
         "visitor_letter",
         {
+          cardId: "card-1",
           triggeredAt,
           ownerEmailSentAt: "2026-10-12T12:01:00.000Z",
           visitorLetterSentAt: null,
@@ -53,7 +60,12 @@ describe("shouldDeferExchangeEmailForTrigger (unit)", () => {
     expect(
       shouldDeferExchangeEmailForTrigger(
         "owner_email",
-        { triggeredAt, ownerEmailSentAt: null, visitorLetterSentAt: null },
+        {
+          cardId: "card-1",
+          triggeredAt,
+          ownerEmailSentAt: null,
+          visitorLetterSentAt: null,
+        },
         nowAfterWindow,
       ),
     ).toBe(false);
