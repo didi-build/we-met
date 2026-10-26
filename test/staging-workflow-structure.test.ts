@@ -41,6 +41,11 @@ function extractDeployJobSection(workflow: string): string {
   return workflow.match(/^  deploy:[\s\S]*$/m)?.[0] ?? "";
 }
 
+function extractDeployJobEnvBlock(deploySection: string): string {
+  const match = deploySection.match(/^    env:\n([\s\S]*?)^    steps:/m);
+  return match?.[1] ?? "";
+}
+
 function splitDeployJobSteps(deploySection: string): DeployStepBlock[] {
   const stepsMarker = "    steps:\n";
   const stepsIdx = deploySection.indexOf(stepsMarker);
@@ -117,9 +122,11 @@ describe("Deploy staging workflow structure (unit)", () => {
   });
 
   it("sets shared staging build env on the deploy job for guard and build steps", () => {
-    expect(deploySection).toContain("WE_MET_ENV: staging");
-    expect(deploySection).toContain("WE_MET_BASE_URL: https://we-met.didi.build");
-    expect(deploySection).toContain('WE_MET_PREVIEW_HOST_SUFFIX: ""');
+    const jobEnv = extractDeployJobEnvBlock(deploySection);
+    expect(jobEnv).toContain("WE_MET_ENV: staging");
+    expect(jobEnv).toContain("WE_MET_BASE_URL: https://we-met.didi.build");
+    expect(jobEnv).toContain('WE_MET_PREVIEW_HOST_SUFFIX: ""');
+    expect(jobEnv).not.toContain("WE_MET_D1_DATABASE_ID_NONPROD");
     const buildStep = stepByName(steps, BUILD_STEP);
     expect(buildStep.block).not.toContain("WE_MET_ENV:");
     expect(buildStep.block).toContain("WE_MET_COMMIT_SHA: ${{ github.sha }}");
@@ -160,6 +167,9 @@ describe("Deploy staging workflow structure (unit)", () => {
   it("treats migration drift listing as warn-only after apply", () => {
     const migrationsBlock = stepByName(steps, MIGRATIONS_STEP).block;
     expect(migrationsBlock).toContain("APPLY_LOG=$(mktemp)");
+    expect(migrationsBlock).toContain("grep -E '\\[code: [0-9]+\\]' \"$APPLY_LOG\"");
+    expect(migrationsBlock).toContain("DRIFT_STDERR=$(mktemp)");
+    expect(migrationsBlock).toContain("<redacted-d1-id>");
     expect(migrationsBlock).toContain("set +e");
     expect(migrationsBlock).toContain("continuing deploy");
     expect(migrationsBlock).toContain("set -e");

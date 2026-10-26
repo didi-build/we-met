@@ -1433,14 +1433,20 @@ describe("processFollowupQueueBatch (unit)", () => {
     expect(deps.weMetEnv).toBe("preview");
   });
 
-  it("defaults WE_MET_ENV to production when missing", () => {
+  it("routes mail to the test inbox when consumer WE_MET_ENV is missing", async () => {
     const env = {
       WE_MET_BASE_URL: "https://we-met.link",
       WE_MET_ASSETS: {} as FollowupConsumerEnv["WE_MET_ASSETS"],
       WE_MET_DB: {} as FollowupConsumerEnv["WE_MET_DB"],
     } as FollowupConsumerEnv;
-    const deps = createFollowupConsumerDepsFromEnv(env);
-    expect(deps.weMetEnv).toBe("production");
+    expect(createFollowupConsumerDepsFromEnv(env).weMetEnv).toBe("");
+
+    const message = createMessage(visitorBody());
+    const deps = createDeps({ weMetEnv: "" });
+    await processFollowupQueueBatch({ messages: [message] }, deps);
+    const sent = vi.mocked(deps.sendEmail).mock.calls[0][0];
+    expect(sent.to).toBe("test-inbox@example.com");
+    expect(sent.subject).toContain("[we-met test → visitor@example.com]");
   });
 
   it("acks visitor follow-up on permanent Cloudflare recipient suppression", async () => {

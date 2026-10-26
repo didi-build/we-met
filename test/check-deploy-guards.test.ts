@@ -1018,6 +1018,40 @@ describe("check-deploy-guards (unit)", () => {
     expect(result.stderr).toContain("placeholder");
   });
 
+  it("fails consumer-nonprod when vars.WE_MET_ENV is missing or empty", () => {
+    const pathMissing = writeTempConsumerConfig(CONSUMER_NONPROD, (config) => {
+      const vars = config.vars as Record<string, string>;
+      delete vars.WE_MET_ENV;
+    });
+    const missingResult = runGuards("consumer-nonprod", pathMissing);
+    expect(missingResult.status).toBe(1);
+    expect(missingResult.stderr).toContain(
+      "non-prod consumer vars.WE_MET_ENV must be a non-empty non-production value",
+    );
+
+    const pathEmpty = writeTempConsumerConfig(CONSUMER_NONPROD, (config) => {
+      const vars = config.vars as Record<string, string>;
+      vars.WE_MET_ENV = "   ";
+    });
+    const emptyResult = runGuards("consumer-nonprod", pathEmpty);
+    expect(emptyResult.status).toBe(1);
+    expect(emptyResult.stderr).toContain(
+      "non-prod consumer vars.WE_MET_ENV must be a non-empty non-production value",
+    );
+  });
+
+  it("fails consumer-nonprod when vars.WE_MET_ENV is production", () => {
+    const path = writeTempConsumerConfig(CONSUMER_NONPROD, (config) => {
+      const vars = config.vars as Record<string, string>;
+      vars.WE_MET_ENV = "production";
+    });
+    const result = runGuards("consumer-nonprod", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      "non-prod consumer vars.WE_MET_ENV must be a non-empty non-production value",
+    );
+  });
+
   it("fails consumer-nonprod when vars contain WE_MET_TEST_MAIL_TO key", () => {
     const dir = mkdtempSync(join(tmpdir(), "we-met-consumer-guards-"));
     tempDirs.push(dir);

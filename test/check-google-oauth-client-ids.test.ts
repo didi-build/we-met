@@ -17,6 +17,13 @@ const SAMPLE_LOCATION =
 
 const STAGING_ONLY_CLIENT_ID = "111111111111-stagingid.apps.googleusercontent.com";
 
+describe("PROD_GOOGLE_CLIENT_ID_SHA256 (unit)", () => {
+  it("is a lowercase SHA-256 hex fingerprint, not a raw Google client id", () => {
+    expect(PROD_GOOGLE_CLIENT_ID_SHA256).toMatch(/^[0-9a-f]{64}$/);
+    expect(PROD_GOOGLE_CLIENT_ID_SHA256).not.toContain(".apps.googleusercontent.com");
+  });
+});
+
 describe("parseGoogleClientIdFromOAuthLocation (unit)", () => {
   it("parses client_id from a Google accounts Location header", () => {
     expect(parseGoogleClientIdFromOAuthLocation(SAMPLE_LOCATION)).toBe(

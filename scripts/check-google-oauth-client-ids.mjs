@@ -13,9 +13,16 @@ const STAGING_SIGN_IN_URL =
   "https://we-met.didi.build/api/auth/google/start?mode=redirect";
 
 // Fingerprint of the production Google OAuth client_id (SHA-256 hex). Update when the
-// production Google client is rotated (see docs/architecture/environments.md).
+// production Google client is rotated (see docs/architecture/environments.md#google-oauth-production-client-fingerprint-rotation).
 export const PROD_GOOGLE_CLIENT_ID_SHA256 =
   "241c5f234052fd56b325b30f86342f19bde300e93e9c81f6bd8b973e3ba10033";
+
+const PROD_GOOGLE_CLIENT_ID_SHA256_RE = /^[0-9a-f]{64}$/;
+if (!PROD_GOOGLE_CLIENT_ID_SHA256_RE.test(PROD_GOOGLE_CLIENT_ID_SHA256)) {
+  throw new Error(
+    "PROD_GOOGLE_CLIENT_ID_SHA256 must be a 64-character lowercase SHA-256 hex fingerprint (never paste a raw Google client id)",
+  );
+}
 
 /**
  * @param {string} signInUrl

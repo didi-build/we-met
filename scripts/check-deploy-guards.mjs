@@ -476,8 +476,13 @@ function checkConsumerNonprod(config) {
       `non-prod consumer Worker name must be "${NONPROD_RESOURCE_MARKERS.consumerWorkerName}"`,
     );
   }
-  if (config.vars?.WE_MET_ENV === "production") {
-    fail("non-prod consumer WE_MET_ENV must not be production");
+  const consumerWeMetEnv = config.vars?.WE_MET_ENV;
+  if (
+    typeof consumerWeMetEnv !== "string" ||
+    consumerWeMetEnv.trim() === "" ||
+    consumerWeMetEnv.trim() === "production"
+  ) {
+    fail("non-prod consumer vars.WE_MET_ENV must be a non-empty non-production value");
   }
   const strings = collectStrings(config);
   for (const marker of [
