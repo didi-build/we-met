@@ -1,0 +1,93 @@
+:root {
+  color-scheme: light;
+  font-family:
+    system-ui,
+    -apple-system,
+    Segoe UI,
+    Roboto,
+    sans-serif;
+  line-height: 1.5;
+  --radius-pill: 999px;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.gallery-root {
+  max-width: 56rem;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+}
+
+.gallery-header h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.75rem;
+}
+
+.gallery-muted {
+  color: var(--ink-muted);
+  margin: 0.25rem 0;
+}
+
+.gallery-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+.gallery-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md, 12px);
+  padding: 1.25rem;
+}
+
+.gallery-card-head h2 {
+  margin: 0;
+}
+
+.gallery-spec {
+  margin: 1rem 0;
+}
+
+.gallery-spec pre {
+  overflow: auto;
+  font-size: 0.8125rem;
+  background: var(--surface-2);
+  padding: 0.75rem;
+  border-radius: var(--radius-sm, 8px);
+}
+
+.gallery-variants {
+  display: grid;
+  gap: 1rem;
+}
+
+.gallery-variant h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.gallery-preview {
+  padding: 1rem;
+  background: var(--bg);
+  border-radius: var(--radius-sm, 8px);
+  margin-bottom: 0.5rem;
+}
+
+.gallery-props {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.gallery-props th,
+.gallery-props td {
+  border: 1px solid var(--line);
+  padding: 0.35rem 0.5rem;
+  text-align: left;
+}
