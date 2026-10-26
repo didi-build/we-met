@@ -34,7 +34,7 @@ Do not break these; each links to the canonical doc.
 - **`specs/`** is **designer-only** (approved specs). **Developers do not edit specs.**
 - **`components/`** holds gallery implementations and `*.gallery.ts` metadata. **Designers** build or update gallery components from approved specs; **developers** edit gallery components only for props or tiny non-design wiring fixes.
 - **`gallery/`** is the gallery SPA (registry and layout), not the Next.js app under `src/`.
-- PR previews deploy the gallery as a **separate** Worker (`gallery-preview` workflow, `wrangler.gallery.jsonc`); no D1, R2, queue, or email bindings. See [component-gallery](docs/component-gallery.md) and [0028](docs/decisions/0028-component-gallery.md).
+- PR previews deploy the gallery as a **separate** Worker (`gallery-preview` workflow, `wrangler.gallery.jsonc`); no D1, R2, queue, or email bindings. See [component-gallery](docs/component-gallery.md) and [0029](docs/decisions/0029-component-gallery.md).
 
 ## Engineering standards
 

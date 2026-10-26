@@ -62,10 +62,20 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
+          set +e
           output="$(npx wrangler preview \
             --config wrangler.gallery.jsonc \
+            --worker-name we-met \
+            --ignore-base-config \
             --name "gallery-pr-${PR_NUMBER}" \
             --json 2>&1)"
+          preview_status=$?
+          set -e
+          if [ "${preview_status}" -ne 0 ]; then
+            printf '%s\n' "$output"
+            exit "${preview_status}"
+          fi
+          printf '%s\n' "$output"
           preview_url="$(printf '%s' "$output" | node scripts/parse-wrangler-preview-json.mjs)"
           echo "preview_url=${preview_url}" >> "$GITHUB_OUTPUT"
       - name: Probe gallery route
@@ -219,5 +229,8 @@ jobs:
         run: node scripts/wrangler-preview-delete.mjs
         env:
           PREVIEW_NAME: gallery-pr-${{ env.PR_NUMBER }}
+          WRANGLER_PREVIEW_CONFIG: wrangler.gallery.jsonc
+          WRANGLER_PREVIEW_WORKER_NAME: we-met
+          WRANGLER_PREVIEW_IGNORE_BASE_CONFIG: "true"
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_NONPROD }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

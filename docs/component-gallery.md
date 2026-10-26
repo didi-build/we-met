@@ -45,4 +45,6 @@ Uses the same preview Cloudflare credentials as the app preview: `CLOUDFLARE_API
 
 Responses include `X-Robots-Tag: noindex, nofollow` (via `gallery/public/_headers`).
 
-See [ADR 0028](./decisions/0028-component-gallery.md).
+Gallery previews use preview name `gallery-pr-<number>` on Worker `we-met` with `--ignore-base-config` and this assets-only config (token scope per [0017](./decisions/0017-cloudflare-api-credentials.md)).
+
+See [ADR 0029](./decisions/0029-component-gallery.md).
