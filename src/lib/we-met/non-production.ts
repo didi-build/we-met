@@ -1,5 +1,12 @@
 export const NON_PRODUCTION_X_ROBOTS_TAG = "noindex, nofollow";
 
+/** Matches the fixed environment banner height (Tailwind `pt-9` / `2.25rem`). */
+export const ENVIRONMENT_BANNER_OFFSET_CSS = "2.25rem";
+
+export const ENVIRONMENT_BANNER_BODY_CLASS = "we-met-env-banner";
+
+export const ENVIRONMENT_BANNER_OFFSET_CSS_VAR = "--we-met-environment-banner-offset";
+
 export type NonProductionBannerLabel = "Staging" | "Preview" | "Local";
 
 export function isProductionWeMetEnv(weMetEnv: string | undefined): boolean {
@@ -66,4 +73,22 @@ export function applyNonProductionXRobotsTag(
   if (shouldSendNonProductionXRobotsTag(weMetEnv)) {
     headers.set("X-Robots-Tag", NON_PRODUCTION_X_ROBOTS_TAG);
   }
+}
+
+export type EnvironmentBannerChrome = {
+  bodyClass: typeof ENVIRONMENT_BANNER_BODY_CLASS;
+  rootStyle: string;
+};
+
+export function resolveEnvironmentBannerChrome(
+  publicEnv: string | undefined,
+): EnvironmentBannerChrome | null {
+  const label = resolveNonProductionBannerLabel(publicEnv);
+  if (!label) {
+    return null;
+  }
+  return {
+    bodyClass: ENVIRONMENT_BANNER_BODY_CLASS,
+    rootStyle: `:root{${ENVIRONMENT_BANNER_OFFSET_CSS_VAR}:${ENVIRONMENT_BANNER_OFFSET_CSS};}`,
+  };
 }

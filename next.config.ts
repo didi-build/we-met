@@ -6,6 +6,7 @@ const weMetEnv = process.env.WE_MET_ENV ?? "production";
 const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_WE_MET_ENV: weMetEnv,
+    NEXT_PUBLIC_WE_MET_BASE_URL: process.env.WE_MET_BASE_URL ?? "https://we-met.link",
     NEXT_PUBLIC_WE_MET_COMMIT_SHA: process.env.WE_MET_COMMIT_SHA?.trim() ?? "",
   },
   async headers() {

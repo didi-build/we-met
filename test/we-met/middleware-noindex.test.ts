@@ -38,6 +38,11 @@ describe("middleware non-production X-Robots-Tag (unit)", () => {
   it("sets X-Robots-Tag for staging and preview", () => {
     for (const weMetEnv of ["staging", "preview"] as const) {
       process.env.WE_MET_ENV = weMetEnv;
+      if (weMetEnv === "staging") {
+        delete process.env.WE_MET_PREVIEW_HOST_SUFFIX;
+      } else {
+        process.env.WE_MET_PREVIEW_HOST_SUFFIX = "-we-met.example.workers.dev";
+      }
       const landing = middleware(request("/", "we-met.link"));
       expect(landing?.headers.get("x-robots-tag")).toBe(NON_PRODUCTION_X_ROBOTS_TAG);
 

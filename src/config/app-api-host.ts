@@ -50,11 +50,11 @@ export function resolveAppOrigin(
   if (config.weMetEnv === "local") {
     return requireAppOrigin("WE_MET_APP_ORIGIN", env.WE_MET_APP_ORIGIN);
   }
-  if (config.previewHostSuffix && host.endsWith(config.previewHostSuffix)) {
-    return url.origin;
-  }
   if (config.weMetEnv === "staging") {
     return new URL(config.baseUrl).origin;
+  }
+  if (config.previewHostSuffix && host.endsWith(config.previewHostSuffix)) {
+    return url.origin;
   }
   return appBaseUrl(config.baseUrl);
 }

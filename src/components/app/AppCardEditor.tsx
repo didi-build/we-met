@@ -9,6 +9,7 @@ import {
 } from "@/app-api/types";
 import type { ContactsSetupPhase } from "@/components/app/editor/PublishedContactsSetup";
 import { CARD_FIELD_LIMITS } from "@/card-data/limits";
+import { editorPublishedCardUrl } from "@/config/editor-published-card-url";
 import { AppEditorBottomBar } from "@/components/app/editor/AppEditorBottomBar";
 import { AppCardPreview } from "@/components/app/editor/AppCardPreview";
 import { AppEditorDialogs } from "@/components/app/editor/AppEditorDialogs";
@@ -232,7 +233,7 @@ export function AppCardEditor({
     if (!slug) {
       return;
     }
-    setPubUrl(`https://we-met.link/hi/${slug}`);
+    setPubUrl(editorPublishedCardUrl(slug));
     setPubTitle("Your card is live");
     setCopyLabel("Copy link");
   }, [card.slug, published?.slug]);
@@ -449,7 +450,7 @@ export function AppCardEditor({
     if (!published) {
       return;
     }
-    const url = `https://we-met.link/hi/${published.slug}`;
+    const url = editorPublishedCardUrl(published.slug);
     setPubUrl(url);
     setPubTitle("Share your card");
     setCopyLabel("Copy link");

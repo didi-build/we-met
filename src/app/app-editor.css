@@ -108,7 +108,7 @@ body {
 /* Header */
 .ap-header {
   position: sticky;
-  top: 0;
+  top: var(--we-met-environment-banner-offset, 0);
   z-index: 30;
   height: 64px;
   display: flex;
@@ -500,7 +500,7 @@ body {
 /* Editor layout */
 .ap-tabs {
   position: sticky;
-  top: 64px;
+  top: calc(64px + var(--we-met-environment-banner-offset, 0px));
   z-index: 20;
   padding: 12px 20px;
   background: var(--bg);
@@ -674,7 +674,7 @@ body {
   }
   .ap-preview-col {
     position: sticky;
-    top: 96px;
+    top: calc(96px + var(--we-met-environment-banner-offset, 0px));
     align-self: start;
   }
   .ap-frame {
