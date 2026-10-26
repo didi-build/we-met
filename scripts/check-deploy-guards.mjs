@@ -34,6 +34,15 @@ import {
   WARMUP_EMAIL_EVENTS_QUEUE_PLACEHOLDER,
 } from "./lib/wrangler-placeholders.mjs";
 
+const STAGING_VARS_ALLOWLIST = new Set([
+  "WE_MET_BASE_URL",
+  "WE_MET_ENV",
+  "WE_MET_PREVIEW_HOST_SUFFIX",
+  "WE_MET_CONTACT_SENDER_ADDRESSES",
+  "CONTACTS_SETUP_ENABLED_FOR_ALL",
+]);
+const STAGING_WORKER_SELF_REFERENCE_BINDING = "WORKER_SELF_REFERENCE";
+
 const WARMUP_WORKER_NAME = "we-met-warmup-cron";
 const WARMUP_RETRY_QUEUE = "we-met-warmup-send-retry";
 const WARMUP_DLQ = "we-met-warmup-send-dlq";
@@ -626,6 +635,48 @@ function checkStagingRoutes(config) {
   }
 }
 
+function checkStagingVarsAllowlist(config) {
+  const vars = config.vars ?? {};
+  for (const key of Object.keys(vars)) {
+    if (!STAGING_VARS_ALLOWLIST.has(key)) {
+      fail(
+        `staging vars may only contain ${[...STAGING_VARS_ALLOWLIST].join(", ")}; found "${key}"`,
+      );
+    }
+  }
+}
+
+function checkStagingWorkerSelfReference(config) {
+  const rows = config.services ?? [];
+  if (rows.length !== 1) {
+    fail("staging must declare exactly one services binding");
+  }
+  const row = rows[0];
+  if (row.binding !== STAGING_WORKER_SELF_REFERENCE_BINDING) {
+    fail(`staging services binding must be "${STAGING_WORKER_SELF_REFERENCE_BINDING}"`);
+  }
+  if (row.service !== STAGING_RESOURCE_MARKERS.workerName) {
+    fail(
+      `staging WORKER_SELF_REFERENCE must target "${STAGING_RESOURCE_MARKERS.workerName}"`,
+    );
+  }
+}
+
+function checkStagingForbiddenTopLevel(config) {
+  if (Object.prototype.hasOwnProperty.call(config, "route")) {
+    fail("staging config must use routes array, not singular route");
+  }
+  if (config.env && typeof config.env === "object") {
+    fail("staging config must not define env blocks");
+  }
+  if ((config.kv_namespaces ?? []).length > 0) {
+    fail("staging must not bind kv_namespaces");
+  }
+  if ((config.durable_objects ?? []).length > 0) {
+    fail("staging must not bind durable_objects");
+  }
+}
+
 function checkStagingD1Id(config) {
   const rows = config.d1_databases ?? [];
   if (rows.length !== 1) {
@@ -656,12 +707,14 @@ function checkStagingD1Id(config) {
 
 function checkStagingBlock(config) {
   checkStagingPublicUrlSettings(config);
+  checkStagingForbiddenTopLevel(config);
   if (config.previews) {
     fail("staging config must not include a previews block");
   }
   if (config.name !== STAGING_RESOURCE_MARKERS.workerName) {
     fail(`staging Worker name must be "${STAGING_RESOURCE_MARKERS.workerName}"`);
   }
+  checkStagingVarsAllowlist(config);
   const stagingEnv = config.vars?.WE_MET_ENV;
   if (stagingEnv !== "staging") {
     fail('staging vars.WE_MET_ENV must be "staging"');
@@ -670,7 +723,8 @@ function checkStagingBlock(config) {
   if (previewHostSuffix.trim() !== "") {
     fail('staging vars.WE_MET_PREVIEW_HOST_SUFFIX must be ""');
   }
-  if (config.vars?.WE_MET_BASE_URL !== STAGING_RESOURCE_MARKERS.baseUrl) {
+  const baseUrl = config.vars?.WE_MET_BASE_URL;
+  if (baseUrl !== STAGING_RESOURCE_MARKERS.baseUrl) {
     fail(`staging vars.WE_MET_BASE_URL must be "${STAGING_RESOURCE_MARKERS.baseUrl}"`);
   }
   if (
@@ -702,6 +756,7 @@ function checkStagingBlock(config) {
     PRODUCTION_RESOURCE_MARKERS.authRateLimiterNamespaceId,
     PRODUCTION_RESOURCE_MARKERS.appRateLimiterNamespaceId,
     PRODUCTION_RESOURCE_MARKERS.workerName,
+    "we-met.link",
   ];
   for (const marker of productionMarkers) {
     if (strings.includes(marker)) {
@@ -732,11 +787,7 @@ function checkStagingBlock(config) {
   }
   checkRateLimitBindings(config.ratelimits, false);
 
-  for (const row of config.services ?? []) {
-    if (row.service === PRODUCTION_RESOURCE_MARKERS.workerName) {
-      fail('staging WORKER_SELF_REFERENCE must not target production Worker "we-met"');
-    }
-  }
+  checkStagingWorkerSelfReference(config);
 
   if (config.send_email) {
     fail("staging must not bind send_email");

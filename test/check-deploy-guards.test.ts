@@ -440,47 +440,83 @@ describe("check-deploy-guards (unit)", () => {
 
   const stagingGuardCases = [
     {
-      label: "staging D1 database_name is production",
-      message: /we-met-db-nonprod|production resource "we-met-db"/,
+      label: "staging workers_dev is true",
+      message: "workers_dev must be false",
       mutate: (config: Record<string, unknown>) => {
-        const d1 = config.d1_databases as { database_name: string }[];
-        d1[0].database_name = "we-met-db";
+        config.workers_dev = true;
       },
     },
     {
-      label: "staging route is we-met.link",
-      message: "we-met.didi.build",
+      label: "staging workers_dev is missing",
+      message: "workers_dev must be false",
       mutate: (config: Record<string, unknown>) => {
-        config.routes = [{ pattern: "we-met.link", custom_domain: true }];
+        delete config.workers_dev;
       },
     },
     {
-      label: "staging route is app.we-met.link",
-      message: "we-met.didi.build",
+      label: "staging preview_urls is true",
+      message: "preview_urls must be false",
       mutate: (config: Record<string, unknown>) => {
-        config.routes = [{ pattern: "app.we-met.link", custom_domain: true }];
+        config.preview_urls = true;
       },
     },
     {
-      label: "staging route is not we-met.didi.build",
-      message: "we-met.didi.build",
+      label: "staging preview_urls is missing",
+      message: "preview_urls must be false",
       mutate: (config: Record<string, unknown>) => {
-        config.routes = [{ pattern: "other.example.com", custom_domain: true }];
+        delete config.preview_urls;
       },
     },
     {
-      label: "staging D1 database_id uses production placeholder",
-      message: "production placeholder",
+      label: "staging config uses singular route",
+      message: "singular route",
       mutate: (config: Record<string, unknown>) => {
-        const d1 = config.d1_databases as { database_id: string }[];
-        d1[0].database_id = "00000000-0000-0000-0000-000000000001";
+        config.route = { pattern: "we-met.didi.build", custom_domain: true };
       },
     },
     {
-      label: "staging Worker name is wrong",
-      message: /we-met-staging|production resource "we-met"/,
+      label: "staging config defines env blocks",
+      message: "env blocks",
       mutate: (config: Record<string, unknown>) => {
-        config.name = "we-met";
+        config.env = { staging: { vars: { WE_MET_ENV: "staging" } } };
+      },
+    },
+    {
+      label: "staging binds kv_namespaces",
+      message: "kv_namespaces",
+      mutate: (config: Record<string, unknown>) => {
+        config.kv_namespaces = [
+          { binding: "KV", id: "00000000-0000-0000-0000-000000000099" },
+        ];
+      },
+    },
+    {
+      label: "staging binds durable_objects",
+      message: "durable_objects",
+      mutate: (config: Record<string, unknown>) => {
+        config.durable_objects = [{ name: "DO", class_name: "Example" }];
+      },
+    },
+    {
+      label: "staging config includes a previews block",
+      message: "previews block",
+      mutate: (config: Record<string, unknown>) => {
+        config.previews = { vars: { WE_MET_ENV: "preview" } };
+      },
+    },
+    {
+      label: "staging Worker name is not we-met-staging",
+      message: 'Worker name must be "we-met-staging"',
+      mutate: (config: Record<string, unknown>) => {
+        config.name = "not-staging";
+      },
+    },
+    {
+      label: "staging vars include a disallowed key",
+      message: "staging vars may only contain",
+      mutate: (config: Record<string, unknown>) => {
+        const vars = config.vars as Record<string, string>;
+        vars.WE_MET_DISALLOWED_EXAMPLE = "nope";
       },
     },
     {
@@ -508,7 +544,7 @@ describe("check-deploy-guards (unit)", () => {
       },
     },
     {
-      label: "staging vars.WE_MET_BASE_URL is wrong",
+      label: "staging vars.WE_MET_BASE_URL is https://we-met.link",
       message: "https://we-met.didi.build",
       mutate: (config: Record<string, unknown>) => {
         const vars = config.vars as Record<string, string>;
@@ -516,17 +552,19 @@ describe("check-deploy-guards (unit)", () => {
       },
     },
     {
-      label: "staging route custom_domain is false",
-      message: "custom_domain true",
+      label: "staging vars.WE_MET_BASE_URL is https://evil.example",
+      message: "https://we-met.didi.build",
       mutate: (config: Record<string, unknown>) => {
-        config.routes = [{ pattern: "we-met.didi.build", custom_domain: false }];
+        const vars = config.vars as Record<string, string>;
+        vars.WE_MET_BASE_URL = "https://evil.example";
       },
     },
     {
-      label: "staging route custom_domain is missing",
-      message: "custom_domain true",
+      label: "staging vars.WE_MET_BASE_URL is missing",
+      message: "https://we-met.didi.build",
       mutate: (config: Record<string, unknown>) => {
-        config.routes = [{ pattern: "we-met.didi.build" }];
+        const vars = config.vars as Record<string, string>;
+        delete vars.WE_MET_BASE_URL;
       },
     },
     {
@@ -546,24 +584,143 @@ describe("check-deploy-guards (unit)", () => {
       },
     },
     {
-      label: "staging config includes a previews block",
-      message: "previews block",
+      label: "staging references production host we-met.link in bindings",
+      message: 'production resource "we-met.link"',
       mutate: (config: Record<string, unknown>) => {
-        config.previews = { vars: { WE_MET_ENV: "preview" } };
+        const rl = config.ratelimits as { namespace_id: string }[];
+        rl[0].namespace_id = "we-met.link";
       },
     },
     {
-      label: "staging workers_dev is true",
-      message: "workers_dev must be false",
+      label: "staging references production D1 name we-met-db",
+      message: 'production resource "we-met-db"',
       mutate: (config: Record<string, unknown>) => {
-        config.workers_dev = true;
+        const d1 = config.d1_databases as { database_name: string }[];
+        d1[0].database_name = "we-met-db";
       },
     },
     {
-      label: "staging preview_urls is true",
-      message: "preview_urls must be false",
+      label: "staging references production R2 bucket we-met-assets",
+      message: 'production resource "we-met-assets"',
       mutate: (config: Record<string, unknown>) => {
-        config.preview_urls = true;
+        const r2 = config.r2_buckets as { bucket_name: string }[];
+        r2[0].bucket_name = "we-met-assets";
+      },
+    },
+    {
+      label: "staging references production queue we-met-followup-email",
+      message: 'production resource "we-met-followup-email"',
+      mutate: (config: Record<string, unknown>) => {
+        const queues = config.queues as { producers: { queue: string }[] };
+        queues.producers[0].queue = "we-met-followup-email";
+      },
+    },
+    {
+      label: "staging references production rate limiter namespace 2002",
+      message: 'production resource "2002"',
+      mutate: (config: Record<string, unknown>) => {
+        const rl = config.ratelimits as { namespace_id: string }[];
+        rl[0].namespace_id = "2002";
+      },
+    },
+    {
+      label: "staging references production Worker name we-met in services",
+      message: 'production resource "we-met"',
+      mutate: (config: Record<string, unknown>) => {
+        const services = config.services as { service: string }[];
+        services[0].service = "we-met";
+      },
+    },
+    {
+      label: "staging route is we-met.link",
+      message: /we-met\.didi\.build|production resource "we-met\.link"/,
+      mutate: (config: Record<string, unknown>) => {
+        config.routes = [{ pattern: "we-met.link", custom_domain: true }];
+      },
+    },
+    {
+      label: "staging route is app.we-met.link",
+      message: "we-met.didi.build",
+      mutate: (config: Record<string, unknown>) => {
+        config.routes = [{ pattern: "app.we-met.link", custom_domain: true }];
+      },
+    },
+    {
+      label: "staging route is not we-met.didi.build",
+      message: "we-met.didi.build",
+      mutate: (config: Record<string, unknown>) => {
+        config.routes = [{ pattern: "evil.example", custom_domain: true }];
+      },
+    },
+    {
+      label: "staging route custom_domain is false",
+      message: "custom_domain true",
+      mutate: (config: Record<string, unknown>) => {
+        config.routes = [{ pattern: "we-met.didi.build", custom_domain: false }];
+      },
+    },
+    {
+      label: "staging route custom_domain is missing",
+      message: "custom_domain true",
+      mutate: (config: Record<string, unknown>) => {
+        config.routes = [{ pattern: "we-met.didi.build" }];
+      },
+    },
+    {
+      label: "staging D1 database_id uses production placeholder",
+      message: "production placeholder",
+      mutate: (config: Record<string, unknown>) => {
+        const d1 = config.d1_databases as { database_id: string }[];
+        d1[0].database_id = "00000000-0000-0000-0000-000000000001";
+      },
+    },
+    {
+      label: "staging D1 database_name is not we-met-db-nonprod",
+      message: "we-met-db-nonprod",
+      mutate: (config: Record<string, unknown>) => {
+        const d1 = config.d1_databases as { database_name: string }[];
+        d1[0].database_name = "we-met-db-wrong-nonprod";
+      },
+    },
+    {
+      label: "staging R2 bucket is not we-met-assets-nonprod",
+      message: "we-met-assets-nonprod",
+      mutate: (config: Record<string, unknown>) => {
+        const r2 = config.r2_buckets as { bucket_name: string }[];
+        r2[0].bucket_name = "we-met-assets-wrong-nonprod";
+      },
+    },
+    {
+      label: "staging queue producer is not we-met-followup-email-nonprod",
+      message: "we-met-followup-email-nonprod",
+      mutate: (config: Record<string, unknown>) => {
+        const queues = config.queues as { producers: { queue: string }[] };
+        queues.producers[0].queue = "we-met-other-nonprod";
+      },
+    },
+    {
+      label: "staging exchange rate limiter namespace is not non-prod",
+      message: "preview rate limiter",
+      mutate: (config: Record<string, unknown>) => {
+        const rl = config.ratelimits as { namespace_id: string; name: string }[];
+        const exchange = rl.find((row) => row.name === "WE_MET_EXCHANGE_RATE_LIMITER");
+        if (exchange) exchange.namespace_id = "1999";
+      },
+    },
+    {
+      label: "staging WORKER_SELF_REFERENCE is not we-met-staging",
+      message: 'must target "we-met-staging"',
+      mutate: (config: Record<string, unknown>) => {
+        const services = config.services as { service: string }[];
+        services[0].service = "not-staging";
+      },
+    },
+    {
+      label: "staging WORKER_SELF_REFERENCE targets production Worker we-met",
+      message: 'production resource "we-met"',
+      mutate: (config: Record<string, unknown>) => {
+        const services = config.services as { service: string }[];
+        services[0].service = "we-met";
       },
     },
     {
@@ -586,39 +743,6 @@ describe("check-deploy-guards (unit)", () => {
       mutate: (config: Record<string, unknown>) => {
         const queues = config.queues as { producers: unknown[]; consumers: unknown[] };
         queues.consumers = [{ queue: "we-met-followup-email-nonprod" }];
-      },
-    },
-    {
-      label: "staging rate limiter uses production namespace",
-      message: /preview rate limiter|production resource "2002"/,
-      mutate: (config: Record<string, unknown>) => {
-        const rl = config.ratelimits as { namespace_id: string }[];
-        rl[0].namespace_id = "2002";
-      },
-    },
-    {
-      label: "staging queue producer is production",
-      message:
-        /we-met-followup-email-nonprod|production resource "we-met-followup-email"/,
-      mutate: (config: Record<string, unknown>) => {
-        const queues = config.queues as { producers: { queue: string }[] };
-        queues.producers[0].queue = "we-met-followup-email";
-      },
-    },
-    {
-      label: "staging WORKER_SELF_REFERENCE targets we-met",
-      message: /production Worker "we-met"|production resource "we-met"/,
-      mutate: (config: Record<string, unknown>) => {
-        const services = config.services as { service: string }[];
-        services[0].service = "we-met";
-      },
-    },
-    {
-      label: "staging R2 bucket is production",
-      message: /we-met-assets-nonprod|production resource "we-met-assets"/,
-      mutate: (config: Record<string, unknown>) => {
-        const r2 = config.r2_buckets as { bucket_name: string }[];
-        r2[0].bucket_name = "we-met-assets";
       },
     },
   ] as const;
