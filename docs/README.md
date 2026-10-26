@@ -8,6 +8,7 @@ Project docs live here so humans and agents share the same map.
 | -------------------------------------------------------------- | --------------------------------------------------------------------- |
 | [architecture/overview.md](./architecture/overview.md)         | Purpose, boundaries, seams, routes, theming, pipeline, open questions |
 | [architecture/environments.md](./architecture/environments.md) | Local, preview, staging, and production bindings and config names     |
+| [component-gallery.md](./component-gallery.md)                 | Spec vs component directories and `/gallery` PR previews              |
 
 ## Decisions
 
@@ -36,6 +37,7 @@ Project docs live here so humans and agents share the same map.
 | [decisions/0020-d1-database-id-injection.md](./decisions/0020-d1-database-id-injection.md)                           | D1 IDs from GitHub environment secrets at deploy                                                                |
 | [decisions/0027-owner-relay-visitor-follow-up.md](./decisions/0027-owner-relay-visitor-follow-up.md)                 | Owner relay visitor follow-up                                                                                   |
 | [decisions/0028-staging-we-met-didi-build.md](./decisions/0028-staging-we-met-didi-build.md)                         | Staging Worker `we-met-staging` on we-met.didi.build ([DIDI-873](https://linear.app/didi-build/issue/DIDI-873)) |
+| [decisions/0029-component-gallery.md](./decisions/0029-component-gallery.md)                                         | Component gallery PR previews                                                                                   |
 
 ## Runbooks
 
