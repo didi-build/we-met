@@ -105,7 +105,7 @@ export function HowItWorksSection() {
 
     for (const step of stepElements) observer.observe(step);
     return () => observer.disconnect();
-  }, [steps.length]);
+  }, [followUpMode]);
 
   return (
     <section className="lp-band" aria-labelledby="how-title">
@@ -123,7 +123,7 @@ export function HowItWorksSection() {
           <div className="lp-panel" aria-hidden="true">
             {steps.map((step, index) => (
               <div
-                key={`${step.title}-${index}`}
+                key={index}
                 className="lp-layer"
                 data-layer={index}
                 data-active={index === activeStep ? "true" : "false"}
@@ -135,7 +135,7 @@ export function HowItWorksSection() {
           <ol className="lp-steps">
             {steps.map((step, index) => (
               <li
-                key={`${step.title}-${index}`}
+                key={index}
                 className="lp-step"
                 data-step={index}
                 data-active={index === activeStep ? "true" : "false"}

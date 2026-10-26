@@ -9,9 +9,11 @@ import { LANDING_RELAY_COPY } from "@/lib/landing/landing-relay-mode";
 
 describe("HowItWorksSection (unit)", () => {
   let observerCallback: IntersectionObserverCallback | null = null;
+  let observeMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     observerCallback = null;
+    observeMock = vi.fn();
     vi.stubGlobal(
       "IntersectionObserver",
       vi.fn(function IntersectionObserverMock(
@@ -21,7 +23,7 @@ describe("HowItWorksSection (unit)", () => {
         observerCallback = callback;
         expect(options).toEqual(HOW_IT_WORKS_INTERSECTION_OPTIONS);
         return {
-          observe: vi.fn(),
+          observe: observeMock,
           disconnect: vi.fn(),
           unobserve: vi.fn(),
           takeRecords: vi.fn(),
@@ -109,5 +111,52 @@ describe("HowItWorksSection (unit)", () => {
     ).toBeGreaterThan(0);
     expect(screen.queryByText(LANDING_RELAY_COPY.step3ChipRelay)).toBeNull();
     expect(screen.getAllByText("Sam's inbox").length).toBeGreaterThan(0);
+  });
+
+  it("keeps focus on the mode switch after toggling direct and relay", () => {
+    render(<HowItWorksSection />);
+
+    const directButtons = screen.getAllByRole("button", { name: "Direct" });
+    const direct = directButtons[0]!;
+    direct.focus();
+    fireEvent.click(direct);
+
+    expect(document.activeElement).toBe(direct);
+    expect(direct.getAttribute("aria-pressed")).toBe("true");
+
+    const relayButtons = screen.getAllByRole("button", { name: "Relay (default)" });
+    const relay = relayButtons[0]!;
+    relay.focus();
+    fireEvent.click(relay);
+
+    expect(document.activeElement).toBe(relay);
+    expect(relay.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("re-subscribes the scroll observer and activates step 3 after a mode toggle", () => {
+    render(<HowItWorksSection />);
+    expect(observeMock.mock.calls.length).toBeGreaterThan(0);
+    const observesAfterMount = observeMock.mock.calls.length;
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Direct" })[0]!);
+    expect(observeMock.mock.calls.length).toBeGreaterThan(observesAfterMount);
+
+    const step3 = document.querySelectorAll(".lp-step")[2]!;
+    act(() => {
+      observerCallback?.(
+        [
+          {
+            isIntersecting: true,
+            target: step3,
+          } as IntersectionObserverEntry,
+        ],
+        {} as IntersectionObserver,
+      );
+    });
+
+    expect(step3.getAttribute("data-active")).toBe("true");
+    expect(
+      document.querySelector('[data-layer="2"]')?.getAttribute("data-active"),
+    ).toBe("true");
   });
 });
