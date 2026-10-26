@@ -4,12 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>We Met: a free digital business card</title>
-<meta name="description" content="A free digital business card. Share one link or QR code and you both get each other's details.">
+<meta name="description" content="A free digital business card. Share one link or QR code, they save your card on the spot, and you get a follow-up letter plus all their details.">
 <meta property="og:title" content="We Met">
-<meta property="og:description" content="A free digital business card. Share one link or QR code and you both get each other's details.">
+<meta property="og:description" content="A free digital business card. Share one link or QR code, they save your card on the spot, and you get a follow-up letter plus all their details.">
 <meta property="og:image" content="https://we-met.link/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="We Met: free digital business cards">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" type="image/svg+xml" href="icons/we-met-mark.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -18,7 +19,7 @@
 <link rel="stylesheet" href="landing.css">
 </head>
 <body>
-<div class="lp" id="lp-root">
+<div class="lp" id="lp-root" data-mode="relay">
   <div class="lp-glow" aria-hidden="true"></div>
 
   <header class="lp-wrap lp-header">
@@ -31,7 +32,7 @@
       <div class="lp-hero-text">
         <p class="lp-eyebrow lp-rise">Free digital business card</p>
         <h1 class="lp-h1 lp-rise lp-rise-1" id="hero-title"><span>Meet someone.</span><span>Swap details.</span><span>Easy.</span></h1>
-        <p class="lp-lead lp-rise lp-rise-2">Share one link or QR code and you both get each other's details, so you never lose a connection and can follow up in your own time.</p>
+        <p class="lp-lead lp-rise lp-rise-2">Share one link or QR code. They save your card on the spot, and you get a follow-up letter ready to send, plus all their details, in your inbox.</p>
         <div class="lp-actions lp-rise lp-rise-3">
           <a class="lp-btn" href="https://app.we-met.link" data-cta>Get started<span aria-hidden="true">→</span></a>
           <a class="lp-link" href="https://we-met.link/hi/didi">See an example</a>
@@ -86,33 +87,55 @@
           <li class="lp-step" data-step="1">
             <span class="lp-num" aria-hidden="true">2</span>
             <h3>They exchange contact details</h3>
-            <p class="lp-body">The person you met taps Exchange contact and adds their name and email.</p>
+            <p class="lp-body">The person you met taps Exchange contact, adds their name and email, and saves your contact card on the spot.</p>
             <ul class="lp-chips"><li><span class="lp-chip">No app needed</span></li></ul>
             <div class="lp-vig-box" aria-hidden="true" data-vigs>
               <div class="lp-vig"><div class="lp-vig-card lp-vig-form"><span class="lp-vig-grab"></span><p class="lp-vig-title">Let's stay in touch</p><div class="lp-vig-field"><span>Full name</span><span>Sam Rivera</span></div><div class="lp-vig-field" data-focus><span>Email</span><span>sam@studio.co</span></div><span class="lp-vig-btn">Exchange contact</span></div></div>
             </div>
           </li>
+          <!-- Step 3 has two states. Relay is the default (page load); Direct previews the owner option (DIDI-831, not built).
+               landing.js sets data-mode on #lp-root from the Relay/Direct switch; [data-mode-show] elements show only in their mode.
+               The switch only changes this illustration, never a setting. -->
           <li class="lp-step" data-step="2">
             <span class="lp-num" aria-hidden="true">3</span>
-            <h3>You both get an email</h3>
-            <p class="lp-body">You get their details as a lead. They get a follow-up email with your contact card attached.</p>
-            <ul class="lp-chips"><li><span class="lp-chip">You get all the lead details</span></li></ul>
+            <h3><span data-mode-show="relay">Two emails land in your inbox</span><span data-mode-show="direct">Your copy lands in your inbox</span></h3>
+            <p class="lp-body" data-mode-show="relay">A “Great meeting you” letter for them, ready to send on, and a “You met” email with every detail they shared, just for you.</p>
+            <p class="lp-body" data-mode-show="direct">The “Great meeting you” letter goes straight to them. Your copy, “You met”, comes to you with every detail they shared.</p>
+            <ul class="lp-chips" data-mode-show="relay"><li><span class="lp-chip">You choose when the letter goes</span></li></ul>
+            <!-- Direct view: the chip slot (36px, same as a text chip) holds the Coming soon badge, a regular .lp-chip.
+                 One element behind SHOW_DIRECT_COMING_SOON in landing.js (true until DIDI-831). Flip the flag or delete the span; the slot keeps its height. -->
+            <ul class="lp-chips" data-mode-show="direct"><li class="lp-chip-slot"><span class="lp-chip" data-slot="direct-coming-soon">Coming soon</span></li></ul>
+            <div class="lp-notes">
+              <p class="lp-note" data-mode-show="relay"><span class="lp-dot" aria-hidden="true"><span class="lp-icon" data-icon="reply" data-size="10" aria-hidden="true"></span></span><span>To send it on, just hit Reply. When you hit Reply, your contact card goes with it, so they can save you in one tap.</span></p>
+              <p class="lp-note" data-mode-show="relay"><span class="lp-dot" aria-hidden="true">i</span><span>We Met sends them nothing, so the letter waits for you until you send it on.</span></p>
+              <p class="lp-note" data-mode-show="relay"><span class="lp-dot" aria-hidden="true">i</span><span>Prefer it automatic? Switch to direct and the letter goes straight to them.</span></p>
+              <p class="lp-note" data-mode-show="direct"><span class="lp-dot" aria-hidden="true">i</span><span>Direct mode: the letter goes directly to their inbox, and you still get “You met” with all the details.</span></p>
+              <div class="lp-mode lp-mode-small" role="group" aria-label="Follow-up mode" data-mode-switch>
+                <button type="button" aria-pressed="true" data-mode-btn="relay">Relay (default)</button>
+                <button type="button" aria-pressed="false" data-mode-btn="direct">Direct</button>
+              </div>
+            </div>
             <div class="lp-vig-box" aria-hidden="true" data-vigs>
-              <div class="lp-vig"><div class="lp-vig-mail"><span class="lp-vig-to">To you</span><div class="lp-vig-row"><span class="lp-vig-av">WM</span><div class="lp-vig-msg"><div class="lp-vig-meta"><span>We Met</span><span>now</span></div><span class="lp-vig-subj">New lead: Sam Rivera</span><span class="lp-vig-from">sam@studio.co</span></div></div></div></div>
-              <div class="lp-vig"><div class="lp-vig-mail"><span class="lp-vig-to">To Sam</span><div class="lp-vig-row"><span class="lp-vig-av lp-vig-av-soft">YN</span><div class="lp-vig-msg"><div class="lp-vig-meta"><span>Your Name</span><span>now</span></div><span class="lp-vig-subj">Nice to meet you, Sam</span><span class="lp-vig-att"><span class="lp-icon" data-icon="contact-card" data-size="14" aria-hidden="true"></span>Contact card</span></div></div></div></div>
+              <div class="lp-vig lp-vig-wide">
+                <div class="lp-inbox lp-fade" data-mode-show="relay">
+                  <div class="lp-inbox-head"><span>Your inbox</span><span class="lp-inbox-count">2 new</span></div>
+                  <div class="lp-inbox-row" data-unread><span class="lp-vig-av">WM</span><div class="lp-vig-msg"><div class="lp-vig-meta"><span>We Met</span><span>now</span></div><span class="lp-vig-subj">Great meeting you, Sam</span><span class="lp-snip">Hi Sam, great meeting you, and thanks for sharing your details with me.</span><div class="lp-tags"><span class="lp-tag lp-tag-solid"><span class="lp-icon" data-icon="reply" data-size="12" aria-hidden="true"></span>Hit Reply to send</span><span class="lp-tag lp-tag-soft"><span class="lp-icon" data-icon="contact-card" data-size="12" aria-hidden="true"></span>Your card goes with it</span></div></div></div>
+                  <div class="lp-inbox-row" data-unread><span class="lp-vig-av">WM</span><div class="lp-vig-msg"><div class="lp-vig-meta"><span>We Met</span><span>now</span></div><span class="lp-vig-subj">You met Sam Rivera</span><span class="lp-snip">sam@studio.co · Product designer · Studio Co · "Met at the design meetup"</span><div class="lp-tags"><span class="lp-tag">All the details, just for you</span></div></div></div>
+                </div>
+                <div class="lp-inbox lp-fade" data-mode-show="direct">
+                  <div class="lp-inbox-head"><span>Your inbox</span><span class="lp-inbox-count">1 new</span></div>
+                  <div class="lp-inbox-row" data-unread><span class="lp-vig-av">WM</span><div class="lp-vig-msg"><div class="lp-vig-meta"><span>We Met</span><span>now</span></div><span class="lp-vig-subj">You met Sam Rivera</span><span class="lp-snip">sam@studio.co · Product designer · Studio Co · "Met at the design meetup"</span><div class="lp-tags"><span class="lp-tag">All the details, just for you</span></div></div></div>
+                </div>
+                <div class="lp-vig-mail lp-vig-sam lp-fade" data-mode-show="direct">
+                  <span class="lp-vig-to">Sam's inbox</span>
+                  <div class="lp-inbox"><div class="lp-inbox-row" data-unread><span class="lp-vig-av lp-vig-av-soft">YN</span><div class="lp-vig-msg"><div class="lp-vig-meta"><span>Your Name via We Met</span><span>now</span></div><span class="lp-vig-subj">Great meeting you, Sam</span><span class="lp-snip">Hi Sam, great meeting you, and thanks for sharing your details with me.</span><div class="lp-tags"><span class="lp-tag lp-tag-soft"><span class="lp-icon" data-icon="contact-card" data-size="12" aria-hidden="true"></span>Contact card</span><span class="lp-tag">Sent to Sam</span></div></div></div></div>
+                </div>
+              </div>
             </div>
           </li>
           </ol>
         </div>
       </div>
-    </section>
-
-    <section class="lp-wrap lp-privacy" aria-labelledby="privacy-title">
-      <div class="lp-privacy-head">
-        <p class="lp-eyebrow">Privacy</p>
-        <h2 class="lp-h2" id="privacy-title">A note on your emails.</h2>
-      </div>
-      <p class="lp-body">Emails from We Met are sent through our operator's mailbox, so the operator can technically see them. We only store delivery information (like whether an email was sent), not the contents of your leads.</p>
     </section>
 
     <section class="lp-wrap lp-final" aria-labelledby="cta-title">

@@ -142,19 +142,57 @@ body{-webkit-font-smoothing:antialiased}
 .lp-vig-btn{display:flex;align-items:center;justify-content:center;min-height:40px;margin-top:4px;border-radius:999px;background:var(--c-accent);color:var(--c-accent-ink);font:600 14px/1 Figtree,system-ui,sans-serif}
 .lp-vig-mail{display:flex;flex-direction:column;gap:8px}
 .lp-vig-to{font:600 12px/1.3 Figtree,system-ui,sans-serif;color:var(--c-ink-muted)}
-.lp-vig-row{display:flex;gap:12px;padding:14px 16px;border-radius:16px;background:var(--c-surface);border:1px solid var(--c-line)}
 .lp-vig-av{flex:none;display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:var(--c-accent);color:var(--c-accent-ink);font:700 11px/1 Figtree,system-ui,sans-serif}
 .lp-vig-av-soft{background:var(--c-surface-2);color:var(--c-ink);border:1px solid var(--c-line)}
 .lp-vig-msg{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
 .lp-vig-meta{display:flex;justify-content:space-between;gap:8px;font:500 12px/1.3 Figtree,system-ui,sans-serif;color:var(--c-ink-muted)}
 .lp-vig-subj{font:600 14px/1.3 Figtree,system-ui,sans-serif}
-.lp-vig-from{font:400 13px/1.35 Figtree,system-ui,sans-serif;color:var(--c-ink-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.lp-vig-att{align-self:flex-start;display:flex;align-items:center;gap:6px;margin-top:6px;padding:5px 10px 5px 8px;border-radius:8px;background:var(--c-surface-2);font:500 12px/1.2 Figtree,system-ui,sans-serif}
 
-/* Privacy */
-.lp-privacy{padding-top:clamp(56px,9cqi,112px);display:flex;flex-wrap:wrap;gap:16px 64px}
-.lp-privacy-head{flex:1 1 320px;display:flex;flex-direction:column;gap:16px}
-.lp-privacy .lp-body{flex:1.3 1 min(440px,100%);padding-top:4px;max-width:46ch}
+/* How it works step 3: relay (default) and direct states (DIDI-822 / DIDI-823). Ported from relay-mode/reference/wm-landing.css.txt.
+   #lp-root[data-mode] picks the state; [data-mode-show] elements render only in their state (the clones in the sticky panel too). */
+.lp[data-mode="direct"] [data-mode-show="relay"],.lp:not([data-mode="direct"]) [data-mode-show="direct"]{display:none!important}
+.lp-vig-wide{max-width:380px}
+.lp-vig-sam{margin-top:14px}
+.lp-inbox{border-radius:20px;background:var(--c-surface);border:1px solid var(--c-line);overflow:hidden}
+.lp-inbox-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 16px;border-bottom:1px solid var(--c-line);font:600 12px/1.3 Figtree,system-ui,sans-serif;color:var(--c-ink-muted)}
+.lp-inbox-count{padding:2px 8px;border-radius:999px;background:var(--c-surface-2);color:var(--c-ink)}
+.lp-inbox-row{display:flex;gap:12px;padding:14px 16px;transition:background-color .15s}
+.lp-inbox-row + .lp-inbox-row{border-top:1px solid var(--c-line)}
+.lp-inbox-row[data-unread] .lp-vig-subj::before{content:"";display:inline-block;width:7px;height:7px;margin-right:7px;border-radius:50%;background:var(--c-ink);vertical-align:2px}
+.lp-snip{font:400 13px/1.4 Figtree,system-ui,sans-serif;color:var(--c-ink-muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.lp-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.lp-tag{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;border:1px solid var(--c-line);background:var(--c-surface);font:500 11.5px/1.3 Figtree,system-ui,sans-serif;color:var(--c-ink);white-space:nowrap}
+.lp-tag-solid{background:var(--c-ink);border-color:var(--c-ink);color:var(--c-bg)}
+.lp-tag-soft{background:var(--c-surface-2);border-color:transparent}
+
+/* Relay/Direct switch (illustration only, not a setting) */
+.lp-mode{align-self:flex-start;width:max-content;display:inline-flex;padding:3px;gap:2px;border-radius:999px;border:1px solid var(--c-line);background:var(--c-surface)}
+.lp-mode button{min-height:34px;padding:0 14px;border:0;border-radius:999px;background:transparent;color:var(--c-ink-muted);font:600 13px/1 Figtree,system-ui,sans-serif;cursor:pointer;transition:background-color .15s,color .15s}
+.lp-mode button:hover{color:var(--c-ink)}
+.lp-mode button[aria-pressed="true"]{background:var(--c-ink);color:var(--c-bg)}
+.lp .lp-mode button:focus-visible{outline:3px solid var(--c-accent);outline-offset:2px}
+.lp-mode-small button{min-height:28px;padding:0 11px;font-size:12px}
+
+/* Direct view chip slot: always a text chip's height (6px + 15px x 1.6 + 6px = 36px), with or without the Coming soon chip,
+   so toggling Relay/Direct or flipping SHOW_DIRECT_COMING_SOON moves nothing. No badge-specific style: the badge is .lp-chip. */
+.lp-chip-slot{position:relative;width:100%;height:36px}
+
+/* Step 3 notes */
+.lp-notes{display:flex;flex-direction:column;gap:10px;margin-top:4px}
+.lp-note{display:flex;align-items:flex-start;gap:10px;max-width:44ch;font-size:15px;line-height:1.5;color:var(--c-ink-muted)}
+.lp-note .lp-dot{flex:none;width:18px;height:18px;margin-top:2px;border-radius:50%;border:1.5px solid var(--c-line-strong);display:flex;align-items:center;justify-content:center;font:700 11px/1 Figtree,system-ui,sans-serif;color:var(--c-ink-muted)}
+.lp-fade{animation:lp-fade .28s cubic-bezier(.2,.7,.2,1) both}
+@keyframes lp-fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* Review capture mode (?static=1, design canvas only): every step shows its vignette inline, also on desktop. */
+.lp-static .lp-panel{display:none!important}
+@media (min-width:860px){
+  .lp-static .lp-how-grid{grid-template-columns:minmax(0,1fr)}
+  .lp-static .lp-step{min-height:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:64px;row-gap:14px;align-content:start;padding:48px 0}
+  .lp-static .lp-step > *{grid-column:1}
+  .lp-static .lp-step > .lp-vig-box{display:flex;grid-column:2;grid-row:1 / span 8}
+  .lp-static .lp-step .lp-num,.lp-static .lp-step h3{color:var(--c-ink)}
+}
 
 /* Final CTA */
 .lp-final{padding-top:clamp(56px,9cqi,112px);padding-bottom:clamp(56px,9cqi,112px)}
