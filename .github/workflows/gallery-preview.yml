@@ -102,7 +102,7 @@ jobs:
             echo "Gallery probe marker must not appear in SPA HTML (only in built assets)."
             exit 1
           fi
-          js_path="$(printf '%s' "$gallery_html" | grep -oE '/gallery/assets/index-[^"]+\.js' | head -1)"
+          js_path="$(grep -oE -m1 '/gallery/assets/index-[^"]+\.js' <<<"$gallery_html")"
           if [ -z "$js_path" ]; then
             echo "Could not find gallery JS asset in /gallery HTML."
             exit 1
@@ -146,7 +146,7 @@ jobs:
               output: {
                 title: 'Gallery preview not configured',
                 summary:
-                  'Set repository secrets `CLOUDFLARE_API_TOKEN_NONPROD` and `CLOUDFLARE_ACCOUNT_ID` on the preview environment to enable gallery previews.',
+                  'Set secrets `CLOUDFLARE_API_TOKEN_NONPROD` and `CLOUDFLARE_ACCOUNT_ID` on the GitHub preview environment to enable gallery previews.',
               },
             });
       - name: Set preview summary mode

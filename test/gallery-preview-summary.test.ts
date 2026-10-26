@@ -19,6 +19,8 @@ describe("gallery-preview-summary (unit)", () => {
     expect(body).toContain("<!-- we-met-gallery-preview -->");
     expect(body).toContain("not configured");
     expect(body).toContain("CLOUDFLARE_API_TOKEN_NONPROD");
+    expect(body).toContain("preview");
+    expect(body).not.toContain("repository secrets");
     expect(body).not.toContain("deploy did not complete");
   });
 

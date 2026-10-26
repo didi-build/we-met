@@ -10,12 +10,8 @@ const prefix = getGalleryUrlPrefix();
 const assetsRoot = getGalleryAssetsRoot();
 const headersPath = join(assetsRoot, "_headers");
 
-const blocks = [
-  `${prefix}/*`,
-  `${prefix}`,
-  `${prefix}/`,
-  `${prefix}/assets/*`,
-  "/*",
-].map((pattern) => `${pattern}\n\tX-Robots-Tag: noindex, nofollow`);
+const blocks = [`${prefix}/*`, `${prefix}/assets/*`, "/*"].map(
+  (pattern) => `${pattern}\n\tX-Robots-Tag: noindex, nofollow`,
+);
 
 writeFileSync(headersPath, `${blocks.join("\n\n")}\n`, "utf8");
