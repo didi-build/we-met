@@ -46,7 +46,7 @@ export function middleware(request: NextRequest) {
   if (
     hostConfig.weMetEnv === "production" &&
     isCardServingHost(hostname, hostConfig) &&
-    pathname.startsWith("/app")
+    (pathname === "/app" || pathname === APP_COMING_SOON_PATH)
   ) {
     return finalizeMiddlewareResponse(
       new NextResponse(null, { status: 404 }),
@@ -73,5 +73,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/", "/app", "/app-coming-soon", "/hi/:path*"],
 };

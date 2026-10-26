@@ -1,5 +1,5 @@
 import type { NextConfig } from "next";
-import { NON_PRODUCTION_X_ROBOTS_TAG } from "./src/lib/we-met/non-production";
+import { resolveNextConfigSecurityHeaders } from "./src/lib/we-met/next-config-headers";
 
 const weMetEnv = process.env.WE_MET_ENV ?? "production";
 
@@ -10,15 +10,7 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_WE_MET_COMMIT_SHA: process.env.WE_MET_COMMIT_SHA?.trim() ?? "",
   },
   async headers() {
-    if (weMetEnv === "production") {
-      return [];
-    }
-    return [
-      {
-        source: "/:path*",
-        headers: [{ key: "X-Robots-Tag", value: NON_PRODUCTION_X_ROBOTS_TAG }],
-      },
-    ];
+    return resolveNextConfigSecurityHeaders(weMetEnv);
   },
 };
 

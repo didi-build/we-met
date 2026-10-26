@@ -517,7 +517,7 @@ export function HiExchangeSheet({
   const detailsTitle = substituteFirstName(copy.detailsTitle, firstName || "there");
 
   return (
-    <div className="fixed inset-0 z-20 flex flex-col items-center justify-end pt-6">
+    <div className="fixed inset-x-0 bottom-0 top-[var(--we-met-environment-banner-offset,0px)] z-20 flex flex-col items-center justify-end pt-6">
       <button
         type="button"
         aria-label={copy.closeLabel}

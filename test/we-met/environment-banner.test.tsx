@@ -15,7 +15,7 @@ describe("WeMetEnvironmentBanner (unit)", () => {
       <WeMetEnvironmentBanner label="Staging" shortSha="deadbeef" />,
     );
     expect(screen.getByTestId("we-met-environment-banner").textContent).toBe(
-      "Staging · deadbeef",
+      "Staging deadbeef",
     );
 
     rerender(<WeMetEnvironmentBanner label="Preview" shortSha="" />);

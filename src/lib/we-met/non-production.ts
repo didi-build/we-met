@@ -1,6 +1,6 @@
 export const NON_PRODUCTION_X_ROBOTS_TAG = "noindex, nofollow";
 
-/** Matches the fixed environment banner height (Tailwind `pt-9` / `2.25rem`). */
+/** Matches the fixed environment banner height (`h-9` / `2.25rem`). */
 export const ENVIRONMENT_BANNER_OFFSET_CSS = "2.25rem";
 
 export const ENVIRONMENT_BANNER_BODY_CLASS = "we-met-env-banner";
@@ -63,7 +63,7 @@ export function formatNonProductionBannerText({
   label,
   shortSha,
 }: NonProductionBannerProps): string {
-  return shortSha ? `${label} · ${shortSha}` : label;
+  return shortSha ? `${label} ${shortSha}` : label;
 }
 
 export function applyNonProductionXRobotsTag(

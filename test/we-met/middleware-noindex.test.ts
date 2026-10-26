@@ -46,8 +46,8 @@ describe("middleware non-production X-Robots-Tag (unit)", () => {
       const landing = middleware(request("/", "we-met.link"));
       expect(landing?.headers.get("x-robots-tag")).toBe(NON_PRODUCTION_X_ROBOTS_TAG);
 
-      const api = middleware(request("/api/exchange", "we-met.link"));
-      expect(api?.headers.get("x-robots-tag")).toBe(NON_PRODUCTION_X_ROBOTS_TAG);
+      const hi = middleware(request("/hi/didi", "we-met.link"));
+      expect(hi?.headers.get("x-robots-tag")).toBe(NON_PRODUCTION_X_ROBOTS_TAG);
     }
   });
 

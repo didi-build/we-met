@@ -29,7 +29,7 @@ describe("non-production env helpers (unit)", () => {
         label: "Staging",
         shortSha: "abc1234",
       }),
-    ).toBe("Staging · abc1234");
+    ).toBe("Staging abc1234");
     expect(shortCommitSha("deadbeef")).toBe("deadbee");
     expect(
       formatNonProductionBannerText({
