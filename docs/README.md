@@ -23,7 +23,6 @@ Project docs live here so humans and agents share the same map.
 | [decisions/0007-production-deploy-manual.md](./decisions/0007-production-deploy-manual.md)                           | Production deploy with approval                                                                                 |
 | [decisions/0008-api-routes-exchange-and-details.md](./decisions/0008-api-routes-exchange-and-details.md)             | `/api/exchange`, `/api/details`                                                                                 |
 | [decisions/0009-environments-local-preview-production.md](./decisions/0009-environments-local-preview-production.md) | Superseded by 0028; was no staging                                                                              |
-| [decisions/0028-staging-we-met-didi-build.md](./decisions/0028-staging-we-met-didi-build.md)                         | Staging Worker `we-met-staging` on we-met.didi.build ([DIDI-873](https://linear.app/didi-build/issue/DIDI-873)) |
 | [decisions/0010-card-data-d1-and-load-script.md](./decisions/0010-card-data-d1-and-load-script.md)                   | D1 schema; gitignored load file                                                                                 |
 | [decisions/0011-d1-migrations.md](./decisions/0011-d1-migrations.md)                                                 | Migration policy                                                                                                |
 | [decisions/0012-r2-images-single-ingestion.md](./decisions/0012-r2-images-single-ingestion.md)                       | R2 + single image function                                                                                      |
@@ -35,12 +34,14 @@ Project docs live here so humans and agents share the same map.
 | [decisions/0018-lead-sink.md](./decisions/0018-lead-sink.md)                                                         | `lead_sinks` list; dispatch in step 1                                                                           |
 | [decisions/0019-pr-preview-github-action.md](./decisions/0019-pr-preview-github-action.md)                           | PR previews via GitHub Actions                                                                                  |
 | [decisions/0020-d1-database-id-injection.md](./decisions/0020-d1-database-id-injection.md)                           | D1 IDs from GitHub environment secrets at deploy                                                                |
+| [decisions/0027-owner-relay-visitor-follow-up.md](./decisions/0027-owner-relay-visitor-follow-up.md)                 | Owner relay visitor follow-up                                                                                   |
+| [decisions/0028-staging-we-met-didi-build.md](./decisions/0028-staging-we-met-didi-build.md)                         | Staging Worker `we-met-staging` on we-met.didi.build ([DIDI-873](https://linear.app/didi-build/issue/DIDI-873)) |
 
 ## Runbooks
 
 | Path                                                           | Purpose                                            |
 | -------------------------------------------------------------- | -------------------------------------------------- |
-| [runbooks/deploy.md](./runbooks/deploy.md)                     | Preview and production deploy                      |
+| [runbooks/deploy.md](./runbooks/deploy.md)                     | Preview, staging, and production deploy            |
 | [runbooks/deploy-setup.md](./runbooks/deploy-setup.md)         | One-time Cloudflare/GitHub setup and proof deploy  |
 | [runbooks/card-loading.md](./runbooks/card-loading.md)         | Load gitignored card JSON into D1 (local / remote) |
 | [runbooks/rollback.md](./runbooks/rollback.md)                 | Production rollback                                |

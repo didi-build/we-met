@@ -37,12 +37,12 @@
 - **Trigger:** Push to **`main`** (same docs-only path ignore pattern as production deploy where applicable).
 - **Environment:** GitHub **`staging`**: **no required reviewers**, **deployment branches `main` only**.
 - **Touches:** Worker **`we-met-staging`** on **`we-met.didi.build`**; shared non-prod D1 **`we-met-db-nonprod`**, R2 **`we-met-assets-nonprod`**, queue **`we-met-followup-email-nonprod`**, rate limiter namespaces **2001**, **2003**, and **2005**; **`IMAGES`**; **`WORKER_SELF_REFERENCE`** pointing at **`we-met-staging`**. No new Cloudflare resources.
-- **D1 migrations:** The staging job applies migrations to **`we-met-db-nonprod`** on each `main` push. It also reports which migration files on `main` are not yet on production D1 (informational for production approvers; not a substitute for the production plan job).
+- **D1 migrations:** The staging job applies migrations to **`we-met-db-nonprod`** on each `main` push. It also **warns** when non-prod D1 has migrations applied that are **not** in **`main`**'s `migrations/` (for example unmerged PR drift from [Migrate non-prod D1](#preview-per-pull-request)); warning only, never touches production D1 ([DIDI-881](https://linear.app/didi-build/issue/DIDI-881)).
 - **Mail / consumer:** Outbound mail uses the existing **`we-met-followup-email-consumer-nonprod`** ([Deploy consumer non-prod](#non-prod-follow-up-email-consumer-merge-to-main-no-approval)); redirect and test stamping via **`WE_MET_TEST_MAIL_TO`**. Staging does **not** deploy the warmup Worker.
 - **Google sign-in:** Enabled on the static staging host (`/api/auth/google/callback` and contacts callback on `https://we-met.didi.build`; see [deploy-setup.md](./deploy-setup.md)).
-- **UX:** `X-Robots-Tag: noindex` and a visible staging banner when **`WE_MET_ENV`** is not **`production`**. No Cloudflare Access.
+- **UX:** `X-Robots-Tag: noindex, nofollow` and a visible staging banner when **`WE_MET_ENV`** is not **`production`**. No Cloudflare Access.
 - **Ordering vs production:** Staging, **Deploy consumer non-prod**, and **Deploy production** all trigger on push to `main`. Staging ships the latest `main` app to `we-met.didi.build` without waiting for **`production`** approval. Production deploy and its approval gate are unchanged ([0007](../decisions/0007-production-deploy-manual.md)).
-- **Verify:** `https://we-met.didi.build/` over HTTPS after the first successful staging deploy; sign-in and exchange smoke per [test-leads.md](./test-leads.md) using non-prod mail.
+- **Verify:** After the first successful staging deploy, load **`https://we-met.didi.build/`** (landing) and **`https://we-met.didi.build/app`** (editor) over HTTPS; sign-in and exchange smoke per [test-leads.md](./test-leads.md) using non-prod mail.
 
 ## Production (merge to `main` + approval)
 
@@ -110,20 +110,19 @@ CI Cloudflare tokens use **Workers Editor** on specific Workers ([0017](../decis
 
 **Troubleshooting:** `The zone "we-met.link" does not exist on your account [code: 10084]` during production deploy means the CI token lacks zone access on `we-met.link`; see [0017](../decisions/0017-cloudflare-api-credentials.md#token-scoping-cloudflare-2026).
 
-| Name                                       | Where                                                                                   | Used by                                                                                        |
-| ------------------------------------------ | --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `CLOUDFLARE_ACCOUNT_ID`                    | Repository secret                                                                       | Preview, staging, consumer non-prod, and production workflows                                  |
-| `CLOUDFLARE_API_TOKEN_NONPROD`             | `preview` environment secret                                                            | Preview workflow                                                                               |
-| `CLOUDFLARE_API_TOKEN_MIGRATE_NONPROD`     | `migrate-nonprod` environment secret                                                    | Migrate non-prod D1 workflow (D1 only; names only here)                                        |
-| `CLOUDFLARE_API_TOKEN_STAGING`             | `staging` environment secret                                                            | Deploy staging workflow ([0028](../decisions/0028-staging-we-met-didi-build.md))               |
-| `WE_MET_D1_DATABASE_ID_NONPROD`            | `preview`, `staging`, `migrate-nonprod`, and `consumer-nonprod` environment **secrets** | Preview, staging, migrate, and non-prod consumer workflows; `db:migrate:remote` (local export) |
-| `WE_MET_TURNSTILE_SITE_KEY_STAGING`        | `staging` environment variable                                                          | Staging build                                                                                  |
-| `WE_MET_TURNSTILE_SITE_KEY_NONPROD`        | `preview` environment variable                                                          | Preview build                                                                                  |
-| `CLOUDFLARE_API_TOKEN_PRODUCTION`          | `production` environment secret                                                         | Production app deploy and D1 migrations only                                                   |
-| `CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION` | `production` environment secret                                                         | Production follow-up email consumer deploy only                                                |
-| `CLOUDFLARE_API_TOKEN_CONSUMER_NONPROD`    | `consumer-nonprod` environment secret                                                   | Non-prod follow-up email consumer deploy only                                                  |
-| `WE_MET_D1_DATABASE_ID_PRODUCTION`         | `production` environment **secret**                                                     | Production deploy (provision override / prepare cross-check)                                   |
-| `WE_MET_TURNSTILE_SITE_KEY_PRODUCTION`     | `production` environment variable                                                       | Production build                                                                               |
+| Name                                       | Where                                                                                   | Used by                                                                                                   |
+| ------------------------------------------ | --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `CLOUDFLARE_ACCOUNT_ID`                    | Repository secret                                                                       | Preview, staging, consumer non-prod, and production workflows                                             |
+| `CLOUDFLARE_API_TOKEN_NONPROD`             | `preview` environment secret                                                            | Preview workflow                                                                                          |
+| `CLOUDFLARE_API_TOKEN_MIGRATE_NONPROD`     | `migrate-nonprod` environment secret                                                    | Migrate non-prod D1 workflow (D1 only; names only here)                                                   |
+| `CLOUDFLARE_API_TOKEN_STAGING`             | `staging` environment secret                                                            | Deploy staging workflow ([0028](../decisions/0028-staging-we-met-didi-build.md))                          |
+| `WE_MET_D1_DATABASE_ID_NONPROD`            | `preview`, `staging`, `migrate-nonprod`, and `consumer-nonprod` environment **secrets** | Preview, staging, migrate, and non-prod consumer workflows; `db:migrate:remote` (local export)            |
+| `WE_MET_TURNSTILE_SITE_KEY_NONPROD`        | `preview` and `staging` environment variables                                           | Preview and staging builds (same non-prod widget; [0028](../decisions/0028-staging-we-met-didi-build.md)) |
+| `CLOUDFLARE_API_TOKEN_PRODUCTION`          | `production` environment secret                                                         | Production app deploy and D1 migrations only                                                              |
+| `CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION` | `production` environment secret                                                         | Production follow-up email consumer deploy only                                                           |
+| `CLOUDFLARE_API_TOKEN_CONSUMER_NONPROD`    | `consumer-nonprod` environment secret                                                   | Non-prod follow-up email consumer deploy only                                                             |
+| `WE_MET_D1_DATABASE_ID_PRODUCTION`         | `production` environment **secret**                                                     | Production deploy (provision override / prepare cross-check)                                              |
+| `WE_MET_TURNSTILE_SITE_KEY_PRODUCTION`     | `production` environment variable                                                       | Production build                                                                                          |
 
 Worker secrets (`WE_MET_TOKEN_SECRET`, `TURNSTILE_SECRET_KEY`): set during the maintainer proof deploy in [deploy-setup.md](./deploy-setup.md) (`wrangler login`, then `wrangler secret put` / `wrangler preview base-config secret put`).
 
