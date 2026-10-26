@@ -62,7 +62,7 @@ Rules:
 - **Binding:** the `oauth_attempts` row is tied to the browser by a short-lived `__Host-wm_oauth` cookie holding the state. It is single use.
 - **Sessions:** opaque random token, only its hash is stored. `last_seen_at` updates at most once a day. Logout deletes the row. Suspend takes effect on the next request.
 - **Cookie:** `__Host-wm_session`, `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`, no `Domain`. Host-only on the app host ([0013](./0013-future-app-host.md)).
-- **Redirect URI** is built from config, never from the request host ([0003](./0003-urls-and-lookup.md)): production uses `appBaseUrl(WE_MET_BASE_URL)`, local uses `WE_MET_APP_ORIGIN`, previews use the request origin only when the host ends with `WE_MET_PREVIEW_HOST_SUFFIX`.
+- **Redirect URI** is built from config, never from the request host ([0003](./0003-urls-and-lookup.md)): production uses `appBaseUrl(WE_MET_BASE_URL)`, local uses `WE_MET_APP_ORIGIN`, **staging** uses `WE_MET_BASE_URL` on the single card host ([0028](./0028-staging-we-met-didi-build.md)), previews use the request origin only when the host ends with `WE_MET_PREVIEW_HOST_SUFFIX`.
 - **Non-prod:** real Google runs on `localhost` with remote non-prod bindings (a separate dev OAuth client). PR previews have no Google sign-in. They use `POST /api/auth/preview-login`: a long random secret (`WE_MET_PREVIEW_LOGIN_SECRET`, a preview base-config secret) signs in a fixed identity (`google_sub` `preview:test`, email from `WE_MET_PREVIEW_LOGIN_EMAIL`). The route fails closed when the secret is unset, exists only when `WE_MET_ENV=preview` (404 otherwise), compares in constant time, uses the auth rate limiter, and a CI guard plus a test fail if it is reachable under production or local config. Agents get the secret from their own secret store. Previews stay public (Cloudflare Access was considered and rejected because agents could not use previews).
 - **Closed sign-ups:** when `signups_open` is off, a new Google account is created as `waitlisted` and gets a session with `allowed: false`. All card routes return 403 for non-active accounts. At sign-in a waitlisted account becomes `active` if `signups_open` is on. A suspended account fails sign-in (`failed`) in v1.
 
@@ -86,7 +86,7 @@ Rules:
 
 ### 6. The app API
 
-Routes (all JSON; served only on the app host, preview hosts and localhost, and 404 on the production card host):
+Routes (all JSON; served on the production app host (`app.we-met.link`), the **staging** single host (`WE_MET_BASE_URL` when `WE_MET_ENV=staging`, see [0028](./0028-staging-we-met-didi-build.md)), PR preview hosts, and `localhost` / `127.0.0.1` when `WE_MET_ENV=local`; **404** on the production card host `we-met.link`):
 
 | Route                                                  | `AppApi` method |
 | ------------------------------------------------------ | --------------- |
@@ -101,7 +101,7 @@ Routes (all JSON; served only on the app host, preview hosts and localhost, and 
 | `POST /api/app/photo`, `GET /api/app/photo?v=<key>`    | `uploadPhoto`   |
 | `POST /api/app/card/publish`                           | `publish`       |
 
-- **SPA mount:** production serves it at `app.we-met.link/`. Local and previews serve the same SPA under `/app`, backed by the real API. The `/app-preview` stub route is removed.
+- **SPA mount:** production serves it at `app.we-met.link/`. Staging serves the SPA under `/app` on the card host (landing stays on `/`). Local and previews serve the same SPA under `/app`, backed by the real API. The `/app-preview` stub route is removed.
 - **Errors:** `{ "error": { "code": "...", "fields"?: ... } }`. 401 `unauthorized`, 403 `forbidden`, 409 `slug-taken` or `slug-locked`, 422 `name-missing` or `slug-invalid` or `slug-reserved` or `invalid-fields`, 413 and 415 for photos, 429 `rate-limited`. A 5xx or network failure becomes the client's `network`. New client codes: `slug-locked`, `forbidden`, `rate-limited`, `invalid-fields`.
 - **CSRF and origin:** every POST, PUT and DELETE requires an `Origin` equal to the app origin (a missing or `null` origin is rejected), the exact content type (`application/json`, or `image/jpeg` for the photo route), and `Sec-Fetch-Site: same-origin` when the header is present. No CORS headers at all. `Cache-Control: no-store` on every API response. `SameSite=Lax` alone is not enough because `we-met.link` card pages are same-site with the app host.
 - **Drafts:** last write wins in v1. `getCard` and `saveDraft` return `updatedAt` for a later merge flow.

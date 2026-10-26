@@ -76,6 +76,7 @@ describe("landing middleware host routing (unit)", () => {
 
   it("allows /app on the staging card host and keeps / as the landing page", () => {
     process.env.WE_MET_BASE_URL = "https://we-met.didi.build";
+    process.env.WE_MET_PREVIEW_HOST_SUFFIX = "";
     process.env.WE_MET_ENV = "staging";
     try {
       const appPath = middleware(request("/app", "we-met.didi.build"));
@@ -103,6 +104,16 @@ describe("landing middleware host routing (unit)", () => {
         "private, max-age=0, must-revalidate",
       );
     }
+  });
+
+  it("keeps /hi/<slug> cache-control on the staging card host", () => {
+    process.env.WE_MET_BASE_URL = "https://we-met.didi.build";
+    process.env.WE_MET_PREVIEW_HOST_SUFFIX = "";
+    process.env.WE_MET_ENV = "staging";
+    const response = middleware(request("/hi/didi", "we-met.didi.build"));
+    expect(response?.headers.get("cache-control")).toBe(
+      "private, max-age=0, must-revalidate",
+    );
   });
 
   it("does not set card HTML cache-control on /hi photo assets", () => {

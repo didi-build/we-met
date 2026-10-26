@@ -1,8 +1,17 @@
+export type WeMetEnv = "local" | "preview" | "staging" | "production";
+
 export type WeMetHostConfig = {
   baseUrl: string;
   previewHostSuffix: string | null;
   weMetEnv: string;
 };
+
+const ALLOWED_WE_MET_ENV = new Set<WeMetEnv>([
+  "local",
+  "preview",
+  "staging",
+  "production",
+]);
 
 function requireNonEmpty(name: string, value: string | undefined): string {
   const trimmed = value?.trim();
@@ -12,14 +21,27 @@ function requireNonEmpty(name: string, value: string | undefined): string {
   return trimmed;
 }
 
+function normalizeWeMetEnv(raw: string | undefined): WeMetEnv {
+  const value = (raw?.trim() || "production") as WeMetEnv;
+  if (!ALLOWED_WE_MET_ENV.has(value)) {
+    throw new Error(`Invalid WE_MET_ENV: ${raw?.trim() ?? ""}`);
+  }
+  return value;
+}
+
 export function readWeMetHostConfig(env: {
   WE_MET_BASE_URL?: string;
   WE_MET_PREVIEW_HOST_SUFFIX?: string;
   WE_MET_ENV?: string;
 }): WeMetHostConfig {
   const baseUrl = requireNonEmpty("WE_MET_BASE_URL", env.WE_MET_BASE_URL);
+  const weMetEnv = normalizeWeMetEnv(env.WE_MET_ENV);
   const previewHostSuffix = env.WE_MET_PREVIEW_HOST_SUFFIX?.trim() || null;
-  const weMetEnv = env.WE_MET_ENV?.trim() || "production";
+  if (weMetEnv === "staging" && previewHostSuffix) {
+    throw new Error(
+      "WE_MET_PREVIEW_HOST_SUFFIX must not be set when WE_MET_ENV is staging",
+    );
+  }
   return { baseUrl, previewHostSuffix, weMetEnv };
 }
 
