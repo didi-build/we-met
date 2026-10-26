@@ -75,6 +75,35 @@ describe("format visitor follow-up email (unit)", () => {
     expect(content.textHtml).not.toContain("Save my contact card");
   });
 
+  it("uses the relay contact card sentence in HTML and plain text", () => {
+    const content = buildVisitorFollowUpEmail({
+      card,
+      visitorName: "Alex",
+      baseUrl,
+    });
+    const sentence = "Tap below to save my contact card to your phone in one tap.";
+    expect(content.textPlain).toContain(sentence);
+    expect(content.textHtml).toContain(sentence);
+    expect(content.textPlain).not.toContain("attached to this email");
+    expect(content.textHtml).not.toContain("attached to this email");
+  });
+
+  it("plain text has a single blank line before the owner name (relay link on and off)", () => {
+    const relayUrl = "https://we-met.link/api/exchange/lead-1/contact-card?token=abc";
+    const ownerLine = "Demo User";
+    for (const contactCardDownloadUrl of [relayUrl, undefined]) {
+      const content = buildVisitorFollowUpEmail({
+        card,
+        visitorName: "Alex",
+        baseUrl,
+        contactCardDownloadUrl,
+      });
+      const beforeOwner = content.textPlain.split(ownerLine)[0] ?? "";
+      expect(beforeOwner.endsWith("\n\n")).toBe(true);
+      expect(beforeOwner.endsWith("\n\n\n")).toBe(false);
+    }
+  });
+
   it("never leaves raw template tags in HTML or text (relay and direct)", () => {
     const relayUrl = "https://we-met.link/api/exchange/lead-1/contact-card?token=abc";
     const relay = buildVisitorFollowUpEmail({
