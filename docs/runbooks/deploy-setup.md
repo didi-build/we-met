@@ -320,7 +320,7 @@ After the production follow-up email consumer shipped (**2026-10-14**), the firs
    - **Secret:** `WE_MET_D1_DATABASE_ID_NONPROD` (same value as `preview`)
    - **Variable:** `WE_MET_TURNSTILE_SITE_KEY_NONPROD` (same non-prod widget site key as `preview`; hostnames must include **`we-met.didi.build`**)
 
-Remove or rename any legacy unsuffixed `CLOUDFLARE_API_TOKEN` secrets. Do **not** duplicate `CLOUDFLARE_ACCOUNT_ID` on the `preview` or `production` environments unless you intentionally use a different account (the repo uses one repo-level `CLOUDFLARE_ACCOUNT_ID` for both workflows).
+Remove or rename any legacy unsuffixed `CLOUDFLARE_API_TOKEN` secrets. Do **not** duplicate `CLOUDFLARE_ACCOUNT_ID` on the `preview` or `production` environments unless you intentionally use a different account (the repo uses one repo-level `CLOUDFLARE_ACCOUNT_ID` for all workflows, including **`staging`** and **`consumer-nonprod`**).
 
 **Known gap:** closing a PR without merging leaves its expand-only migration applied in shared non-prod D1; add a new migration to revert if needed.
 

@@ -7,6 +7,7 @@ import { parseJsonc } from "../scripts/lib/parse-jsonc.mjs";
 
 const SCRIPT = "scripts/check-deploy-guards.mjs";
 const BASE_CONFIG = readFileSync("wrangler.jsonc", "utf8");
+const STAGING_BASE_CONFIG = readFileSync("wrangler.staging.jsonc", "utf8");
 const MAIL_SAFETY_BASE = readFileSync("config/nonprod-mail-safety.json", "utf8");
 
 const tempDirs: string[] = [];
@@ -25,6 +26,16 @@ function writeTempConfig(mutator: (config: Record<string, unknown>) => void) {
   tempDirs.push(dir);
   const path = join(dir, "wrangler.jsonc");
   const config = parseJsonc(BASE_CONFIG) as Record<string, unknown>;
+  mutator(config);
+  writeFileSync(path, JSON.stringify(config, null, 2), "utf8");
+  return { dir, path };
+}
+
+function writeTempStagingConfig(mutator: (config: Record<string, unknown>) => void) {
+  const dir = mkdtempSync(join(tmpdir(), "we-met-staging-guards-"));
+  tempDirs.push(dir);
+  const path = join(dir, "wrangler.staging.jsonc");
+  const config = parseJsonc(STAGING_BASE_CONFIG) as Record<string, unknown>;
   mutator(config);
   writeFileSync(path, JSON.stringify(config, null, 2), "utf8");
   return { dir, path };
@@ -59,6 +70,11 @@ describe("check-deploy-guards (unit)", () => {
 
   it("passes production guards on committed wrangler.jsonc", () => {
     const result = runGuards("production", "wrangler.jsonc");
+    expect(result.status).toBe(0);
+  });
+
+  it("passes staging guards on committed wrangler.staging.jsonc", () => {
+    const result = runGuards("staging", "wrangler.staging.jsonc");
     expect(result.status).toBe(0);
   });
 
@@ -421,6 +437,187 @@ describe("check-deploy-guards (unit)", () => {
       expect(result.stderr).toContain(message);
     });
   }
+
+  const stagingGuardCases = [
+    {
+      label: "staging D1 database_name is production",
+      message: /we-met-db-nonprod|production resource "we-met-db"/,
+      mutate: (config: Record<string, unknown>) => {
+        const d1 = config.d1_databases as { database_name: string }[];
+        d1[0].database_name = "we-met-db";
+      },
+    },
+    {
+      label: "staging route is we-met.link",
+      message: "we-met.didi.build",
+      mutate: (config: Record<string, unknown>) => {
+        config.routes = [{ pattern: "we-met.link", custom_domain: true }];
+      },
+    },
+    {
+      label: "staging route is app.we-met.link",
+      message: "we-met.didi.build",
+      mutate: (config: Record<string, unknown>) => {
+        config.routes = [{ pattern: "app.we-met.link", custom_domain: true }];
+      },
+    },
+    {
+      label: "staging route is not we-met.didi.build",
+      message: "we-met.didi.build",
+      mutate: (config: Record<string, unknown>) => {
+        config.routes = [{ pattern: "other.example.com", custom_domain: true }];
+      },
+    },
+    {
+      label: "staging D1 database_id uses production placeholder",
+      message: "production placeholder",
+      mutate: (config: Record<string, unknown>) => {
+        const d1 = config.d1_databases as { database_id: string }[];
+        d1[0].database_id = "00000000-0000-0000-0000-000000000001";
+      },
+    },
+    {
+      label: "staging Worker name is wrong",
+      message: /we-met-staging|production resource "we-met"/,
+      mutate: (config: Record<string, unknown>) => {
+        config.name = "we-met";
+      },
+    },
+    {
+      label: "staging vars.WE_MET_ENV is missing",
+      message: 'vars.WE_MET_ENV must be "staging"',
+      mutate: (config: Record<string, unknown>) => {
+        const vars = config.vars as Record<string, string>;
+        delete vars.WE_MET_ENV;
+      },
+    },
+    {
+      label: "staging vars.WE_MET_ENV is not staging",
+      message: 'vars.WE_MET_ENV must be "staging"',
+      mutate: (config: Record<string, unknown>) => {
+        const vars = config.vars as Record<string, string>;
+        vars.WE_MET_ENV = "production";
+      },
+    },
+    {
+      label: "staging vars.WE_MET_PREVIEW_HOST_SUFFIX is non-empty",
+      message: 'WE_MET_PREVIEW_HOST_SUFFIX must be ""',
+      mutate: (config: Record<string, unknown>) => {
+        const vars = config.vars as Record<string, string>;
+        vars.WE_MET_PREVIEW_HOST_SUFFIX = "-we-met.preview.workers.dev";
+      },
+    },
+    {
+      label: "staging binds send_email",
+      message: "send_email",
+      mutate: (config: Record<string, unknown>) => {
+        config.send_email = { name: "EMAIL" };
+      },
+    },
+    {
+      label: "staging defines triggers.crons",
+      message: "triggers.crons",
+      mutate: (config: Record<string, unknown>) => {
+        config.triggers = { crons: ["0 * * * *"] };
+      },
+    },
+    {
+      label: "staging defines queue consumers",
+      message: "queue consumers",
+      mutate: (config: Record<string, unknown>) => {
+        const queues = config.queues as { producers: unknown[]; consumers: unknown[] };
+        queues.consumers = [{ queue: "we-met-followup-email-nonprod" }];
+      },
+    },
+    {
+      label: "staging rate limiter uses production namespace",
+      message: /preview rate limiter|production resource "2002"/,
+      mutate: (config: Record<string, unknown>) => {
+        const rl = config.ratelimits as { namespace_id: string }[];
+        rl[0].namespace_id = "2002";
+      },
+    },
+    {
+      label: "staging queue producer is production",
+      message:
+        /we-met-followup-email-nonprod|production resource "we-met-followup-email"/,
+      mutate: (config: Record<string, unknown>) => {
+        const queues = config.queues as { producers: { queue: string }[] };
+        queues.producers[0].queue = "we-met-followup-email";
+      },
+    },
+    {
+      label: "staging WORKER_SELF_REFERENCE targets we-met",
+      message: /production Worker "we-met"|production resource "we-met"/,
+      mutate: (config: Record<string, unknown>) => {
+        const services = config.services as { service: string }[];
+        services[0].service = "we-met";
+      },
+    },
+    {
+      label: "staging R2 bucket is production",
+      message: /we-met-assets-nonprod|production resource "we-met-assets"/,
+      mutate: (config: Record<string, unknown>) => {
+        const r2 = config.r2_buckets as { bucket_name: string }[];
+        r2[0].bucket_name = "we-met-assets";
+      },
+    },
+  ] as const;
+
+  for (const { label, message, mutate } of stagingGuardCases) {
+    it(`fails staging guards when ${label}`, () => {
+      const { path } = writeTempStagingConfig(mutate);
+      const result = runGuards("staging", path);
+      expect(result.status).toBe(1);
+      if (message instanceof RegExp) {
+        expect(result.stderr).toMatch(message);
+      } else {
+        expect(result.stderr).toContain(message);
+      }
+    });
+  }
+
+  it("fails staging guards when D1 database_id does not match non-prod id after substitution", () => {
+    const { path } = writeTempStagingConfig((config) => {
+      const d1 = config.d1_databases as { database_id: string }[];
+      d1[0].database_id = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+    });
+    const result = spawnSync(
+      "node",
+      [SCRIPT, "--target", "staging", "--config", path],
+      {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          WE_MET_D1_DATABASE_ID_NONPROD: "22222222-2222-2222-2222-222222222222",
+        },
+      },
+    );
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("non-prod database_id");
+  });
+
+  it("fails staging guards when D1 database_id equals production id after substitution", () => {
+    const same = "11111111-1111-1111-1111-111111111111";
+    const { path } = writeTempStagingConfig((config) => {
+      const d1 = config.d1_databases as { database_id: string }[];
+      d1[0].database_id = same;
+    });
+    const result = spawnSync(
+      "node",
+      [SCRIPT, "--target", "staging", "--config", path],
+      {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          WE_MET_D1_DATABASE_ID_PRODUCTION: same,
+          WE_MET_D1_DATABASE_ID_NONPROD: "22222222-2222-2222-2222-222222222222",
+        },
+      },
+    );
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("production database_id");
+  });
 
   const CONSUMER_NONPROD =
     "workers/we-met-followup-email-consumer/wrangler.nonprod.jsonc";
