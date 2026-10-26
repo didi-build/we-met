@@ -7,7 +7,9 @@ function shouldUseHttpApi(): boolean {
     return false;
   }
   const env = process.env.NEXT_PUBLIC_WE_MET_ENV ?? "production";
-  return env === "preview" || env === "local" || env === "production";
+  return (
+    env === "preview" || env === "local" || env === "production" || env === "staging"
+  );
 }
 
 export function createRuntimeAppApi(search = ""): AppApi {

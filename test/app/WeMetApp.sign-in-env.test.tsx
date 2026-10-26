@@ -13,6 +13,18 @@ describe("WeMetApp sign-in by environment (integration)", () => {
     vi.unstubAllEnvs();
   });
 
+  it("shows Google sign-in on staging like production", async () => {
+    vi.stubEnv("NEXT_PUBLIC_WE_MET_ENV", "staging");
+    render(
+      <AppTestShell>
+        <WeMetApp />
+      </AppTestShell>,
+    );
+    await waitFor(() => expect(screen.getByText("Make your We Met card")).toBeTruthy());
+    expect(screen.getByText(/Sign in with Google/i)).toBeTruthy();
+    expect(screen.queryByLabelText(/Preview sign-in/i)).toBeNull();
+  });
+
   it("shows Google sign-in when not on preview", async () => {
     vi.stubEnv("NEXT_PUBLIC_WE_MET_ENV", "local");
     render(

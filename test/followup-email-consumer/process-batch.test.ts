@@ -429,6 +429,18 @@ describe("processFollowupQueueBatch (unit)", () => {
     expect(message.retry).not.toHaveBeenCalled();
   });
 
+  it("staging consumer redirects visitor mail with test subject and delivery line", async () => {
+    const message = createMessage(visitorBody());
+    const deps = createDeps({ weMetEnv: "staging" });
+    await processFollowupQueueBatch({ messages: [message] }, deps);
+    const sent = vi.mocked(deps.sendEmail).mock.calls[0][0];
+    expect(sent.to).toBe("test-inbox@example.com");
+    expect(sent.subject).toContain("[we-met test → visitor@example.com]");
+    expect(sent.textPlain).toContain(
+      "Test delivery (sink destination): visitor@example.com",
+    );
+  });
+
   it("redirects when lead.environment is production but consumer WE_MET_ENV is preview", async () => {
     const message = createMessage(
       visitorBody({

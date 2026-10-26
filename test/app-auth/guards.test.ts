@@ -20,6 +20,16 @@ describe("app auth guards (unit)", () => {
     expect(assertAppApiHost("app.we-met.link", production)).toBe(true);
   });
 
+  it("allows app API routes on the staging single host", () => {
+    const staging = readWeMetHostConfig({
+      WE_MET_BASE_URL: "https://we-met.didi.build",
+      WE_MET_ENV: "staging",
+      WE_MET_PREVIEW_HOST_SUFFIX: "",
+    });
+    expect(assertAppApiHost("we-met.didi.build", staging)).toBe(true);
+    expect(assertAppApiHost("app.we-met.didi.build", staging)).toBe(false);
+  });
+
   it("rejects missing, null, and wrong Origin on mutations", () => {
     const env = { WE_MET_APP_ORIGIN: "http://localhost:3000" };
     const local = readWeMetHostConfig({
