@@ -104,6 +104,27 @@ describe("prepare-wrangler-config (unit)", () => {
     expect(text).not.toContain(D1_PLACEHOLDER_NONPROD);
   });
 
+  it("substitutes non-prod D1 ID in staging config without logging the id", () => {
+    const output = trackRootOutput(`wrangler.staging.test-${process.pid}.ci.jsonc`);
+    const nonprodId = "22222222-2222-2222-2222-222222222222";
+    const result = runPrepare("staging", output, {
+      WE_MET_D1_DATABASE_ID_NONPROD: nonprodId,
+    });
+    expect(result.status).toBe(0);
+    expect(result.stdout).not.toContain(nonprodId);
+    expect(result.stderr).not.toContain(nonprodId);
+    const text = readFileSync(output, "utf8");
+    expect(text).toContain(nonprodId);
+    expect(text).not.toContain(D1_PLACEHOLDER_NONPROD);
+  });
+
+  it("fails staging target when non-prod D1 env var is missing", () => {
+    const output = trackRootOutput(`wrangler.staging.test-${process.pid}.ci.jsonc`);
+    const result = runPrepare("staging", output, {});
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(/WE_MET_D1_DATABASE_ID_NONPROD|missing D1 id/);
+  });
+
   it("fails consumer-nonprod prepare when output is outside the consumer directory", () => {
     const output = join(tmpdir(), "wrangler.consumer.jsonc");
     const result = runPrepare("consumer-nonprod", output, {

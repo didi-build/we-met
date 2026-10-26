@@ -1,5 +1,6 @@
 /** Generated CI configs (gitignored); must live in repo root for Wrangler relative paths. */
 export const WRANGLER_CI_CONFIG = "wrangler.ci.jsonc";
+export const WRANGLER_STAGING_CI_CONFIG = "wrangler.staging.ci.jsonc";
 export const WRANGLER_D1_NONPROD_CI_CONFIG = "wrangler.d1-nonprod.ci.jsonc";
 
 /** Placeholder D1 IDs in committed wrangler.jsonc (real IDs injected at deploy). */
@@ -31,6 +32,12 @@ export const PRODUCTION_RESOURCE_MARKERS = {
   authRateLimiterNamespaceId: "2004",
   appRateLimiterNamespaceId: "2006",
   workerName: "we-met",
+};
+
+export const STAGING_RESOURCE_MARKERS = {
+  workerName: "we-met-staging",
+  hostname: "we-met.didi.build",
+  baseUrl: "https://we-met.didi.build",
 };
 
 export const NONPROD_RESOURCE_MARKERS = {
