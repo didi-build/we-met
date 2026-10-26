@@ -513,26 +513,31 @@ describe("processFollowupQueueBatch (unit)", () => {
     const getSendState = vi
       .spyOn(store, "getSendState")
       .mockRejectedValue(new Error("d1 unavailable"));
-    const deps = createDeps({
-      exchangeOwnerEmail: store,
-      readLeadEmailControls: vi.fn(async () => ({
-        ...defaultLeadEmailControls,
-        visitorEmailMode: "owner_relay" as const,
-      })),
-    });
-    await processFollowupQueueBatch({ messages: [message] }, deps);
-    expect(getSendState).toHaveBeenCalled();
-    const relayLogs = errorSpy.mock.calls.filter(
-      (call) => call[0] === "relay_letter_missing_contact_card_link",
-    );
-    expect(relayLogs).toHaveLength(1);
-    expect(relayLogs[0]?.[1]).toEqual({ leadId: "lead-1" });
-    expect(relayLogs[0]?.[1]).not.toHaveProperty("error");
-    expect(message.ack).toHaveBeenCalledOnce();
-    expect(message.retry).not.toHaveBeenCalled();
-    expect(vi.mocked(deps.sendEmail)).toHaveBeenCalledOnce();
-    getSendState.mockRestore();
-    errorSpy.mockRestore();
+    try {
+      const deps = createDeps({
+        exchangeOwnerEmail: store,
+        readLeadEmailControls: vi.fn(async () => ({
+          ...defaultLeadEmailControls,
+          visitorEmailMode: "owner_relay" as const,
+        })),
+      });
+      await processFollowupQueueBatch({ messages: [message] }, deps);
+      expect(getSendState).toHaveBeenCalled();
+      const relayLogs = errorSpy.mock.calls.filter(
+        (call) => call[0] === "relay_letter_missing_contact_card_link",
+      );
+      expect(relayLogs).toHaveLength(1);
+      expect(relayLogs[0]).toEqual([
+        "relay_letter_missing_contact_card_link",
+        { leadId: "lead-1" },
+      ]);
+      expect(message.ack).toHaveBeenCalledOnce();
+      expect(message.retry).not.toHaveBeenCalled();
+      expect(vi.mocked(deps.sendEmail)).toHaveBeenCalledOnce();
+    } finally {
+      getSendState.mockRestore();
+      errorSpy.mockRestore();
+    }
   });
 
   it("logs relay_letter_missing_contact_card_link with leadId only when sendState is null", async () => {
