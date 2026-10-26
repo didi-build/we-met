@@ -4,6 +4,7 @@ import {
   appHostForBaseUrl,
   isAppServingHost,
   isCardServingHost,
+  readWeMetHostConfig,
 } from "@/config/we-met";
 
 const PREVIEW_SUFFIX = "-we-met.diademshoukralla.workers.dev";
@@ -50,6 +51,32 @@ describe("isCardServingHost (unit)", () => {
   it("rejects we-met.link lookalikes", () => {
     expect(isCardServingHost("not-we-met.link", productionConfig)).toBe(false);
     expect(isCardServingHost("we-met.link.evil.com", productionConfig)).toBe(false);
+  });
+});
+
+describe("readWeMetHostConfig (unit)", () => {
+  it("defaults missing WE_MET_ENV to production", () => {
+    const config = readWeMetHostConfig({ WE_MET_BASE_URL: "https://we-met.link" });
+    expect(config.weMetEnv).toBe("production");
+  });
+
+  it("throws on invalid WE_MET_ENV values", () => {
+    expect(() =>
+      readWeMetHostConfig({
+        WE_MET_BASE_URL: "https://we-met.link",
+        WE_MET_ENV: "unknown",
+      }),
+    ).toThrow(/Invalid WE_MET_ENV/);
+  });
+
+  it("rejects staging when WE_MET_PREVIEW_HOST_SUFFIX is set", () => {
+    expect(() =>
+      readWeMetHostConfig({
+        WE_MET_BASE_URL: "https://we-met.didi.build",
+        WE_MET_ENV: "staging",
+        WE_MET_PREVIEW_HOST_SUFFIX: "-we-met.example.workers.dev",
+      }),
+    ).toThrow(/WE_MET_PREVIEW_HOST_SUFFIX/);
   });
 });
 

@@ -71,6 +71,14 @@ describe("app API host helpers (unit)", () => {
     expect(appSpaPath(staging, "we-met.didi.build")).toBe("/app");
   });
 
+  it("staging resolveAppOrigin ignores an untrusted request host", () => {
+    expect(
+      resolveAppOrigin(staging, "https://evil.example/app", {
+        WE_MET_APP_ORIGIN: "http://localhost:3000",
+      }),
+    ).toBe("https://we-met.didi.build");
+  });
+
   it("production app host and OAuth origin are unchanged", () => {
     expect(isAppApiServingHost("we-met.link", production)).toBe(false);
     expect(isAppApiServingHost("app.we-met.link", production)).toBe(true);
