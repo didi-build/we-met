@@ -3,6 +3,7 @@ import { FollowupEmailError } from "@/email/followup-email-error";
 import {
   resolveEmailRecipient,
   resolveNonProdTestMailTo,
+  resolveOwnerSinkReplyTo,
   resolveSinkEmailRecipient,
 } from "@/email/recipient";
 
@@ -47,6 +48,24 @@ describe("resolveEmailRecipient (unit)", () => {
         to: "inbox@example.com",
         visitorEmailForContent: "a@example.com",
       },
+    },
+    {
+      name: "staging redirects to test inbox",
+      weMetEnv: "staging",
+      visitorEmail: "visitor@example.com",
+      testMailTo: "test-inbox@example.com",
+      expect: {
+        mode: "nonprod" as const,
+        to: "test-inbox@example.com",
+        visitorEmailForContent: "visitor@example.com",
+      },
+    },
+    {
+      name: "staging fails closed when redirect unset",
+      weMetEnv: "staging",
+      visitorEmail: "visitor@example.com",
+      testMailTo: undefined,
+      throws: FollowupEmailError,
     },
     {
       name: "non-production fails closed when redirect unset",
@@ -113,5 +132,41 @@ describe("resolveSinkEmailRecipient (unit)", () => {
       to: "test-inbox@example.com",
       sinkDestinationForContent: "owner@example.com",
     });
+  });
+
+  it("staging redirects sink mail to test inbox", () => {
+    expect(
+      resolveSinkEmailRecipient({
+        weMetEnv: "staging",
+        sinkDestinationEmail: "owner@example.com",
+        testMailTo: "test-inbox@example.com",
+      }),
+    ).toEqual({
+      mode: "nonprod",
+      to: "test-inbox@example.com",
+      sinkDestinationForContent: "owner@example.com",
+    });
+  });
+});
+
+describe("resolveOwnerSinkReplyTo (unit)", () => {
+  it("production uses visitor email", () => {
+    expect(
+      resolveOwnerSinkReplyTo({
+        weMetEnv: "production",
+        visitorEmail: "visitor@example.com",
+        testMailTo: undefined,
+      }),
+    ).toBe("visitor@example.com");
+  });
+
+  it("staging redirects Reply-To to test inbox", () => {
+    expect(
+      resolveOwnerSinkReplyTo({
+        weMetEnv: "staging",
+        visitorEmail: "visitor@example.com",
+        testMailTo: "test-inbox@example.com",
+      }),
+    ).toBe("test-inbox@example.com");
   });
 });

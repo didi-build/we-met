@@ -2,6 +2,7 @@ import {
   absoluteUrl,
   appBaseUrl,
   isCardServingHost,
+  isStagingSingleHost,
   type WeMetHostConfig,
 } from "@/config/we-met";
 
@@ -46,9 +47,12 @@ export function resolveLandingUrls(
   browseOrigin?: string,
 ): LandingUrls {
   const origin = (browseOrigin ?? config.baseUrl).replace(/\/$/, "");
+  const appHome = isStagingSingleHost(config)
+    ? absoluteUrl(new URL(config.baseUrl).origin, "/app")
+    : appBaseUrl(config.baseUrl);
   return {
     siteHome: origin,
-    appHome: appBaseUrl(config.baseUrl),
+    appHome,
     exampleCard: absoluteUrl(origin, "/hi/didi"),
     privacy: absoluteUrl(origin, "/privacy"),
     terms: absoluteUrl(origin, "/terms"),

@@ -15,6 +15,12 @@ const previewWorkerConfig = {
   weMetEnv: "preview",
 };
 
+const stagingCardConfig = {
+  baseUrl: "https://we-met.didi.build",
+  previewHostSuffix: null,
+  weMetEnv: "staging",
+};
+
 describe("resolveLandingBrowseOrigin (unit)", () => {
   it("uses the production card origin on the production card host", () => {
     expect(
@@ -54,5 +60,11 @@ describe("resolveLandingUrls (unit)", () => {
     expect(urls.privacy).not.toBe("/privacy");
     expect(urls.terms).not.toBe("/terms");
     expect(urls.appHome).toBe("https://app.we-met.link");
+  });
+
+  it("uses /app on the staging card origin for appHome", () => {
+    const urls = resolveLandingUrls(stagingCardConfig);
+    expect(urls.appHome).toBe("https://we-met.didi.build/app");
+    expect(urls.appHome).not.toContain("app.we-met.didi.build");
   });
 });

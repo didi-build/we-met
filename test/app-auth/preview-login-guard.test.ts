@@ -10,6 +10,7 @@ describe("preview login guard (unit)", () => {
     expect(previewLoginAllowed("preview", false)).toBe(false);
     expect(previewLoginAllowed("production", true)).toBe(false);
     expect(previewLoginAllowed("local", true)).toBe(false);
+    expect(previewLoginAllowed("staging", true)).toBe(false);
   });
 
   it("matches route helper", () => {
@@ -28,6 +29,12 @@ describe("preview login guard (unit)", () => {
     expect(
       isPreviewLoginRouteEnabled({
         WE_MET_ENV: "local",
+        WE_MET_PREVIEW_LOGIN_SECRET: "secret",
+      }),
+    ).toBe(false);
+    expect(
+      isPreviewLoginRouteEnabled({
+        WE_MET_ENV: "staging",
         WE_MET_PREVIEW_LOGIN_SECRET: "secret",
       }),
     ).toBe(false);
