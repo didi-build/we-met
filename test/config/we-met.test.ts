@@ -70,6 +70,16 @@ describe("readWeMetHostConfig (unit)", () => {
     ).toThrow(/Invalid WE_MET_ENV/);
   });
 
+  it("accepts preview workers.dev hosts when base URL is staging origin", () => {
+    const previewConfig = readWeMetHostConfig({
+      WE_MET_BASE_URL: "https://we-met.didi.build",
+      WE_MET_ENV: "preview",
+      WE_MET_PREVIEW_HOST_SUFFIX: PREVIEW_SUFFIX,
+    });
+    expect(isCardServingHost("we-met.didi.build", previewConfig)).toBe(true);
+    expect(isCardServingHost(`pr-3${PREVIEW_SUFFIX}`, previewConfig)).toBe(true);
+  });
+
   it("rejects staging when WE_MET_PREVIEW_HOST_SUFFIX is set", () => {
     expect(() =>
       readWeMetHostConfig({

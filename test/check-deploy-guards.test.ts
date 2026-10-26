@@ -263,6 +263,18 @@ describe("check-deploy-guards (unit)", () => {
     expect(result.stderr).toContain("app.we-met.link");
   });
 
+  it("fails when top-level WE_MET_BASE_URL is the staging origin", () => {
+    const { path } = writeTempConfig((config) => {
+      const vars = config.vars as Record<string, string>;
+      vars.WE_MET_BASE_URL = "https://we-met.didi.build";
+    });
+    const result = runGuards("production", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      'top-level vars.WE_MET_BASE_URL must be "https://we-met.link"',
+    );
+  });
+
   it("fails when previews.routes includes app.we-met.link", () => {
     const { path } = writeTempConfig((config) => {
       const previews = config.previews as Record<string, unknown>;
@@ -424,6 +436,15 @@ describe("check-deploy-guards (unit)", () => {
       mutate: (config: Record<string, unknown>) => {
         const vars = config.vars as Record<string, string>;
         vars.WE_MET_PREVIEW_HOST_SUFFIX = "-we-met.preview.workers.dev";
+      },
+    },
+    {
+      label: "previews.vars.WE_MET_BASE_URL is https://we-met.link",
+      message: 'previews.vars.WE_MET_BASE_URL must be "https://we-met.didi.build"',
+      mutate: (config: Record<string, unknown>) => {
+        const previews = config.previews as Record<string, unknown>;
+        const vars = previews.vars as Record<string, string>;
+        vars.WE_MET_BASE_URL = "https://we-met.link";
       },
     },
   ] as const;
@@ -1107,6 +1128,30 @@ describe("check-deploy-guards (unit)", () => {
     const result = runGuards("consumer-nonprod", path);
     expect(result.status).toBe(1);
     expect(result.stderr).toMatch(/database_name|production resource/);
+  });
+
+  it("fails consumer-nonprod when WE_MET_BASE_URL is production origin", () => {
+    const path = writeTempConsumerConfig(CONSUMER_NONPROD, (config) => {
+      const vars = config.vars as Record<string, string>;
+      vars.WE_MET_BASE_URL = "https://we-met.link";
+    });
+    const result = runGuards("consumer-nonprod", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      'non-prod consumer vars.WE_MET_BASE_URL must be "https://we-met.didi.build"',
+    );
+  });
+
+  it("fails consumer-production when WE_MET_BASE_URL is non-prod origin", () => {
+    const path = writeTempConsumerConfig(CONSUMER_PRODUCTION, (config) => {
+      const vars = config.vars as Record<string, string>;
+      vars.WE_MET_BASE_URL = "https://we-met.didi.build";
+    });
+    const result = runGuards("consumer-production", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      'production consumer vars.WE_MET_BASE_URL must be "https://we-met.link"',
+    );
   });
 
   it("fails consumer-production when D1 references non-prod database name", () => {

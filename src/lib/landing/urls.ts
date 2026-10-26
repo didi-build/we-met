@@ -17,7 +17,7 @@ export type LandingUrls = {
 
 /**
  * Origin for same-site marketing navigation (footer legal links, header home, example card).
- * On PR previews, `WE_MET_BASE_URL` stays the production card origin for email/canonical URLs;
+ * On PR previews, `WE_MET_BASE_URL` matches the staging card origin for email and canonical URLs;
  * when the request is served on a preview card host, browse links use the request origin instead.
  */
 export function resolveLandingBrowseOrigin(
@@ -47,9 +47,14 @@ export function resolveLandingUrls(
   browseOrigin?: string,
 ): LandingUrls {
   const origin = (browseOrigin ?? config.baseUrl).replace(/\/$/, "");
-  const appHome = isStagingSingleHost(config)
-    ? absoluteUrl(new URL(config.baseUrl).origin, "/app")
-    : appBaseUrl(config.baseUrl);
+  let appHome: string;
+  if (isStagingSingleHost(config)) {
+    appHome = absoluteUrl(new URL(config.baseUrl).origin, "/app");
+  } else if (config.weMetEnv === "preview") {
+    appHome = absoluteUrl(origin, "/app");
+  } else {
+    appHome = appBaseUrl(config.baseUrl);
+  }
   return {
     siteHome: origin,
     appHome,
