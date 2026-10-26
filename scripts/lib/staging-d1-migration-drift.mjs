@@ -61,6 +61,19 @@ export function findRemoteOnlyAppliedMigrations(appliedNames, repoFilenames) {
  * @param {string[]} remoteOnly
  * @returns {string}
  */
+/**
+ * @param {string[]} appliedNames
+ * @returns {string}
+ */
+export function formatAppliedMigrationNamesForLog(appliedNames) {
+  if (appliedNames.length === 0) {
+    return "Applied D1 migrations: (none listed in d1_migrations)";
+  }
+  return ["Applied D1 migrations:", ...appliedNames.map((name) => `  - ${name}`)].join(
+    "\n",
+  );
+}
+
 export function formatMigrationDriftMarkdown(remoteOnly) {
   if (remoteOnly.length === 0) {
     return "No remote-only D1 migrations (all applied names exist on main).";

@@ -22,6 +22,10 @@ jobs:
     environment:
       name: staging
       url: https://we-met.didi.build
+    env:
+      WE_MET_ENV: staging
+      WE_MET_BASE_URL: https://we-met.didi.build
+      WE_MET_PREVIEW_HOST_SUFFIX: ""
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -40,6 +44,8 @@ jobs:
             --target staging \
             --output wrangler.staging.ci.jsonc
       - name: Deploy-time guards (staging)
+        env:
+          WE_MET_D1_DATABASE_ID_NONPROD: ${{ secrets.WE_MET_D1_DATABASE_ID_NONPROD }}
         run: node scripts/check-deploy-guards.mjs --target staging --config wrangler.staging.ci.jsonc
       - name: Require staging Worker has no preview-login secret (names only)
         env:
@@ -49,7 +55,7 @@ jobs:
           set -euo pipefail
           SECRET_LIST_STDOUT=$(mktemp)
           SECRET_LIST_STDERR=$(mktemp)
-          if ! npx wrangler secret list --name we-met-staging \
+          if ! npx wrangler secret list --config wrangler.staging.ci.jsonc --name we-met-staging \
             >"$SECRET_LIST_STDOUT" 2>"$SECRET_LIST_STDERR"; then
             echo "::error::wrangler secret list failed for Worker we-met-staging using CLOUDFLARE_API_TOKEN_STAGING. Staging deploy was stopped. See docs/decisions/0017-cloudflare-api-credentials.md for token scoping."
             grep -oE '\[code: [0-9]+\]' "$SECRET_LIST_STDERR" | sort -u || true
@@ -95,16 +101,10 @@ jobs:
             exit 1
           fi
       - name: Deploy-time guards (staging build env)
-        env:
-          WE_MET_ENV: staging
-          WE_MET_BASE_URL: https://we-met.didi.build
-          WE_MET_PREVIEW_HOST_SUFFIX: ""
-        run: node scripts/check-deploy-guards.mjs --target staging-build --config wrangler.staging.ci.jsonc
+        run: node scripts/check-deploy-guards.mjs --target staging-build
       - name: Build OpenNext (staging)
         env:
           NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.WE_MET_TURNSTILE_SITE_KEY_NONPROD }}
-          WE_MET_ENV: staging
-          WE_MET_BASE_URL: https://we-met.didi.build
           WE_MET_COMMIT_SHA: ${{ github.sha }}
         run: npm run build
       - name: Apply staging D1 migrations
@@ -114,14 +114,31 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          npx wrangler d1 migrations apply WE_MET_DB --remote \
-            --config wrangler.staging.ci.jsonc
+          APPLY_LOG=$(mktemp)
+          if ! npx wrangler d1 migrations apply WE_MET_DB --remote \
+            --config wrangler.staging.ci.jsonc >"$APPLY_LOG" 2>&1; then
+            echo "::error::wrangler d1 migrations apply failed for staging"
+            exit 1
+          fi
+          MIGRATION_REPORT="D1 migration drift report unavailable."
           EXEC_JSON=$(mktemp)
-          npx wrangler d1 execute WE_MET_DB --remote \
+          set +e
+          if npx wrangler d1 execute WE_MET_DB --remote \
             --config wrangler.staging.ci.jsonc \
             --command "SELECT name FROM d1_migrations ORDER BY id" \
-            --json >"$EXEC_JSON"
-          MIGRATION_REPORT=$(node scripts/staging-d1-migration-drift.mjs --wrangler-json "$EXEC_JSON")
+            --json >"$EXEC_JSON" 2>/dev/null; then
+            node scripts/staging-d1-migration-drift.mjs --wrangler-json "$EXEC_JSON" --log-applied-names \
+              || echo "::warning::Could not log applied D1 migration names"
+            DRIFT_MARKDOWN=$(node scripts/staging-d1-migration-drift.mjs --wrangler-json "$EXEC_JSON" 2>/dev/null)
+            if [ -n "$DRIFT_MARKDOWN" ]; then
+              MIGRATION_REPORT="$DRIFT_MARKDOWN"
+            else
+              echo "::warning::Migration drift report script failed; continuing deploy"
+            fi
+          else
+            echo "::warning::Could not list applied D1 migrations for drift report; continuing deploy"
+          fi
+          set -e
           {
             echo "migration_report<<MIGRATION_EOF"
             echo "$MIGRATION_REPORT"

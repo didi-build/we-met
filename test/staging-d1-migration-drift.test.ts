@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   findRemoteOnlyAppliedMigrations,
+  formatAppliedMigrationNamesForLog,
   formatMigrationDriftMarkdown,
   parseAppliedMigrationNamesFromWranglerExecute,
 } from "../scripts/lib/staging-d1-migration-drift.mjs";
@@ -23,6 +24,14 @@ describe("staging D1 migration drift (unit)", () => {
     expect(
       findRemoteOnlyAppliedMigrations(["0001_init.sql", "9999_pr_only.sql"], repo),
     ).toEqual(["9999_pr_only.sql"]);
+  });
+
+  it("formats applied migration names for CI logs without database ids", () => {
+    const text = formatAppliedMigrationNamesForLog(["0001_init.sql"]);
+    expect(text).toContain("0001_init.sql");
+    expect(text).not.toMatch(
+      /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i,
+    );
   });
 
   it("formats warn-only markdown for drift", () => {

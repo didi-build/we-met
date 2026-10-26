@@ -1433,6 +1433,16 @@ describe("processFollowupQueueBatch (unit)", () => {
     expect(deps.weMetEnv).toBe("preview");
   });
 
+  it("defaults WE_MET_ENV to production when missing", () => {
+    const env = {
+      WE_MET_BASE_URL: "https://we-met.link",
+      WE_MET_ASSETS: {} as FollowupConsumerEnv["WE_MET_ASSETS"],
+      WE_MET_DB: {} as FollowupConsumerEnv["WE_MET_DB"],
+    } as FollowupConsumerEnv;
+    const deps = createFollowupConsumerDepsFromEnv(env);
+    expect(deps.weMetEnv).toBe("production");
+  });
+
   it("acks visitor follow-up on permanent Cloudflare recipient suppression", async () => {
     const message = createMessage(visitorBody(), { attempts: 2 });
     const deps = createDeps({

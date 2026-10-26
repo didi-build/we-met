@@ -169,7 +169,7 @@ export function createFollowupConsumerDepsFromEnv(
     console.error("lead_sink_ledger_mark_failed", { leadId, sinkId, errorCode });
   };
   const now = () => new Date();
-  const weMetEnv = env.WE_MET_ENV.trim();
+  const weMetEnv = env.WE_MET_ENV?.trim() || "production";
   const { baseUrl } = readWeMetHostConfig({
     ...env,
     WE_MET_ENV: weMetEnv,

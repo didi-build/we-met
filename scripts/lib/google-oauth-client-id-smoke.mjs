@@ -1,8 +1,26 @@
+import { createHash } from "node:crypto";
+
 /**
  * Parse Google OAuth client_id from a Google sign-in start redirect Location header.
  */
 
 const GOOGLE_ACCOUNTS_HOST = "accounts.google.com";
+
+/**
+ * @param {string} clientId
+ * @returns {string}
+ */
+export function sha256HexClientId(clientId) {
+  return createHash("sha256").update(clientId, "utf8").digest("hex");
+}
+
+/**
+ * @param {string} clientId
+ * @returns {string}
+ */
+export function stagingClientIdSha256LogPrefix(clientId) {
+  return sha256HexClientId(clientId).slice(0, 8);
+}
 
 /**
  * @param {string | null | undefined} location
@@ -33,28 +51,20 @@ export function parseGoogleClientIdFromOAuthLocation(location) {
 }
 
 /**
- * @param {string} clientId
- * @returns {string}
+ * @param {string | null | undefined} stagingClientId
+ * @param {string} productionClientIdSha256Hex
+ * @returns {{ ok: true; logPrefix: string } | { ok: false; reason: "unparsable" | "equal" }}
  */
-export function googleClientIdLogSuffix(clientId) {
-  const trimmed = clientId.trim();
-  if (trimmed.length <= 6) {
-    return trimmed;
-  }
-  return trimmed.slice(-6);
-}
-
-/**
- * @param {string | null} stagingClientId
- * @param {string | null} productionClientId
- * @returns {{ ok: true } | { ok: false; reason: string }}
- */
-export function compareGoogleOAuthClientIds(stagingClientId, productionClientId) {
-  if (!stagingClientId || !productionClientId) {
+export function compareStagingClientIdToProductionFingerprint(
+  stagingClientId,
+  productionClientIdSha256Hex,
+) {
+  if (!stagingClientId) {
     return { ok: false, reason: "unparsable" };
   }
-  if (stagingClientId === productionClientId) {
+  const stagingHash = sha256HexClientId(stagingClientId);
+  if (stagingHash === productionClientIdSha256Hex) {
     return { ok: false, reason: "equal" };
   }
-  return { ok: true };
+  return { ok: true, logPrefix: stagingHash.slice(0, 8) };
 }
