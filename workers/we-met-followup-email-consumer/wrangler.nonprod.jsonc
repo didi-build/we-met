@@ -48,7 +48,7 @@
       "persist": true,
     },
     "traces": { "enabled": true, "head_sampling_rate": 1, "persist": true },
-    "issue_detection": { "enabled": true },
+    "issues": { "enabled": true },
   },
   "previews": {
     "observability": {
@@ -59,7 +59,7 @@
         "persist": true,
       },
       "traces": { "enabled": true, "head_sampling_rate": 1, "persist": true },
-      "issue_detection": { "enabled": true },
+      "issues": { "enabled": true },
     },
   },
 }
