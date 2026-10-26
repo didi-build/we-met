@@ -75,17 +75,31 @@ describe("format visitor follow-up email (unit)", () => {
     expect(content.textHtml).not.toContain("Save my contact card");
   });
 
-  it("uses the relay contact card sentence in HTML and plain text", () => {
-    const content = buildVisitorFollowUpEmail({
+  it("uses tap-below copy with link and attached fallback without link", () => {
+    const tapBelow = "Tap below to save my contact card to your phone in one tap.";
+    const attachedFallback =
+      "My contact card is attached, open it to save me to your phone.";
+    const relayUrl = "https://we-met.link/api/exchange/lead-1/contact-card?token=abc";
+    const withLink = buildVisitorFollowUpEmail({
+      card,
+      visitorName: "Alex",
+      baseUrl,
+      contactCardDownloadUrl: relayUrl,
+    });
+    expect(withLink.textPlain).toContain(tapBelow);
+    expect(withLink.textHtml).toContain(tapBelow);
+    expect(withLink.textPlain).not.toContain(attachedFallback);
+    expect(withLink.textHtml).not.toContain(attachedFallback);
+
+    const withoutLink = buildVisitorFollowUpEmail({
       card,
       visitorName: "Alex",
       baseUrl,
     });
-    const sentence = "Tap below to save my contact card to your phone in one tap.";
-    expect(content.textPlain).toContain(sentence);
-    expect(content.textHtml).toContain(sentence);
-    expect(content.textPlain).not.toContain("attached to this email");
-    expect(content.textHtml).not.toContain("attached to this email");
+    expect(withoutLink.textPlain).toContain(attachedFallback);
+    expect(withoutLink.textHtml).toContain(attachedFallback);
+    expect(withoutLink.textPlain).not.toContain("Tap below");
+    expect(withoutLink.textHtml).not.toContain("Tap below");
   });
 
   it("plain text has a single blank line before the owner name (relay link on and off)", () => {
