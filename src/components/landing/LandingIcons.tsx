@@ -59,6 +59,26 @@ export function ContactCardIcon({ size, className }: IconProps) {
   );
 }
 
+export function ReplyIcon({ size, className }: IconProps) {
+  return (
+    <svg
+      aria-hidden
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M9 14L4 9l5-5" />
+      <path d="M4 9h10a6 6 0 016 6v5" />
+    </svg>
+  );
+}
+
 export function SunIcon({ size, className }: IconProps) {
   return (
     <svg
