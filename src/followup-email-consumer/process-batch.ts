@@ -332,13 +332,19 @@ async function sendVisitorLetter(
       : undefined;
 
   if (visitorEmailMode === "owner_relay" && !contactCardDownloadUrl) {
-    const sendState = await deps.exchangeOwnerEmail.getSendState(message.lead.leadId);
-    if (sendState) {
-      console.error("relay_letter_missing_contact_card_link", {
-        leadId: message.lead.leadId,
-        cardId: sendState.cardId,
-      });
+    let cardId: string | undefined;
+    try {
+      const sendState = await deps.exchangeOwnerEmail.getSendState(message.lead.leadId);
+      cardId = sendState?.cardId;
+    } catch {
+      // Logging-only lookup; must not block or retry the letter send.
     }
+    console.error(
+      "relay_letter_missing_contact_card_link",
+      cardId
+        ? { leadId: message.lead.leadId, cardId }
+        : { leadId: message.lead.leadId },
+    );
   }
 
   const content = buildVisitorFollowUpEmail({

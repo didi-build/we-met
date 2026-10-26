@@ -65,7 +65,7 @@ describe("exchange_visitor_letter_enqueue_failed (unit)", () => {
     expect(logEnqueueFailed).toHaveBeenCalledWith(lead.leadId);
   });
 
-  it("still enqueues relay token and owner sink details when resolveVisitorEmailMode rejects", async () => {
+  it("logs mode read failure, mints no token, and still dispatches owner sink details", async () => {
     const repo = new MemoryCardRepository();
     const card = await repo.upsertCard(exampleCardInput());
     const exchangeOwnerEmail = new MemoryExchangeOwnerEmailStore();
@@ -108,7 +108,7 @@ describe("exchange_visitor_letter_enqueue_failed (unit)", () => {
     });
 
     expect(result.status).toBe("success");
-    expect(enqueued?.relayContactCardToken).toBeTruthy();
+    expect(enqueued?.relayContactCardToken).toBeUndefined();
     const modeLogs = errorSpy.mock.calls.filter(
       (call) => call[0] === "visitor_email_mode_read_failed",
     );

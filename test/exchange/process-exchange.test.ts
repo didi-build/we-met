@@ -303,7 +303,7 @@ describe("processExchange (unit)", () => {
     expect(message.relayContactCardToken).toBeUndefined();
   });
 
-  it("still enqueues relay token when visitor email mode read fails on exchange", async () => {
+  it("logs mode read failure and enqueues no relay token when visitor email mode read fails on exchange", async () => {
     const repo = new MemoryCardRepository();
     const card = await repo.upsertCard(exampleCardInput());
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -317,7 +317,7 @@ describe("processExchange (unit)", () => {
     const message = deps.followupMessages[0] as {
       relayContactCardToken?: string;
     };
-    expect(message.relayContactCardToken).toBeTruthy();
+    expect(message.relayContactCardToken).toBeUndefined();
     const modeLogs = errorSpy.mock.calls.filter(
       (call) => call[0] === "visitor_email_mode_read_failed",
     );

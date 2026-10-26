@@ -4,7 +4,7 @@ import * as relayContactCardToken from "@/exchange/relay-contact-card-token";
 import { resolveRelayContactCardTokenForEnqueue } from "@/exchange/resolve-relay-contact-card-token-for-enqueue";
 
 describe("resolveRelayContactCardTokenForEnqueue (unit)", () => {
-  it("falls back to owner_relay and mints when mode read fails", async () => {
+  it("resolves to direct and mints no token when mode read fails", async () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const token = await resolveRelayContactCardTokenForEnqueue(
       "test-secret",
@@ -14,7 +14,7 @@ describe("resolveRelayContactCardTokenForEnqueue (unit)", () => {
       "lead-mode-fail",
       "card-1",
     );
-    expect(token).toBeTruthy();
+    expect(token).toBeUndefined();
     const modeLogs = errorSpy.mock.calls.filter(
       (call) => call[0] === "visitor_email_mode_read_failed",
     );

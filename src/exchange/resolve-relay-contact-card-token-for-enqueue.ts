@@ -2,8 +2,8 @@ import type { VisitorEmailMode } from "@/app-settings/defaults";
 import { relayContactCardTokenForEnqueue } from "@/exchange/relay-contact-card-token";
 
 /**
- * Reads visitor email mode (defaulting to owner_relay on read failure), then mints a relay
- * contact-card token when mode is owner_relay.
+ * Reads visitor email mode (defaulting to direct on read failure, matching main), then mints a
+ * relay contact-card token when mode is owner_relay.
  */
 export async function resolveRelayContactCardTokenForEnqueue(
   masterSecret: string,
@@ -11,12 +11,12 @@ export async function resolveRelayContactCardTokenForEnqueue(
   leadId: string,
   cardId: string,
 ): Promise<string | undefined> {
-  let visitorEmailMode: VisitorEmailMode = "owner_relay";
+  let visitorEmailMode: VisitorEmailMode = "direct";
   try {
     visitorEmailMode = await resolveVisitorEmailMode();
   } catch {
     console.error("visitor_email_mode_read_failed", { leadId });
-    visitorEmailMode = "owner_relay";
+    visitorEmailMode = "direct";
   }
 
   try {

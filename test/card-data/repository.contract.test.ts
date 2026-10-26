@@ -13,7 +13,8 @@ import { MemoryCardRepository } from "@/card-data/memory-repository";
 import type { CardRepository } from "@/card-data/repository";
 import { splitSqlStatements } from "@/card-data/sql-statements";
 import { exampleCardInput } from "../helpers/example-card";
-import { withLocalD1 } from "../helpers/d1";
+import { withIsolatedLocalD1, withLocalD1 } from "../helpers/d1";
+import { upsertCardWithEmailSink } from "../helpers/card-email-sink";
 
 function registerTestSinkKind() {
   registerLeadSinkKind("test_sink", {
@@ -76,26 +77,6 @@ function defineContract(
       });
     });
 
-    it("getById returns null for non-live cards and inactive accounts", async () => {
-      if (label !== "memory") {
-        return;
-      }
-      await withRepo(async (repo) => {
-        const mem = repo as MemoryCardRepository;
-        const slug = `contract-getbyid-memory`;
-        const saved = await mem.upsertCard({
-          ...exampleCardInput(),
-          slug,
-        });
-        expect(await mem.getById(saved.id)).not.toBeNull();
-        mem.setCardStatusForTest(saved.id, "retired");
-        expect(await mem.getById(saved.id)).toBeNull();
-        mem.setCardStatusForTest(saved.id, "live");
-        mem.setAccountStatus(saved.accountId, "suspended");
-        expect(await mem.getById(saved.id)).toBeNull();
-      });
-    });
-
     it("lists and validates lead sinks", async () => {
       await withRepo(async (repo) => {
         registerTestSinkKind();
@@ -148,6 +129,50 @@ defineContract("d1", async (fn) => {
   await withLocalD1(async (db) => {
     await resetD1Tables(db);
     await fn(new D1CardRepository(db));
+  });
+});
+
+describe("CardRepository getById visibility", () => {
+  it("memory returns null for non-live cards and inactive accounts", async () => {
+    const mem = new MemoryCardRepository();
+    const slug = "contract-getbyid-memory";
+    const saved = await mem.upsertCard({
+      ...exampleCardInput(),
+      slug,
+    });
+    expect(await mem.getById(saved.id)).not.toBeNull();
+    mem.setCardStatusForTest(saved.id, "retired");
+    expect(await mem.getById(saved.id)).toBeNull();
+    mem.setCardStatusForTest(saved.id, "live");
+    mem.setAccountStatus(saved.accountId, "suspended");
+    expect(await mem.getById(saved.id)).toBeNull();
+  });
+
+  it("d1 returns null for non-live cards and inactive accounts", async () => {
+    await withIsolatedLocalD1(async (db) => {
+      await resetD1Tables(db);
+      const repo = new D1CardRepository(db);
+      const slug = "contract-getbyid-d1";
+      const card = await upsertCardWithEmailSink(repo, {
+        ...exampleCardInput(),
+        slug,
+      });
+      expect(await repo.getById(card.id)).not.toBeNull();
+      await db
+        .prepare(`UPDATE cards SET status = ? WHERE id = ?`)
+        .bind("retired", card.id)
+        .run();
+      expect(await repo.getById(card.id)).toBeNull();
+      await db
+        .prepare(`UPDATE cards SET status = 'live' WHERE id = ?`)
+        .bind(card.id)
+        .run();
+      await db
+        .prepare(`UPDATE accounts SET status = ? WHERE id = ?`)
+        .bind("suspended", card.accountId)
+        .run();
+      expect(await repo.getById(card.id)).toBeNull();
+    });
   });
 });
 
