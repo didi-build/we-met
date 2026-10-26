@@ -30,13 +30,13 @@ All three set `workers_dev: false` and have no public Workers.dev URL for the co
 
 ### 1.2 D1, R2, and queues
 
-| Resource                    | Production name              | Used by                                                                                                                                                                                                                                                                               |
-| --------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| D1                          | `we-met-db`                  | App Worker (read/write cards, leads, settings, ledger on exchange/details), follow-up consumer (ledger updates)                                                                                                                                                                       |
-| R2                          | `we-met-assets`              | App Worker (card photos), consumer (`get` only for vCard attachments)                                                                                                                                                                                                                 |
-| Queue (follow-up)           | `we-met-followup-email`      | App produces; consumer consumes. **No `dead_letter_queue` in Wrangler**; exhausted retries are deleted per [environments](./architecture/environments.md#known-gaps-unverified) and [Cloudflare DLQ docs](https://developers.cloudflare.com/queues/configuration/dead-letter-queues/) |
-| Queue (warmup retry)        | `we-met-warmup-send-retry`   | Warmup producer and consumer; DLQ `we-met-warmup-send-dlq`                                                                                                                                                                                                                            |
-| Queue (warmup email events) | `we-met-warmup-email-events` | Fed by Email Sending event subscription on `mail.we-met.link`; DLQ `we-met-warmup-email-events-dlq`                                                                                                                                                                                   |
+| Resource                    | Production name              | Used by                                                                                                                                                                                                                                                                                                                                              |
+| --------------------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D1                          | `we-met-db`                  | App Worker (read/write cards, leads, settings, ledger on exchange/details), follow-up consumer (ledger updates)                                                                                                                                                                                                                                      |
+| R2                          | `we-met-assets`              | App Worker (card photos), consumer (`get` only for vCard attachments)                                                                                                                                                                                                                                                                                |
+| Queue (follow-up)           | `we-met-followup-email`      | App produces; consumer consumes. **No `dead_letter_queue` in Wrangler**; exhausted retries are deleted per [Consumer queue handling](./architecture/environments.md#config-and-secret-names) in [environments](./architecture/environments.md) and [Cloudflare DLQ docs](https://developers.cloudflare.com/queues/configuration/dead-letter-queues/) |
+| Queue (warmup retry)        | `we-met-warmup-send-retry`   | Warmup producer and consumer; DLQ `we-met-warmup-send-dlq`                                                                                                                                                                                                                                                                                           |
+| Queue (warmup email events) | `we-met-warmup-email-events` | Fed by Email Sending event subscription on `mail.we-met.link`; DLQ `we-met-warmup-email-events-dlq`                                                                                                                                                                                                                                                  |
 
 Non-prod uses `*-nonprod` names only; deploy guards reject production resource names in the `previews` block ([`scripts/check-deploy-guards.mjs`](../scripts/check-deploy-guards.mjs), [environments](./architecture/environments.md#deploy-time-guards)).
 
@@ -51,7 +51,7 @@ Non-prod uses `*-nonprod` names only; deploy guards reject production resource n
 
 These are **not** a full observability program, but they are the production signals and guardrails that exist today.
 
-#### Workers Observability (logs, traces, issue detection)
+#### Workers Observability (logs, traces, Issues config)
 
 Committed config on **app** and **follow-up consumer** (production):
 
@@ -59,13 +59,13 @@ Committed config on **app** and **follow-up consumer** (production):
 - `observability.traces`: `enabled: true`, `head_sampling_rate: 1`, `persist: true`
 - `observability.issue_detection`: `enabled: true` ([`wrangler.jsonc`](../wrangler.jsonc), [`wrangler.production.jsonc`](../workers/we-met-followup-email-consumer/wrangler.production.jsonc))
 
-Cloudflare documents the same product area as **Workers Issues** (`observability.issues.enabled`); this repo uses the `issue_detection` key in Wrangler ([Issues docs](https://developers.cloudflare.com/workers/observability/issues/)).
+Cloudflare documents **Workers Issues** under `observability.issues.enabled` ([Issues docs](https://developers.cloudflare.com/workers/observability/issues/), [Wrangler configuration](https://developers.cloudflare.com/workers/wrangler/configuration/)). This repo uses the key `issue_detection` instead. **UNVERIFIED:** with Wrangler **4.151.1** (`package.json`), that key is not the documented Issues toggle; do not assume Issues grouping or automations are active until M0 lands and someone confirms in the dashboard.
 
-**Warmup Worker:** logs only (`persist: true`, `head_sampling_rate: 1`); no traces or `issue_detection` in [`workers/warmup/wrangler.jsonc`](../workers/warmup/wrangler.jsonc).
+**Warmup Worker:** logs only (`persist: true`, `head_sampling_rate: 1`); no traces or Issues config in [`workers/warmup/wrangler.jsonc`](../workers/warmup/wrangler.jsonc).
 
 #### Structured log events (mail and exchange)
 
-Documented event names for debugging (no PII in listed fields): app `exchange_visitor_letter_enqueue_failed`; consumer visitor, sink, and ledger events ([environments](./architecture/environments.md#consumer-logs-debugging-live-mail)).
+Documented event names for debugging (no PII in listed fields): app `exchange_visitor_letter_enqueue_failed`; consumer visitor, sink, and ledger events in the **Consumer logs** table under [Config and secret names](./architecture/environments.md#config-and-secret-names) in [environments](./architecture/environments.md).
 
 #### Lead email kill switch and daily caps (D1 `app_settings`)
 
@@ -115,15 +115,15 @@ How teams typically monitor small SaaS and larger products, with sources. We Met
 
 ### 2.3 Error tracking and logs
 
-- **Workers Issues / issue detection:** groups 5xx, uncaught exceptions, and error logs without an SDK ([Issues](https://developers.cloudflare.com/workers/observability/issues/), [investigate](https://developers.cloudflare.com/workers/observability/issues/investigate/)).
+- **Workers Issues:** groups 5xx, uncaught exceptions, and error logs without an SDK when enabled with `observability.issues.enabled` ([Issues](https://developers.cloudflare.com/workers/observability/issues/), [investigate](https://developers.cloudflare.com/workers/observability/issues/investigate/)).
 - **Workers Logs and traces:** persisted telemetry with configurable sampling ([Workers Logs](https://developers.cloudflare.com/workers/observability/logs/workers-logs/), [Traces](https://developers.cloudflare.com/workers/observability/traces/)).
 - **Logpush / OpenTelemetry export:** for longer retention or a SIEM; Workers Logpush is billed per request on Paid plans ([Workers pricing, Logpush](https://developers.cloudflare.com/workers/platform/pricing/)).
-- **Third-party error tracking (example: Sentry):** strong for stack traces, release tracking, and cross-service context; free Developer tier exists with quotas ([Sentry pricing](https://sentry.io/pricing/), [Developer plan limits](https://sentry.zendesk.com/hc/en-us/articles/26206897429275-Changes-to-our-Developer-plan)). For Workers, Cloudflare-native Issues should be the default; add Sentry only if Issues plus logs are insufficient for triage.
+- **Third-party error tracking (example: Sentry):** strong for stack traces, release tracking, and cross-service context; free Developer tier exists with quotas ([Sentry pricing](https://sentry.io/pricing/), [Developer plan limits](https://sentry.zendesk.com/hc/en-us/articles/26206897429275-Changes-to-our-Developer-plan)). Prefer Cloudflare Issues plus logs first; add Sentry only if triage still gaps after M0.
 
 ### 2.4 Metrics and queues
 
-- **Queue backlog** is a standard saturation signal: Cloudflare exposes backlog message count and bytes via analytics APIs ([Queues metrics](https://developers.cloudflare.com/queues/observability/metrics/)).
-- **Threshold monitors** on SQL/GraphQL datasets can notify via email or webhook ([Cloudflare Monitors](https://developers.cloudflare.com/notifications/monitors/)).
+- **Queue backlog** is a standard saturation signal: Cloudflare exposes backlog message count and bytes via the `queuesBacklogAdaptiveGroups` dataset ([Queues metrics](https://developers.cloudflare.com/queues/observability/metrics/)).
+- **Threshold monitors** run SQL API queries on a schedule and can notify via email or webhook ([Cloudflare Monitors](https://developers.cloudflare.com/notifications/monitors/)). **UNVERIFIED:** whether `queuesBacklogAdaptiveGroups` appears in the Monitors dataset picker for this account; confirm in the dashboard before treating M3/M4 as done.
 - **Email Sending** has metrics and logs in the dashboard ([Email metrics](https://developers.cloudflare.com/email-service/observability/metrics-analytics/), [Email logs](https://developers.cloudflare.com/email-service/observability/logs/)).
 
 ### 2.5 Alerting, on-call, and alert fatigue
@@ -134,17 +134,16 @@ How teams typically monitor small SaaS and larger products, with sources. We Met
 
 ### 2.6 Status pages and incident communication
 
-- **Public status page:** builds trust during incidents; can be manual (post when you know) or tied to monitors ([Instatus product positioning](https://instatus.com/llms-full.txt)).
-- **Private or unlisted page:** enough for a small B2B card product until traffic justifies marketing a public page.
+- **Public status page:** builds trust during incidents; can be manual (post when you know) or tied to monitors ([Instatus pricing and plan types](https://instatus.com/pricing)).
 - **Incident notes:** this repo already has a lightweight template ([incident runbook](./runbooks/incident.md)); link status updates and Linear tickets there.
 
 ### 2.7 What similar-stage teams often do
 
-| Pattern                      | Typical approach                                                              | Example sources                                                                       |
-| ---------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| Solo founder / one engineer  | Cloud provider logs + 2 to 4 synthetic checks + email alerts; defer heavy APM | [Google SRE Book, ch. 6](https://sre.google/sre-book/monitoring-distributed-systems/) |
-| Small SaaS with paying users | SLO on core flow, external uptime, status page, weekly review of error budget | [Implementing SLOs](https://sre.google/workbook/implementing-slos/)                   |
-| Larger SaaS                  | PagerDuty/Opsgenie rotation, Logpush to SIEM, multi-region synthetics         | [Being on-call](https://sre.google/sre-book/being-on-call/)                           |
+| Pattern                      | Typical approach                                                              | Example sources                                                                                                                |
+| ---------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Solo founder / one engineer  | Provider logs plus a handful of external HTTP checks and email alerts         | [Cloudflare Health Checks](https://developers.cloudflare.com/health-checks/), [Instatus Starter](https://instatus.com/pricing) |
+| Small SaaS with paying users | SLO on core flow, external uptime, status page, weekly review of error budget | [Implementing SLOs](https://sre.google/workbook/implementing-slos/)                                                            |
+| Larger SaaS                  | PagerDuty/Opsgenie rotation, Logpush to SIEM, multi-region synthetics         | [Being on-call](https://sre.google/sre-book/being-on-call/)                                                                    |
 
 We Met is in the first row today, moving toward the second after public cutover ([DIDI-566](https://linear.app/didi-build/issue/DIDI-566)).
 
@@ -156,45 +155,45 @@ We Met is in the first row today, moving toward the second after public cutover 
 
 1. **Symptom alerts:** "visitors cannot load a card" and "owner mail is not being delivered" matter; raw D1 CPU does not.
 2. **Cloudflare-native first:** Workers Observability, Queues metrics, Monitors, Health Checks, Email Sending analytics, Notifications webhooks.
-3. **No overnight paging** except **confirmed user-visible outage** (synthetic check failure plus 5xx spike, or follow-up backlog growing with zero successful deletes).
+3. **No overnight paging** except **confirmed user-visible outage** (synthetic check failure plus 5xx spike, or follow-up backlog growing with delivery failures).
 4. **Minimize PII in alerts:** use slugs, counts, and error codes; never queue payloads or visitor emails in notifications (aligned with [data-map](./privacy/data-map.yml)).
 
 ### 3.2 What to monitor
 
 #### Per Worker
 
-| Worker                           | Traffic / errors                                                                                                                                               | Saturation / dependencies                                                              | Existing hooks                  |
-| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------- |
-| `we-met`                         | 5xx rate on `GET /hi/*`, `POST /api/exchange`, `POST /api/details`; Turnstile 403 rate (abuse, not outage); `exchange_visitor_letter_enqueue_failed` log count | D1 errors in traces; rate limiter 429 rate                                             | Logs, traces, `issue_detection` |
-| `we-met-followup-email-consumer` | `lead_sink_permanent_failure`, `visitor_followup_permanent_failure`, `cloudflare_send_permanent_failure`                                                       | Queue backlog on `we-met-followup-email`; Email Sending bounces/complaints (dashboard) | Logs, traces, `issue_detection` |
-| `we-met-warmup-cron`             | Cron invocation failures; `warmup_email_event_alert_*` logs                                                                                                    | KV read failures; DLQ depth on warmup DLQs                                             | Logs; `WARMUP_ALERT_TO` email   |
+| Worker                           | Traffic / errors                                                                                                                                               | Saturation / dependencies                                                              | Existing hooks                                         |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| `we-met`                         | 5xx rate on `GET /hi/*`, `POST /api/exchange`, `POST /api/details`; Turnstile 403 rate (abuse, not outage); `exchange_visitor_letter_enqueue_failed` log count | D1 errors in traces; rate limiter 429 rate                                             | Logs, traces; `issue_detection` in Wrangler (see §1.4) |
+| `we-met-followup-email-consumer` | `lead_sink_permanent_failure`, `visitor_followup_permanent_failure`, `cloudflare_send_permanent_failure`                                                       | Queue backlog on `we-met-followup-email`; Email Sending bounces/complaints (dashboard) | Logs, traces; `issue_detection` in Wrangler (see §1.4) |
+| `we-met-warmup-cron`             | Cron invocation failures; `warmup_email_event_alert_*` logs                                                                                                    | KV read failures; DLQ depth on warmup DLQs                                             | Logs; `WARMUP_ALERT_TO` email                          |
 
 #### Per user-facing flow
 
-| Flow                     | SLI (measurement)                                                                                                                                                     | Suggested alert (daytime email)                                                                  |
-| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| **Card page**            | Synthetic `GET https://we-met.link/hi/<probe-slug>` returns 200 and expected substring                                                                                | 2 of 3 regions fail for 5 minutes                                                                |
-| **Exchange submit**      | Synthetic or canary `POST /api/exchange` with Turnstile test key **only on non-prod**; production: monitor 5xx rate on `/api/exchange` via Workers analytics / Issues | 5xx share above SLO burn threshold                                                               |
-| **Owner email delivery** | Queue lag plus ledger: growing backlog OR spike in `lead_sink_permanent_failure` with zero `billableOperations` success deletes in window                             | Backlog &gt; N messages for 30 minutes **and** at least one permanent failure log in same window |
-| **Visitor letter**       | `visitor_followup_permanent_failure` rate; optional ledger gap accepted per [environments](./architecture/environments.md)                                            | Any permanent failure cluster (&gt;3 in 1 hour)                                                  |
-| **Warmup / reputation**  | Existing `WARMUP_ALERT_TO` path                                                                                                                                       | Keep; add dashboard check on `paused` KV key weekly                                              |
-| **DLQ depth**            | `we-met-warmup-send-dlq`, `we-met-warmup-email-events-dlq` via Queues metrics                                                                                         | &gt; 0 messages for 15 minutes                                                                   |
-| **Follow-up queue**      | No DLQ today: monitor **backlog** and **permanent failure logs** instead                                                                                              | Backlog sustained high with rising retries                                                       |
+| Flow                     | SLI (measurement)                                                                                                                                                                                                  | Suggested alert (daytime email)                                                                  |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| **Card page**            | Synthetic `GET https://we-met.link/hi/<probe-slug>` returns 200 and expected substring                                                                                                                             | 2 of 3 regions fail for 5 minutes                                                                |
+| **Exchange submit**      | Synthetic or canary `POST /api/exchange` with Turnstile test key **only on non-prod**; production: monitor 5xx rate on `/api/exchange` via Workers analytics / Issues (after M0)                                   | 5xx share above SLO burn threshold                                                               |
+| **Owner email delivery** | Rising `messages` backlog ([Queues metrics](https://developers.cloudflare.com/queues/observability/metrics/)) **or** spike in `lead_sink_permanent_failure`; ledger reaches `status = 'sent'` for email sink phase | Backlog &gt; N messages for 30 minutes **and** at least one permanent failure log in same window |
+| **Visitor letter**       | `visitor_followup_permanent_failure` rate; optional ledger gap accepted per [environments](./architecture/environments.md#known-gaps-unverified)                                                                   | Any permanent failure cluster (&gt;3 in 1 hour)                                                  |
+| **Warmup / reputation**  | Existing `WARMUP_ALERT_TO` path                                                                                                                                                                                    | Keep; add dashboard check on `paused` KV key weekly                                              |
+| **DLQ depth**            | `we-met-warmup-send-dlq`, `we-met-warmup-email-events-dlq` via Queues metrics                                                                                                                                      | &gt; 0 messages for 15 minutes                                                                   |
+| **Follow-up queue**      | No DLQ today: monitor **backlog** and **permanent failure logs** instead                                                                                                                                           | Backlog sustained high with rising retries                                                       |
 
-**Probe slug:** use a dedicated live card in production D1 (operator-owned), not personal card data in git ([0010](./decisions/0010-card-data-d1-and-load-script.md)).
+**Probe slug:** use a dedicated **live** card in production D1, published through the **app editor** on `app.we-met.link`. **Never** load the probe card with `npm run cards:load` (production cards publish through the app; `cards:load` is for local/non-prod D1 only per [AGENTS.md](../AGENTS.md) and [card-loading](./runbooks/card-loading.md)).
 
 ### 3.3 Tooling choices
 
 | Need                      | Recommendation                                                                                         | Why                                                                                                                                                      |
 | ------------------------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Errors and 5xx            | **Workers Issues** (already `issue_detection: true`) + dashboard automations to email/webhook          | No SDK; matches deployed config                                                                                                                          |
-| Logs and traces           | **Workers Observability** (already at 100% head sampling)                                              | Reduce sampling after baseline if [Observability pricing](https://developers.cloudflare.com/observability/pricing/) bites (post Dec 2026 unified model)  |
+| Errors and 5xx            | **Workers Issues** after **M0** (`observability.issues.enabled`) plus dashboard automations            | Native grouping ([Issues](https://developers.cloudflare.com/workers/observability/issues/)); current `issue_detection` key is **UNVERIFIED**             |
+| Logs and traces           | **Workers Observability** (100% head sampling today)                                                   | Reduce sampling after baseline if [Observability pricing](https://developers.cloudflare.com/observability/pricing/) bites (post Dec 2026 unified model)  |
 | Long retention            | **Logpush** to R2 or S3 **only if** compliance or postmortems need &gt;7 days                          | [Workers Logpush pricing](https://developers.cloudflare.com/workers/platform/pricing/)                                                                   |
-| Custom metrics / SLO math | **Analytics Engine** or **Workers Analytics Engine** for counters (exchange success, enqueue failures) | Optional second phase; not required for first alerts                                                                                                     |
-| Queue backlog             | **Cloudflare Monitors** on `queuesBacklogAdaptiveGroups`                                               | [Queues metrics](https://developers.cloudflare.com/queues/observability/metrics/), [Monitors](https://developers.cloudflare.com/notifications/monitors/) |
+| Custom metrics / SLO math | **Workers Analytics Engine** for counters (exchange success, enqueue failures)                         | Optional second phase; [Analytics Engine pricing](https://developers.cloudflare.com/analytics/analytics-engine/pricing/)                                 |
+| Queue backlog             | **Cloudflare Monitors** on `queuesBacklogAdaptiveGroups` **UNVERIFIED** for Monitors UI                | [Queues metrics](https://developers.cloudflare.com/queues/observability/metrics/), [Monitors](https://developers.cloudflare.com/notifications/monitors/) |
 | External uptime           | **Cloudflare Health Checks** (if zone is Pro+) **or** Instatus/Better Stack free monitors              | Health Checks need paid zone plan ([availability table](https://developers.cloudflare.com/health-checks/#availability))                                  |
-| Status page               | **Instatus Starter (free)** or **private Notion/README** until public marketing needs a branded page   | [Instatus pricing](https://instatus.com/pricing)                                                                                                         |
-| Third-party APM           | **Defer Sentry** unless Issues grouping is insufficient                                                | Overlap with Workers Issues ([Sentry pricing](https://sentry.io/pricing/))                                                                               |
+| Status page               | **Instatus Starter (free, public page only)** or **no hosted page** (incident runbook only) until paid | [Instatus pricing](https://instatus.com/pricing)                                                                                                         |
+| Third-party APM           | **Defer Sentry** unless Issues plus logs are insufficient                                              | Overlap with Workers Issues ([Sentry pricing](https://sentry.io/pricing/)); vendor adoption needs §3.7                                                   |
 
 ### 3.4 Alert routing (proposed)
 
@@ -209,67 +208,88 @@ We Met is in the first row today, moving toward the second after public cutover 
 
 ### 3.5 Status page approach
 
-| Option                                   | Pros                             | Cons                                                                             |
-| ---------------------------------------- | -------------------------------- | -------------------------------------------------------------------------------- |
-| **No public page (default)**             | Zero cost, no subscriber PII     | Users rely on owner comms during incidents                                       |
-| **Unlisted / password Instatus Starter** | Free monitors + simple incidents | No custom domain on free tier ([Instatus pricing](https://instatus.com/pricing)) |
-| **Public `status.we-met.link`**          | Professional                     | Needs DNS + paid tier for custom domain; **Diadem decision**                     |
+| Option                                                             | Pros                                       | Cons                                                                                                |
+| ------------------------------------------------------------------ | ------------------------------------------ | --------------------------------------------------------------------------------------------------- |
+| **No hosted page (default)**                                       | Zero cost, no subscriber PII               | Users rely on owner comms during incidents                                                          |
+| **Instatus Starter (free)**                                        | Free monitors and a **public** status page | Page is public only; no custom domain on Starter ([Instatus pricing](https://instatus.com/pricing)) |
+| **Instatus Private Pro ($50/mo)** or **Select ($100/mo)**          | Password, allowlists, or audience controls | Paid; **CTO + Diadem** approval ([Instatus pricing](https://instatus.com/pricing))                  |
+| **Public `status.we-met.link` on Instatus Pro ($20/mo) or higher** | Custom domain on public page               | DNS plus paid tier; **CTO + Diadem** decision                                                       |
 
-**Recommendation:** start with **private incident doc** ([incident runbook](./runbooks/incident.md)) plus **internal** Instatus or Cloudflare notification history; add a **public** page before broad marketing ([DIDI-566](https://linear.app/didi-build/issue/DIDI-566)).
+**Recommendation:** start with the [incident runbook](./runbooks/incident.md) and Cloudflare notification history; add a **hosted** page only after §3.7 review. Do not use Instatus Starter if a non-public page is required.
 
 ### 3.6 Rough monthly cost
 
 **Date checked:** 2026-10-26 (vendor pages below; **We Met's actual zone plan and traffic are unknown** without dashboard access).
 
-| Line item                                  | Assumption                                                   | Source                                                                                                                                             | Monthly estimate                                                            |
-| ------------------------------------------ | ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| Workers Paid base                          | Account already on Workers Paid for production Workers       | [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/)                                                                     | **$5** minimum                                                              |
-| Workers Logs / traces                      | Low traffic (&lt;20M log events/mo at current 100% sampling) | [Workers pricing, Workers Logs table](https://developers.cloudflare.com/workers/platform/pricing/)                                                 | **$0** incremental (within included 20M until Dec 2026)                     |
-| Observability unified pricing              | After 2026-12-01, ingestion-based                            | [Observability pricing](https://developers.cloudflare.com/observability/pricing/)                                                                  | **Unknown** until measured; reduce `head_sampling_rate` if over 50 GB/cycle |
-| Queues                                     | &lt;1M operations/mo at We Met scale                         | [Queues pricing](https://developers.cloudflare.com/queues/platform/pricing/)                                                                       | **$0** (within 1M included)                                                 |
-| Cloudflare zone plan                       | **Unknown** (Free vs Pro affects Health Checks)              | [Cloudflare plans](https://www.cloudflare.com/plans/), [Health Checks availability](https://developers.cloudflare.com/health-checks/#availability) | **$0** (Free) or **$20** (Pro)                                              |
-| External monitors + status                 | Instatus Starter                                             | [Instatus pricing](https://instatus.com/pricing)                                                                                                   | **$0**                                                                      |
-| Optional Instatus Pro (custom domain, SMS) | If chosen                                                    | [Instatus pricing](https://instatus.com/pricing)                                                                                                   | **$20**                                                                     |
-| Sentry (not recommended initially)         | Developer free tier                                          | [Sentry pricing](https://sentry.io/pricing/)                                                                                                       | **$0**                                                                      |
+| Line item                                  | Assumption                                                   | Source                                                                                                                                                | Monthly estimate                                                            |
+| ------------------------------------------ | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Workers Paid base                          | Account already on Workers Paid for production Workers       | [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/)                                                                        | **$5** minimum                                                              |
+| Workers Logs / traces                      | Low traffic (&lt;20M log events/mo at current 100% sampling) | [Workers pricing, Workers Logs table](https://developers.cloudflare.com/workers/platform/pricing/)                                                    | **$0** incremental (within included 20M until Dec 2026)                     |
+| Observability unified pricing              | After 2026-12-01, ingestion-based                            | [Observability pricing](https://developers.cloudflare.com/observability/pricing/)                                                                     | **Unknown** until measured; reduce `head_sampling_rate` if over 50 GB/cycle |
+| Workers Analytics Engine (M8)              | Low volume counters                                          | [Analytics Engine pricing](https://developers.cloudflare.com/analytics/analytics-engine/pricing/) (checked 2026-10-26; **not billed yet** per vendor) | **$0** today; **Unknown** once billing starts ($0.25/million writes quoted) |
+| Workers Logpush (M12)                      | Only if enabled                                              | [Workers Logpush pricing](https://developers.cloudflare.com/workers/platform/pricing/) (10M requests/mo included, +$0.05/million)                     | **$0** if disabled; **Unknown** at We Met log volume if enabled             |
+| Queues                                     | &lt;1M operations/mo at We Met scale                         | [Queues pricing](https://developers.cloudflare.com/queues/platform/pricing/)                                                                          | **$0** (within 1M included)                                                 |
+| Cloudflare zone plan                       | **Unknown** (Free vs Pro affects Health Checks)              | [Cloudflare plans](https://www.cloudflare.com/plans/), [Health Checks availability](https://developers.cloudflare.com/health-checks/#availability)    | **$0** (Free) or **$20** (Pro)                                              |
+| External monitors + public status          | Instatus Starter                                             | [Instatus pricing](https://instatus.com/pricing)                                                                                                      | **$0**                                                                      |
+| Optional Instatus Pro (custom domain, SMS) | If chosen                                                    | [Instatus pricing](https://instatus.com/pricing)                                                                                                      | **$20**                                                                     |
+| Sentry (not recommended initially)         | Developer free tier                                          | [Sentry pricing](https://sentry.io/pricing/)                                                                                                          | **$0**                                                                      |
 
-**Planning range (excluding unknown zone plan):** about **$5 to $25/mo** Cloudflare + **$0 to $20/mo** optional status/uptime vendor.
+**Planning range (excluding unknown zone plan and unmeasured Logpush/Analytics Engine billing):** about **$5 to $25/mo** Cloudflare + **$0 to $20/mo** optional status/uptime vendor.
+
+### 3.7 Privacy and vendor compliance
+
+Before enabling any **new vendor** (Instatus, Better Stack, Sentry, AWS S3 for log archive, or similar):
+
+- Update [`docs/privacy/subprocessors.yml`](./privacy/subprocessors.yml) and the public privacy page ([subprocessors runbook context](./privacy/subprocessors.md)).
+- **CTO + Diadem** approval for vendor choice, regions, and DPA posture.
+
+Monitoring-specific notes:
+
+- **Status page subscribers:** email addresses collected for incident updates are **PII**; document purpose, retention, and processor in the data map if we enable subscriptions.
+- **M12 (Logpush):** exported Worker logs can include `leadId`, `photoKey`, and URLs longer than the default **7-day** Workers Logs retention ([Workers Logs limits](https://developers.cloudflare.com/workers/observability/logs/workers-logs/#limits)); treat as extended retention of operational identifiers and scrub or restrict destinations.
+- **M8 (Analytics Engine binding):** add a `data-map.yml` entry for any new binding and emitted dimensions before production write traffic.
+- **M9 (status page):** public comms and subscriber data; **CTO + Diadem**.
+- **Alert content:** automations (M6) must send only issue title and dashboard link; no visitor email, message bodies, or queue payloads.
 
 ---
 
 ## 4. Proposed SLOs (user-facing flows)
 
-Rolling **30-day** window; measured from **synthetic + Workers analytics** (not yet implemented). Error budgets use [Google's definition](https://sre.google/workbook/error-budget-policy/).
+Rolling **30-day** window; measured from **synthetic + Workers analytics** (not yet implemented). Error budgets use [Google's definition](https://sre.google/workbook/error-budget-policy/). Ledger statuses are `queued`, `sent`, and `failed` only ([`migrations/0002_lead_delivery_ledger.sql`](../migrations/0002_lead_delivery_ledger.sql)).
 
-| Flow                       | SLI                                                                         | SLO target                    | Error budget (30d)                        | Notes                                                                    |
-| -------------------------- | --------------------------------------------------------------------------- | ----------------------------- | ----------------------------------------- | ------------------------------------------------------------------------ |
-| **Card availability**      | Successful synthetic GET (200, body contains probe marker)                  | **99.9%**                     | ~43 minutes downtime                      | Aligns with "can open the card"                                          |
-| **Exchange acceptance**    | `POST /api/exchange` returns 2xx excluding honeypot fake 200                | **99.5%**                     | ~3.6 hours                                | Excludes 429 abuse and 503 when kill switch intentionally on             |
-| **Owner email timeliness** | Time from successful exchange to ledger `status = delivered` for email sink | **99%** within **15 minutes** | 1% of exchanges may exceed 15 min or fail | Queue retries up to ~12h; SLO forces backlog alerting before max retries |
+| Flow                       | SLI                                                                                       | SLO target                    | Error budget (30d)                        | Notes                                                                    |
+| -------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------- | ----------------------------------------- | ------------------------------------------------------------------------ |
+| **Card availability**      | Successful synthetic GET (200, body contains probe marker)                                | **99.9%**                     | ~43 minutes downtime                      | Aligns with "can open the card"                                          |
+| **Exchange acceptance**    | `POST /api/exchange` returns 2xx excluding honeypot fake 200                              | **99.5%**                     | ~3.6 hours                                | Excludes 429 abuse and 503 when kill switch intentionally on             |
+| **Owner email timeliness** | Time from successful exchange to ledger `status = 'sent'` for the email sink record phase | **99%** within **15 minutes** | 1% of exchanges may exceed 15 min or fail | Queue retries up to ~12h; SLO forces backlog alerting before max retries |
 
 **Not an SLO (operational guardrails):** warmup send caps, `lead_email_enabled`, Turnstile pass rate.
 
-When an SLO budget is exhausted in a month, policy: **freeze non-urgent production deploys** and prioritize reliability tickets ([error budget policy](https://sre.google/workbook/error-budget-policy/)).
+When an SLO budget is exhausted in a month, proposed policy: **freeze non-urgent production deploys** and prioritize reliability tickets ([error budget policy](https://sre.google/workbook/error-budget-policy/)). **Diadem must confirm** targets and freeze rules (open question §6).
 
 ---
 
 ## 5. Proposed build tickets
 
-Each row is one PR unless noted. Tag **Diadem** where account, secrets, or product decision is required.
+Each row is one PR unless noted. **Diadem** = Cloudflare account, secrets, or product choice. **CTO + Diadem** = vendor, privacy, or public comms.
 
-| ID (suggested) | Title                                   | Acceptance criterion                                                                                        | Diadem?                            |
-| -------------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------------- |
-| M1             | Document probe slug runbook             | `docs/runbooks/monitoring-probe.md` names how to create/store a live probe card slug without committing PII |                                    |
-| M2             | Add follow-up queue DLQ in Wrangler     | `we-met-followup-email-dlq` bound; consumer config documents operator replay steps                          | Yes (create queue in dashboard)    |
-| M3             | Cloudflare Monitor: follow-up backlog   | Monitor fires email when `we-met-followup-email` backlog &gt; threshold 30 minutes                          | Yes (notification email/webhook)   |
-| M4             | Cloudflare Monitor: warmup DLQ non-zero | Alert when either warmup DLQ has messages &gt; 0 for 15 minutes                                             | Yes                                |
-| M5             | Synthetic check: card page              | External or Health Check on probe URL; failure notifies operator                                            | Yes (zone plan / Instatus account) |
-| M6             | Workers Issues automation               | New issue on `we-met` or consumer sends email with issue title and link (no PII)                            | Yes (dashboard automation)         |
-| M7             | Reduce log/trace sampling               | `head_sampling_rate` tuned; comment in Wrangler cites cost check date                                       |                                    |
-| M8             | Analytics Engine counters for exchange  | Emit `exchange_outcome` counter by status class; dashboard or monitor                                       |                                    |
-| M9             | Status page (if approved)               | Public or private status page linked from internal runbook                                                  | Yes (public vs private, DNS)       |
-| M10            | SLO dashboard                           | Single Cloudflare dashboard or doc section showing 30d SLI vs targets                                       |                                    |
-| M11            | Incident comms template                 | Extend [incident.md](./runbooks/incident.md) with status page + customer email boilerplate                  |                                    |
-| M12            | Optional Logpush to R2                  | IaC or runbook for log export; PII scrubbing review                                                         | Yes (R2 bucket, tokens)            |
+| ID (suggested) | Title                                   | Acceptance criterion                                                                                                                         | Owner approval                          |
+| -------------- | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| M0             | Fix Workers Issues Wrangler key         | Replace `issue_detection` with `observability.issues.enabled` in app and both consumer wrangler configs; dashboard shows Issues after deploy |                                         |
+| M1             | Document probe slug runbook             | `docs/runbooks/monitoring-probe.md`: probe card published via app editor only, never `cards:load`                                            |                                         |
+| M2             | Add follow-up queue DLQ in Wrangler     | `we-met-followup-email-dlq` bound; consumer config documents operator replay steps                                                           | Diadem (create queue in dashboard)      |
+| M3             | Cloudflare Monitor: follow-up backlog   | Monitor fires email when `we-met-followup-email` backlog &gt; threshold 30 minutes (dataset **UNVERIFIED**)                                  | Diadem (notification email/webhook)     |
+| M4             | Cloudflare Monitor: warmup DLQ non-zero | Alert when either warmup DLQ has messages &gt; 0 for 15 minutes (dataset **UNVERIFIED**)                                                     | Diadem                                  |
+| M5             | Synthetic check: card page              | External or Health Check on probe URL; failure notifies operator                                                                             | Diadem (zone plan / Instatus account)   |
+| M6             | Workers Issues automation               | Automation emails issue title and Issues dashboard link only; no visitor or queue payload fields                                             | Diadem (dashboard automation)           |
+| M7             | Reduce log/trace sampling               | `head_sampling_rate` tuned; comment in Wrangler cites cost check date                                                                        | Diadem (cost decision; open question 8) |
+| M8             | Analytics Engine counters for exchange  | Emit `exchange_outcome` counter by status class; `data-map.yml` updated for binding                                                          | Diadem (binding + data map)             |
+| M9             | Status page (if approved)               | Hosted status page linked from internal runbook; subprocessors updated if vendor used                                                        | CTO + Diadem                            |
+| M10            | SLO dashboard                           | Single Cloudflare dashboard or doc section showing 30d SLI vs targets                                                                        |                                         |
+| M11            | Incident comms template                 | Extend [incident.md](./runbooks/incident.md) with status page + customer email boilerplate                                                   |                                         |
+| M12            | Optional Logpush to R2                  | Runbook or config for log export; privacy review for extended retention                                                                      | CTO + Diadem                            |
+
+**Any PR that adopts Instatus, Better Stack, Sentry, or non-Cloudflare log storage** needs **CTO + Diadem** before merge, even if not listed above.
 
 ---
 
@@ -278,7 +298,7 @@ Each row is one PR unless noted. Tag **Diadem** where account, secrets, or produ
 Plain questions for approval from a phone:
 
 1. What **Cloudflare zone plan** is `we-met.link` on today (Free vs Pro)? This decides whether **Health Checks** are available without a third-party monitor.
-2. Should **synthetic monitoring** hit a **real live slug** in production, and who owns creating that probe card?
+2. Should **synthetic monitoring** hit a **real live slug** in production, and who owns creating that probe card (via the app editor)?
 3. Do you want a **public status page** before general launch, or only **private** incident comms for now?
 4. If public, preferred host: **`status.we-met.link`**, Instatus subdomain, or other?
 5. What **email address** should receive **P2** (degraded mail/backlog) alerts during the day? (Warmup already uses `WARMUP_ALERT_TO` for reputation.)
@@ -287,6 +307,7 @@ Plain questions for approval from a phone:
 8. Is **100% log/trace sampling** in production acceptable cost-wise after [Observability pricing changes on 2026-12-01](https://developers.cloudflare.com/observability/pricing/), or should we lower sampling in M7 first?
 9. Should exhausted follow-up messages get a **DLQ** (M2) so nothing is silently deleted after 30 retries?
 10. Any **compliance** need for log retention beyond **7 days** ([Workers Logs retention](https://developers.cloudflare.com/workers/observability/logs/workers-logs/#limits))?
+11. Do you accept the proposed **SLO targets** (99.9% card availability, 99.5% exchange acceptance, 99% owner email within 15 minutes) and the **deploy freeze** when the monthly error budget is spent?
 
 ---
 
