@@ -22,6 +22,11 @@ describe("createRuntimeAppApi (unit)", () => {
     vi.unstubAllEnvs();
   });
 
+  it("uses the HTTP API on production", () => {
+    vi.stubEnv("NEXT_PUBLIC_WE_MET_ENV", "production");
+    expect(createRuntimeAppApi()).toBe(apiMocks.http);
+  });
+
   it("uses the HTTP API on staging", () => {
     vi.stubEnv("NEXT_PUBLIC_WE_MET_ENV", "staging");
     expect(createRuntimeAppApi()).toBe(apiMocks.http);

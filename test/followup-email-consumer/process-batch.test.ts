@@ -441,6 +441,38 @@ describe("processFollowupQueueBatch (unit)", () => {
     );
   });
 
+  it("staging consumer redirects owner lead sink mail with test subject and delivery line", async () => {
+    const ledger = new MemoryConsumerLeadDeliveryLedger();
+    ledger.seedQueued("lead-1", "sink-1", "record");
+    const message = createMessage(sinkRecordBody());
+    const deps = createDeps({ weMetEnv: "staging" }, ledger);
+    await processFollowupQueueBatch({ messages: [message] }, deps);
+    const sent = vi.mocked(deps.sendEmail).mock.calls[0][0];
+    expect(sent.to).toBe("test-inbox@example.com");
+    expect(sent.subject).toContain("[we-met test → owner@example.com]");
+    expect(sent.textPlain).toContain(
+      "Test delivery (sink destination): owner@example.com",
+    );
+  });
+
+  it("staging consumer redirects owner relay visitor mail with test subject and delivery line", async () => {
+    const message = createMessage(visitorBody());
+    const deps = createDeps({
+      weMetEnv: "staging",
+      readLeadEmailControls: vi.fn(async () => ({
+        ...defaultLeadEmailControls,
+        visitorEmailMode: "owner_relay" as const,
+      })),
+    });
+    await processFollowupQueueBatch({ messages: [message] }, deps);
+    const sent = vi.mocked(deps.sendEmail).mock.calls[0][0];
+    expect(sent.to).toBe("test-inbox@example.com");
+    expect(sent.subject).toContain("[we-met test → owner@example.com]");
+    expect(sent.textPlain).toContain(
+      "Test delivery (sink destination): owner@example.com",
+    );
+  });
+
   it("redirects when lead.environment is production but consumer WE_MET_ENV is preview", async () => {
     const message = createMessage(
       visitorBody({

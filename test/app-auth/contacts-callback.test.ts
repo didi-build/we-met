@@ -400,6 +400,36 @@ describe("contacts OAuth callback (integration)", () => {
     });
   });
 
+  it("declined redirect on staging uses the staging /app origin", async () => {
+    try {
+      routeMocks.env.WE_MET_BASE_URL = "https://we-met.didi.build";
+      routeMocks.env.WE_MET_ENV = "staging";
+      setRequestHeaders({ host: "we-met.didi.build" });
+      const response = await contactsCallbackGet(
+        new Request(
+          "https://we-met.didi.build/api/auth/google/contacts/callback?error=access_denied&state=declined",
+        ),
+      );
+      expect(response.status).toBe(302);
+      const location = response.headers.get("location") ?? "";
+      expect(location.startsWith("https://we-met.didi.build/app")).toBe(true);
+      expect(location).toContain("contacts_setup=declined");
+    } finally {
+      routeMocks.env = {
+        WE_MET_BASE_URL: "https://we-met.link",
+        WE_MET_ENV: "local",
+        WE_MET_APP_ORIGIN: "http://localhost:3000",
+        WE_MET_PREVIEW_HOST_SUFFIX: "",
+        GOOGLE_CLIENT_ID: "client",
+        GOOGLE_CLIENT_SECRET: "secret",
+        WE_MET_CONTACT_SENDER_ADDRESSES: "hello@we-met.link,hello@mail.we-met.link",
+        CONTACTS_SETUP_ALLOWLIST: "owner@example.com",
+        CONTACTS_SETUP_ENABLED_FOR_ALL: "false",
+      };
+      setRequestHeaders({ host: "localhost:3000" });
+    }
+  });
+
   it("declines when People API sync fails", async () => {
     await withIsolatedLocalD1(async (db) => {
       routeMocks.env.WE_MET_DB = db;
