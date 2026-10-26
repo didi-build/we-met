@@ -1,4 +1,9 @@
-import { appBaseUrl, isAppServingHost, type WeMetHostConfig } from "@/config/we-met";
+import {
+  appBaseUrl,
+  isAppServingHost,
+  isStagingSingleHost,
+  type WeMetHostConfig,
+} from "@/config/we-met";
 
 function hostLabel(hostname: string): string {
   return hostname.toLowerCase().split(":")[0] ?? "";
@@ -48,12 +53,15 @@ export function resolveAppOrigin(
   if (config.previewHostSuffix && host.endsWith(config.previewHostSuffix)) {
     return url.origin;
   }
+  if (config.weMetEnv === "staging") {
+    return new URL(config.baseUrl).origin;
+  }
   return appBaseUrl(config.baseUrl);
 }
 
 /** Where to send the browser after a redirect-mode Google sign-in. */
 export function appSpaPath(config: WeMetHostConfig, hostname: string): string {
-  if (isAppServingHost(hostname, config)) {
+  if (isAppServingHost(hostname, config) && !isStagingSingleHost(config)) {
     return "/";
   }
   return "/app";

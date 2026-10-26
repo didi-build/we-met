@@ -1,4 +1,4 @@
-# 0029. Component gallery on a dedicated Workers preview
+# 0029. Component gallery Workers preview alias
 
 - **Status:** accepted
 - **Date:** 2026-10-26
@@ -10,13 +10,15 @@ Design workflow v2 ([DIDI-848](https://linear.app/didi-build/issue/DIDI-848)) ne
 ## Decision
 
 1. **Hosting:** A static React gallery built with Vite and served via Wrangler **static assets** (`wrangler.gallery.jsonc`, `not_found_handling: single-page-application`). Not part of the OpenNext app bundle or production deploy.
-2. **Preview naming and Worker target:** Gallery previews use name `gallery-pr-<pr-number>` (separate URL from app previews `pr-<pr-number>`). The non-prod API token is scoped to Worker **`we-met`** only ([0017](./0017-cloudflare-api-credentials.md)), so gallery preview deploy uses `--worker-name we-met` and `--ignore-base-config` with the assets-only gallery config (no inherited D1, R2, queue, or email bindings from the app preview base config).
-3. **Preview URLs:** `preview_urls: true` and `workers_dev: false` in `wrangler.gallery.jsonc` so `wrangler preview --json` returns a workers.dev URL ([0019](./0019-pr-preview-github-action.md)).
-4. **Routes:** The gallery SPA lives at `/gallery` (root redirects there). Variants and props come from per-component `*.gallery.ts` beside each gallery component.
-5. **Directories:** `specs/` (designer-only) and `components/` (gallery implementations: Designer builds from the approved spec; Developer edits only for props or tiny non-design wiring fixes). The gallery UI lives under `gallery/`.
-6. **PR previews:** `.github/workflows/gallery-preview.yml` runs on same-repo pull requests using existing `CLOUDFLARE_API_TOKEN_NONPROD` and `CLOUDFLARE_ACCOUNT_ID` (preview environment). No new secrets. Deletes the gallery preview when the PR closes.
-7. **Robots:** Gallery responses send `X-Robots-Tag: noindex, nofollow` via static asset `_headers`.
-8. **Bindings:** Gallery preview deployments have no D1, R2, queue, KV, or email bindings.
+2. **Preview alias (not a separate Worker script):** Gallery previews use preview name `gallery-pr-<pr-number>` on the existing **`we-met`** Worker script (separate workers.dev URL from app previews `pr-<pr-number>`). The non-prod API token is scoped to Worker **`we-met`** only ([0017](./0017-cloudflare-api-credentials.md)), so the gallery cannot target a new Worker name without widening the token. Gallery CI never runs production deploy (`wrangler deploy` / OpenNext production paths); it only runs `wrangler preview` with the gallery config.
+3. **Gallery Wrangler config:** `wrangler.gallery.jsonc` includes an empty top-level `"previews": {}` block (required by Wrangler for `wrangler preview` on this Worker). The file has static assets only and no `d1_databases`, `r2_buckets`, `queues`, `services`, or email bindings in `previews` or at the top level.
+4. **`--ignore-base-config`:** Gallery preview deploy passes `--ignore-base-config` so Wrangler does **not** apply the dashboard **Preview base config** shared by app previews (which would attach D1, R2, queues, and vars from the OpenNext app). Combined with `--config wrangler.gallery.jsonc`, only this assets-only file (including empty `previews`) is used; app `wrangler.jsonc` is not read for gallery deploy.
+5. **Preview URLs:** `preview_urls: true` and `workers_dev: false` in `wrangler.gallery.jsonc` so `wrangler preview --json` returns a workers.dev URL ([0019](./0019-pr-preview-github-action.md)).
+6. **Routes:** The gallery SPA lives at `/gallery` (root redirects there). Variants and props come from per-component `*.gallery.ts` beside each gallery component.
+7. **Directories:** `specs/` (designer-only) and `components/` (gallery implementations: Designer builds from the approved spec; Developer edits only for props or tiny non-design wiring fixes). The gallery UI lives under `gallery/`.
+8. **PR previews:** `.github/workflows/gallery-preview.yml` runs on same-repo pull requests using existing `CLOUDFLARE_API_TOKEN_NONPROD` and `CLOUDFLARE_ACCOUNT_ID` (preview environment). No new secrets. Deletes the gallery preview when the PR closes.
+9. **Robots:** Gallery responses send `X-Robots-Tag: noindex, nofollow` via static asset `_headers`.
+10. **Bindings:** Gallery preview deployments have no D1, R2, queue, KV, or email bindings.
 
 ## Reasons
 

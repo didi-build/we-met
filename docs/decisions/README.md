@@ -13,6 +13,8 @@ Use [0000-template.md](./0000-template.md). Filename pattern: `NNNN-short-title.
 
 ## Environment decisions
 
-| ADR                                 | Status   | Topic                                                                                    |
-| ----------------------------------- | -------- | ---------------------------------------------------------------------------------------- |
-| [0029](./0029-component-gallery.md) | Accepted | Component gallery PR previews ([DIDI-863](https://linear.app/didi-build/issue/DIDI-863)) |
+| ADR                                                     | Status     | Topic                                                                                     |
+| ------------------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------- |
+| [0009](./0009-environments-local-preview-production.md) | Superseded | Local, preview, production (no staging)                                                   |
+| [0028](./0028-staging-we-met-didi-build.md)             | Accepted   | Staging on `we-met.didi.build` ([DIDI-873](https://linear.app/didi-build/issue/DIDI-873)) |
+| [0029](./0029-component-gallery.md)                     | Accepted   | Component gallery PR previews ([DIDI-863](https://linear.app/didi-build/issue/DIDI-863))  |
