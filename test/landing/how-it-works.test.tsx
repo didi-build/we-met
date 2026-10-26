@@ -2,9 +2,10 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
-import { act, render } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { HOW_IT_WORKS_INTERSECTION_OPTIONS } from "@/components/landing/how-it-works-observer";
 import { HowItWorksSection } from "@/components/landing/HowItWorksSection";
+import { LANDING_RELAY_COPY } from "@/lib/landing/landing-relay-mode";
 
 describe("HowItWorksSection (unit)", () => {
   let observerCallback: IntersectionObserverCallback | null = null;
@@ -33,7 +34,9 @@ describe("HowItWorksSection (unit)", () => {
   });
 
   afterEach(() => {
+    cleanup();
     vi.unstubAllGlobals();
+    vi.resetModules();
   });
 
   it("activates the step reported by IntersectionObserver", () => {
@@ -64,5 +67,47 @@ describe("HowItWorksSection (unit)", () => {
     expect(css).toMatch(
       /@media \(prefers-reduced-motion:\s*reduce\)[\s\S]*\.lp \*[\s\S]*transition:\s*none !important/,
     );
+  });
+
+  it("defaults to relay step 3 copy and vignette subjects", () => {
+    render(<HowItWorksSection />);
+
+    expect(
+      screen.getAllByRole("heading", {
+        level: 3,
+        name: LANDING_RELAY_COPY.step3TitleRelay,
+      }).length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText(LANDING_RELAY_COPY.step3ChipRelay).length,
+    ).toBeGreaterThan(0);
+    expect(screen.getAllByText("Great meeting you, Sam").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("You met Sam Rivera").length).toBeGreaterThan(0);
+    expect(screen.queryByText("New lead: Sam Rivera")).toBeNull();
+    expect(screen.queryByText("Nice to meet you, Sam")).toBeNull();
+
+    const relayButton = screen.getByRole("button", { name: "Relay (default)" });
+    expect(relayButton.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("switches to direct view and shows Coming soon badge when enabled", () => {
+    render(<HowItWorksSection />);
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Direct" })[0]!);
+
+    expect(
+      screen.getAllByRole("heading", {
+        level: 3,
+        name: LANDING_RELAY_COPY.step3TitleDirect,
+      }).length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText(LANDING_RELAY_COPY.comingSoonBadge).length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText(LANDING_RELAY_COPY.directStateLine).length,
+    ).toBeGreaterThan(0);
+    expect(screen.queryByText(LANDING_RELAY_COPY.step3ChipRelay)).toBeNull();
+    expect(screen.getAllByText("Sam's inbox").length).toBeGreaterThan(0);
   });
 });

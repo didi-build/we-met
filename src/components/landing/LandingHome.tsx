@@ -2,6 +2,7 @@ import { HowItWorksSection } from "@/components/landing/HowItWorksSection";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import { LandingHeader } from "@/components/landing/LandingHeader";
 import { LandingPhonePreview } from "@/components/landing/LandingPhonePreview";
+import { LANDING_RELAY_COPY } from "@/lib/landing/landing-relay-mode";
 import type { LandingUrls } from "@/lib/landing/urls";
 
 type LandingHomeProps = {
@@ -22,10 +23,7 @@ export function LandingHome({ urls, getStartedLabel }: LandingHomeProps) {
               <span>Swap details.</span>
               <span>Easy.</span>
             </h1>
-            <p className="lp-lead lp-rise lp-rise-2">
-              Share one link or QR code and you both get each other&apos;s details, so
-              you never lose a connection and can follow up in your own time.
-            </p>
+            <p className="lp-lead lp-rise lp-rise-2">{LANDING_RELAY_COPY.heroLead}</p>
             <div className="lp-actions lp-rise lp-rise-3">
               <a className="lp-btn" href={urls.appHome}>
                 {getStartedLabel}

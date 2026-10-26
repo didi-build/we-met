@@ -3,7 +3,9 @@ import {
   CopyIcon,
   LandingIcon,
   QrSampleIcon,
+  ReplyIcon,
 } from "@/components/landing/LandingIcons";
+import type { FollowUpMode } from "@/lib/landing/landing-relay-mode";
 
 export function ShareLinkVignette() {
   return (
@@ -47,49 +49,97 @@ export function ExchangeFormVignette() {
   );
 }
 
-export function LeadEmailVignette() {
+function LetterInboxRow({ toSam }: { toSam: boolean }) {
   return (
-    <div className="lp-vig">
-      <div className="lp-vig-mail">
-        <span className="lp-vig-to">To you</span>
-        <div className="lp-vig-row">
-          <span className="lp-vig-av">WM</span>
-          <div className="lp-vig-msg">
-            <div className="lp-vig-meta">
-              <span>We Met</span>
-              <span>now</span>
-            </div>
-            <span className="lp-vig-subj">New lead: Sam Rivera</span>
-            <span className="lp-vig-from">sam@studio.co</span>
-          </div>
+    <div className="lp-inbox-row" data-unread>
+      {toSam ? (
+        <span className="lp-vig-av lp-vig-av-soft">YN</span>
+      ) : (
+        <span className="lp-vig-av">WM</span>
+      )}
+      <div className="lp-vig-msg">
+        <div className="lp-vig-meta">
+          <span>{toSam ? "Your Name via We Met" : "We Met"}</span>
+          <span>now</span>
+        </div>
+        <span className="lp-vig-subj">Great meeting you, Sam</span>
+        <span className="lp-snip">
+          Hi Sam, great meeting you, and thanks for sharing your details with me.
+        </span>
+        <div className="lp-tags">
+          {toSam ? (
+            <>
+              <span className="lp-tag lp-tag-soft">
+                <LandingIcon>
+                  <ContactCardIcon size={12} />
+                </LandingIcon>
+                Contact card
+              </span>
+              <span className="lp-tag">Sent to Sam</span>
+            </>
+          ) : (
+            <>
+              <span className="lp-tag lp-tag-solid">
+                <LandingIcon>
+                  <ReplyIcon size={12} />
+                </LandingIcon>
+                Hit Reply to send
+              </span>
+              <span className="lp-tag lp-tag-soft">
+                <LandingIcon>
+                  <ContactCardIcon size={12} />
+                </LandingIcon>
+                Your card goes with it
+              </span>
+            </>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-export function VisitorEmailVignette() {
+function YouMetInboxRow() {
   return (
-    <div className="lp-vig">
-      <div className="lp-vig-mail">
-        <span className="lp-vig-to">To Sam</span>
-        <div className="lp-vig-row">
-          <span className="lp-vig-av lp-vig-av-soft">YN</span>
-          <div className="lp-vig-msg">
-            <div className="lp-vig-meta">
-              <span>Your Name</span>
-              <span>now</span>
-            </div>
-            <span className="lp-vig-subj">Nice to meet you, Sam</span>
-            <span className="lp-vig-att">
-              <LandingIcon>
-                <ContactCardIcon size={14} />
-              </LandingIcon>
-              Contact card
-            </span>
-          </div>
+    <div className="lp-inbox-row" data-unread>
+      <span className="lp-vig-av">WM</span>
+      <div className="lp-vig-msg">
+        <div className="lp-vig-meta">
+          <span>We Met</span>
+          <span>now</span>
+        </div>
+        <span className="lp-vig-subj">You met Sam Rivera</span>
+        <span className="lp-snip">
+          sam@studio.co · Product designer · Studio Co · &quot;Met at the design
+          meetup&quot;
+        </span>
+        <div className="lp-tags">
+          <span className="lp-tag">All the details, just for you</span>
         </div>
       </div>
+    </div>
+  );
+}
+
+export function FollowUpInboxVignette({ mode }: { mode: FollowUpMode }) {
+  return (
+    <div className="lp-vig lp-vig-wide">
+      <div className="lp-inbox lp-fade" key={mode}>
+        <div className="lp-inbox-head">
+          <span>Your inbox</span>
+          <span className="lp-inbox-count">{mode === "relay" ? "2 new" : "1 new"}</span>
+        </div>
+        {mode === "relay" && <LetterInboxRow toSam={false} />}
+        <YouMetInboxRow />
+      </div>
+      {mode === "direct" && (
+        <div className="lp-vig-mail lp-fade" style={{ marginTop: 14 }}>
+          <span className="lp-vig-to">Sam&apos;s inbox</span>
+          <div className="lp-inbox">
+            <LetterInboxRow toSam />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
