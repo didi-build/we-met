@@ -61,7 +61,7 @@ export function resolveD1IdForDatabaseName(databaseName, target, env, provisionF
 }
 
 /**
- * @param {'production' | 'preview' | 'd1-migrate-nonprod' | 'consumer-production' | 'consumer-nonprod'} target
+ * @param {'production' | 'preview' | 'staging' | 'd1-migrate-nonprod' | 'consumer-production' | 'consumer-nonprod'} target
  * @param {Record<string, string | undefined>} env
  * @param {Record<string, string> | null} provisionFile
  */
@@ -78,6 +78,7 @@ export function resolveD1IdsForPrepareTarget(target, env, provisionFile) {
   }
   if (
     target === "preview" ||
+    target === "staging" ||
     target === "d1-migrate-nonprod" ||
     target === "consumer-nonprod"
   ) {
