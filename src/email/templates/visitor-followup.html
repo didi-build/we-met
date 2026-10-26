@@ -38,10 +38,11 @@ a{color:#171717}
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
 <tr><td class="wm-ink" style="font-size:17px;line-height:26px;mso-line-height-rule:exactly;color:#171717;padding:0 0 16px">Hi {{visitor_first_name}},</td></tr>
 <tr><td class="wm-ink" style="font-size:17px;line-height:26px;mso-line-height-rule:exactly;color:#171717;padding:0 0 16px">Great meeting you, and thanks for sharing your details with me.</td></tr>
-<tr><td class="wm-ink" style="font-size:17px;line-height:26px;mso-line-height-rule:exactly;color:#171717;padding:0 0 16px">My contact card is attached to this email, so you can save it to your phone in one tap.</td></tr>
 {{#if contact_card_download_url}}
+<tr><td class="wm-ink" style="font-size:17px;line-height:26px;mso-line-height-rule:exactly;color:#171717;padding:0 0 16px">Tap below to save my contact card to your phone in one tap.</td></tr>
 <tr><td class="wm-ink" style="font-size:17px;line-height:26px;mso-line-height-rule:exactly;color:#171717;padding:0 0 32px"><a href="{{contact_card_download_url}}" style="color:#171717;text-decoration:underline">Save my contact card</a></td></tr>
 {{else}}
+<tr><td class="wm-ink" style="font-size:17px;line-height:26px;mso-line-height-rule:exactly;color:#171717;padding:0 0 16px">My contact card is attached, open it to save me to your phone.</td></tr>
 <tr><td height="16" style="font-size:0;line-height:0">&nbsp;</td></tr>
 {{/if}}
 <tr><td style="border-top:1px solid #dfdfdf;padding:24px 0 0;font-size:0;line-height:0" class="wm-card">&nbsp;</td></tr>

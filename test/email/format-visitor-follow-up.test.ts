@@ -75,6 +75,49 @@ describe("format visitor follow-up email (unit)", () => {
     expect(content.textHtml).not.toContain("Save my contact card");
   });
 
+  it("uses tap-below copy with link and attached fallback without link", () => {
+    const tapBelow = "Tap below to save my contact card to your phone in one tap.";
+    const attachedFallback =
+      "My contact card is attached, open it to save me to your phone.";
+    const relayUrl = "https://we-met.link/api/exchange/lead-1/contact-card?token=abc";
+    const withLink = buildVisitorFollowUpEmail({
+      card,
+      visitorName: "Alex",
+      baseUrl,
+      contactCardDownloadUrl: relayUrl,
+    });
+    expect(withLink.textPlain).toContain(tapBelow);
+    expect(withLink.textHtml).toContain(tapBelow);
+    expect(withLink.textPlain).not.toContain(attachedFallback);
+    expect(withLink.textHtml).not.toContain(attachedFallback);
+
+    const withoutLink = buildVisitorFollowUpEmail({
+      card,
+      visitorName: "Alex",
+      baseUrl,
+    });
+    expect(withoutLink.textPlain).toContain(attachedFallback);
+    expect(withoutLink.textHtml).toContain(attachedFallback);
+    expect(withoutLink.textPlain).not.toContain("Tap below");
+    expect(withoutLink.textHtml).not.toContain("Tap below");
+  });
+
+  it("plain text has a single blank line before the owner name (relay link on and off)", () => {
+    const relayUrl = "https://we-met.link/api/exchange/lead-1/contact-card?token=abc";
+    const ownerLine = "Demo User";
+    for (const contactCardDownloadUrl of [relayUrl, undefined]) {
+      const content = buildVisitorFollowUpEmail({
+        card,
+        visitorName: "Alex",
+        baseUrl,
+        contactCardDownloadUrl,
+      });
+      const beforeOwner = content.textPlain.split(ownerLine)[0] ?? "";
+      expect(beforeOwner.endsWith("\n\n")).toBe(true);
+      expect(beforeOwner.endsWith("\n\n\n")).toBe(false);
+    }
+  });
+
   it("never leaves raw template tags in HTML or text (relay and direct)", () => {
     const relayUrl = "https://we-met.link/api/exchange/lead-1/contact-card?token=abc";
     const relay = buildVisitorFollowUpEmail({
