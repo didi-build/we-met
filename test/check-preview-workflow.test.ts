@@ -10,6 +10,7 @@ import {
   REGRESSION_PRE_PR_WRANGLER_PREVIEW_LINE,
   findProductionTokenReferencesInText,
   findPullRequestWorkflowViolations,
+  findPreviewConfigViolations,
   findProductionResourceMarkerViolations,
   findSharedResourceIdViolations,
   findWranglerInvocationViolations,
@@ -126,6 +127,23 @@ describe("preview-workflow guard regressions (unit)", () => {
       ),
     ).toBe(true);
   });
+
+  it("findPreviewConfigViolations fails when preview config carries a production D1 name", () => {
+    const dir = mkdtempSync(join(tmpdir(), "preview-wf-prod-d1-marker-"));
+    seedRepo(dir);
+    const previewPath = join(dir, "wrangler.preview.jsonc");
+    const preview = parseJsonc(readFileSync(previewPath, "utf8")) as Record<
+      string,
+      unknown
+    >;
+    const d1Rows = preview.d1_databases as Array<Record<string, string>>;
+    preview.d1_databases = [{ ...d1Rows[0], database_name: "we-met-db" }];
+    writeFileSync(previewPath, `${JSON.stringify(preview, null, 2)}\n`);
+    const violations = findPreviewConfigViolations(dir);
+    expect(violations.some((message) => message.includes("we-met-db"))).toBe(true);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   it("blocks the exact pre-DIDI-918 wrangler preview deploy line (wrangler.ci.jsonc)", () => {
     const violations = findWranglerInvocationViolations(
       REGRESSION_PRE_PR_WRANGLER_PREVIEW_LINE,

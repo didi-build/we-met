@@ -39,7 +39,7 @@ npm run gallery:guards
 
 ## PR gallery preview
 
-Same-repo pull requests run **Gallery preview** (`.github/workflows/gallery-preview.yml`). It runs `npm run gallery:guards`, builds assets, then `wrangler preview` with `wrangler.gallery.jsonc`, `--worker-name we-met`, and `--ignore-base-config` (no D1, R2, queues, or email bindings). Preview name: `gallery-pr-<number>`.
+Same-repo pull requests run **Gallery preview** (`.github/workflows/gallery-preview.yml`). It runs `npm run gallery:guards`, builds assets, then `wrangler preview --config wrangler.gallery.jsonc` on Worker **`we-met-preview`** (assets-only config; no D1, R2, queues, or email bindings). Preview name: `gallery-pr-<number>`.
 
 Credentials are on the GitHub **`preview` environment** ([ADR 0030](./decisions/0030-preview-worker-isolation.md)): `CLOUDFLARE_API_TOKEN_PREVIEW` and `CLOUDFLARE_ACCOUNT_ID` (not repository-level secrets for the token). Fork PRs skip gallery deploy.
 

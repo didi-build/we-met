@@ -24,7 +24,7 @@ PR preview CI previously used a token with Workers Editor on production Worker `
 ## Consequences
 
 - GitHub `preview` environment needs `CLOUDFLARE_API_TOKEN_PREVIEW` (dashboard token scoped to `we-met-preview` only; manual setup in DIDI-919).
-- Legacy preview dashboard tokens scoped to Worker `we-met` are retired separately (DIDI-929); workflows reference only `CLOUDFLARE_API_TOKEN_PREVIEW`.
+- Legacy preview dashboard tokens scoped to Worker `we-met` are retired separately ([DIDI-929](https://linear.app/didi-build/issue/DIDI-929)); workflows reference only `CLOUDFLARE_API_TOKEN_PREVIEW`.
 - [0017](./0017-cloudflare-api-credentials.md) production and staging token rows remain; preview rows move here.
 
 ## Guard scope (not a security boundary)
