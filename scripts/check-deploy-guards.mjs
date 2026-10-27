@@ -384,8 +384,8 @@ function checkPreviewBlock(previews) {
   if (!previewHostSuffix.trim()) {
     fail("previews.vars.WE_MET_PREVIEW_HOST_SUFFIX must be non-empty");
   }
-  if (!previewHostSuffix.startsWith("-we-met.")) {
-    fail('previews.vars.WE_MET_PREVIEW_HOST_SUFFIX must start with "-we-met."');
+  if (!previewHostSuffix.startsWith("-we-met-preview.")) {
+    fail('previews.vars.WE_MET_PREVIEW_HOST_SUFFIX must start with "-we-met-preview."');
   }
 
   const previewBaseUrl = previewVars?.WE_MET_BASE_URL;

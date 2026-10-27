@@ -28,14 +28,9 @@ const PRODUCTION_TOKEN_BRACKET_PATTERN =
 const PRODUCTION_TOKEN_FORMAT_PATTERN =
   /format\s*\(\s*['"][^'"]*['"]\s*,\s*secrets\s*\.\s*CLOUDFLARE_API_TOKEN\s*}/i;
 
-const BLOCKED_CF_TOKEN_NAMES = [
-  "CLOUDFLARE_API_TOKEN_NONPROD",
-  "CLOUDFLARE_API_TOKEN_PRODUCTION",
-  "CLOUDFLARE_API_TOKEN_STAGING",
-  "CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION",
-  "CLOUDFLARE_API_TOKEN_CONSUMER_NONPROD",
-  "CLOUDFLARE_API_TOKEN_MIGRATE_NONPROD",
-];
+const PREVIEW_WORKFLOW_TOKEN = "CLOUDFLARE_API_TOKEN_PREVIEW";
+const MIGRATE_WORKFLOW_TOKEN = "CLOUDFLARE_API_TOKEN_MIGRATE_NONPROD";
+const CF_TOKEN_REF_PATTERN = /CLOUDFLARE_API_TOKEN_[A-Z0-9_]+/g;
 
 const SECRETS_INHERIT_PATTERN = /\bsecrets\s*:\s*inherit\b/i;
 
@@ -88,15 +83,17 @@ export function workflowOnTriggersPullRequest(on) {
 export function findProductionTokenReferencesInText(text, fileName = "") {
   const violations = [];
   const migrateAllowed = fileName === "migrate-nonprod.yml";
-  for (const secretName of BLOCKED_CF_TOKEN_NAMES) {
-    if (secretName === "CLOUDFLARE_API_TOKEN_MIGRATE_NONPROD" && migrateAllowed) {
+  for (const match of text.matchAll(CF_TOKEN_REF_PATTERN)) {
+    const secretName = match[0];
+    if (secretName === PREVIEW_WORKFLOW_TOKEN) {
       continue;
     }
-    if (text.includes(secretName)) {
-      violations.push(
-        `references ${secretName} in a pull request workflow (use CLOUDFLARE_API_TOKEN_PREVIEW on preview workflows only)`,
-      );
+    if (secretName === MIGRATE_WORKFLOW_TOKEN && migrateAllowed) {
+      continue;
     }
+    violations.push(
+      `references ${secretName} in a pull request workflow (use ${PREVIEW_WORKFLOW_TOKEN} on preview workflows only)`,
+    );
   }
   if (UNSUFFIXED_PRODUCTION_TOKEN_DOT_PATTERN.test(text)) {
     violations.push(

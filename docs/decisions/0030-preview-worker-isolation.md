@@ -6,14 +6,15 @@
 
 ## Context
 
-`CLOUDFLARE_API_TOKEN_NONPROD` was Workers Editor on production Worker `we-met`, so a compromised PR workflow could deploy to production. Diadem chose Option 2 (DIDI-894): move PR previews to a separate preview Worker with its own scoped token ([DIDI-918](https://linear.app/didi-build/issue/DIDI-918)).
+PR preview CI previously used a token with Workers Editor on production Worker `we-met`, so a compromised PR workflow could deploy to production. Diadem chose Option 2 (DIDI-894): move PR previews to a separate preview Worker with its own scoped token ([DIDI-918](https://linear.app/didi-build/issue/DIDI-918)).
 
 ## Decision
 
 1. **Preview Worker config:** `wrangler.preview.jsonc` names Worker `we-met-preview`, sets `workers_dev: true` and `preview_urls: true`, and binds only non-prod D1, R2, queues, and rate limits. No routes, custom domains, or service bindings to `we-met`.
 2. **Gallery previews:** `wrangler.gallery.jsonc` also targets `we-met-preview` (static assets only). PR workflow runs `wrangler preview --config wrangler.gallery.jsonc` without `--worker-name` or `--ignore-base-config`.
 3. **Preview workflows:** `.github/workflows/preview.yml` and `gallery-preview.yml` use only `secrets.CLOUDFLARE_API_TOKEN_PREVIEW` on the GitHub `preview` environment. App previews run `wrangler preview --config wrangler.preview.ci.jsonc` (prepared from `wrangler.preview.jsonc`). Cleanup uses `WRANGLER_CONFIG` with `scripts/wrangler-preview-delete.mjs`.
-4. **Guard:** `npm run preview-workflow` fails closed if a PR-triggered workflow targets production Worker `we-met`, omits the preview config, references legacy or production Cloudflare tokens, or renames `preview.yml`.
+4. **Preview host suffix:** `WE_MET_PREVIEW_HOST_SUFFIX` is `-we-met-preview.<subdomain>.workers.dev` (Worker name `we-met-preview`; preview URLs are `<preview-name>-we-met-preview.<subdomain>.workers.dev`).
+5. **Guard:** `npm run preview-workflow` fails closed if a PR-triggered workflow targets production Worker `we-met`, omits the preview config, references non-preview Cloudflare tokens, or renames `preview.yml`.
 
 ## Reasons
 
@@ -23,7 +24,7 @@
 ## Consequences
 
 - GitHub `preview` environment needs `CLOUDFLARE_API_TOKEN_PREVIEW` (dashboard token scoped to `we-met-preview` only; manual setup in DIDI-919).
-- `CLOUDFLARE_API_TOKEN_NONPROD` is removed from all workflows; retire or repurpose the dashboard token separately.
+- Legacy preview dashboard tokens scoped to Worker `we-met` are retired separately (DIDI-929); workflows reference only `CLOUDFLARE_API_TOKEN_PREVIEW`.
 - [0017](./0017-cloudflare-api-credentials.md) production and staging token rows remain; preview rows move here.
 
 ## Guard scope (not a security boundary)

@@ -16,7 +16,6 @@ const MIGRATE_NONPROD_ENV = "migrate-nonprod";
 const CONSUMER_PRODUCTION_SECRET = "CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION";
 const STAGING_SECRET = "CLOUDFLARE_API_TOKEN_STAGING";
 const PREVIEW_SECRET = "CLOUDFLARE_API_TOKEN_PREVIEW";
-const LEGACY_PREVIEW_NONPROD_SECRET = "CLOUDFLARE_API_TOKEN_NONPROD";
 const ALLOWED_PREVIEW_TOKEN_FILES = new Set(["preview.yml", "gallery-preview.yml"]);
 
 /**
@@ -80,23 +79,6 @@ export function findStagingCredentialViolations(workflowsDir) {
     if (name === ALLOWED_DEPLOY_STAGING_FILE) continue;
     const text = readFileSync(join(workflowsDir, name), "utf8");
     if (text.includes(STAGING_SECRET)) {
-      violations.push(name);
-    }
-  }
-  return violations.sort();
-}
-
-export function findLegacyPreviewNonprodCredentialViolations(workflowsDir) {
-  if (!existsSync(workflowsDir)) {
-    return [];
-  }
-  const violations = [];
-  for (const entry of readdirSync(workflowsDir, { withFileTypes: true })) {
-    if (!entry.isFile()) continue;
-    const name = entry.name;
-    if (!name.endsWith(".yml") && !name.endsWith(".yaml")) continue;
-    const text = readFileSync(join(workflowsDir, name), "utf8");
-    if (text.includes(LEGACY_PREVIEW_NONPROD_SECRET)) {
       violations.push(name);
     }
   }
@@ -179,18 +161,6 @@ function runCli() {
       `${STAGING_SECRET} must only appear in .github/workflows/${ALLOWED_DEPLOY_STAGING_FILE}. Offenders:\n`,
     );
     for (const file of stagingViolations) {
-      console.error(`  - ${file}`);
-    }
-    process.exit(1);
-  }
-
-  const legacyPreviewViolations =
-    findLegacyPreviewNonprodCredentialViolations(WORKFLOWS_DIR);
-  if (legacyPreviewViolations.length > 0) {
-    console.error(
-      `${LEGACY_PREVIEW_NONPROD_SECRET} must not appear in GitHub Actions workflows (use ${PREVIEW_SECRET} on preview workflows only). Offenders:\n`,
-    );
-    for (const file of legacyPreviewViolations) {
       console.error(`  - ${file}`);
     }
     process.exit(1);

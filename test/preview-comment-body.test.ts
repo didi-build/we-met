@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 
 const SCRIPT = "scripts/preview-comment-body.mjs";
-const PREVIEW_URL = "https://pr-42-we-met.example.workers.dev";
+const PREVIEW_URL = "https://pr-42-we-met-preview.example.workers.dev";
 
 const MIGRATION_NOTICE = `
 

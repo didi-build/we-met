@@ -71,7 +71,7 @@ describe("preview-workflow guard (unit)", () => {
     ).not.toEqual([]);
     expect(
       findProductionTokenReferencesInText(
-        "token: ${{ secrets.CLOUDFLARE_API_TOKEN_NONPROD }}",
+        "token: ${{ secrets.CLOUDFLARE_API_TOKEN_STAGING }}",
       ),
     ).not.toEqual([]);
     expect(

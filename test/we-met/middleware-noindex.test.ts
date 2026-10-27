@@ -21,7 +21,7 @@ describe("middleware non-production X-Robots-Tag (unit)", () => {
       savedEnv[key] = process.env[key];
     }
     process.env.WE_MET_BASE_URL = "https://we-met.link";
-    process.env.WE_MET_PREVIEW_HOST_SUFFIX = "-we-met.example.workers.dev";
+    process.env.WE_MET_PREVIEW_HOST_SUFFIX = "-we-met-preview.example.workers.dev";
   });
 
   afterEach(() => {
@@ -41,7 +41,7 @@ describe("middleware non-production X-Robots-Tag (unit)", () => {
       if (weMetEnv === "staging") {
         delete process.env.WE_MET_PREVIEW_HOST_SUFFIX;
       } else {
-        process.env.WE_MET_PREVIEW_HOST_SUFFIX = "-we-met.example.workers.dev";
+        process.env.WE_MET_PREVIEW_HOST_SUFFIX = "-we-met-preview.example.workers.dev";
       }
       const landing = middleware(request("/", "we-met.link"));
       expect(landing?.headers.get("x-robots-tag")).toBe(NON_PRODUCTION_X_ROBOTS_TAG);

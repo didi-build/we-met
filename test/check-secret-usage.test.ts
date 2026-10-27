@@ -9,7 +9,6 @@ import {
   findConsumerProductionCredentialViolations,
   findMigrateNonprodCredentialViolations,
   findStagingCredentialViolations,
-  findLegacyPreviewNonprodCredentialViolations,
   findPreviewCredentialViolations,
 } from "../scripts/check-secret-usage.mjs";
 
@@ -99,15 +98,6 @@ describe("check-secret-usage (unit)", () => {
 
     writeFileSync(join(dir, "leak.yml"), "CLOUDFLARE_API_TOKEN_PREVIEW\n");
     expect(findPreviewCredentialViolations(dir)).toEqual(["leak.yml"]);
-  });
-
-  it("rejects legacy CLOUDFLARE_API_TOKEN_NONPROD in any workflow", () => {
-    const dir = mkdtempSync(join(tmpdir(), "secret-usage-legacy-preview-"));
-    writeFileSync(join(dir, "preview.yml"), "CLOUDFLARE_API_TOKEN_PREVIEW\n");
-    expect(findLegacyPreviewNonprodCredentialViolations(dir)).toEqual([]);
-
-    writeFileSync(join(dir, "old.yml"), "CLOUDFLARE_API_TOKEN_NONPROD\n");
-    expect(findLegacyPreviewNonprodCredentialViolations(dir)).toEqual(["old.yml"]);
   });
 
   it("returns no violations when the workflows directory is missing", () => {

@@ -41,7 +41,7 @@ vi.mock("@/images/ingest-card-photo", () => ({
 
 function mutationHeaders(): HeadersInit {
   return {
-    origin: "https://pr-37-we-met.example.workers.dev",
+    origin: "https://pr-37-we-met-preview.example.workers.dev",
     "content-type": "application/json",
     "sec-fetch-site": "same-origin",
   };
@@ -53,7 +53,7 @@ describe("card editor full flow (integration)", () => {
       WE_MET_BASE_URL: "https://we-met.link",
       WE_MET_ENV: "preview",
       WE_MET_APP_ORIGIN: "https://app.we-met.link",
-      WE_MET_PREVIEW_HOST_SUFFIX: "-we-met.example.workers.dev",
+      WE_MET_PREVIEW_HOST_SUFFIX: "-we-met-preview.example.workers.dev",
       WE_MET_PREVIEW_LOGIN_SECRET: "test-preview-secret",
       WE_MET_PREVIEW_LOGIN_EMAIL: "owner@example.com",
       WE_MET_AUTH_RATE_LIMITER: {
@@ -66,18 +66,21 @@ describe("card editor full flow (integration)", () => {
       },
       IMAGES: {},
     };
-    routeMocks.headerMap.set("host", "pr-37-we-met.example.workers.dev");
+    routeMocks.headerMap.set("host", "pr-37-we-met-preview.example.workers.dev");
   });
 
   it("preview login → save → slug-check → publish → exchange ledger row", async () => {
     await withIsolatedLocalD1(async (db) => {
       routeMocks.env.WE_MET_DB = db;
       const login = await previewLoginPost(
-        new Request("https://pr-37-we-met.example.workers.dev/api/auth/preview-login", {
-          method: "POST",
-          headers: mutationHeaders(),
-          body: JSON.stringify({ secret: "test-preview-secret" }),
-        }),
+        new Request(
+          "https://pr-37-we-met-preview.example.workers.dev/api/auth/preview-login",
+          {
+            method: "POST",
+            headers: mutationHeaders(),
+            body: JSON.stringify({ secret: "test-preview-secret" }),
+          },
+        ),
       );
       expect(login.status).toBe(200);
       const cookie = login.headers.get("set-cookie") ?? "";
@@ -102,27 +105,33 @@ describe("card editor full flow (integration)", () => {
       };
 
       const draftRes = await draftPut(
-        new Request("https://pr-37-we-met.example.workers.dev/api/app/card/draft", {
-          method: "PUT",
-          headers: mutationHeaders(),
-          body: JSON.stringify({ card }),
-        }),
+        new Request(
+          "https://pr-37-we-met-preview.example.workers.dev/api/app/card/draft",
+          {
+            method: "PUT",
+            headers: mutationHeaders(),
+            body: JSON.stringify({ card }),
+          },
+        ),
       );
       expect(draftRes.status).toBe(200);
 
       const slugRes = await slugCheckGet(
         new Request(
-          "https://pr-37-we-met.example.workers.dev/api/app/slug-check?slug=flow-card",
+          "https://pr-37-we-met-preview.example.workers.dev/api/app/slug-check?slug=flow-card",
         ),
       );
       expect(slugRes.status).toBe(200);
 
       const publishRes = await publishPost(
-        new Request("https://pr-37-we-met.example.workers.dev/api/app/card/publish", {
-          method: "POST",
-          headers: mutationHeaders(),
-          body: JSON.stringify({ card }),
-        }),
+        new Request(
+          "https://pr-37-we-met-preview.example.workers.dev/api/app/card/publish",
+          {
+            method: "POST",
+            headers: mutationHeaders(),
+            body: JSON.stringify({ card }),
+          },
+        ),
       );
       expect(publishRes.status).toBe(200);
       const published = (await publishRes.json()) as { url: string };

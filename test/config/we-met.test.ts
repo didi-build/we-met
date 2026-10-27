@@ -8,7 +8,7 @@ import {
   readWeMetHostConfig,
 } from "@/config/we-met";
 
-const PREVIEW_SUFFIX = "-we-met.diademshoukralla.workers.dev";
+const PREVIEW_SUFFIX = "-we-met-preview.diademshoukralla.workers.dev";
 
 const productionConfig = {
   baseUrl: "https://we-met.link",
@@ -28,7 +28,10 @@ describe("isCardServingHost (unit)", () => {
 
   it("accepts a verified preview workers.dev host", () => {
     expect(
-      isCardServingHost(`pr-3-we-met.diademshoukralla.workers.dev`, productionConfig),
+      isCardServingHost(
+        `pr-3-we-met-preview.diademshoukralla.workers.dev`,
+        productionConfig,
+      ),
     ).toBe(true);
   });
 
@@ -85,7 +88,7 @@ describe("readWeMetHostConfig (unit)", () => {
       readWeMetHostConfig({
         WE_MET_BASE_URL: "https://we-met.didi.build",
         WE_MET_ENV: "staging",
-        WE_MET_PREVIEW_HOST_SUFFIX: "-we-met.example.workers.dev",
+        WE_MET_PREVIEW_HOST_SUFFIX: "-we-met-preview.example.workers.dev",
       }),
     ).toThrow(/WE_MET_PREVIEW_HOST_SUFFIX/);
   });

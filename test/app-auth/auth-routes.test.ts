@@ -293,13 +293,13 @@ describe("auth API routes (integration)", () => {
       routeMocks.env.WE_MET_PREVIEW_LOGIN_SECRET = "preview-secret";
       routeMocks.env.WE_MET_PREVIEW_LOGIN_EMAIL = "preview@test.we-met.link";
       routeMocks.env.WE_MET_PREVIEW_HOST_SUFFIX =
-        "-we-met.diademshoukralla.workers.dev";
+        "-we-met-preview.diademshoukralla.workers.dev";
       routeMocks.env.WE_MET_AUTH_RATE_LIMITER = {
         async limit() {
           return { success: true };
         },
       };
-      const previewHost = "pr-36-we-met.diademshoukralla.workers.dev";
+      const previewHost = "pr-36-we-met-preview.diademshoukralla.workers.dev";
       setRequestHeaders({ host: previewHost });
       const response = await previewLoginPost(
         new Request(`https://${previewHost}/api/auth/preview-login`, {
@@ -321,11 +321,11 @@ describe("auth API routes (integration)", () => {
   it("google start returns 404 on preview env", async () => {
     try {
       routeMocks.env.WE_MET_ENV = "preview";
-      routeMocks.env.WE_MET_PREVIEW_HOST_SUFFIX = "-we-met.example.workers.dev";
-      setRequestHeaders({ host: "pr-1-we-met.example.workers.dev" });
+      routeMocks.env.WE_MET_PREVIEW_HOST_SUFFIX = "-we-met-preview.example.workers.dev";
+      setRequestHeaders({ host: "pr-1-we-met-preview.example.workers.dev" });
       const response = await googleStartGet(
         new Request(
-          "https://pr-1-we-met.example.workers.dev/api/auth/google/start?mode=redirect",
+          "https://pr-1-we-met-preview.example.workers.dev/api/auth/google/start?mode=redirect",
         ),
       );
       expect(response.status).toBe(404);

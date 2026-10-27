@@ -96,10 +96,10 @@ describe("contacts OAuth start (integration)", () => {
   it("returns 404 on preview env and allows staging", async () => {
     try {
       routeMocks.env.WE_MET_ENV = "preview";
-      setRequestHeaders({ host: "pr-1-we-met.example.workers.dev" });
+      setRequestHeaders({ host: "pr-1-we-met-preview.example.workers.dev" });
       const response = await contactsStartGet(
         new Request(
-          "https://pr-1-we-met.example.workers.dev/api/auth/google/contacts/start",
+          "https://pr-1-we-met-preview.example.workers.dev/api/auth/google/contacts/start",
         ),
       );
       expect(response.status).toBe(404);

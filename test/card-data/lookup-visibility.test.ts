@@ -7,7 +7,7 @@ import { exampleCardInput } from "../helpers/example-card";
 
 const hostConfig = {
   baseUrl: "https://we-met.link",
-  previewHostSuffix: "-we-met.diademshoukralla.workers.dev",
+  previewHostSuffix: "-we-met-preview.diademshoukralla.workers.dev",
   weMetEnv: "production",
 };
 

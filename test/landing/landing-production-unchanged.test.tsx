@@ -10,7 +10,7 @@ import { resolveLandingUrls } from "@/lib/landing/urls";
 
 const productionConfig = {
   baseUrl: "https://we-met.link",
-  previewHostSuffix: "-we-met.example.workers.dev",
+  previewHostSuffix: "-we-met-preview.example.workers.dev",
   weMetEnv: "production",
 };
 

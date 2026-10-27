@@ -17,7 +17,7 @@ describe("app API host helpers (unit)", () => {
   const preview = readWeMetHostConfig({
     WE_MET_BASE_URL: "https://we-met.didi.build",
     WE_MET_ENV: "preview",
-    WE_MET_PREVIEW_HOST_SUFFIX: "-we-met.example.workers.dev",
+    WE_MET_PREVIEW_HOST_SUFFIX: "-we-met-preview.example.workers.dev",
   });
 
   const local = readWeMetHostConfig({
@@ -35,7 +35,9 @@ describe("app API host helpers (unit)", () => {
   it("allows app, preview, and local hosts for app API routes", () => {
     expect(isAppApiServingHost("app.we-met.link", production)).toBe(true);
     expect(isAppApiServingHost("we-met.link", production)).toBe(false);
-    expect(isAppApiServingHost("pr-1-we-met.example.workers.dev", preview)).toBe(true);
+    expect(
+      isAppApiServingHost("pr-1-we-met-preview.example.workers.dev", preview),
+    ).toBe(true);
     expect(isAppApiServingHost("localhost", local)).toBe(true);
     expect(isAppApiServingHost("localhost", production)).toBe(false);
   });
@@ -52,13 +54,17 @@ describe("app API host helpers (unit)", () => {
       }),
     ).toBe("http://localhost:3000");
     expect(
-      resolveAppOrigin(preview, "https://pr-1-we-met.example.workers.dev/app", {}),
-    ).toBe("https://pr-1-we-met.example.workers.dev");
+      resolveAppOrigin(
+        preview,
+        "https://pr-1-we-met-preview.example.workers.dev/app",
+        {},
+      ),
+    ).toBe("https://pr-1-we-met-preview.example.workers.dev");
   });
 
   it("chooses SPA paths for redirect targets", () => {
     expect(appSpaPath(production, "app.we-met.link")).toBe("/");
-    expect(appSpaPath(preview, "pr-1-we-met.example.workers.dev")).toBe("/app");
+    expect(appSpaPath(preview, "pr-1-we-met-preview.example.workers.dev")).toBe("/app");
   });
 
   it("staging uses the card host as the single app and API host", () => {
@@ -92,11 +98,15 @@ describe("app API host helpers (unit)", () => {
   it("resolveAppOrigin prefers staging over preview suffix on the request host", () => {
     const handBuilt: WeMetHostConfig = {
       baseUrl: "https://we-met.didi.build",
-      previewHostSuffix: "-we-met.example.workers.dev",
+      previewHostSuffix: "-we-met-preview.example.workers.dev",
       weMetEnv: "staging",
     };
     expect(
-      resolveAppOrigin(handBuilt, "https://pr-99-we-met.example.workers.dev/app", {}),
+      resolveAppOrigin(
+        handBuilt,
+        "https://pr-99-we-met-preview.example.workers.dev/app",
+        {},
+      ),
     ).toBe("https://we-met.didi.build");
   });
 
@@ -105,7 +115,7 @@ describe("app API host helpers (unit)", () => {
       readWeMetHostConfig({
         WE_MET_BASE_URL: "https://we-met.didi.build",
         WE_MET_ENV: "staging",
-        WE_MET_PREVIEW_HOST_SUFFIX: "-we-met.example.workers.dev",
+        WE_MET_PREVIEW_HOST_SUFFIX: "-we-met-preview.example.workers.dev",
       }),
     ).toThrow(/WE_MET_PREVIEW_HOST_SUFFIX/);
   });

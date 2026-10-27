@@ -44,7 +44,7 @@ describe("app card route rate limits (integration)", () => {
         WE_MET_BASE_URL: "https://we-met.link",
         WE_MET_ENV: "preview",
         WE_MET_APP_ORIGIN: "https://app.we-met.link",
-        WE_MET_PREVIEW_HOST_SUFFIX: "-we-met.example.workers.dev",
+        WE_MET_PREVIEW_HOST_SUFFIX: "-we-met-preview.example.workers.dev",
         WE_MET_DB: db,
         WE_MET_AUTH_RATE_LIMITER: {
           limit: async () => {
@@ -53,7 +53,7 @@ describe("app card route rate limits (integration)", () => {
           },
         },
       };
-      const previewHost = "pr-1-we-met.example.workers.dev";
+      const previewHost = "pr-1-we-met-preview.example.workers.dev";
       routeMocks.headerMap.set("host", previewHost);
       routeMocks.headerMap.set("x-forwarded-for", "198.51.100.9");
 
@@ -69,7 +69,7 @@ describe("app card route rate limits (integration)", () => {
         WE_MET_BASE_URL: "https://we-met.link",
         WE_MET_ENV: "preview",
         WE_MET_APP_ORIGIN: "https://app.we-met.link",
-        WE_MET_PREVIEW_HOST_SUFFIX: "-we-met.example.workers.dev",
+        WE_MET_PREVIEW_HOST_SUFFIX: "-we-met-preview.example.workers.dev",
         WE_MET_DB: db,
         WE_MET_AUTH_RATE_LIMITER: {
           limit: async () => {
@@ -78,7 +78,7 @@ describe("app card route rate limits (integration)", () => {
           },
         },
       };
-      const previewHost = "pr-2-we-met.example.workers.dev";
+      const previewHost = "pr-2-we-met-preview.example.workers.dev";
       routeMocks.headerMap.set("host", previewHost);
       routeMocks.headerMap.set("x-forwarded-for", "198.51.100.10");
 
@@ -99,12 +99,12 @@ describe("app card route rate limits (integration)", () => {
         .bind(now, now)
         .run();
       const session = await createSession(db, "a1");
-      const previewHost = "pr-3-we-met.example.workers.dev";
+      const previewHost = "pr-3-we-met-preview.example.workers.dev";
       routeMocks.env = {
         WE_MET_BASE_URL: "https://we-met.link",
         WE_MET_ENV: "preview",
         WE_MET_APP_ORIGIN: "https://app.we-met.link",
-        WE_MET_PREVIEW_HOST_SUFFIX: "-we-met.example.workers.dev",
+        WE_MET_PREVIEW_HOST_SUFFIX: "-we-met-preview.example.workers.dev",
         WE_MET_DB: db,
         WE_MET_AUTH_RATE_LIMITER: {
           limit: async () => {

@@ -9,7 +9,7 @@ Preview workflows and production deploys need Cloudflare API access with differe
 
 ## Decision
 
-- **Preview token (superseded for PR previews by [0030](./0030-preview-worker-isolation.md)):** PR previews use `CLOUDFLARE_API_TOKEN_PREVIEW` on the **`preview`** environment, scoped to Worker **`we-met-preview`** only. The former `CLOUDFLARE_API_TOKEN_NONPROD` (`we-met-ci-nonprod`, Editor on **`we-met`**) is no longer referenced in workflows.
+- **Preview token (superseded for PR previews by [0030](./0030-preview-worker-isolation.md)):** PR previews use `CLOUDFLARE_API_TOKEN_PREVIEW` on the **`preview`** environment, scoped to Worker **`we-met-preview`** only. Legacy dashboard tokens scoped to production Worker **`we-met`** are not used in workflows.
 - **Production token:** stored only as `CLOUDFLARE_API_TOKEN_PRODUCTION` on the GitHub **`production`** environment; scoped for production Worker deploy and D1 migrations.
 - **`CLOUDFLARE_ACCOUNT_ID`:** single repository secret used by both preview and production workflows.
 - **Never** use **`BOOTSTRAP_TOKEN`** for We Met deploys or previews ([AGENTS.md](../../AGENTS.md)).
@@ -22,7 +22,7 @@ Preview workflows and production deploys need Cloudflare API access with differe
 ## Consequences
 
 - [environments.md](../architecture/environments.md) and [deploy.md](../runbooks/deploy.md) document secret names; [deploy-setup.md](../runbooks/deploy-setup.md) describes dashboard token names and scopes.
-- Rename or create secrets in GitHub to match `CLOUDFLARE_API_TOKEN_NONPROD` and `CLOUDFLARE_API_TOKEN_PRODUCTION`; remove any unsuffixed `CLOUDFLARE_API_TOKEN` repository or environment secret.
+- Rename or create secrets in GitHub to match `CLOUDFLARE_API_TOKEN_PREVIEW` (preview) and `CLOUDFLARE_API_TOKEN_PRODUCTION` (production); remove any unsuffixed `CLOUDFLARE_API_TOKEN` repository or environment secret.
 
 ## Token scoping (Cloudflare, 2026+)
 

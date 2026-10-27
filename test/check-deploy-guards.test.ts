@@ -422,8 +422,9 @@ describe("check-deploy-guards (unit)", () => {
       },
     },
     {
-      label: "previews.vars.WE_MET_PREVIEW_HOST_SUFFIX lacks -we-met. prefix",
-      message: 'previews.vars.WE_MET_PREVIEW_HOST_SUFFIX must start with "-we-met."',
+      label: "previews.vars.WE_MET_PREVIEW_HOST_SUFFIX lacks -we-met-preview. prefix",
+      message:
+        'previews.vars.WE_MET_PREVIEW_HOST_SUFFIX must start with "-we-met-preview."',
       mutate: (config: Record<string, unknown>) => {
         const previews = config.previews as Record<string, unknown>;
         const vars = previews.vars as Record<string, string>;
@@ -435,7 +436,7 @@ describe("check-deploy-guards (unit)", () => {
       message: 'top-level vars.WE_MET_PREVIEW_HOST_SUFFIX must be ""',
       mutate: (config: Record<string, unknown>) => {
         const vars = config.vars as Record<string, string>;
-        vars.WE_MET_PREVIEW_HOST_SUFFIX = "-we-met.preview.workers.dev";
+        vars.WE_MET_PREVIEW_HOST_SUFFIX = "-we-met-preview.example.workers.dev";
       },
     },
     {
@@ -570,7 +571,7 @@ describe("check-deploy-guards (unit)", () => {
       message: 'WE_MET_PREVIEW_HOST_SUFFIX must be ""',
       mutate: (config: Record<string, unknown>) => {
         const vars = config.vars as Record<string, string>;
-        vars.WE_MET_PREVIEW_HOST_SUFFIX = "-we-met.preview.workers.dev";
+        vars.WE_MET_PREVIEW_HOST_SUFFIX = "-we-met-preview.example.workers.dev";
       },
     },
     {

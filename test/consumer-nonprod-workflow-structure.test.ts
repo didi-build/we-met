@@ -43,7 +43,7 @@ describe("Deploy consumer non-prod workflow structure (unit)", () => {
       `CLOUDFLARE_API_TOKEN: \${{ secrets.${CONSUMER_TOKEN} }}`,
     );
     expect(stepBlock).not.toContain("CLOUDFLARE_API_TOKEN_PRODUCTION");
-    expect(stepBlock).not.toContain("CLOUDFLARE_API_TOKEN_NONPROD");
+    expect(stepBlock).not.toContain("CLOUDFLARE_API_TOKEN_PREVIEW");
   });
 
   it("secret check requires three non-prod consumer secret names", () => {

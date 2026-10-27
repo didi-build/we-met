@@ -37,7 +37,7 @@ describe("resolveLandingBrowseOrigin (unit)", () => {
   });
 
   it("uses the request origin on a preview workers.dev card host", () => {
-    const previewHost = `pr-35-we-met${previewHostSuffix}`;
+    const previewHost = `pr-35${previewHostSuffix}`;
     expect(resolveLandingBrowseOrigin(previewWorkerConfig, previewHost, "https")).toBe(
       `https://${previewHost}`,
     );
@@ -60,7 +60,7 @@ describe("resolveLandingUrls (unit)", () => {
   });
 
   it("builds privacy and terms from an explicit preview browse origin", () => {
-    const previewOrigin = `https://pr-35-we-met${previewHostSuffix}`;
+    const previewOrigin = `https://pr-35${previewHostSuffix}`;
     const urls = resolveLandingUrls(previewWorkerConfig, previewOrigin);
 
     expect(urls.privacy).toBe(`${previewOrigin}/privacy`);
