@@ -2,9 +2,9 @@
 
 Design-only section spec for the We Met privacy page (`/privacy`, `src/components/landing/PrivacyPolicyContent.tsx`). Copy only: no layout or behaviour change. Ticket: [DIDI-920](https://linear.app/didi-build/issue/DIDI-920). Dev: [DIDI-921](https://linear.app/didi-build/issue/DIDI-921).
 
-**Status: Proposed, awaiting Diadem approval.** Any edit after approval needs a fresh approval.
+**Approved by Diadem, Oct 27, 2026, 4:13 PM ET ([DIDI-920](https://linear.app/didi-build/issue/DIDI-920)). Any edit to this text needs a fresh approval.**
 
-This file sits next to the privacy page spec (`design/legal/privacy/spec.md`, on the unmerged DIDI-916 branch). Once both merge, `spec.md` links here, or this section is folded into it in a design-only follow-up.
+This file sits next to the privacy page spec ([spec.md](spec.md), merged in `dfeee96`). A later design-only follow-up links it from `spec.md` (or folds it in) and adds it to `design/README.md`.
 
 ## Purpose
 
@@ -16,7 +16,7 @@ The section "What the people you meet can see" describes only the direct-mode fo
 
 Diadem, Oct 27, 2026, 3:57 PM ET, verbatim (DIDI-920). **Matches Product direction: yes.**
 
-## What the visitor receives in relay mode (checked against `main` at `f19c6b6`)
+## What the visitor receives in relay mode (checked against `main` at `f19c6b6`; `src/` unchanged at `dfeee96`)
 
 | # | Item | Reference |
 | --- | --- | --- |
@@ -44,24 +44,22 @@ Not disclosed on the current page: items 2, 3, 5, 7 and 9 in relay terms. Line 6
 
 ## Final copy
 
-Section "What the people you meet can see". Placement: a **new paragraph** right after the paragraph at lines 64 to 67 that ends "...you follow up from your own inbox, with Reply-To set to them." and before the paragraph at line 68 ("We recommend creating an exchange on your own card first..."). Existing text is unchanged.
+Section "What the people you meet can see" in `src/components/landing/PrivacyPolicyContent.tsx`. Placement: a **new** `<p className="lp-body">` right after the paragraph at lines 64 to 67 that ends "...you follow up from your own inbox, with Reply-To set to them." and before the paragraph at line 68 ("We recommend creating an exchange on your own card first..."). Line numbers checked against `main` at `dfeee96`. Existing text is unchanged.
 
-### Option A (recommended)
+FINAL (character for character):
 
 `In this default mode, we email the follow-up letter to you, not to them. When you hit Reply, they get it from your own inbox, with your name, role and photo, and your contact card, ready to save. The contact card uses your full Google name and includes your Google account email address, your phone number if you added one, and the links on your card.`
 
-### Option B (Option A plus the save link lifetime)
-
-`In this default mode, we email the follow-up letter to you, not to them. When you hit Reply, they get it from your own inbox, with your name, role and photo, and your contact card, ready to save. The contact card uses your full Google name and includes your Google account email address, your phone number if you added one, and the links on your card. The link to save your card does not expire. It gives your current card while your card is published, including to anyone your reply is forwarded to.`
-
-JSX for the developer: one `<p className="lp-body">` with the chosen text, apostrophes as `&apos;` if any are added. No em dashes.
+JSX for the developer: one `<p className="lp-body">` with the text above. No em dashes.
 
 ## Decisions
 
+- Approval (Diadem, Oct 27, 2026, 4:13 PM ET, verbatim): "Approve Option A for DIDI-920".
+- Option B's extra save-link sentence ("The link to save your card does not expire. It gives your current card while your card is published, including to anyone your reply is forwarded to.") was **not approved** and is not part of the copy.
 - New paragraph, not a rewrite of line 65, so DIDI-916's approved lines (76 to 82) and the existing default-mode sentence stay untouched.
 - "your contact card, ready to save" reuses the DIDI-916 approved wording.
-- Option B is offered because the save link never expires (ADR 0027 addendum, Decision 4). Diadem picks A or B.
 
 ## Changes
 
 - 2026-10-27: Section spec created with the relay mode behaviour list and proposed text (Options A and B), awaiting Diadem approval ([DIDI-920](https://linear.app/didi-build/issue/DIDI-920)).
+- 2026-10-27, 4:13 PM ET: Diadem: "Approve Option A for DIDI-920". Relay-mode privacy disclosure approved, Option A ([DIDI-920](https://linear.app/didi-build/issue/DIDI-920)).
