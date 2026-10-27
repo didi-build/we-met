@@ -272,7 +272,7 @@ export function collectGalleryPreviewArgvViolations(argString) {
     );
   }
 
-  const forbidden = ["--secrets-file", "--var", "--env", "-c"];
+  const forbidden = ["--secrets-file", "--var", "--env", "-c", "--worker-name"];
   for (const flag of forbidden) {
     if (flags.has(flag)) {
       errors.push(`gallery-preview.yml wrangler preview must not pass ${flag}.`);
@@ -284,11 +284,10 @@ export function collectGalleryPreviewArgvViolations(argString) {
       "gallery-preview.yml wrangler preview must pass --config wrangler.gallery.jsonc.",
     );
   }
-  if (flags.get("--worker-name") !== "we-met") {
-    errors.push("gallery-preview.yml wrangler preview must pass --worker-name we-met.");
-  }
-  if (!flags.has("--ignore-base-config")) {
-    errors.push("gallery-preview.yml wrangler preview must pass --ignore-base-config.");
+  if (flags.has("--ignore-base-config")) {
+    errors.push(
+      "gallery-preview.yml wrangler preview must not pass --ignore-base-config.",
+    );
   }
   if (!flags.has("--name")) {
     errors.push("gallery-preview.yml wrangler preview must pass --name.");
@@ -311,12 +310,12 @@ export function collectGalleryConfigViolations(config) {
       errors.push(`wrangler.gallery.jsonc must not define top-level key ${key}.`);
     }
   }
-  if (config.workers_dev !== false) {
-    errors.push("wrangler.gallery.jsonc must set workers_dev to false.");
+  if (config.workers_dev !== true) {
+    errors.push("wrangler.gallery.jsonc must set workers_dev to true.");
   }
-  if (config.name !== "we-met") {
+  if (config.name !== "we-met-preview") {
     errors.push(
-      'wrangler.gallery.jsonc name must remain "we-met" (Worker-scoped preview token).',
+      'wrangler.gallery.jsonc name must remain "we-met-preview" (preview Worker only).',
     );
   }
   const assets = config.assets;

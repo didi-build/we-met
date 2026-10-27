@@ -4,6 +4,7 @@
  *
  * Usage:
  *   node scripts/check-deploy-guards.mjs --target preview --config wrangler.jsonc
+ *   node scripts/check-deploy-guards.mjs --target preview-worker --config wrangler.preview.jsonc
  *   node scripts/check-deploy-guards.mjs --target production --config wrangler.jsonc
  *   node scripts/check-deploy-guards.mjs --target consumer-nonprod --config workers/we-met-followup-email-consumer/wrangler.nonprod.jsonc
  *   node scripts/check-deploy-guards.mjs --target consumer-production --config workers/we-met-followup-email-consumer/wrangler.production.jsonc
@@ -53,7 +54,7 @@ import { previewLoginReachableForWorkerEnv } from "./lib/preview-login-guard.mjs
 
 function usage() {
   console.error(
-    "Usage: check-deploy-guards.mjs --target <preview|production|staging|staging-build|consumer-nonprod|consumer-production|warmup-production> --config <path> [--mail-safety-config <path>]",
+    "Usage: check-deploy-guards.mjs --target <preview|preview-worker|production|staging|staging-build|consumer-nonprod|consumer-production|warmup-production> --config <path> [--mail-safety-config <path>]",
   );
   process.exit(1);
 }
@@ -408,6 +409,59 @@ function checkPreviewBlock(previews) {
     "preview queue",
   );
   checkRateLimitBindings(previews?.ratelimits, false);
+}
+
+const PREVIEW_WORKER_NAME = "we-met-preview";
+const PREVIEW_CONFIG_LABEL = "wrangler.preview.jsonc";
+
+function checkPreviewWorkerDomainSettings(config) {
+  if (config.workers_dev !== true) {
+    fail(`${PREVIEW_CONFIG_LABEL} workers_dev must be true`);
+  }
+  if (config.preview_urls !== true) {
+    fail(`${PREVIEW_CONFIG_LABEL} preview_urls must be true`);
+  }
+  const patterns = routePatterns(config);
+  if (patterns.length > 0) {
+    fail(`${PREVIEW_CONFIG_LABEL} must not define routes or custom domains`);
+  }
+}
+
+function checkPreviewWorkerNoProductionServiceBinding(config) {
+  const services = config.services ?? [];
+  for (const row of services) {
+    const service = row?.service;
+    if (service === "we-met") {
+      fail(`${PREVIEW_CONFIG_LABEL} must not service-bind to production Worker we-met`);
+    }
+    if (service && service !== PREVIEW_WORKER_NAME) {
+      fail(
+        `${PREVIEW_CONFIG_LABEL} service binding must target ${PREVIEW_WORKER_NAME} only`,
+      );
+    }
+  }
+}
+
+function checkPreviewWorkerBlock(config) {
+  if (config.name !== PREVIEW_WORKER_NAME) {
+    fail(`${PREVIEW_CONFIG_LABEL} name must be "${PREVIEW_WORKER_NAME}"`);
+  }
+  checkPreviewWorkerDomainSettings(config);
+  checkPreviewWorkerNoProductionServiceBinding(config);
+  checkPreviewBlock({
+    vars: config.vars,
+    d1_databases: config.d1_databases,
+    r2_buckets: config.r2_buckets,
+    queues: config.queues,
+    ratelimits: config.ratelimits,
+    routes: config.routes,
+  });
+  const topD1 = config.d1_databases ?? [];
+  for (const row of topD1) {
+    if (row.database_id === D1_PLACEHOLDER_PRODUCTION) {
+      fail(`${PREVIEW_CONFIG_LABEL} must not use production D1 placeholder id`);
+    }
+  }
 }
 
 const ALLOWED_CONSUMER_VAR_KEYS = new Set(["WE_MET_ENV", "WE_MET_BASE_URL"]);
@@ -931,7 +985,13 @@ function main() {
     target === "consumer-nonprod" || target === "consumer-production";
   const isWarmupTarget = target === "warmup-production";
   const isStagingFamily = target === "staging" || target === "staging-build";
-  if (!isConsumerTarget && !isWarmupTarget && !isStagingFamily) {
+  const isPreviewWorkerTarget = target === "preview-worker";
+  if (
+    !isConsumerTarget &&
+    !isWarmupTarget &&
+    !isStagingFamily &&
+    !isPreviewWorkerTarget
+  ) {
     checkWranglerDomainSettings(config);
     checkDistinctD1Ids(config);
   }
@@ -945,6 +1005,12 @@ function main() {
   if (target === "staging") {
     checkStagingBlock(config);
     console.log("deploy-time guards passed (staging)");
+    return;
+  }
+
+  if (target === "preview-worker") {
+    checkPreviewWorkerBlock(config);
+    console.log("deploy-time guards passed (preview-worker)");
     return;
   }
 

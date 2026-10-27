@@ -15,8 +15,8 @@ import {
 
 const BASE_CONFIG = {
   $schema: "node_modules/wrangler/config-schema.json",
-  name: "we-met",
-  workers_dev: false,
+  name: "we-met-preview",
+  workers_dev: true,
   preview_urls: true,
   compatibility_date: "2026-09-24",
   assets: {
@@ -27,14 +27,12 @@ const BASE_CONFIG = {
   previews: {},
 };
 
-const VALID_PREVIEW_ARGS = `--config wrangler.gallery.jsonc --worker-name we-met --ignore-base-config --name "gallery-pr-1" --json`;
+const VALID_PREVIEW_ARGS = `--config wrangler.gallery.jsonc --name "gallery-pr-1" --json`;
 
 const VALID_WORKFLOW_SNIPPET = `
 run: |
   output="$(npx wrangler preview \\
     --config wrangler.gallery.jsonc \\
-    --worker-name we-met \\
-    --ignore-base-config \\
     --name "gallery-pr-\${PR_NUMBER}" \\
     --json 2>&1)"
 `;
@@ -65,10 +63,10 @@ describe("gallery guards (unit)", () => {
     ).toContain("wrangler.gallery.jsonc assets must not define binding.");
   });
 
-  it("requires workers_dev false and assets.directory ./dist", () => {
+  it("requires workers_dev true and assets.directory ./dist", () => {
     expect(
-      collectGalleryConfigViolations({ ...BASE_CONFIG, workers_dev: true }),
-    ).toContain("wrangler.gallery.jsonc must set workers_dev to false.");
+      collectGalleryConfigViolations({ ...BASE_CONFIG, workers_dev: false }),
+    ).toContain("wrangler.gallery.jsonc must set workers_dev to true.");
     expect(
       collectGalleryConfigViolations({
         ...BASE_CONFIG,
@@ -84,12 +82,12 @@ describe("gallery guards (unit)", () => {
     expect(collectGalleryWorkflowViolations(VALID_WORKFLOW_SNIPPET)).toEqual([]);
   });
 
-  it("rejects wrangler preview missing --ignore-base-config", () => {
+  it("rejects wrangler preview with --worker-name", () => {
     const bad = `
-      npx wrangler preview --config wrangler.gallery.jsonc --worker-name we-met --name x --json
+      npx wrangler preview --config wrangler.gallery.jsonc --worker-name we-met-preview --name x --json
     `;
     expect(collectGalleryWorkflowViolations(bad)).toContain(
-      "gallery-preview.yml wrangler preview must pass --ignore-base-config.",
+      "gallery-preview.yml wrangler preview must not pass --worker-name.",
     );
   });
 
@@ -98,9 +96,7 @@ describe("gallery guards (unit)", () => {
       collectGalleryPreviewArgvViolations(`${VALID_PREVIEW_ARGS} --var FOO:bar`),
     ).toContain("gallery-preview.yml wrangler preview must not pass --var.");
     expect(
-      collectGalleryPreviewArgvViolations(
-        `-c wrangler.gallery.jsonc --worker-name we-met --ignore-base-config --name x --json`,
-      ),
+      collectGalleryPreviewArgvViolations(`-c wrangler.gallery.jsonc --name x --json`),
     ).toContain("gallery-preview.yml wrangler preview must not pass -c.");
   });
 

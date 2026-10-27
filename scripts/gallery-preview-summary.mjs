@@ -7,7 +7,7 @@ const previewMode = process.env.PREVIEW_MODE ?? "unknown";
 let statusLine;
 if (previewMode === "unconfigured") {
   statusLine =
-    "**Gallery preview:** not configured. Set secrets on the GitHub **preview** environment: `CLOUDFLARE_API_TOKEN_NONPROD` (existing preview token) and `CLOUDFLARE_ACCOUNT_ID`. Same-repo pull requests only; fork PRs skip gallery deploy.";
+    "**Gallery preview:** not configured. Set secrets on the GitHub **preview** environment: `CLOUDFLARE_API_TOKEN_PREVIEW` and `CLOUDFLARE_ACCOUNT_ID`. Same-repo pull requests only; fork PRs skip gallery deploy.";
 } else if (previewMode === "deployed" && galleryUrl) {
   statusLine = `✅ **Gallery preview:** [Open /gallery](${galleryUrl})`;
 } else if (previewMode === "failed") {

@@ -9,7 +9,7 @@
     "node": ">=22.13.0"
   },
   "scripts": {
-    "check": "npm run format:check && npm run lint && npm run typecheck && npm run email-templates:check && npm run test && npm run theme-colors && npm run nodrift:check && npm run gallery:guards && npm run gallery:build && npm run build && npm run worker:dry-run && npm run worker:dry-run:generated && npm run worker:dry-run:staging && npm run worker:consumer-dry-run:nonprod && npm run worker:consumer-dry-run:production && npm run worker:warmup-dry-run && npm run warmup-no-emails && npm run consumer-email-bundle:check && npm run deploy:guards && npm run workflow-provision-policy && npm run workflow-d1-id-secrets && npm run secrets && npm run secret-usage && npm run actions-policy-workflows && npm run placeholders && npm run attribution",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run email-templates:check && npm run test && npm run theme-colors && npm run nodrift:check && npm run gallery:guards && npm run gallery:build && npm run build && npm run worker:dry-run && npm run worker:dry-run:generated && npm run worker:dry-run:staging && npm run worker:consumer-dry-run:nonprod && npm run worker:consumer-dry-run:production && npm run worker:warmup-dry-run && npm run warmup-no-emails && npm run consumer-email-bundle:check && npm run deploy:guards && npm run preview-workflow && npm run workflow-provision-policy && npm run workflow-d1-id-secrets && npm run secrets && npm run secret-usage && npm run actions-policy-workflows && npm run placeholders && npm run attribution",
     "nodrift:check": "nodrift check",
     "email-templates:generate": "node scripts/generate-email-templates.mjs",
     "email-templates:check": "node scripts/check-email-templates-generated.mjs",
@@ -28,7 +28,8 @@
     "worker:consumer-dry-run:production": "wrangler deploy --dry-run --config workers/we-met-followup-email-consumer/wrangler.production.jsonc",
     "worker:warmup-dry-run": "wrangler deploy --dry-run --config workers/warmup/wrangler.jsonc",
     "warmup-no-emails": "node scripts/check-warmup-no-emails.mjs",
-    "deploy:guards": "node scripts/check-deploy-guards.mjs --target preview --config wrangler.jsonc && node scripts/check-deploy-guards.mjs --target production --config wrangler.jsonc && node scripts/check-deploy-guards.mjs --target staging --config wrangler.staging.jsonc && node scripts/check-deploy-guards.mjs --target consumer-nonprod --config workers/we-met-followup-email-consumer/wrangler.nonprod.jsonc && node scripts/check-deploy-guards.mjs --target consumer-production --config workers/we-met-followup-email-consumer/wrangler.production.jsonc && node scripts/check-deploy-guards.mjs --target warmup-production --config workers/warmup/wrangler.jsonc",
+    "deploy:guards": "node scripts/check-deploy-guards.mjs --target preview --config wrangler.jsonc && node scripts/check-deploy-guards.mjs --target preview-worker --config wrangler.preview.jsonc && node scripts/check-deploy-guards.mjs --target production --config wrangler.jsonc && node scripts/check-deploy-guards.mjs --target staging --config wrangler.staging.jsonc && node scripts/check-deploy-guards.mjs --target consumer-nonprod --config workers/we-met-followup-email-consumer/wrangler.nonprod.jsonc && node scripts/check-deploy-guards.mjs --target consumer-production --config workers/we-met-followup-email-consumer/wrangler.production.jsonc && node scripts/check-deploy-guards.mjs --target warmup-production --config workers/warmup/wrangler.jsonc",
+    "preview-workflow": "node scripts/check-preview-workflow.mjs",
     "workflow-provision-policy": "node scripts/check-workflow-provision-policy.mjs",
     "workflow-d1-id-secrets": "node scripts/check-workflow-d1-id-secrets.mjs",
     "db:migrate": "node scripts/apply-migrations.mjs --local",
@@ -94,6 +95,7 @@
     "typescript-eslint": "8.71.2",
     "vite": "^7.3.7",
     "vitest": "3.2.7",
-    "wrangler": "^4.151.1"
+    "wrangler": "^4.151.1",
+    "yaml": "2.9.1"
   }
 }

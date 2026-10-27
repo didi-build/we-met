@@ -1,0 +1,89 @@
+// PR preview Worker only. CI uses wrangler preview with CLOUDFLARE_API_TOKEN_PREVIEW.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "main": ".open-next/worker.js",
+  "name": "we-met-preview",
+  "workers_dev": true,
+  "preview_urls": true,
+  "compatibility_date": "2026-09-24",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS",
+  },
+  "services": [
+    {
+      "binding": "WORKER_SELF_REFERENCE",
+      "service": "we-met-preview",
+    },
+  ],
+  "images": {
+    "binding": "IMAGES",
+  },
+  "d1_databases": [
+    {
+      "binding": "WE_MET_DB",
+      "database_name": "we-met-db-nonprod",
+      "database_id": "00000000-0000-0000-0000-000000000002",
+      "migrations_dir": "migrations",
+    },
+  ],
+  "r2_buckets": [
+    {
+      "binding": "WE_MET_ASSETS",
+      "bucket_name": "we-met-assets-nonprod",
+    },
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "WE_MET_FOLLOWUP_EMAIL_QUEUE",
+        "queue": "we-met-followup-email-nonprod",
+      },
+    ],
+  },
+  "ratelimits": [
+    {
+      "name": "WE_MET_EXCHANGE_RATE_LIMITER",
+      "namespace_id": "2001",
+      "simple": {
+        "limit": 10,
+        "period": 60,
+      },
+    },
+    {
+      "name": "WE_MET_AUTH_RATE_LIMITER",
+      "namespace_id": "2003",
+      "simple": {
+        "limit": 10,
+        "period": 60,
+      },
+    },
+    {
+      "name": "WE_MET_APP_RATE_LIMITER",
+      "namespace_id": "2005",
+      "simple": {
+        "limit": 60,
+        "period": 60,
+      },
+    },
+  ],
+  "vars": {
+    "WE_MET_BASE_URL": "https://we-met.didi.build",
+    "WE_MET_ENV": "preview",
+    "WE_MET_PREVIEW_HOST_SUFFIX": "-we-met.diademshoukralla.workers.dev",
+    "WE_MET_CONTACT_SENDER_ADDRESSES": "hello@we-met.link,hello@mail.we-met.link",
+    "CONTACTS_SETUP_ENABLED_FOR_ALL": "false",
+  },
+  "observability": {
+    "redact_query_string": true,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "invocation_logs": true,
+      "persist": true,
+    },
+    "traces": { "enabled": true, "head_sampling_rate": 1, "persist": true },
+    "issues": { "enabled": true },
+  },
+}

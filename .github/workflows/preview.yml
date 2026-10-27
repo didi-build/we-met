@@ -28,13 +28,12 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
-      - run: npm ci
       - name: Fetch main for non-prod resource gate
         run: git fetch origin main --depth=1
       - name: Verify non-prod D1/R2 exist on main (no preview provision)
         run: node scripts/verify-preview-nonprod-resources.mjs
-      - name: Deploy-time guards (preview, committed config)
-        run: node scripts/check-deploy-guards.mjs --target preview --config wrangler.jsonc
+      - name: Deploy-time guards (preview Worker, committed config)
+        run: node scripts/check-deploy-guards.mjs --target preview-worker --config wrangler.preview.jsonc
       - name: Prepare Wrangler config (non-prod D1 IDs)
         env:
           WE_MET_D1_DATABASE_ID_NONPROD: ${{ secrets.WE_MET_D1_DATABASE_ID_NONPROD }}
@@ -42,9 +41,9 @@ jobs:
           set -euo pipefail
           node scripts/prepare-wrangler-config.mjs \
             --target preview \
-            --output wrangler.ci.jsonc
-      - name: Deploy-time guards (preview)
-        run: node scripts/check-deploy-guards.mjs --target preview --config wrangler.ci.jsonc
+            --output wrangler.preview.ci.jsonc
+      - name: Deploy-time guards (preview Worker)
+        run: node scripts/check-deploy-guards.mjs --target preview-worker --config wrangler.preview.ci.jsonc
       - name: Require non-prod Turnstile site key
         env:
           NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.WE_MET_TURNSTILE_SITE_KEY_NONPROD }}
@@ -62,12 +61,12 @@ jobs:
       - name: Create or update Cloudflare Preview
         id: preview
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_NONPROD }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_PREVIEW }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
           output="$(npx wrangler preview \
-            --config wrangler.ci.jsonc \
+            --config wrangler.preview.ci.jsonc \
             --name "pr-${{ github.event.pull_request.number }}" \
             --json 2>&1)"
           printf '%s\n' "$output"
@@ -114,10 +113,8 @@ jobs:
       - name: Delete Cloudflare Preview
         continue-on-error: true
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_NONPROD }}
+          PREVIEW_NAME: pr-${{ github.event.pull_request.number }}
+          WRANGLER_CONFIG: wrangler.preview.jsonc
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_PREVIEW }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          # Preview may already be gone; closing a PR must not fail the workflow.
-          npx wrangler preview delete \
-            --name "pr-${{ github.event.pull_request.number }}" \
-            --skip-confirmation
+        run: node scripts/wrangler-preview-delete.mjs
