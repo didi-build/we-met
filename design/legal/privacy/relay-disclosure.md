@@ -16,7 +16,9 @@ The section "What the people you meet can see" describes only the direct-mode fo
 
 Diadem, Oct 27, 2026, 3:57 PM ET, verbatim (DIDI-920). **Matches Product direction: yes.**
 
-## What the visitor receives in relay mode (checked against `main` at `f19c6b6`; `src/` unchanged at `dfeee96`)
+## What the visitor receives in relay mode (checked against main dfeee96 (src unchanged since f19c6b6))
+
+In direct mode, We Met emails the follow-up letter to the visitor, with From display name built from the owner's given name (`{first} via We Met`), and Reply-To set to the owner's Google account email (`src/followup-email-consumer/process-batch.ts` 313 to 326).
 
 | # | Item | Reference |
 | --- | --- | --- |
