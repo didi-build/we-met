@@ -9,7 +9,7 @@ Preview workflows and production deploys need Cloudflare API access with differe
 
 ## Decision
 
-- **Preview token (superseded for PR previews by [0030](./0030-preview-worker-isolation.md)):** PR previews use `CLOUDFLARE_API_TOKEN_PREVIEW` on the **`preview`** environment, scoped to Worker **`we-met-preview`** only. Legacy dashboard tokens scoped to production Worker **`we-met`** are not used in workflows.
+- **Non-prod token:** `CLOUDFLARE_API_TOKEN_NONPROD` on the GitHub **`preview`** environment, used by preview workflows; scoped as narrowly as Cloudflare allows (see **Token scoping** below).
 - **Production token:** stored only as `CLOUDFLARE_API_TOKEN_PRODUCTION` on the GitHub **`production`** environment; scoped for production Worker deploy and D1 migrations.
 - **`CLOUDFLARE_ACCOUNT_ID`:** single repository secret used by both preview and production workflows.
 - **Never** use **`BOOTSTRAP_TOKEN`** for We Met deploys or previews ([AGENTS.md](../../AGENTS.md)).
@@ -22,7 +22,7 @@ Preview workflows and production deploys need Cloudflare API access with differe
 ## Consequences
 
 - [environments.md](../architecture/environments.md) and [deploy.md](../runbooks/deploy.md) document secret names; [deploy-setup.md](../runbooks/deploy-setup.md) describes dashboard token names and scopes.
-- Rename or create secrets in GitHub to match `CLOUDFLARE_API_TOKEN_PREVIEW` (preview) and `CLOUDFLARE_API_TOKEN_PRODUCTION` (production); remove any unsuffixed `CLOUDFLARE_API_TOKEN` repository or environment secret.
+- Rename or create secrets in GitHub to match `CLOUDFLARE_API_TOKEN_NONPROD` and `CLOUDFLARE_API_TOKEN_PRODUCTION`; remove any unsuffixed `CLOUDFLARE_API_TOKEN` repository or environment secret.
 
 ## Token scoping (Cloudflare, 2026+)
 
@@ -34,7 +34,9 @@ The **non-prod** token does **not** need a zone policy: preview deploys do not t
 
 **D1, R2, and Queues** permissions in API tokens remain **account-level** for now (no per-database or per-bucket token scope). The production CI token therefore includes account-level **D1 Edit** (dashboard label **D1 Write**) for `wrangler d1 migrations apply`; R2 and Queues are omitted until a 403 requires them.
 
-PR preview deploy and delete on Worker **`we-met-preview`** use **`CLOUDFLARE_API_TOKEN_PREVIEW`** ([0030](./0030-preview-worker-isolation.md)). Production separation is the preview Worker name, non-prod bindings in `wrangler.preview.jsonc`, and the preview-only token scope.
+Previews use the **same** Worker name (`we-met`) as production. The non-prod token is scoped to that Worker only; **separation from production** is **GitHub secret placement** (`preview` vs `production` environments, plus repo-level `CLOUDFLARE_ACCOUNT_ID`) plus the **extra D1 and zone policies** on the production token only.
+
+**Editor** scoped to Worker **`we-met`** is sufficient to **create and delete** `pr-<n>` preview instances in CI (`wrangler preview` / `preview delete`); closing or merging the first preview PR deleted preview `pr-3` successfully (verified **2026-10-11**). Wrangler may print a harmless open-beta warning for `preview delete`. If a future workflow returns **403**, grant the permission named in the error — never **Admin**.
 
 **Production follow-up email consumer token (DIDI-599):** dashboard name **`we-met-ci-consumer-production`**, GitHub secret **`CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION`** on the **`production`** environment only. Use **two** token policies — do **not** widen **`we-met-ci-production`**:
 

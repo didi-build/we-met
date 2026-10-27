@@ -7,6 +7,7 @@ import { parseJsonc } from "../scripts/lib/parse-jsonc.mjs";
 
 const SCRIPT = "scripts/check-deploy-guards.mjs";
 const BASE_CONFIG = readFileSync("wrangler.jsonc", "utf8");
+const PREVIEW_WORKER_BASE_CONFIG = readFileSync("wrangler.preview.jsonc", "utf8");
 const STAGING_BASE_CONFIG = readFileSync("wrangler.staging.jsonc", "utf8");
 const MAIL_SAFETY_BASE = readFileSync("config/nonprod-mail-safety.json", "utf8");
 
@@ -26,6 +27,18 @@ function writeTempConfig(mutator: (config: Record<string, unknown>) => void) {
   tempDirs.push(dir);
   const path = join(dir, "wrangler.jsonc");
   const config = parseJsonc(BASE_CONFIG) as Record<string, unknown>;
+  mutator(config);
+  writeFileSync(path, JSON.stringify(config, null, 2), "utf8");
+  return { dir, path };
+}
+
+function writeTempPreviewWorkerConfig(
+  mutator: (config: Record<string, unknown>) => void,
+) {
+  const dir = mkdtempSync(join(tmpdir(), "we-met-preview-worker-guards-"));
+  tempDirs.push(dir);
+  const path = join(dir, "wrangler.preview.jsonc");
+  const config = parseJsonc(PREVIEW_WORKER_BASE_CONFIG) as Record<string, unknown>;
   mutator(config);
   writeFileSync(path, JSON.stringify(config, null, 2), "utf8");
   return { dir, path };
@@ -65,6 +78,11 @@ afterEach(() => {
 describe("check-deploy-guards (unit)", () => {
   it("passes preview guards on committed wrangler.jsonc", () => {
     const result = runGuards("preview", "wrangler.jsonc");
+    expect(result.status).toBe(0);
+  });
+
+  it("passes preview-worker guards on committed wrangler.preview.jsonc", () => {
+    const result = runGuards("preview-worker", "wrangler.preview.jsonc");
     expect(result.status).toBe(0);
   });
 
@@ -422,9 +440,8 @@ describe("check-deploy-guards (unit)", () => {
       },
     },
     {
-      label: "previews.vars.WE_MET_PREVIEW_HOST_SUFFIX lacks -we-met-preview. prefix",
-      message:
-        'previews.vars.WE_MET_PREVIEW_HOST_SUFFIX must start with "-we-met-preview."',
+      label: "previews.vars.WE_MET_PREVIEW_HOST_SUFFIX lacks -we-met. prefix",
+      message: 'previews.vars.WE_MET_PREVIEW_HOST_SUFFIX must start with "-we-met."',
       mutate: (config: Record<string, unknown>) => {
         const previews = config.previews as Record<string, unknown>;
         const vars = previews.vars as Record<string, string>;
@@ -459,6 +476,16 @@ describe("check-deploy-guards (unit)", () => {
       expect(result.stderr).toContain(message);
     });
   }
+
+  it("fails preview-worker when vars.WE_MET_PREVIEW_HOST_SUFFIX uses legacy -we-met. prefix", () => {
+    const { path } = writeTempPreviewWorkerConfig((config) => {
+      const vars = config.vars as Record<string, string>;
+      vars.WE_MET_PREVIEW_HOST_SUFFIX = "-we-met.example.workers.dev";
+    });
+    const result = runGuards("preview-worker", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("-we-met-preview.");
+  });
 
   const stagingGuardCases = [
     {

@@ -2,6 +2,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { parseJsonc } from "./parse-jsonc.mjs";
+import { PRODUCTION_RESOURCE_MARKERS } from "./wrangler-placeholders.mjs";
 import {
   GALLERY_PREVIEW_CONFIG,
   PREVIEW_CONFIG,
@@ -29,8 +30,14 @@ const PRODUCTION_TOKEN_FORMAT_PATTERN =
   /format\s*\(\s*['"][^'"]*['"]\s*,\s*secrets\s*\.\s*CLOUDFLARE_API_TOKEN\s*}/i;
 
 const PREVIEW_WORKFLOW_TOKEN = "CLOUDFLARE_API_TOKEN_PREVIEW";
-const MIGRATE_WORKFLOW_TOKEN = "CLOUDFLARE_API_TOKEN_MIGRATE_NONPROD";
-const CF_TOKEN_REF_PATTERN = /CLOUDFLARE_API_TOKEN_[A-Z0-9_]+/g;
+const BLOCKED_CF_TOKEN_NAMES = [
+  "CLOUDFLARE_API_TOKEN_NONPROD",
+  "CLOUDFLARE_API_TOKEN_PRODUCTION",
+  "CLOUDFLARE_API_TOKEN_STAGING",
+  "CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION",
+  "CLOUDFLARE_API_TOKEN_CONSUMER_NONPROD",
+  "CLOUDFLARE_API_TOKEN_MIGRATE_NONPROD",
+];
 
 const SECRETS_INHERIT_PATTERN = /\bsecrets\s*:\s*inherit\b/i;
 
@@ -54,6 +61,57 @@ const ALLOWED_PREVIEW_DELETE_CONFIGS = new Set([
   PREVIEW_CONFIG,
   GALLERY_PREVIEW_CONFIG,
 ]);
+
+/**
+ * @param {unknown} value
+ * @param {string[]} [out]
+ * @returns {string[]}
+ */
+function collectStrings(value, out = []) {
+  if (value === null || value === undefined) {
+    return out;
+  }
+  if (typeof value === "string") {
+    out.push(value);
+    return out;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectStrings(item, out);
+    }
+    return out;
+  }
+  if (typeof value === "object") {
+    for (const nested of Object.values(value)) {
+      collectStrings(nested, out);
+    }
+  }
+  return out;
+}
+
+/**
+ * @param {Record<string, unknown>} config
+ * @param {string} label
+ * @returns {string[]}
+ */
+export function findProductionResourceMarkerViolations(config, label) {
+  const productionMarkers = [
+    PRODUCTION_RESOURCE_MARKERS.d1Name,
+    PRODUCTION_RESOURCE_MARKERS.r2Bucket,
+    PRODUCTION_RESOURCE_MARKERS.queue,
+    PRODUCTION_RESOURCE_MARKERS.exchangeRateLimiterNamespaceId,
+    PRODUCTION_RESOURCE_MARKERS.authRateLimiterNamespaceId,
+    PRODUCTION_RESOURCE_MARKERS.appRateLimiterNamespaceId,
+  ];
+  const strings = collectStrings(config);
+  const violations = [];
+  for (const marker of productionMarkers) {
+    if (strings.includes(marker)) {
+      violations.push(`${label} references production resource "${marker}"`);
+    }
+  }
+  return violations;
+}
 
 /**
  * @param {unknown} on
@@ -83,17 +141,15 @@ export function workflowOnTriggersPullRequest(on) {
 export function findProductionTokenReferencesInText(text, fileName = "") {
   const violations = [];
   const migrateAllowed = fileName === "migrate-nonprod.yml";
-  for (const match of text.matchAll(CF_TOKEN_REF_PATTERN)) {
-    const secretName = match[0];
-    if (secretName === PREVIEW_WORKFLOW_TOKEN) {
+  for (const secretName of BLOCKED_CF_TOKEN_NAMES) {
+    if (secretName === "CLOUDFLARE_API_TOKEN_MIGRATE_NONPROD" && migrateAllowed) {
       continue;
     }
-    if (secretName === MIGRATE_WORKFLOW_TOKEN && migrateAllowed) {
-      continue;
+    if (text.includes(secretName)) {
+      violations.push(
+        `references ${secretName} in a pull request workflow (use ${PREVIEW_WORKFLOW_TOKEN} on preview workflows only)`,
+      );
     }
-    violations.push(
-      `references ${secretName} in a pull request workflow (use ${PREVIEW_WORKFLOW_TOKEN} on preview workflows only)`,
-    );
   }
   if (UNSUFFIXED_PRODUCTION_TOKEN_DOT_PATTERN.test(text)) {
     violations.push(
@@ -555,6 +611,7 @@ export function findPreviewConfigViolations(root) {
   }
 
   violations.push(...findSharedResourceIdViolations(production, preview));
+  violations.push(...findProductionResourceMarkerViolations(preview, PREVIEW_CONFIG));
 
   const galleryPath = join(root, GALLERY_PREVIEW_CONFIG);
   if (existsSync(galleryPath)) {

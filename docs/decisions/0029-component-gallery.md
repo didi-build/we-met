@@ -15,7 +15,7 @@ Design workflow v2 ([DIDI-848](https://linear.app/didi-build/issue/DIDI-848)) ne
 4. **`--ignore-base-config`:** Skips the Cloudflare dashboard **Preview base config** for Worker `we-met` (the D1/R2/queue/vars bundle used by OpenNext app previews). Gallery deploy uses only `wrangler.gallery.jsonc` plus `--config`; app `wrangler.jsonc` is not merged in.
 5. **Routes:** Gallery SPA is served at `/gallery/` on the preview hostname. The preview root `/` is not the gallery.
 6. **Registry:** `components/<name>/<name>.gallery.ts` imports app components from `src/`; no duplicate CSS or shadow implementations for seeded entries.
-7. **PR workflow:** `.github/workflows/gallery-preview.yml` on the **`preview` environment** (`CLOUDFLARE_API_TOKEN_PREVIEW`, `CLOUDFLARE_ACCOUNT_ID`). Deletes `gallery-pr-<n>` when the PR closes.
+7. **PR workflow:** `.github/workflows/gallery-preview.yml` on the **`preview` environment** (`CLOUDFLARE_API_TOKEN_NONPROD`, `CLOUDFLARE_ACCOUNT_ID`). Deletes `gallery-pr-<n>` when the PR closes.
 8. **Robots:** `wrangler.gallery.jsonc` uses `assets.directory` `./dist`; `dist/_headers` applies `X-Robots-Tag: noindex, nofollow` to `/gallery/*`, `/gallery/assets/*`, and `/*` (gallery files live under `dist/gallery/`). On `workers.dev` Preview URLs, Cloudflare adds `X-Robots-Tag: noindex` automatically ([Workers Previews: Protect Preview content](https://developers.cloudflare.com/workers/previews/custom-domains/#protect-preview-content)); `nofollow` is carried in `gallery/index.html` via `<meta name="robots" content="noindex, nofollow" />`, which CI probes on deployed previews.
 
 ## Reasons

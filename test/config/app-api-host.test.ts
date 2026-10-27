@@ -4,6 +4,7 @@ import {
   isAppApiServingHost,
   resolveAppOrigin,
 } from "@/config/app-api-host";
+import { isCardServingHost } from "@/config/we-met";
 import type { WeMetHostConfig } from "@/config/we-met";
 import { readWeMetHostConfig } from "@/config/we-met";
 
@@ -30,6 +31,15 @@ describe("app API host helpers (unit)", () => {
     WE_MET_BASE_URL: "https://we-met.didi.build",
     WE_MET_ENV: "staging",
     WE_MET_PREVIEW_HOST_SUFFIX: "",
+  });
+
+  it("accepts pr-42-we-met-preview workers.dev for card, app API, and OAuth origin", () => {
+    const host = "pr-42-we-met-preview.example.workers.dev";
+    expect(isCardServingHost(host, preview)).toBe(true);
+    expect(isAppApiServingHost(host, preview)).toBe(true);
+    expect(resolveAppOrigin(preview, `https://${host}/app`, {})).toBe(
+      `https://${host}`,
+    );
   });
 
   it("allows app, preview, and local hosts for app API routes", () => {

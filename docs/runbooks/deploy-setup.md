@@ -302,7 +302,7 @@ After the production follow-up email consumer shipped (**2026-10-14**), the firs
 ## 3. GitHub secrets and variables
 
 1. Create the **`preview`** environment (Settings → Environments → New environment): **no** required reviewers, **no** branch restriction (PR workflows run on `refs/pull/N/merge` and must not wait for approval). Security is equivalent to repository scope for these values; the environment exists for deployment history and symmetry with `production`. Add:
-   - **Secret:** `CLOUDFLARE_API_TOKEN_PREVIEW` (value from `we-met-ci-preview`; used by app and gallery PR previews on Worker `we-met-preview`)
+   - **Secret:** `CLOUDFLARE_API_TOKEN_PREVIEW` (value from `we-met-ci-preview`; used by app and gallery PR previews on Worker `we-met-preview`). Remove the legacy `CLOUDFLARE_API_TOKEN_NONPROD` secret when cut over ([DIDI-929](https://linear.app/didi-build/issue/DIDI-929)).
    - **Secrets:** `WE_MET_D1_DATABASE_ID_NONPROD` (same UUID as non-prod D1; masked in Actions logs)
    - **Variables:** `WE_MET_TURNSTILE_SITE_KEY_NONPROD` (widget **we-met nonprod**)
 2. Create the **`production`** environment with yourself as a required reviewer. Under **Deployment branches**, choose **Selected branches** and allow **`main` only**.

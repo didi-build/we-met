@@ -358,7 +358,7 @@ function checkPreviewBlockNoAppHostRoute(previews) {
   }
 }
 
-function checkPreviewBlock(previews) {
+function checkPreviewResourceBindings(previews) {
   checkPreviewBlockNoAppHostRoute(previews);
   const strings = collectStrings(previews ?? {});
   const productionMarkers = [
@@ -378,14 +378,6 @@ function checkPreviewBlock(previews) {
   const previewVars = previews?.vars;
   if (previewVars?.WE_MET_ENV !== "preview") {
     fail('previews.vars.WE_MET_ENV must be "preview"');
-  }
-
-  const previewHostSuffix = previewVars?.WE_MET_PREVIEW_HOST_SUFFIX ?? "";
-  if (!previewHostSuffix.trim()) {
-    fail("previews.vars.WE_MET_PREVIEW_HOST_SUFFIX must be non-empty");
-  }
-  if (!previewHostSuffix.startsWith("-we-met-preview.")) {
-    fail('previews.vars.WE_MET_PREVIEW_HOST_SUFFIX must start with "-we-met-preview."');
   }
 
   const previewBaseUrl = previewVars?.WE_MET_BASE_URL;
@@ -409,6 +401,33 @@ function checkPreviewBlock(previews) {
     "preview queue",
   );
   checkRateLimitBindings(previews?.ratelimits, false);
+}
+
+function assertNestedPreviewHostSuffix(previewVars) {
+  const previewHostSuffix = previewVars?.WE_MET_PREVIEW_HOST_SUFFIX ?? "";
+  if (!previewHostSuffix.trim()) {
+    fail("previews.vars.WE_MET_PREVIEW_HOST_SUFFIX must be non-empty");
+  }
+  if (!previewHostSuffix.startsWith("-we-met.")) {
+    fail('previews.vars.WE_MET_PREVIEW_HOST_SUFFIX must start with "-we-met."');
+  }
+}
+
+function assertPreviewWorkerHostSuffix(previewVars) {
+  const previewHostSuffix = previewVars?.WE_MET_PREVIEW_HOST_SUFFIX ?? "";
+  if (!previewHostSuffix.trim()) {
+    fail(`${PREVIEW_CONFIG_LABEL} vars.WE_MET_PREVIEW_HOST_SUFFIX must be non-empty`);
+  }
+  if (!previewHostSuffix.startsWith("-we-met-preview.")) {
+    fail(
+      `${PREVIEW_CONFIG_LABEL} vars.WE_MET_PREVIEW_HOST_SUFFIX must start with "-we-met-preview."`,
+    );
+  }
+}
+
+function checkPreviewBlock(previews) {
+  checkPreviewResourceBindings(previews);
+  assertNestedPreviewHostSuffix(previews?.vars);
 }
 
 const PREVIEW_WORKER_NAME = "we-met-preview";
@@ -448,7 +467,7 @@ function checkPreviewWorkerBlock(config) {
   }
   checkPreviewWorkerDomainSettings(config);
   checkPreviewWorkerNoProductionServiceBinding(config);
-  checkPreviewBlock({
+  checkPreviewResourceBindings({
     vars: config.vars,
     d1_databases: config.d1_databases,
     r2_buckets: config.r2_buckets,
@@ -456,6 +475,7 @@ function checkPreviewWorkerBlock(config) {
     ratelimits: config.ratelimits,
     routes: config.routes,
   });
+  assertPreviewWorkerHostSuffix(config.vars);
   const topD1 = config.d1_databases ?? [];
   for (const row of topD1) {
     if (row.database_id === D1_PLACEHOLDER_PRODUCTION) {

@@ -4,11 +4,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { parseJsonc } from "../scripts/lib/parse-jsonc.mjs";
 import { auditPreviewRepository } from "../scripts/check-preview-workflow.mjs";
 import {
   REGRESSION_PRE_PR_WRANGLER_PREVIEW_LINE,
   findProductionTokenReferencesInText,
   findPullRequestWorkflowViolations,
+  findProductionResourceMarkerViolations,
   findSharedResourceIdViolations,
   findWranglerInvocationViolations,
   workflowOnTriggersPullRequest,
@@ -75,6 +77,11 @@ describe("preview-workflow guard (unit)", () => {
       ),
     ).not.toEqual([]);
     expect(
+      findProductionTokenReferencesInText(
+        "token: ${{ secrets.CLOUDFLARE_API_TOKEN_NONPROD }}",
+      ),
+    ).not.toEqual([]);
+    expect(
       findProductionTokenReferencesInText("secrets[ 'CLOUDFLARE_API_TOKEN' ]"),
     ).not.toEqual([]);
     expect(findProductionTokenReferencesInText("toJSON(secrets)")).not.toEqual([]);
@@ -94,6 +101,31 @@ describe("preview-workflow guard (unit)", () => {
 });
 
 describe("preview-workflow guard regressions (unit)", () => {
+  it("flags production D1 name and rate-limit namespace ids in preview config", () => {
+    const preview = parseJsonc(
+      readFileSync(join(root, "wrangler.preview.jsonc"), "utf8"),
+    ) as Record<string, unknown>;
+    expect(
+      findProductionResourceMarkerViolations(preview, "wrangler.preview.jsonc"),
+    ).toEqual([]);
+
+    const bad = { ...preview, d1_databases: [{ database_name: "we-met-db" }] };
+    expect(
+      findProductionResourceMarkerViolations(bad, "wrangler.preview.jsonc").some((m) =>
+        m.includes("we-met-db"),
+      ),
+    ).toBe(true);
+
+    const badRl = {
+      ...preview,
+      ratelimits: [{ name: "EXCHANGE", namespace_id: "2002" }],
+    };
+    expect(
+      findProductionResourceMarkerViolations(badRl, "wrangler.preview.jsonc").some(
+        (m) => m.includes("2002"),
+      ),
+    ).toBe(true);
+  });
   it("blocks the exact pre-DIDI-918 wrangler preview deploy line (wrangler.ci.jsonc)", () => {
     const violations = findWranglerInvocationViolations(
       REGRESSION_PRE_PR_WRANGLER_PREVIEW_LINE,
