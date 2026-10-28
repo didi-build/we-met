@@ -93,10 +93,6 @@
     "issues": { "enabled": true },
   },
   "previews": {
-    "assets": {
-      "directory": ".open-next/assets",
-      "binding": "ASSETS",
-    },
     "services": [
       {
         "binding": "WORKER_SELF_REFERENCE",
