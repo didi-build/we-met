@@ -28,3 +28,4 @@ design/<area>/<feature>/
 | landing | Relay mode (How it works step 3) | [landing/relay-mode/spec.md](landing/relay-mode/spec.md) |
 | legal | Privacy page | [legal/privacy/spec.md](legal/privacy/spec.md) |
 | legal | Privacy page, relay-mode disclosure | [legal/privacy/relay-disclosure.md](legal/privacy/relay-disclosure.md) |
+| legal | Privacy page, visitor receipt disclosure | [legal/privacy/visitor-receipt-disclosure.md](legal/privacy/visitor-receipt-disclosure.md) |
