@@ -141,7 +141,7 @@ How teams typically monitor small SaaS and larger products, with sources. We Met
 ### 2.6 Status pages and incident communication
 
 - **Public status page:** builds trust during incidents; can be manual (post when you know) or tied to monitors ([Instatus pricing and plan types](https://instatus.com/pricing)).
-- **Incident notes:** this repo already has a lightweight template ([incident runbook](./runbooks/incident.md)); link status updates and Linear tickets there.
+- **Incident notes:** this repo already has a lightweight template ([incident runbook](./runbooks/incident.md), comms order and customer boilerplate in [M11](./runbooks/incident.md)); link status updates and Linear tickets there.
 
 ### 2.7 What similar-stage teams often do
 
@@ -186,7 +186,7 @@ We Met is in the first row today, moving toward the second after public cutover 
 | **DLQ depth**            | `we-met-warmup-send-dlq`, `we-met-warmup-email-events-dlq` via Queues metrics                                                                                                                                      | &gt; 0 messages for 15 minutes                                                                   |
 | **Follow-up queue**      | No DLQ today: monitor **backlog** and **permanent failure logs** instead                                                                                                                                           | Backlog sustained high with rising retries                                                       |
 
-**Probe slug:** use a dedicated **live** card in production D1, published through the **app editor** on `app.we-met.link`. **Never** load the probe card with `npm run cards:load` (production cards publish through the app; `cards:load` is for local/non-prod D1 only per [AGENTS.md](../AGENTS.md) and [card-loading](./runbooks/card-loading.md)).
+**Probe slug:** use a dedicated **live** card in production D1, published through the **app editor** on `app.we-met.link`. **Never** load the probe card with `npm run cards:load` (production cards publish through the app; `cards:load` is for local/non-prod D1 only per [AGENTS.md](../AGENTS.md) and [card-loading](./runbooks/card-loading.md)). Operator steps, marker string, and recreate flow: [monitoring-probe runbook](./runbooks/monitoring-probe.md) ([M1](./runbooks/monitoring-probe.md)).
 
 ### 3.3 Tooling choices
 
@@ -201,14 +201,18 @@ We Met is in the first row today, moving toward the second after public cutover 
 | Status page               | **Instatus Starter (free, public page only)** or **no hosted page** (incident runbook only) until paid                                   | [Instatus pricing](https://instatus.com/pricing)                                                                                                         |
 | Third-party APM           | **Defer Sentry** unless Issues plus logs are insufficient                                                                                | Overlap with Workers Issues ([Sentry pricing](https://sentry.io/pricing/)); vendor adoption needs §3.7                                                   |
 
-### 3.4 Alert routing (proposed)
+### 3.4 Alert routing (approved)
 
-| Severity                   | When                                                                   | Channel                                              | Hours                                                |
-| -------------------------- | ---------------------------------------------------------------------- | ---------------------------------------------------- | ---------------------------------------------------- |
-| **P1 Outage**              | Synthetic card check failed AND elevated 5xx on `we-met`               | Email + optional SMS (if on Instatus Pro or similar) | Any time, expected rare                              |
-| **P2 Degraded**            | Follow-up backlog high with delivery failures; Email account suspended | Email to operator                                    | 08:00 to 22:00 America/Toronto (adjust to Diadem TZ) |
-| **P3 Reputation / warmup** | Warmup auto-pause, non-seed bounce summary                             | Existing `WARMUP_ALERT_TO`                           | As today                                             |
-| **P4 Informational**       | Daily budget alerts, deploy completed                                  | Email or GitHub notification                         | No wake-up                                           |
+Diadem answered [DIDI-861](https://linear.app/didi-build/issue/DIDI-861) (Oct 25, 2026): operator inbox **hello@we-met.link**, **email only** at any hour for **P1 outage**, **quiet hours 22:00 to 08:00 America/Toronto** for non-outage alerts, **no SMS or PagerDuty**.
+
+**Canonical policy:** [alert-routing runbook](./runbooks/alert-routing.md) (severity table, quiet hours, and privacy rules for notification bodies).
+
+| Severity                   | When                                                                   | Channel                                               | Hours                                             |
+| -------------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------- |
+| **P1 Outage**              | Synthetic card check failed AND elevated 5xx on `we-met`               | Email to **hello@we-met.link**                        | Any time, expected rare                           |
+| **P2 Degraded**            | Follow-up backlog high with delivery failures; Email account suspended | Email to **hello@we-met.link**                        | 08:00 to 22:00 America/Toronto                    |
+| **P3 Reputation / warmup** | Warmup auto-pause, non-seed bounce summary                             | Existing `WARMUP_ALERT_TO`                            | As today                                          |
+| **P4 Informational**       | Daily budget alerts, deploy completed                                  | Email to **hello@we-met.link** or GitHub notification | 08:00 to 22:00 America/Toronto; no wake-up intent |
 
 **No PagerDuty** until there is a second on-call engineer ([Being on-call](https://sre.google/sre-book/being-on-call/)).
 
@@ -279,21 +283,21 @@ When an SLO budget is exhausted in a month, proposed policy: **freeze non-urgent
 
 Each row is one PR unless noted. **Diadem** = Cloudflare account, secrets, or product choice. **CTO + Diadem** = vendor, privacy, or public comms.
 
-| ID (suggested) | Title                                                                                      | Acceptance criterion                                                                                          | Owner approval                          |
-| -------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
-| M0             | Fix Workers Issues Wrangler key ([DIDI-860](https://linear.app/didi-build/issue/DIDI-860)) | `observability.issues.enabled` in app and both consumer wrangler configs; dashboard shows Issues after deploy |                                         |
-| M1             | Document probe slug runbook                                                                | `docs/runbooks/monitoring-probe.md`: probe card published via app editor only, never `cards:load`             |                                         |
-| M2             | Add follow-up queue DLQ in Wrangler                                                        | `we-met-followup-email-dlq` bound; consumer config documents operator replay steps                            | Diadem (create queue in dashboard)      |
-| M3             | Cloudflare Monitor: follow-up backlog                                                      | Monitor fires email when `we-met-followup-email` backlog &gt; threshold 30 minutes (dataset **UNVERIFIED**)   | Diadem (notification email/webhook)     |
-| M4             | Cloudflare Monitor: warmup DLQ non-zero                                                    | Alert when either warmup DLQ has messages &gt; 0 for 15 minutes (dataset **UNVERIFIED**)                      | Diadem                                  |
-| M5             | Synthetic check: card page                                                                 | External or Health Check on probe URL; failure notifies operator                                              | Diadem (zone plan / Instatus account)   |
-| M6             | Workers Issues automation                                                                  | Automation emails issue title and Issues dashboard link only; no visitor or queue payload fields              | Diadem (dashboard automation)           |
-| M7             | Reduce log/trace sampling                                                                  | `head_sampling_rate` tuned; comment in Wrangler cites cost check date                                         | Diadem (cost decision; open question 8) |
-| M8             | Analytics Engine counters for exchange                                                     | Emit `exchange_outcome` counter by status class; `data-map.yml` updated for binding                           | Diadem (binding + data map)             |
-| M9             | Status page (if approved)                                                                  | Hosted status page linked from internal runbook; subprocessors updated if vendor used                         | CTO + Diadem                            |
-| M10            | SLO dashboard                                                                              | Single Cloudflare dashboard or doc section showing 30d SLI vs targets                                         |                                         |
-| M11            | Incident comms template                                                                    | Extend [incident.md](./runbooks/incident.md) with status page + customer email boilerplate                    |                                         |
-| M12            | Optional Logpush to R2                                                                     | Runbook or config for log export; privacy review for extended retention                                       | CTO + Diadem                            |
+| ID (suggested) | Title                                                                                      | Acceptance criterion                                                                                                                                                 | Owner approval                          |
+| -------------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| M0             | Fix Workers Issues Wrangler key ([DIDI-860](https://linear.app/didi-build/issue/DIDI-860)) | `observability.issues.enabled` in app and both consumer wrangler configs; dashboard shows Issues after deploy                                                        |                                         |
+| M1             | Document probe slug runbook                                                                | [monitoring-probe.md](./runbooks/monitoring-probe.md): probe card via app editor only, never `cards:load` ([DIDI-936](https://linear.app/didi-build/issue/DIDI-936)) |                                         |
+| M2             | Add follow-up queue DLQ in Wrangler                                                        | `we-met-followup-email-dlq` bound; consumer config documents operator replay steps                                                                                   | Diadem (create queue in dashboard)      |
+| M3             | Cloudflare Monitor: follow-up backlog                                                      | Monitor fires email when `we-met-followup-email` backlog &gt; threshold 30 minutes (dataset **UNVERIFIED**)                                                          | Diadem (notification email/webhook)     |
+| M4             | Cloudflare Monitor: warmup DLQ non-zero                                                    | Alert when either warmup DLQ has messages &gt; 0 for 15 minutes (dataset **UNVERIFIED**)                                                                             | Diadem                                  |
+| M5             | Synthetic check: card page                                                                 | External or Health Check on probe URL; failure notifies operator                                                                                                     | Diadem (zone plan / Instatus account)   |
+| M6             | Workers Issues automation                                                                  | Automation emails issue title and Issues dashboard link only; no visitor or queue payload fields                                                                     | Diadem (dashboard automation)           |
+| M7             | Reduce log/trace sampling                                                                  | `head_sampling_rate` tuned; comment in Wrangler cites cost check date                                                                                                | Diadem (cost decision; open question 8) |
+| M8             | Analytics Engine counters for exchange                                                     | Emit `exchange_outcome` counter by status class; `data-map.yml` updated for binding                                                                                  | Diadem (binding + data map)             |
+| M9             | Status page (if approved)                                                                  | Hosted status page linked from internal runbook; subprocessors updated if vendor used                                                                                | CTO + Diadem                            |
+| M10            | SLO dashboard                                                                              | Single Cloudflare dashboard or doc section showing 30d SLI vs targets                                                                                                |                                         |
+| M11            | Incident comms template                                                                    | [incident.md](./runbooks/incident.md): private owner email, status page when live, customer boilerplate ([DIDI-936](https://linear.app/didi-build/issue/DIDI-936))   |                                         |
+| M12            | Optional Logpush to R2                                                                     | Runbook or config for log export; privacy review for extended retention                                                                                              | CTO + Diadem                            |
 
 **Any PR that adopts Instatus, Better Stack, Sentry, or non-Cloudflare log storage** needs **CTO + Diadem** before merge, even if not listed above.
 
@@ -321,5 +325,5 @@ Plain questions for approval from a phone:
 
 - [DIDI-835](https://linear.app/didi-build/issue/DIDI-835), [DIDI-776](https://linear.app/didi-build/issue/DIDI-776)
 - [Architecture overview](./architecture/overview.md), [Environments](./architecture/environments.md)
-- [Kill switch and caps](./runbooks/kill-switch-and-caps.md), [Rollback](./runbooks/rollback.md), [Incident notes](./runbooks/incident.md)
+- [Kill switch and caps](./runbooks/kill-switch-and-caps.md), [Rollback](./runbooks/rollback.md), [Incident notes](./runbooks/incident.md), [Alert routing](./runbooks/alert-routing.md), [Monitoring probe card](./runbooks/monitoring-probe.md)
 - [Warmup Worker README](../workers/warmup/README.md)
