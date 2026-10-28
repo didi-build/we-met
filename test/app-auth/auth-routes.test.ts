@@ -1,7 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GET as sessionGet } from "@/app/api/app/session/route";
 import { POST as logoutPost } from "@/app/api/auth/logout/route";
-import { POST as previewLoginPost } from "@/app/api/auth/preview-login/route";
+import {
+  DELETE as previewLoginDelete,
+  GET as previewLoginGet,
+  HEAD as previewLoginHead,
+  OPTIONS as previewLoginOptions,
+  PATCH as previewLoginPatch,
+  POST as previewLoginPost,
+  PUT as previewLoginPut,
+} from "@/app/api/auth/preview-login/route";
 import { GET as googleCallbackGet } from "@/app/api/auth/google/callback/route";
 import { GET as googleStartGet } from "@/app/api/auth/google/start/route";
 import {
@@ -102,12 +110,40 @@ describe("auth API routes (integration)", () => {
       }),
     );
     expect(response.status).toBe(404);
+    expect(response.body).toBeNull();
     expect(
       isPreviewLoginRouteEnabled({
         WE_MET_ENV: "production",
         WE_MET_PREVIEW_LOGIN_SECRET: "x",
       }),
     ).toBe(false);
+  });
+
+  it("preview-login GET is 404 when preview login is disabled", async () => {
+    routeMocks.env.WE_MET_ENV = "staging";
+    routeMocks.env.WE_MET_BASE_URL = "https://we-met.didi.build";
+    setRequestHeaders({ host: "we-met.didi.build" });
+    const response = await previewLoginGet();
+    expect(response.status).toBe(404);
+    expect(response.body).toBeNull();
+  });
+
+  it("preview-login non-POST methods return 404 when preview login is disabled", async () => {
+    routeMocks.env.WE_MET_ENV = "staging";
+    routeMocks.env.WE_MET_BASE_URL = "https://we-met.didi.build";
+    setRequestHeaders({ host: "we-met.didi.build" });
+    const handlers = [
+      previewLoginHead,
+      previewLoginPut,
+      previewLoginPatch,
+      previewLoginDelete,
+      previewLoginOptions,
+    ] as const;
+    for (const handler of handlers) {
+      const response = await handler();
+      expect(response.status).toBe(404);
+      expect(response.body).toBeNull();
+    }
   });
 
   it("google start returns redirect with set-cookie", async () => {
@@ -313,6 +349,8 @@ describe("auth API routes (integration)", () => {
       );
       expect(response.status).toBe(200);
       expect(response.headers.get("set-cookie")).toContain(SESSION_COOKIE_NAME);
+      const getOnPreview = await previewLoginGet();
+      expect(getOnPreview.status).toBe(404);
       routeMocks.env.WE_MET_ENV = "local";
       setRequestHeaders({ host: "localhost:3000" });
     });
