@@ -11,7 +11,7 @@ import type { CardRecord } from "@/card-data/types";
 import { MemoryCardRepository } from "@/card-data/memory-repository";
 import { createExchangeOwnerEmailStoreFromD1 } from "@/exchange-owner-email/d1-repository";
 import { createLeadDeliveryLedgerFromD1 } from "@/lead-delivery-ledger/d1-repository";
-import { assertLeadEmailCapacity } from "@/lead-email/availability";
+import { readLeadEmailCapacityCheck } from "@/lead-email/availability";
 import { createDetailsToken } from "@/exchange/token";
 import { exampleCardInput } from "../helpers/example-card";
 import { withIsolatedLocalD1 } from "../helpers/d1";
@@ -102,8 +102,8 @@ function buildExchangeDeps(
     createLedgerId: () => "ledger-route-1",
     now,
     baseUrl: "https://we-met.link",
-    assertLeadEmailCapacity: (cardId: string, needed: number) =>
-      assertLeadEmailCapacity(db, cardId, needed, now()),
+    checkLeadEmailCapacity: (cardId: string, needed: number) =>
+      readLeadEmailCapacityCheck(db, cardId, needed, now()),
     incrementDailySendCounts: async () => undefined,
     exchangeOwnerEmail: createExchangeOwnerEmailStoreFromD1(db),
     logExchangeVisitorLetterEnqueueFailed: vi.fn(),

@@ -1,5 +1,26 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { parseJsonc } from "../scripts/lib/parse-jsonc.mjs";
+
+const PREVIEW_BUILD_STEP = "Build OpenNext (non-prod Turnstile site key)";
+
+function previewRuntimeBaseUrl(): string {
+  const config = parseJsonc(readFileSync("wrangler.jsonc", "utf8")) as {
+    previews: { vars: { WE_MET_BASE_URL: string } };
+  };
+  return config.previews.vars.WE_MET_BASE_URL;
+}
+
+function extractPreviewBuildStepEnvBlock(workflow: string): string {
+  const stepMatch = workflow.match(
+    new RegExp(
+      `- name: ${PREVIEW_BUILD_STEP.replace(/[()]/g, "\\$&")}[\\s\\S]*?(?=\\n      - name:|\\n  [a-z])`,
+    ),
+  );
+  const block = stepMatch?.[0] ?? "";
+  const envMatch = block.match(/^        env:\n([\s\S]*?)^        run:/m);
+  return envMatch?.[1] ?? "";
+}
 
 describe("Preview workflow structure (unit)", () => {
   const preview = readFileSync(".github/workflows/preview.yml", "utf8");
@@ -42,5 +63,13 @@ describe("Preview workflow structure (unit)", () => {
   it("parses wrangler preview JSON via parse-wrangler-preview-json.mjs", () => {
     expect(preview).toContain("parse-wrangler-preview-json.mjs");
     expect(preview).not.toMatch(/\|\s*jq\b/);
+  });
+
+  it("sets preview build-time WE_MET_BASE_URL to match previews.vars in wrangler.jsonc", () => {
+    const runtimeBaseUrl = previewRuntimeBaseUrl();
+    expect(runtimeBaseUrl).toBe("https://we-met.didi.build");
+    const buildEnv = extractPreviewBuildStepEnvBlock(preview);
+    expect(buildEnv).toContain(`WE_MET_BASE_URL: ${runtimeBaseUrl}`);
+    expect(buildEnv).toContain("WE_MET_ENV: preview");
   });
 });

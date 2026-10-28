@@ -10,7 +10,7 @@ import type { ProcessExchangeDeps } from "@/exchange/process-exchange";
 import { MemoryCardRepository } from "@/card-data/memory-repository";
 import { createExchangeOwnerEmailStoreFromD1 } from "@/exchange-owner-email/d1-repository";
 import { createLeadDeliveryLedgerFromD1 } from "@/lead-delivery-ledger/d1-repository";
-import { assertLeadEmailCapacity } from "@/lead-email/availability";
+import { readLeadEmailCapacityCheck } from "@/lead-email/availability";
 import { processDetails } from "@/exchange/process-details";
 import { processDetailsDismiss } from "@/exchange/process-details-dismiss";
 import { processExchange } from "@/exchange/process-exchange";
@@ -72,8 +72,8 @@ function exchangeDeps(
     createLedgerId: () => "ledger-abuse-1",
     now,
     baseUrl: "https://we-met.link",
-    assertLeadEmailCapacity: (cardId: string, needed: number) =>
-      assertLeadEmailCapacity(db, cardId, needed, now()),
+    checkLeadEmailCapacity: (cardId: string, needed: number) =>
+      readLeadEmailCapacityCheck(db, cardId, needed, now()),
     incrementDailySendCounts: async () => undefined,
     logExchangeVisitorLetterEnqueueFailed: vi.fn(),
     resolveVisitorEmailMode: async (): Promise<VisitorEmailMode> => "owner_relay",
@@ -501,8 +501,8 @@ describe("exchange and details abuse controls (D1 integration)", () => {
         createLedgerId: () => `ledger-day-${nowMs}`,
         now: () => new Date(nowMs),
         baseUrl: "https://we-met.link",
-        assertLeadEmailCapacity: (cardId: string, needed: number) =>
-          assertLeadEmailCapacity(db, cardId, needed, new Date(nowMs)),
+        checkLeadEmailCapacity: (cardId: string, needed: number) =>
+          readLeadEmailCapacityCheck(db, cardId, needed, new Date(nowMs)),
         incrementDailySendCounts: async () => undefined,
         logExchangeVisitorLetterEnqueueFailed: vi.fn(),
         resolveVisitorEmailMode: async (): Promise<VisitorEmailMode> => "owner_relay",
@@ -597,8 +597,8 @@ describe("exchange and details abuse controls (D1 integration)", () => {
         createLedgerId: () => `ledger-day-direct-${nowMs}`,
         now: () => new Date(nowMs),
         baseUrl: "https://we-met.link",
-        assertLeadEmailCapacity: (cardId: string, needed: number) =>
-          assertLeadEmailCapacity(db, cardId, needed, new Date(nowMs)),
+        checkLeadEmailCapacity: (cardId: string, needed: number) =>
+          readLeadEmailCapacityCheck(db, cardId, needed, new Date(nowMs)),
         incrementDailySendCounts: async () => undefined,
         logExchangeVisitorLetterEnqueueFailed: vi.fn(),
         resolveVisitorEmailMode: async (): Promise<VisitorEmailMode> => "direct",

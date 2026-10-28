@@ -15,7 +15,7 @@
 | `daily_cap_per_card` | Max **enqueue** slots per UTC day for one `card_id` (owner + visitor kinds summed). Product default **50**.                                                                                                                                                                                                                                                                        |
 | `visitor_email_mode` | `owner_relay` (default) or exact lowercase **`direct`**. **Missing, empty, unknown, or mixed-case** values are **`owner_relay`**: the visitor letter goes to the owner; **`direct`** sends the letter to the visitor. Both modes enqueue the letter and the owner relay email; caps count **two** slots per exchange ([0027](../decisions/0027-owner-relay-visitor-follow-up.md)). |
 
-Missing, non-numeric, or non-positive cap values **fail closed** (same as kill switch off) — new submissions get **503** `lead_email_unavailable`.
+Missing, non-numeric, or non-positive cap values **fail closed** (same HTTP **503** `lead_email_unavailable` as the kill switch) with Analytics Engine class **`cap_config_error`** (counts as an exchange SLO failure). Valid caps that are full return the same HTTP response with class **`cap_reached`** (excluded from the exchange acceptance SLI). Kill switch off uses class **`kill-switch 503`** (also excluded from the SLI).
 
 ### Launch values (product default)
 
@@ -63,7 +63,7 @@ INSERT INTO app_settings (key, value) VALUES ('lead_email_enabled', '0')
 
 ### New submissions
 
-`POST /api/exchange` and `POST /api/details` return **503** with `{ "error": "lead_email_unavailable" }`. **No** `lead_delivery_ledger` row, queue message, or `daily_send_counts` change.
+`POST /api/exchange` and `POST /api/details` return **503** with `{ "error": "lead_email_unavailable" }`. **No** `lead_delivery_ledger` row, queue message, or `daily_send_counts` change. On exchange, Workers Analytics Engine records **`kill-switch 503`** (see runbook settings above for cap classes).
 
 ### Already queued mail
 
