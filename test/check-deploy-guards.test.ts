@@ -86,6 +86,75 @@ describe("check-deploy-guards (unit)", () => {
     expect(result.status).toBe(0);
   });
 
+  it("passes preview-worker guards on prepared wrangler.preview.ci.jsonc", () => {
+    const configPath = `wrangler.preview.guards-test-${process.pid}.ci.jsonc`;
+    const prep = spawnSync(
+      "node",
+      [
+        "scripts/prepare-wrangler-config.mjs",
+        "--target",
+        "preview",
+        "--output",
+        configPath,
+      ],
+      {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          WE_MET_D1_DATABASE_ID_NONPROD: "22222222-2222-2222-2222-222222222222",
+        },
+      },
+    );
+    expect(prep.status).toBe(0);
+    try {
+      const result = runGuards("preview-worker", configPath);
+      expect(result.status).toBe(0);
+    } finally {
+      rmSync(configPath, { force: true });
+    }
+  });
+
+  it("fails preview-worker when previews block references production queue", () => {
+    const { path } = writeTempPreviewWorkerConfig((config) => {
+      const previews = config.previews as Record<string, unknown>;
+      const queues = previews.queues as {
+        producers: { queue: string }[];
+      };
+      queues.producers[0].queue = "we-met-followup-email";
+    });
+    const result = runGuards("preview-worker", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("production resource");
+  });
+
+  it("fails preview-worker when previews block declares binding not on top level", () => {
+    const { path } = writeTempPreviewWorkerConfig((config) => {
+      const previews = config.previews as Record<string, unknown>;
+      previews.d1_databases = [
+        ...(previews.d1_databases as object[]),
+        {
+          binding: "WE_MET_DB_EXTRA",
+          database_name: "we-met-db-nonprod",
+          database_id: "00000000-0000-0000-0000-000000000002",
+        },
+      ];
+    });
+    const result = runGuards("preview-worker", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("not present at top level");
+  });
+
+  it("fails preview-worker CI guard when previews block keeps D1 placeholder", () => {
+    const dir = mkdtempSync(join(tmpdir(), "we-met-preview-worker-ci-guards-"));
+    tempDirs.push(dir);
+    const path = join(dir, "wrangler.preview.ci.jsonc");
+    const config = parseJsonc(PREVIEW_WORKER_BASE_CONFIG) as Record<string, unknown>;
+    writeFileSync(path, JSON.stringify(config, null, 2), "utf8");
+    const result = runGuards("preview-worker", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("unsubstituted non-prod D1 placeholder");
+  });
+
   it("passes production guards on committed wrangler.jsonc", () => {
     const result = runGuards("production", "wrangler.jsonc");
     expect(result.status).toBe(0);
