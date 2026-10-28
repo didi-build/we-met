@@ -1,9 +1,9 @@
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import type { spawnSync } from "node:child_process";
 import { spawnSync as nodeSpawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   runActivation,
   runActivationFromCliOrEvent,
@@ -27,6 +27,24 @@ import { D1_PLACEHOLDER_PRODUCTION } from "../scripts/lib/wrangler-placeholders.
 import { workflowPermissionsAllowOnly } from "../scripts/lib/workflow-permissions-parse.mjs";
 
 const EXPECTED_D1_ID = "11111111-2222-3333-4444-555555555555";
+
+const ACTIVATION_WORKFLOW_RUN_BLOCK =
+  /^\s+(?:-\s+)?run:\s*\|[\s\S]*?(?=\n\s{6}\S|\n\s{4}\S|$)/gm;
+const ACTIVATION_WORKFLOW_RUN_LINE = /^\s+(?:-\s+)?run:\s+[^\n|]+$/gm;
+
+const wranglerConfigTempDirs: string[] = [];
+
+afterEach(() => {
+  for (const dir of wranglerConfigTempDirs.splice(0)) {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+function activationWorkflowRunScripts(workflow: string): string[] {
+  const runBlocks = workflow.match(ACTIVATION_WORKFLOW_RUN_BLOCK) ?? [];
+  const runLines = workflow.match(ACTIVATION_WORKFLOW_RUN_LINE) ?? [];
+  return [...runBlocks, ...runLines];
+}
 
 function testEnv(overrides: Record<string, string | undefined> = {}) {
   return {
@@ -92,6 +110,7 @@ function expectIoExcludesWranglerAndRawEmail(
 
 function writeWranglerConfig(config: Record<string, unknown>) {
   const dir = mkdtempSync(join(tmpdir(), "activate-staging-guard-"));
+  wranglerConfigTempDirs.push(dir);
   const path = join(dir, "config.jsonc");
   writeFileSync(path, JSON.stringify(config, null, 2));
   return path;
@@ -563,32 +582,74 @@ describe("readWorkflowDispatchEmailFromGithubEvent (unit)", () => {
 
 describe("runActivationFromCliOrEvent (unit)", () => {
   it("masks raw dispatch email before any other output when reading GITHUB_EVENT_PATH", () => {
-    const eventPath = join(tmpdir(), "github-event.json");
-    writeFileSync(eventPath, JSON.stringify({ inputs: { email: "QA@Example.com" } }));
-    const outputLines: string[] = [];
-    const logLine = (line: string) => {
-      outputLines.push(line);
-    };
-    const logError = (line: string) => {
-      outputLines.push(line);
-    };
-    runActivationFromCliOrEvent({
-      config: validWranglerConfig(),
-      env: testEnv({ GITHUB_EVENT_PATH: eventPath }),
-      logLine,
-      logError,
-      spawnSyncFn: mockSpawn(() => ({
-        status: 0,
-        stdout: wranglerSuccessStdout(1),
-        stderr: "",
-      })),
-      maskD1DatabaseIdFn: () => {},
-      maskActivationEmailForLogsFn: () => {},
-      now: () => new Date("2026-10-28T12:00:00.000Z"),
-    });
-    expect(outputLines[0]).toBe("::add-mask::QA@Example.com");
-    expect(outputLines[1]).toBe("::add-mask::qa@example.com");
-    expect(outputLines[0]).not.toBe("::add-mask::qa@example.com");
+    const eventDir = mkdtempSync(join(tmpdir(), "activate-event-"));
+    const eventPath = join(eventDir, "github-event.json");
+    try {
+      writeFileSync(eventPath, JSON.stringify({ inputs: { email: "QA@Example.com" } }));
+      const outputLines: string[] = [];
+      const logLine = (line: string) => {
+        outputLines.push(line);
+      };
+      const logError = (line: string) => {
+        outputLines.push(line);
+      };
+      runActivationFromCliOrEvent({
+        config: validWranglerConfig(),
+        env: testEnv({ GITHUB_EVENT_PATH: eventPath }),
+        logLine,
+        logError,
+        spawnSyncFn: mockSpawn(() => ({
+          status: 0,
+          stdout: wranglerSuccessStdout(1),
+          stderr: "",
+        })),
+        maskD1DatabaseIdFn: () => {},
+        maskActivationEmailForLogsFn: () => {},
+        now: () => new Date("2026-10-28T12:00:00.000Z"),
+      });
+      expect(outputLines[0]).toBe("::add-mask::QA@Example.com");
+      expect(outputLines[1]).toBe("::add-mask::qa@example.com");
+      expect(outputLines[0]).not.toBe("::add-mask::qa@example.com");
+    } finally {
+      rmSync(eventDir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects control characters without echoing the dispatch email", () => {
+    const eventDir = mkdtempSync(join(tmpdir(), "activate-event-"));
+    const eventPath = join(eventDir, "github-event.json");
+    const poison = "qa@example.com\n::warning::injected";
+    try {
+      writeFileSync(eventPath, JSON.stringify({ inputs: { email: poison } }));
+      const outputLines: string[] = [];
+      const code = runActivationFromCliOrEvent({
+        config: validWranglerConfig(),
+        env: testEnv({ GITHUB_EVENT_PATH: eventPath }),
+        logLine: (line) => {
+          outputLines.push(line);
+        },
+        logError: (line) => {
+          outputLines.push(line);
+        },
+        spawnSyncFn: mockSpawn(() => ({
+          status: 0,
+          stdout: wranglerSuccessStdout(1),
+          stderr: "",
+        })),
+        maskD1DatabaseIdFn: () => {},
+        maskActivationEmailForLogsFn: () => {},
+        now: () => new Date("2026-10-28T12:00:00.000Z"),
+      });
+      expect(code).not.toBe(0);
+      expect(outputLines).toHaveLength(1);
+      expect(outputLines[0]).toBe(
+        `Activation email rejected: ${ACTIVATION_EVENT_EMAIL_CONTROL_REJECTED}`,
+      );
+      expect(outputLines.join("\n")).not.toContain("qa@example.com");
+      expect(outputLines.join("\n")).not.toContain("::warning::");
+    } finally {
+      rmSync(eventDir, { recursive: true, force: true });
+    }
   });
 });
 
@@ -650,25 +711,24 @@ describe("Activate staging account workflow structure (unit)", () => {
     );
   });
 
+  it("run-line regex matches list-item run steps in this workflow", () => {
+    expect(workflow).toMatch(ACTIVATION_WORKFLOW_RUN_LINE);
+    expect(workflow).toMatch(/^\s+- run: npm ci$/m);
+  });
+
   it("does not leak dispatch email via workflow expressions or shell event reads", () => {
     expect(workflow).not.toContain("inputs.email");
     expect(workflow).not.toContain("ACTIVATE_EMAIL");
     expect(workflow).not.toContain("github.event.inputs");
-    expect(workflow).not.toContain("toJSON(github.event");
+    expect(workflow).not.toMatch(/tojson\s*\(\s*github\.event/i);
     expect(workflow).not.toContain("inputs[");
-    const runBlocks =
-      workflow.match(/run:\s*\|[\s\S]*?(?=\n\s{6}\S|\n\s{4}\S|$)/g) ?? [];
-    const runLines = workflow.match(/^\s+run:\s+[^\n|]+$/gm) ?? [];
-    for (const block of [...runBlocks, ...runLines]) {
+    for (const block of activationWorkflowRunScripts(workflow)) {
       expect(block).not.toContain("GITHUB_EVENT_PATH");
     }
   });
 
   it("does not interpolate workflow inputs or secrets inside run scripts", () => {
-    const runBlocks =
-      workflow.match(/run:\s*\|[\s\S]*?(?=\n\s{6}\S|\n\s{4}\S|$)/g) ?? [];
-    const runLines = workflow.match(/^\s+run:\s+[^\n|]+$/gm) ?? [];
-    for (const block of [...runBlocks, ...runLines]) {
+    for (const block of activationWorkflowRunScripts(workflow)) {
       expect(block).not.toMatch(/\$\{\{\s*inputs\./);
       expect(block).not.toMatch(/\$\{\{\s*secrets\./);
     }
