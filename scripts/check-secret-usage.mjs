@@ -9,7 +9,10 @@ const ALLOWED_MIGRATE_NONPROD_FILES = new Set([
   "provision-nonprod-main.yml",
 ]);
 const ALLOWED_DEPLOY_PRODUCTION_FILE = "deploy-production.yml";
-const ALLOWED_DEPLOY_STAGING_FILE = "deploy-staging.yml";
+const ALLOWED_DEPLOY_STAGING_FILES = new Set([
+  "deploy-staging.yml",
+  "activate-staging-account.yml",
+]);
 const SECRET_NAME = "BOOTSTRAP_TOKEN";
 const MIGRATE_NONPROD_SECRET = "CLOUDFLARE_API_TOKEN_MIGRATE_NONPROD";
 const MIGRATE_NONPROD_ENV = "migrate-nonprod";
@@ -77,7 +80,7 @@ export function findStagingCredentialViolations(workflowsDir) {
     if (!entry.isFile()) continue;
     const name = entry.name;
     if (!name.endsWith(".yml") && !name.endsWith(".yaml")) continue;
-    if (name === ALLOWED_DEPLOY_STAGING_FILE) continue;
+    if (ALLOWED_DEPLOY_STAGING_FILES.has(name)) continue;
     const text = readFileSync(join(workflowsDir, name), "utf8");
     if (text.includes(STAGING_SECRET)) {
       violations.push(name);
@@ -176,7 +179,7 @@ function runCli() {
   const stagingViolations = findStagingCredentialViolations(WORKFLOWS_DIR);
   if (stagingViolations.length > 0) {
     console.error(
-      `${STAGING_SECRET} must only appear in .github/workflows/${ALLOWED_DEPLOY_STAGING_FILE}. Offenders:\n`,
+      `${STAGING_SECRET} must only appear in ${[...ALLOWED_DEPLOY_STAGING_FILES].map((f) => `.github/workflows/${f}`).join(" or ")}. Offenders:\n`,
     );
     for (const file of stagingViolations) {
       console.error(`  - ${file}`);

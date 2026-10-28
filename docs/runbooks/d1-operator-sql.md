@@ -17,7 +17,7 @@ The **binding** name passed to `wrangler d1 execute` is always **`WE_MET_DB`** (
 ## Auth
 
 - **Maintainer laptop:** `npx wrangler login` (OAuth). Do **not** paste API tokens into runbooks or chat.
-- **CI:** GitHub environment secrets (`CLOUDFLARE_API_TOKEN_*`) — see [deploy.md](./deploy.md) and [0017](../decisions/0017-cloudflare-api-credentials.md). Ad-hoc operator SQL is **not** run from CI.
+- **CI:** GitHub environment secrets (`CLOUDFLARE_API_TOKEN_*`). See [deploy.md](./deploy.md) and [0017](../decisions/0017-cloudflare-api-credentials.md). Most ad-hoc operator SQL stays on a laptop; **staging account activation** uses [**Activate staging account**](../../.github/workflows/activate-staging-account.yml) on **`main`** ([activating-an-account.md](./activating-an-account.md#activate-on-staging-github-actions)).
 
 ## Non-prod remote (`we-met-db-nonprod`)
 

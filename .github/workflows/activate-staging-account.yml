@@ -1,0 +1,62 @@
+name: Activate staging account
+
+on:
+  workflow_dispatch:
+    inputs:
+      email:
+        description: Google account email to activate (waitlisted after first sign-in on staging)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: activate-staging-account
+  cancel-in-progress: false
+
+jobs:
+  activate:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: staging
+    steps:
+      - name: Require main branch ref
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_REF}" != "refs/heads/main" ]; then
+            echo "::error::This workflow may only run on refs/heads/main."
+            exit 1
+          fi
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Prepare Wrangler config (staging D1 ID)
+        env:
+          WE_MET_D1_DATABASE_ID_NONPROD: ${{ secrets.WE_MET_D1_DATABASE_ID_NONPROD }}
+        run: |
+          set -euo pipefail
+          echo "::add-mask::${WE_MET_D1_DATABASE_ID_NONPROD}"
+          node scripts/prepare-wrangler-config.mjs \
+            --target staging \
+            --output wrangler.staging.ci.jsonc
+      - name: Deploy-time guards (staging D1 binding)
+        env:
+          WE_MET_D1_DATABASE_ID_NONPROD: ${{ secrets.WE_MET_D1_DATABASE_ID_NONPROD }}
+        run: node scripts/check-deploy-guards.mjs --target staging --config wrangler.staging.ci.jsonc
+      - name: Activate waitlisted account in non-prod D1
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_STAGING }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WE_MET_D1_DATABASE_ID_NONPROD: ${{ secrets.WE_MET_D1_DATABASE_ID_NONPROD }}
+        run: |
+          set -euo pipefail
+          node scripts/activate-staging-account.mjs \
+            --config wrangler.staging.ci.jsonc

@@ -69,10 +69,13 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          output="$(npx wrangler preview \
+          if ! output="$(npx wrangler preview \
             --config wrangler.preview.ci.jsonc \
             --name "pr-${{ github.event.pull_request.number }}" \
-            --json 2>&1)"
+            --json 2>&1)"; then
+            printf '%s\n' "$output"
+            exit 1
+          fi
           printf '%s\n' "$output"
           preview_url="$(printf '%s' "$output" | node scripts/parse-wrangler-preview-json.mjs)"
           echo "preview_url=${preview_url}" >> "$GITHUB_OUTPUT"
