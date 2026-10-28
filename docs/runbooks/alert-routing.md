@@ -13,7 +13,7 @@
 | SMS                              | **Not used**          |
 | PagerDuty or other paging vendor | **Not used**          |
 
-Configure Cloudflare Notifications, Monitors, Health Checks, Instatus, and Workers Issues automations to send to **hello@we-met.link** unless a ticket explicitly documents a different routing (for example warmup).
+Configure Cloudflare Notifications, Monitors, Health Checks, Instatus (only after CTO and Diadem vendor approval per [monitoring-plan.md](../monitoring-plan.md) §3.7), Better Stack (same approval), and Workers Issues automations to send to **hello@we-met.link** unless a ticket explicitly documents a different routing (for example warmup).
 
 ## Severity and quiet hours
 
@@ -28,7 +28,7 @@ All times use **America/Toronto**.
 
 **Quiet hours:** **22:00 to 08:00** America/Toronto. During quiet hours, **only P1 outage** alerts should email **hello@we-met.link**. Queue backlog, DLQ depth, Workers Issues, and other non-outage signals wait until **08:00** unless the condition is also classified as P1.
 
-When wiring automations in Cloudflare or a vendor UI, use separate notification policies for P1 (always notify) versus P2/P4 (suppress or delay outside 08:00 to 22:00 America/Toronto). Exact UI steps live in the ticket that adds each monitor ([M3](../monitoring-plan.md#5-proposed-build-tickets), [M5](../monitoring-plan.md#5-proposed-build-tickets), [M6](../monitoring-plan.md#5-proposed-build-tickets)).
+When wiring automations in Cloudflare or a vendor UI, use separate notification policies for P1 (always notify) versus P2/P4 (**hold until 08:00** America/Toronto when the signal fires during quiet hours). Exact UI steps live in the ticket that adds each monitor ([M3](../monitoring-plan.md#5-proposed-build-tickets), [M5](../monitoring-plan.md#5-proposed-build-tickets), [M6](../monitoring-plan.md#5-proposed-build-tickets)).
 
 ## Alert content (privacy)
 

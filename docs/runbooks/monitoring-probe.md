@@ -2,7 +2,7 @@
 
 **Purpose:** Document the **live production card** used by external uptime checks ([monitoring-plan.md](../monitoring-plan.md) §3.2, ticket **M5**). Diadem chose a **dedicated test probe card**, not the maintainer `didi` card ([DIDI-861](https://linear.app/didi-build/issue/DIDI-861) answer **2a**).
 
-**Scope:** Production D1 only (`we-met-db`). This runbook does not change code or Cloudflare configuration.
+**Scope:** Operator documentation only. Production **card rows** change only through the **app editor** on `app.we-met.link` (published content in production D1, `we-met-db`). This runbook does **not** change Worker code, Wrangler, or repo config. **Synthetic monitor wiring** (Health Checks, external uptime URL and assertions) is separate **[M5](../monitoring-plan.md#5-proposed-build-tickets)** work and needs **Diadem** approval before go-live.
 
 ## Rules
 
@@ -28,7 +28,7 @@ Replace `<your-probe-slug>` with the slug you chose when publishing the card (lo
 
 ## Probe marker string
 
-Synthetic checks (Cloudflare Health Checks, Instatus, Better Stack, or similar) must assert this exact substring appears in the HTML:
+Synthetic checks (Cloudflare Health Checks, Instatus or Better Stack only after CTO and Diadem vendor approval per [monitoring-plan.md](../monitoring-plan.md) §3.7, or similar) must assert this exact substring appears in the HTML:
 
 ```text
 we-met-card-availability-probe
@@ -52,9 +52,34 @@ curl -sS "https://we-met.link/hi/<your-probe-slug>" | grep -F 'we-met-card-avail
 
 Expect exit code **0** and one match. Do not paste full HTML into tickets; the grep line is enough.
 
+## Public card and vCard (privacy)
+
+The probe URL is **public**. If a visitor uses contact exchange, the downloaded vCard includes the **account owner email** (`EMAIL;TYPE=INTERNET,WORK` in the generated vCard; see `src/lib/hi/vcard.ts`) plus any name, phone, or photo fields stored on the card.
+
+Configure the probe card so nothing personal leaks:
+
+| Field                                               | Requirement                                                                                  |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| **Account email** (owner inbox on `accounts.email`) | **`hello@we-met.link` only**                                                                 |
+| **Display name**                                    | Neutral ops label only (for example "We Met monitoring"). **No** personal or customer names. |
+| **Photo**                                           | **None** (do not upload a profile photo)                                                     |
+| **Phone**                                           | **None** (leave contact phone empty so vCard has no `TEL` line)                              |
+
+Re-check after every publish.
+
 ## Lead sinks (must stay off)
 
-In the app editor, confirm **no enabled email lead sinks** on the probe card. If sink UI is unavailable, verify in D1 that no `lead_sinks` row for this card has `enabled = 1` ([d1-operator-sql](./d1-operator-sql.md); use slug or card id from the app, not from git).
+In the app editor, confirm **no enabled email lead sinks** on the probe card.
+
+If the sink UI is unavailable, run a **read-only** check in production D1 under [Production (`we-met-db`)](./d1-operator-sql.md#production-we-met-db) in [d1-operator-sql.md](./d1-operator-sql.md) (production approval discipline and second pair of eyes for destructive SQL; this query is read-only). Resolve `card_id` from the app, not from git. **Never** change lead sinks with direct SQL (`INSERT`, `UPDATE`, or `DELETE` on `lead_sinks`).
+
+```bash
+npx wrangler d1 execute WE_MET_DB --remote \
+  -c wrangler.ci.jsonc \
+  --command "SELECT id, enabled FROM lead_sinks WHERE card_id = '<card-uuid-from-app>' AND enabled = 1;"
+```
+
+Expect **zero rows**. Use the production config steps in [d1-operator-sql.md](./d1-operator-sql.md#production-we-met-db) to prepare `wrangler.ci.jsonc` before `--remote`.
 
 Probes must **never** `POST /api/exchange` on this card. GET-only checks send no mail when sinks are disabled.
 
@@ -64,11 +89,11 @@ Use this when the card was deleted, the slug was renamed, or production D1 was r
 
 1. **Account:** Sign in on **`app.we-met.link`** as the operator who will own the probe card (same account as other internal ops cards, not an end-customer test account unless policy changes).
 2. **Create or reclaim slug:** Pick a new lowercase slug (placeholder pattern: `<your-probe-slug>`). Avoid `didi` and avoid slugs used by real customers.
-3. **Minimal profile:** Set display name and any required fields so the public page renders (photo optional). Keep copy neutral; no personal contact details beyond what the product requires.
+3. **Minimal profile:** Follow [Public card and vCard (privacy)](#public-card-and-vcard-privacy): owner account email **`hello@we-met.link`**, neutral display name only, **no photo**, **no phone**.
 4. **About paragraph:** Include **`we-met-card-availability-probe`** as described above.
 5. **Lead sinks:** Leave all sinks **disabled** or unset. Double-check after first publish.
 6. **Publish** through the app editor.
-7. **Update monitors:** In Cloudflare or your uptime vendor, point the synthetic check at `https://we-met.link/hi/<your-probe-slug>` and confirm the marker assertion still matches **`we-met-card-availability-probe`**.
+7. **Update monitors (M5, Diadem approval):** After [M5](../monitoring-plan.md#5-proposed-build-tickets) is approved and wired, point the synthetic check at `https://we-met.link/hi/<your-probe-slug>` and confirm the marker assertion still matches **`we-met-card-availability-probe`**. Do not change Cloudflare or vendor monitor settings from this doc alone.
 8. **Record offline:** Note slug and last-verified date in operator storage (not in git).
 
 ## Related docs
