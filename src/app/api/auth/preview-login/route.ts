@@ -28,36 +28,37 @@ async function previewLoginRouteGuard(): Promise<
   return ctx;
 }
 
-async function previewLoginNotFoundWhenDisabled(): Promise<Response> {
+async function previewLoginNonPostResponse(): Promise<Response> {
   const guardResult = await previewLoginRouteGuard();
   if (guardResult instanceof Response) {
     return guardResult;
   }
+  // Preview login is POST-only; app API host and env already passed the guard.
   return apiNotFound();
 }
 
 export async function GET() {
-  return previewLoginNotFoundWhenDisabled();
+  return previewLoginNonPostResponse();
 }
 
 export async function HEAD() {
-  return previewLoginNotFoundWhenDisabled();
+  return previewLoginNonPostResponse();
 }
 
 export async function PUT() {
-  return previewLoginNotFoundWhenDisabled();
+  return previewLoginNonPostResponse();
 }
 
 export async function PATCH() {
-  return previewLoginNotFoundWhenDisabled();
+  return previewLoginNonPostResponse();
 }
 
 export async function DELETE() {
-  return previewLoginNotFoundWhenDisabled();
+  return previewLoginNonPostResponse();
 }
 
 export async function OPTIONS() {
-  return previewLoginNotFoundWhenDisabled();
+  return previewLoginNonPostResponse();
 }
 
 export async function POST(request: Request) {

@@ -79,6 +79,23 @@ function restoreDefaultRouteEnv() {
   setRequestHeaders({ host: "localhost:3000" });
 }
 
+const previewLoginNonPostHandlers = [
+  previewLoginHead,
+  previewLoginPut,
+  previewLoginPatch,
+  previewLoginDelete,
+  previewLoginOptions,
+] as const;
+
+async function expectPreviewLoginNonPost404NoCookie(): Promise<void> {
+  for (const handler of previewLoginNonPostHandlers) {
+    const response = await handler();
+    expect(response.status).toBe(404);
+    expect(response.body).toBeNull();
+    expect(response.headers.get("set-cookie")).toBeNull();
+  }
+}
+
 describe("auth API routes (integration)", () => {
   beforeEach(() => {
     googleOAuthMocks.exchangeGoogleCode.mockReset();
@@ -128,21 +145,53 @@ describe("auth API routes (integration)", () => {
     expect(response.body).toBeNull();
   });
 
-  it("preview-login non-POST methods return 404 when preview login is disabled", async () => {
-    routeMocks.env.WE_MET_ENV = "staging";
-    routeMocks.env.WE_MET_BASE_URL = "https://we-met.didi.build";
-    setRequestHeaders({ host: "we-met.didi.build" });
-    const handlers = [
-      previewLoginHead,
-      previewLoginPut,
-      previewLoginPatch,
-      previewLoginDelete,
-      previewLoginOptions,
-    ] as const;
-    for (const handler of handlers) {
-      const response = await handler();
-      expect(response.status).toBe(404);
-      expect(response.body).toBeNull();
+  it("preview-login non-POST methods return 404 when preview login is disabled on staging", async () => {
+    try {
+      routeMocks.env.WE_MET_ENV = "staging";
+      routeMocks.env.WE_MET_BASE_URL = "https://we-met.didi.build";
+      setRequestHeaders({ host: "we-met.didi.build" });
+      await expectPreviewLoginNonPost404NoCookie();
+    } finally {
+      restoreDefaultRouteEnv();
+    }
+  });
+
+  it("preview-login non-POST methods return 404 when preview login is disabled on production", async () => {
+    try {
+      routeMocks.env.WE_MET_ENV = "production";
+      setRequestHeaders({ host: "app.we-met.link" });
+      await expectPreviewLoginNonPost404NoCookie();
+    } finally {
+      restoreDefaultRouteEnv();
+    }
+  });
+
+  it("preview-login GET and POST return 404 on non-app-api host when preview login is enabled", async () => {
+    try {
+      routeMocks.env.WE_MET_ENV = "preview";
+      routeMocks.env.WE_MET_PREVIEW_LOGIN_SECRET = "preview-secret";
+      routeMocks.env.WE_MET_PREVIEW_LOGIN_EMAIL = "preview@test.we-met.link";
+      routeMocks.env.WE_MET_PREVIEW_HOST_SUFFIX =
+        "-we-met.diademshoukralla.workers.dev";
+      const workerBaseHost = "we-met-preview.diademshoukralla.workers.dev";
+      setRequestHeaders({ host: workerBaseHost });
+      const getResponse = await previewLoginGet();
+      expect(getResponse.status).toBe(404);
+      expect(getResponse.headers.get("set-cookie")).toBeNull();
+      const postResponse = await previewLoginPost(
+        new Request(`https://${workerBaseHost}/api/auth/preview-login`, {
+          method: "POST",
+          headers: {
+            origin: `https://${workerBaseHost}`,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ secret: "preview-secret" }),
+        }),
+      );
+      expect(postResponse.status).toBe(404);
+      expect(postResponse.headers.get("set-cookie")).toBeNull();
+    } finally {
+      restoreDefaultRouteEnv();
     }
   });
 
@@ -349,8 +398,15 @@ describe("auth API routes (integration)", () => {
       );
       expect(response.status).toBe(200);
       expect(response.headers.get("set-cookie")).toContain(SESSION_COOKIE_NAME);
-      const getOnPreview = await previewLoginGet();
-      expect(getOnPreview.status).toBe(404);
+      const nonPostOnPreview = [
+        previewLoginGet,
+        ...previewLoginNonPostHandlers,
+      ] as const;
+      for (const handler of nonPostOnPreview) {
+        const methodResponse = await handler();
+        expect(methodResponse.status).toBe(404);
+        expect(methodResponse.headers.get("set-cookie")).toBeNull();
+      }
       routeMocks.env.WE_MET_ENV = "local";
       setRequestHeaders({ host: "localhost:3000" });
     });
