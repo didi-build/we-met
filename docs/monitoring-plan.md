@@ -210,6 +210,8 @@ We Met is in the first row today, moving toward the second after public cutover 
 | **P3 Reputation / warmup** | Warmup auto-pause, non-seed bounce summary                             | Existing `WARMUP_ALERT_TO`                           | As today                                             |
 | **P4 Informational**       | Daily budget alerts, deploy completed                                  | Email or GitHub notification                         | No wake-up                                           |
 
+**M3, M4, and M6 dashboard alerts ([DIDI-861](https://linear.app/didi-build/issue/DIDI-861), [monitoring-alerts.md](./runbooks/monitoring-alerts.md)):** email **hello@we-met.link** only. **P3 `WARMUP_ALERT_TO`:** separate **warmup Worker** runtime alerts (auto-pause, seed bounce summaries per [warmup README](../workers/warmup/README.md)), not Cloudflare Monitors; operators may set the secret to **hello@we-met.link** for one inbox without changing the runbook recipients.
+
 **No PagerDuty** until there is a second on-call engineer ([Being on-call](https://sre.google/sre-book/being-on-call/)).
 
 ### 3.5 Status page approach
