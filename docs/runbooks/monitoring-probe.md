@@ -38,7 +38,7 @@ This string is **not** secret. It only proves the card page rendered real app HT
 
 ### Where to put the marker on the card
 
-1. Sign in on **`app.we-met.link`** with the operator account that owns the probe card.
+1. Sign in on **`app.we-met.link`** with the account whose sign-in email is **`hello@we-met.link`**, and **only** that account. Do not publish the probe card from a personal or other ops sign-in.
 2. Open the card editor and go to **About me**.
 3. Add or edit one short paragraph so the marker appears **verbatim** in the published page (for example last line: `we-met-card-availability-probe`).
 4. Optional human-readable line above the marker: explain the card is for automated uptime checks only and is not a customer-facing profile.
@@ -52,20 +52,46 @@ curl -sS "https://we-met.link/hi/<your-probe-slug>" | grep -F 'we-met-card-avail
 
 Expect exit code **0** and one match. Do not paste full HTML into tickets; the grep line is enough.
 
-## Public card and vCard (privacy)
+## Public card, vCard, and exchange (privacy)
 
-The probe URL is **public**. If a visitor uses contact exchange, the downloaded vCard includes the **account owner email** (`EMAIL;TYPE=INTERNET,WORK` in the generated vCard; see `src/lib/hi/vcard.ts`) plus any name, phone, or photo fields stored on the card.
+The probe URL is **public**. Contact exchange is possible even though uptime checks must stay GET-only; misconfiguration can still expose owner contact data to a visitor who submits the form.
 
-Configure the probe card so nothing personal leaks:
+### Sign-in account (required)
 
-| Field                                               | Requirement                                                                                  |
-| --------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| **Account email** (owner inbox on `accounts.email`) | **`hello@we-met.link` only**                                                                 |
-| **Display name**                                    | Neutral ops label only (for example "We Met monitoring"). **No** personal or customer names. |
-| **Photo**                                           | **None** (do not upload a profile photo)                                                     |
-| **Phone**                                           | **None** (leave contact phone empty so vCard has no `TEL` line)                              |
+The probe card must belong to the account whose **`accounts.email`** is **`hello@we-met.link`**. That value comes from **sign-in**, not from a field on the card editor. Before publish, confirm in the app that you are signed in as **`hello@we-met.link`** only.
 
-Re-check after every publish.
+### Where the vCard email comes from
+
+`buildVCard` in `src/lib/hi/vcard.ts` always emits:
+
+```text
+EMAIL;TYPE=INTERNET,WORK:<ownerEmail argument>
+```
+
+The app passes **`ownerEmail` from the signed-in account** (`accounts.email`). It is **not** an editable card field. Changing display copy on the card does **not** change vCard email; only signing in under a different account would.
+
+The same **`hello@we-met.link` only, no phone** rule applies to the JSON body of a successful **`POST /api/exchange`**: **`ownerEmail`** is the account email and optional **`ownerPhone`** comes from **`contact.phone`** on the card ([account-deletion.md](./account-deletion.md), row `api.exchange_post_success_body`). That response is not stored server-side but remains in the visitor browser for that tab.
+
+### Card fields that map into the vCard (lines 57 to 90)
+
+Keep every emitted field **neutral** (for example `we-met probe`) or **empty**. **No** personal or customer names, **no** profile photo, **no** phone number.
+
+| vCard property               | Source in `buildVCard`                      | Probe card requirement                                  |
+| ---------------------------- | ------------------------------------------- | ------------------------------------------------------- |
+| `N` (structured name)        | `contact.name.family`, `contact.name.given` | Empty or neutral tokens only                            |
+| `FN`                         | `contact.name.full`                         | Neutral label only (for example `we-met probe`)         |
+| `NICKNAME`                   | `contact.name.nickname` when non-empty      | Leave empty or neutral                                  |
+| `ORG`                        | `contact.org`                               | Empty or neutral                                        |
+| `TITLE`                      | `contact.title`                             | Empty or neutral                                        |
+| `EMAIL;TYPE=INTERNET,WORK`   | `options.ownerEmail` (sign-in account)      | **`hello@we-met.link` only** via sign-in account above  |
+| `TEL;TYPE=CELL`              | `contact.phone` when non-empty              | **Empty** (omit line; no `ownerPhone` in exchange JSON) |
+| `PHOTO;ENCODING=b;TYPE=JPEG` | card photo when present                     | **No photo** uploaded                                   |
+| `URL` (each entry)           | `contact.urls[]` with optional `TYPE`       | Empty list or neutral URLs only                         |
+| `NOTE`                       | `contact.vcardNote`                         | Empty or neutral                                        |
+
+Also keep the **public display name** on the card (page header) neutral; it is visible on `GET /hi/<slug>` even when exchange is unused.
+
+Re-check all of the above after every publish.
 
 ## Lead sinks (must stay off)
 
@@ -87,9 +113,9 @@ Probes must **never** `POST /api/exchange` on this card. GET-only checks send no
 
 Use this when the card was deleted, the slug was renamed, or production D1 was restored without the probe row.
 
-1. **Account:** Sign in on **`app.we-met.link`** as the operator who will own the probe card (same account as other internal ops cards, not an end-customer test account unless policy changes).
+1. **Account:** Sign in on **`app.we-met.link`** with the account whose sign-in email is **`hello@we-met.link`**, and **only** that account. Do not use a personal sign-in or another internal ops account.
 2. **Create or reclaim slug:** Pick a new lowercase slug (placeholder pattern: `<your-probe-slug>`). Avoid `didi` and avoid slugs used by real customers.
-3. **Minimal profile:** Follow [Public card and vCard (privacy)](#public-card-and-vcard-privacy): owner account email **`hello@we-met.link`**, neutral display name only, **no photo**, **no phone**.
+3. **Minimal profile:** Follow [Public card, vCard, and exchange (privacy)](#public-card-vcard-and-exchange-privacy): sign-in **`hello@we-met.link` only**; all vCard-mapped contact fields neutral or empty; **no photo**; **no phone**.
 4. **About paragraph:** Include **`we-met-card-availability-probe`** as described above.
 5. **Lead sinks:** Leave all sinks **disabled** or unset. Double-check after first publish.
 6. **Publish** through the app editor.
