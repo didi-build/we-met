@@ -1,5 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { POST } from "@/app/api/exchange/route";
+
+vi.mock("@opennextjs/cloudflare", () => ({
+  getCloudflareContext: vi.fn(async () => ({ env: {} })),
+}));
 
 describe("POST /api/exchange honeypot (integration)", () => {
   it("returns an empty token without processing bots that fill the website field", async () => {

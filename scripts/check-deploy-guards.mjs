@@ -24,6 +24,10 @@ import {
   D1_PLACEHOLDER_PRODUCTION,
   NONPROD_RESOURCE_MARKERS,
   PRODUCTION_APP_HOST,
+  PRODUCTION_EXCHANGE_OUTCOME_DATASET,
+  PREVIEW_EXCHANGE_OUTCOME_DATASET,
+  STAGING_EXCHANGE_OUTCOME_DATASET,
+  EXCHANGE_OUTCOME_ANALYTICS_BINDING,
   PRODUCTION_RESOURCE_MARKERS,
   STAGING_RESOURCE_MARKERS,
   RATE_LIMIT_BINDINGS,
@@ -169,6 +173,43 @@ function expectedRateLimitNamespace(bindingName, isProduction) {
       return markers.appRateLimiterNamespaceId;
     default:
       return null;
+  }
+}
+
+function exchangeOutcomeDatasetName(configSection) {
+  const rows = configSection?.analytics_engine_datasets ?? [];
+  const row = rows.find(
+    (entry) => entry?.binding === EXCHANGE_OUTCOME_ANALYTICS_BINDING,
+  );
+  return typeof row?.dataset === "string" ? row.dataset : null;
+}
+
+function checkExchangeOutcomeAnalyticsDataset(configSection, expectedDataset, label) {
+  const dataset = exchangeOutcomeDatasetName(configSection);
+  if (!dataset) {
+    fail(
+      `${label} must declare analytics_engine_datasets ${EXCHANGE_OUTCOME_ANALYTICS_BINDING}`,
+    );
+  }
+  if (dataset !== expectedDataset) {
+    fail(`${label} exchange outcome dataset must be "${expectedDataset}"`);
+  }
+}
+
+function checkPreviewExchangeOutcomeAnalyticsDataset(previews) {
+  const dataset = exchangeOutcomeDatasetName(previews);
+  if (!dataset) {
+    fail(
+      `previews must declare analytics_engine_datasets ${EXCHANGE_OUTCOME_ANALYTICS_BINDING}`,
+    );
+  }
+  if (dataset === PRODUCTION_EXCHANGE_OUTCOME_DATASET) {
+    fail("previews exchange outcome dataset must not use production dataset name");
+  }
+  if (dataset !== PREVIEW_EXCHANGE_OUTCOME_DATASET) {
+    fail(
+      `previews exchange outcome dataset must be "${PREVIEW_EXCHANGE_OUTCOME_DATASET}"`,
+    );
   }
 }
 
@@ -408,6 +449,7 @@ function checkPreviewBlock(previews) {
     "preview queue",
   );
   checkRateLimitBindings(previews?.ratelimits, false);
+  checkPreviewExchangeOutcomeAnalyticsDataset(previews);
 }
 
 const ALLOWED_CONSUMER_VAR_KEYS = new Set(["WE_MET_ENV", "WE_MET_BASE_URL"]);
@@ -856,6 +898,11 @@ function checkStagingBlock(config) {
   if (consumers.length > 0) {
     fail("staging must not define queue consumers");
   }
+  checkExchangeOutcomeAnalyticsDataset(
+    config,
+    STAGING_EXCHANGE_OUTCOME_DATASET,
+    "staging",
+  );
 }
 
 function checkProductionBlock(config) {
@@ -919,6 +966,11 @@ function checkProductionBlock(config) {
   }
   checkRateLimitBindings(rlRows, true);
   checkProductionAppHostRoute(config);
+  checkExchangeOutcomeAnalyticsDataset(
+    config,
+    PRODUCTION_EXCHANGE_OUTCOME_DATASET,
+    "production",
+  );
 }
 
 function main() {

@@ -22,7 +22,7 @@ Sources: committed Wrangler configs, [`.github/workflows/deploy-production.yml`]
 
 All three set `workers_dev: false` and have no public Workers.dev URL for the consumer or warmup Worker ([environments](./architecture/environments.md)).
 
-**App Worker bindings (production):** D1 `we-met-db` (`WE_MET_DB`), R2 `we-met-assets` (`WE_MET_ASSETS`), queue producer `we-met-followup-email` (`WE_MET_FOLLOWUP_EMAIL_QUEUE`), rate limiters (exchange **2002**, auth **2004**, app **2006**), Images, and `WORKER_SELF_REFERENCE` ([`wrangler.jsonc`](../wrangler.jsonc)).
+**App Worker bindings (production):** D1 `we-met-db` (`WE_MET_DB`), R2 `we-met-assets` (`WE_MET_ASSETS`), queue producer `we-met-followup-email` (`WE_MET_FOLLOWUP_EMAIL_QUEUE`), Analytics Engine `we-met-exchange-outcome` (`WE_MET_EXCHANGE_OUTCOME_ANALYTICS`), rate limiters (exchange **2002**, auth **2004**, app **2006**), Images, and `WORKER_SELF_REFERENCE` ([`wrangler.jsonc`](../wrangler.jsonc)).
 
 **Follow-up consumer bindings:** same D1 and R2 names, `send_email` as `EMAIL` with `allowed_sender_addresses: ["hello@mail.we-met.link"]`, consumes `we-met-followup-email` with `max_retries: 30`, `retry_delay: 30`, `max_batch_size: 5` ([`wrangler.production.jsonc`](../workers/we-met-followup-email-consumer/wrangler.production.jsonc), [0023](./decisions/0023-owner-email-lead-sink-consumer.md)).
 
@@ -76,7 +76,7 @@ Documented event names for debugging (no PII in listed fields): app `exchange_vi
 #### Lead email kill switch and daily caps (D1 `app_settings`)
 
 - `lead_email_enabled`: off unless value is `1` or `true` (case-insensitive); missing defaults to **on**
-- `daily_cap_global` / `daily_cap_per_card`: non-positive or invalid values **fail closed** with **503** `lead_email_unavailable` on exchange and details
+- `daily_cap_global` / `daily_cap_per_card`: invalid or exhausted caps return **503** `lead_email_unavailable` (Analytics Engine classes **`cap_config_error`** or **`cap_reached`**; see [kill-switch runbook](./runbooks/kill-switch-and-caps.md)); kill switch off uses **`kill-switch 503`**
 - Consumer re-reads `lead_email_enabled` and acks without send when off ([kill-switch runbook](./runbooks/kill-switch-and-caps.md), [overview pipeline](./architecture/overview.md#pipeline-flow))
 
 #### Warmup kill switch, caps, and auto-pause (KV `WARMUP_STATE`)
@@ -176,15 +176,15 @@ We Met is in the first row today, moving toward the second after public cutover 
 
 #### Per user-facing flow
 
-| Flow                     | SLI (measurement)                                                                                                                                                                                                  | Suggested alert (daytime email)                                                                  |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
-| **Card page**            | Synthetic `GET https://we-met.link/hi/<probe-slug>` returns 200 and expected substring                                                                                                                             | 2 of 3 regions fail for 5 minutes                                                                |
-| **Exchange submit**      | Synthetic or canary `POST /api/exchange` with Turnstile test key **only on non-prod**; production: monitor 5xx rate on `/api/exchange` via Workers analytics / Issues (after M0)                                   | 5xx share above SLO burn threshold                                                               |
-| **Owner email delivery** | Rising `messages` backlog ([Queues metrics](https://developers.cloudflare.com/queues/observability/metrics/)) **or** spike in `lead_sink_permanent_failure`; ledger reaches `status = 'sent'` for email sink phase | Backlog &gt; N messages for 30 minutes **and** at least one permanent failure log in same window |
-| **Visitor letter**       | `visitor_followup_permanent_failure` rate; optional ledger gap accepted per [environments](./architecture/environments.md#known-gaps-unverified)                                                                   | Any permanent failure cluster (&gt;3 in 1 hour)                                                  |
-| **Warmup / reputation**  | Existing `WARMUP_ALERT_TO` path                                                                                                                                                                                    | Keep; add dashboard check on `paused` KV key weekly                                              |
-| **DLQ depth**            | `we-met-warmup-send-dlq`, `we-met-warmup-email-events-dlq` via Queues metrics                                                                                                                                      | &gt; 0 messages for 15 minutes                                                                   |
-| **Follow-up queue**      | No DLQ today: monitor **backlog** and **permanent failure logs** instead                                                                                                                                           | Backlog sustained high with rising retries                                                       |
+| Flow                     | SLI (measurement)                                                                                                                                                                                                                          | Suggested alert (daytime email)                                                                  |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| **Card page**            | Synthetic `GET https://we-met.link/hi/<probe-slug>` returns 200 and expected substring                                                                                                                                                     | 2 of 3 regions fail for 5 minutes                                                                |
+| **Exchange submit**      | Synthetic or canary `POST /api/exchange` with Turnstile test key **only on non-prod**; production: **`exchange_outcome`** SLI via Workers Analytics Engine ([section 4.1](#41-slo-measurement-queries-m10)) plus Issues for unexpected 5xx | 5xx share above SLO burn threshold (**`cap_config_error`** counts toward exchange SLO)           |
+| **Owner email delivery** | Rising `messages` backlog ([Queues metrics](https://developers.cloudflare.com/queues/observability/metrics/)) **or** spike in `lead_sink_permanent_failure`; ledger reaches `status = 'sent'` for email sink phase                         | Backlog &gt; N messages for 30 minutes **and** at least one permanent failure log in same window |
+| **Visitor letter**       | `visitor_followup_permanent_failure` rate; optional ledger gap accepted per [environments](./architecture/environments.md#known-gaps-unverified)                                                                                           | Any permanent failure cluster (&gt;3 in 1 hour)                                                  |
+| **Warmup / reputation**  | Existing `WARMUP_ALERT_TO` path                                                                                                                                                                                                            | Keep; add dashboard check on `paused` KV key weekly                                              |
+| **DLQ depth**            | `we-met-warmup-send-dlq`, `we-met-warmup-email-events-dlq` via Queues metrics                                                                                                                                                              | &gt; 0 messages for 15 minutes                                                                   |
+| **Follow-up queue**      | No DLQ today: monitor **backlog** and **permanent failure logs** instead                                                                                                                                                                   | Backlog sustained high with rising retries                                                       |
 
 **Probe slug:** use a dedicated **live** card in production D1, published through the **app editor** on `app.we-met.link`. **Never** load the probe card with `npm run cards:load` (production cards publish through the app; `cards:load` is for local/non-prod D1 only per [AGENTS.md](../AGENTS.md) and [card-loading](./runbooks/card-loading.md)). Operator steps, marker string, and recreate flow: [monitoring-probe runbook](./runbooks/monitoring-probe.md) ([M1](./runbooks/monitoring-probe.md)).
 
@@ -215,6 +215,8 @@ Diadem answered [DIDI-861](https://linear.app/didi-build/issue/DIDI-861) (Oct 25
 | **P4 Informational**       | Daily budget alerts, deploy completed                                  | Email to **hello@we-met.link** | 08:00 to 22:00 America/Toronto; no wake-up intent |
 
 **M3, M4, and M6 dashboard alerts ([DIDI-861](https://linear.app/didi-build/issue/DIDI-861), [monitoring-alerts.md](./runbooks/monitoring-alerts.md)):** email **hello@we-met.link** only. **P3 `WARMUP_ALERT_TO`:** separate **warmup Worker** runtime alerts (auto-pause, seed bounce summaries per [warmup README](../workers/warmup/README.md)), not Cloudflare Monitors; operators may set the secret to **hello@we-met.link** for one inbox without changing the runbook recipients.
+
+**Exchange acceptance SLI ([section 4](#4-proposed-slos-user-facing-flows)):** **`kill-switch 503`** and **`cap_reached`** are excluded from the SLO denominator; **`cap_config_error`** counts as a failure (weighted like **`5xx`** in [section 4.1](#41-slo-measurement-queries-m10)).
 
 **No PagerDuty** until there is a second on-call engineer ([Being on-call](https://sre.google/sre-book/being-on-call/)).
 
@@ -259,7 +261,7 @@ Monitoring-specific notes:
 
 - **Status page subscribers:** email addresses collected for incident updates are **PII**; document purpose, retention, and processor in the data map if we enable subscriptions.
 - **M12 (Logpush):** exported Worker logs can include `leadId`, `photoKey`, and URLs longer than the default **7-day** Workers Logs retention ([Workers Logs limits](https://developers.cloudflare.com/workers/observability/logs/workers-logs/#limits)); treat as extended retention of operational identifiers and scrub or restrict destinations.
-- **M8 (Analytics Engine binding):** add a `data-map.yml` entry for any new binding and emitted dimensions before production write traffic.
+- **M8 (Analytics Engine binding):** add a `data-map.yml` entry for any new binding and emitted dimensions before production write traffic; **`exchange_outcome`** rows retain **3 months** per [Analytics Engine limits](https://developers.cloudflare.com/analytics/analytics-engine/limits/) (documented in [data-map](./privacy/data-map.yml)).
 - **M9 (status page):** public comms and subscriber data; **CTO + Diadem**.
 - **Alert content:** automations (M6) must send only issue title and dashboard link; no visitor email, message bodies, or queue payloads.
 
@@ -267,17 +269,90 @@ Monitoring-specific notes:
 
 ## 4. Proposed SLOs (user-facing flows)
 
-Rolling **30-day** window; measured from **synthetic + Workers analytics** (not yet implemented). Error budgets use [Google's definition](https://sre.google/workbook/error-budget-policy/). Ledger statuses are `queued`, `sent`, and `failed` only ([`migrations/0002_lead_delivery_ledger.sql`](../migrations/0002_lead_delivery_ledger.sql)).
+Rolling **30-day** window; measured from **synthetic checks**, **Workers Analytics Engine** (`exchange_outcome` on `POST /api/exchange`), and **production D1** (owner email timeliness). Error budgets use [Google's definition](https://sre.google/workbook/error-budget-policy/). Ledger statuses are `queued`, `sent`, and `failed` only ([`migrations/0002_lead_delivery_ledger.sql`](../migrations/0002_lead_delivery_ledger.sql)).
 
-| Flow                       | SLI                                                                                       | SLO target                    | Error budget (30d)                        | Notes                                                                                                                                |
-| -------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| **Card availability**      | Successful synthetic GET (200, body contains probe marker)                                | **99.9%**                     | ~43 minutes downtime                      | Probe marker and URL: [monitoring-probe.md](./runbooks/monitoring-probe.md); alerts: [alert-routing.md](./runbooks/alert-routing.md) |
-| **Exchange acceptance**    | `POST /api/exchange` returns 2xx excluding honeypot fake 200                              | **99.5%**                     | ~3.6 hours                                | Excludes 429 abuse and 503 when kill switch intentionally on                                                                         |
-| **Owner email timeliness** | Time from successful exchange to ledger `status = 'sent'` for the email sink record phase | **99%** within **15 minutes** | 1% of exchanges may exceed 15 min or fail | Queue retries up to ~12h; SLO forces backlog alerting before max retries                                                             |
+| Flow                       | SLI                                                                                       | SLO target                    | Error budget (30d)                        | Notes                                                                                                                                              |
+| -------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Card availability**      | Successful synthetic GET (200, body contains probe marker)                                | **99.9%**                     | ~43 minutes downtime                      | Probe marker and URL: [monitoring-probe.md](./runbooks/monitoring-probe.md); alerts: [alert-routing.md](./runbooks/alert-routing.md)               |
+| **Exchange acceptance**    | `POST /api/exchange` returns 2xx excluding honeypot fake 200                              | **99.5%**                     | ~3.6 hours                                | Excludes 429 abuse, intentional kill switch (`kill-switch 503`), and daily cap blocks (`cap_reached`); `cap_config_error` counts as an SLO failure |
+| **Owner email timeliness** | Time from successful exchange to ledger `status = 'sent'` for the email sink record phase | **99%** within **15 minutes** | 1% of exchanges may exceed 15 min or fail | Queue retries up to ~12h; SLO forces backlog alerting before max retries                                                                           |
 
 **Not an SLO (operational guardrails):** warmup send caps, `lead_email_enabled`, Turnstile pass rate.
 
-When an SLO budget is exhausted in a month, proposed policy: **freeze non-urgent production deploys** and prioritize reliability tickets ([error budget policy](https://sre.google/workbook/error-budget-policy/)). **Diadem must confirm** targets and freeze rules (open question §6).
+When an SLO budget is exhausted in a month, the draft plan proposed **freeze non-urgent production deploys** and prioritize reliability tickets ([error budget policy](https://sre.google/workbook/error-budget-policy/)). **Diadem confirmed the SLO targets with no deploy freeze** ([DIDI-861](https://linear.app/didi-build/issue/DIDI-861), answer 11b, Oct 25, 2026). See [section 4.1](#41-slo-measurement-queries-m10) for measurement queries.
+
+---
+
+## 4.1 SLO measurement queries (M10)
+
+Rolling **30-day** window. Targets match [section 4](#4-proposed-slos-user-facing-flows). **Error budget policy:** no deploy freeze when a monthly budget is spent (Diadem, [DIDI-861](https://linear.app/didi-build/issue/DIDI-861) 11b).
+
+Run production SLI math against **production** datasets and D1 only (`we-met-db`). Staging and preview use their own Analytics Engine dataset names in [`wrangler.staging.jsonc`](../wrangler.staging.jsonc) and the [`wrangler.jsonc`](../wrangler.jsonc) `previews` block.
+
+### Card availability (target 99.9%)
+
+**SLI:** share of successful synthetic `GET https://we-met.link/hi/<probe-slug>` checks (HTTP 200 and body contains the probe marker). Source: external monitor or Cloudflare Health Check (M5), not Workers Analytics Engine.
+
+**Example (operator monitor export):**
+
+```text
+successful_probe_checks / total_probe_checks
+WHERE check_target = probe_slug_url AND window = last_30_days
+```
+
+Compare result to **0.999**.
+
+### Exchange acceptance (target 99.5%)
+
+**SLI:** share of `POST /api/exchange` outcomes classified **2xx** among requests that count toward the SLO (excludes **429**, **kill-switch 503**, **cap_reached**, and honeypot fake 200; honeypot posts do not write Analytics Engine points; **cap_config_error** counts as a failure). Implemented in [`src/exchange/exchange-outcome-analytics.ts`](../src/exchange/exchange-outcome-analytics.ts) ([M8](#5-proposed-build-tickets), [DIDI-940](https://linear.app/didi-build/issue/DIDI-940)).
+
+**Production query** ([Workers Analytics Engine SQL API](https://developers.cloudflare.com/analytics/analytics-engine/sql-api/) on dataset `we-met-exchange-outcome`; use sample weights per [Analytics Engine limits](https://developers.cloudflare.com/analytics/analytics-engine/limits/)):
+
+```sql
+SELECT
+  if(
+    sumIf(
+      _sample_interval * double1,
+      blob1 NOT IN ('429', 'kill-switch 503', 'cap_reached')
+    ) > 0,
+    100.0 * sumIf(_sample_interval * double1, blob1 = '2xx')
+      / sumIf(
+          _sample_interval * double1,
+          blob1 NOT IN ('429', 'kill-switch 503', 'cap_reached')
+        ),
+    0
+  ) AS exchange_acceptance_pct
+FROM "we-met-exchange-outcome"
+WHERE index1 = 'exchange_outcome'
+  AND timestamp > NOW() - INTERVAL '30' DAY
+```
+
+Compare `exchange_acceptance_pct` to **99.5**.
+
+### Owner email timeliness (target 99% within 15 minutes)
+
+**SLI:** among successful exchanges, share where the owner email sink **record** phase reaches `lead_delivery_ledger.status = 'sent'` within **15 minutes** of `created_at`. Source: production D1 (`we-met-db`), not Analytics Engine.
+
+**Example query** (run in D1 SQL console or approved tooling; metadata only, no visitor PII in ledger rows):
+
+```sql
+SELECT
+  100.0 * SUM(
+    CASE
+      WHEN status = 'sent'
+        AND sent_at IS NOT NULL
+        AND (julianday(sent_at) - julianday(created_at)) * 1440.0 <= 15
+      THEN 1
+      ELSE 0
+    END
+  ) / NULLIF(COUNT(*), 0) AS owner_email_timely_pct
+FROM lead_delivery_ledger
+WHERE phase = 'record'
+  AND sink_kind = 'email'
+  AND created_at >= datetime('now', '-30 days')
+```
+
+Compare `owner_email_timely_pct` to **99.0**.
 
 ---
 
@@ -285,21 +360,21 @@ When an SLO budget is exhausted in a month, proposed policy: **freeze non-urgent
 
 Each row is one PR unless noted. **Diadem** = Cloudflare account, secrets, or product choice. **CTO + Diadem** = vendor, privacy, or public comms.
 
-| ID (suggested) | Title                                                                                      | Acceptance criterion                                                                                                                                                                                 | Owner approval                                                               |
-| -------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| M0             | Fix Workers Issues Wrangler key ([DIDI-860](https://linear.app/didi-build/issue/DIDI-860)) | `observability.issues.enabled` in app and both consumer wrangler configs; dashboard shows Issues after deploy                                                                                        |                                                                              |
-| M1             | Document probe slug runbook                                                                | [monitoring-probe.md](./runbooks/monitoring-probe.md): probe card via app editor only, never `cards:load` ([DIDI-936](https://linear.app/didi-build/issue/DIDI-936))                                 |                                                                              |
-| M2             | Add follow-up queue DLQ in Wrangler                                                        | `we-met-followup-email-dlq` bound; consumer config documents operator replay steps                                                                                                                   | Diadem (create queue in dashboard)                                           |
-| M3             | Cloudflare Monitor: follow-up backlog                                                      | [monitoring-alerts.md](./runbooks/monitoring-alerts.md#m3-follow-up-queue-backlog-high-for-30-minutes) completed in dashboard ([DIDI-943](https://linear.app/didi-build/issue/DIDI-943))             | Diadem (notification email/webhook)                                          |
-| M4             | Cloudflare Monitor: warmup DLQ non-zero                                                    | [monitoring-alerts.md](./runbooks/monitoring-alerts.md#m4-warmup-dead-letter-queue-non-zero-for-15-minutes) completed in dashboard ([DIDI-943](https://linear.app/didi-build/issue/DIDI-943))        | Diadem                                                                       |
-| M5             | Synthetic check: card page                                                                 | External or Health Check on probe URL per [monitoring-probe.md](./runbooks/monitoring-probe.md); failure notifies per [alert-routing.md](./runbooks/alert-routing.md)                                | Diadem (zone plan / Instatus account)                                        |
-| M6             | Workers Issues automation                                                                  | [monitoring-alerts.md](./runbooks/monitoring-alerts.md#m6-workers-issues-automation-title-and-dashboard-link-only) completed in dashboard ([DIDI-943](https://linear.app/didi-build/issue/DIDI-943)) | Diadem (dashboard automation)                                                |
-| M7             | Reduce log/trace sampling                                                                  | `head_sampling_rate` tuned; comment in Wrangler cites cost check date                                                                                                                                | Diadem (cost decision; open question 8)                                      |
-| M8             | Analytics Engine counters for exchange                                                     | Emit `exchange_outcome` counter by status class; `data-map.yml` updated for binding                                                                                                                  | Diadem (binding + data map)                                                  |
-| M9             | Status page (if approved)                                                                  | Hosted status page linked from internal runbook; subprocessors updated if vendor used                                                                                                                | CTO + Diadem                                                                 |
-| M10            | SLO dashboard                                                                              | Single Cloudflare dashboard or doc section showing 30d SLI vs targets                                                                                                                                |                                                                              |
-| M11            | Incident comms template                                                                    | [incident.md](./runbooks/incident.md): private owner email, status page when live, customer boilerplate ([DIDI-936](https://linear.app/didi-build/issue/DIDI-936))                                   | Pending: needs CTO and Diadem approval (customer email templates are drafts) |
-| M12            | Optional Logpush to R2                                                                     | Runbook or config for log export; privacy review for extended retention                                                                                                                              | CTO + Diadem                                                                 |
+| ID (suggested) | Title                                                                                      | Acceptance criterion                                                                                                                                                                                                                                                                                        | Owner approval                                                               |
+| -------------- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| M0             | Fix Workers Issues Wrangler key ([DIDI-860](https://linear.app/didi-build/issue/DIDI-860)) | `observability.issues.enabled` in app and both consumer wrangler configs; dashboard shows Issues after deploy                                                                                                                                                                                               |                                                                              |
+| M1             | Document probe slug runbook                                                                | [monitoring-probe.md](./runbooks/monitoring-probe.md): probe card via app editor only, never `cards:load` ([DIDI-936](https://linear.app/didi-build/issue/DIDI-936))                                                                                                                                        |                                                                              |
+| M2             | Add follow-up queue DLQ in Wrangler                                                        | `we-met-followup-email-dlq` bound; consumer config documents operator replay steps                                                                                                                                                                                                                          | Diadem (create queue in dashboard)                                           |
+| M3             | Cloudflare Monitor: follow-up backlog                                                      | [monitoring-alerts.md](./runbooks/monitoring-alerts.md#m3-follow-up-queue-backlog-high-for-30-minutes) completed in dashboard ([DIDI-943](https://linear.app/didi-build/issue/DIDI-943))                                                                                                                    | Diadem (notification email/webhook)                                          |
+| M4             | Cloudflare Monitor: warmup DLQ non-zero                                                    | [monitoring-alerts.md](./runbooks/monitoring-alerts.md#m4-warmup-dead-letter-queue-non-zero-for-15-minutes) completed in dashboard ([DIDI-943](https://linear.app/didi-build/issue/DIDI-943))                                                                                                               | Diadem                                                                       |
+| M5             | Synthetic check: card page                                                                 | External or Health Check on probe URL per [monitoring-probe.md](./runbooks/monitoring-probe.md); failure notifies per [alert-routing.md](./runbooks/alert-routing.md)                                                                                                                                       | Diadem (zone plan / Instatus account)                                        |
+| M6             | Workers Issues automation                                                                  | [monitoring-alerts.md](./runbooks/monitoring-alerts.md#m6-workers-issues-automation-title-and-dashboard-link-only) completed in dashboard ([DIDI-943](https://linear.app/didi-build/issue/DIDI-943))                                                                                                        | Diadem (dashboard automation)                                                |
+| M7             | Reduce log/trace sampling                                                                  | `head_sampling_rate` tuned; comment in Wrangler cites cost check date                                                                                                                                                                                                                                       | Diadem (cost decision; open question 8)                                      |
+| M8             | Analytics Engine counters for exchange                                                     | Emit `exchange_outcome` by status class (`2xx`, `4xx`, `429`, `5xx`, `kill-switch 503`, `cap_reached`, `cap_config_error`); same HTTP 503 for kill switch, cap reached, and cap config; `data-map.yml` updated ([3 months](https://developers.cloudflare.com/analytics/analytics-engine/limits/) retention) | Diadem (binding + data map)                                                  |
+| M9             | Status page (if approved)                                                                  | Hosted status page linked from internal runbook; subprocessors updated if vendor used                                                                                                                                                                                                                       | CTO + Diadem                                                                 |
+| M10            | SLO dashboard                                                                              | [Section 4.1](#41-slo-measurement-queries-m10) queries for 30d SLI vs targets (exchange uses Workers Analytics Engine SQL API with `_sample_interval` weighting)                                                                                                                                            |                                                                              |
+| M11            | Incident comms template                                                                    | [incident.md](./runbooks/incident.md): private owner email, status page when live, customer boilerplate ([DIDI-936](https://linear.app/didi-build/issue/DIDI-936))                                                                                                                                          | Pending: needs CTO and Diadem approval (customer email templates are drafts) |
+| M12            | Optional Logpush to R2                                                                     | Runbook or config for log export; privacy review for extended retention                                                                                                                                                                                                                                     | CTO + Diadem                                                                 |
 
 **Any PR that adopts Instatus, Better Stack, Sentry, or non-Cloudflare log storage** needs **CTO + Diadem** before merge, even if not listed above.
 
@@ -319,7 +394,7 @@ Plain questions for approval from a phone:
 8. Is **100% log/trace sampling** in production acceptable cost-wise after [Observability pricing changes on 2026-12-01](https://developers.cloudflare.com/observability/pricing/), or should we lower sampling in M7 first?
 9. Should exhausted follow-up messages get a **DLQ** (M2) so nothing is silently deleted after 30 retries?
 10. Any **compliance** need for log retention beyond **7 days** ([Workers Logs retention](https://developers.cloudflare.com/workers/observability/logs/workers-logs/#limits))?
-11. Do you accept the proposed **SLO targets** (99.9% card availability, 99.5% exchange acceptance, 99% owner email within 15 minutes) and the **deploy freeze** when the monthly error budget is spent?
+11. **Answered ([DIDI-861](https://linear.app/didi-build/issue/DIDI-861) 11b):** SLO targets accepted; **no deploy freeze** when the monthly error budget is spent (see [section 4](#4-proposed-slos-user-facing-flows)).
 
 ---
 

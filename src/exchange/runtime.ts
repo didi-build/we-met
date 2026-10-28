@@ -24,7 +24,7 @@ import type { R2Bucket } from "@cloudflare/workers-types";
 import type { TurnstileLogger } from "@/exchange/turnstile";
 import { createExchangeOwnerEmailStoreFromD1 } from "@/exchange-owner-email/d1-repository";
 import { createLeadDeliveryLedgerFromD1 } from "@/lead-delivery-ledger/d1-repository";
-import { assertLeadEmailCapacity } from "@/lead-email/availability";
+import { readLeadEmailCapacityCheck } from "@/lead-email/availability";
 import {
   incrementDailySendCounts,
   utcDayFromDate,
@@ -136,8 +136,8 @@ export async function createProcessExchangeDeps(
       const controls = await readLeadEmailControls(db);
       return controls.visitorEmailMode;
     },
-    assertLeadEmailCapacity: (cardId, needed) =>
-      assertLeadEmailCapacity(db, cardId, needed, now()),
+    checkLeadEmailCapacity: (cardId, needed) =>
+      readLeadEmailCapacityCheck(db, cardId, needed, now()),
     incrementDailySendCounts: (cardId, kinds) =>
       incrementDailySendCounts(db, utcDayFromDate(now()), cardId, kinds),
     logExchangeVisitorLetterEnqueueFailed: consoleExchangeVisitorLetterEnqueueFailed,
