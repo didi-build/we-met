@@ -306,21 +306,22 @@ Compare result to **0.999**.
 
 **SLI:** share of `POST /api/exchange` outcomes classified **2xx** among requests that count toward the SLO (excludes **429**, **kill-switch 503**, **cap_reached**, and honeypot fake 200; honeypot posts do not write Analytics Engine points; **cap_config_error** counts as a failure). Implemented in [`src/exchange/exchange-outcome-analytics.ts`](../src/exchange/exchange-outcome-analytics.ts) ([M8](#5-proposed-build-tickets), [DIDI-940](https://linear.app/didi-build/issue/DIDI-940)).
 
-**Production query** ([Workers Analytics Engine SQL API](/analytics/analytics-engine/sql-api/) on dataset `we-met-exchange-outcome`; use sample weights per [Analytics Engine limits](/analytics/analytics-engine/limits/)):
+**Production query** ([Workers Analytics Engine SQL API](https://developers.cloudflare.com/analytics/analytics-engine/sql-api/) on dataset `we-met-exchange-outcome`; use sample weights per [Analytics Engine limits](https://developers.cloudflare.com/analytics/analytics-engine/limits/)):
 
 ```sql
 SELECT
-  100.0 * SUM(CASE WHEN blob1 = '2xx' THEN _sample_interval * double1 ELSE 0 END)
-    / NULLIF(
-        SUM(
-          CASE
-            WHEN blob1 NOT IN ('429', 'kill-switch 503', 'cap_reached')
-            THEN _sample_interval * double1
-            ELSE 0
-          END
+  if(
+    sumIf(
+      _sample_interval * double1,
+      blob1 NOT IN ('429', 'kill-switch 503', 'cap_reached')
+    ) > 0,
+    100.0 * sumIf(_sample_interval * double1, blob1 = '2xx')
+      / sumIf(
+          _sample_interval * double1,
+          blob1 NOT IN ('429', 'kill-switch 503', 'cap_reached')
         ),
-        0
-      ) AS exchange_acceptance_pct
+    0
+  ) AS exchange_acceptance_pct
 FROM "we-met-exchange-outcome"
 WHERE index1 = 'exchange_outcome'
   AND timestamp > NOW() - INTERVAL '30' DAY

@@ -137,6 +137,32 @@ describe("POST /api/exchange analytics (integration)", () => {
     expectSingleOutcome("4xx");
   });
 
+  it("records 4xx when Turnstile verification fails", async () => {
+    routeMocks.processResult = { status: "turnstile_failed" };
+    const response = await POST(
+      new Request("https://we-met.link/api/exchange", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: validExchangeBody(),
+      }),
+    );
+    expect(response.status).toBe(403);
+    expectSingleOutcome("4xx");
+  });
+
+  it("records 4xx when the card is not found", async () => {
+    routeMocks.processResult = { status: "card_not_found" };
+    const response = await POST(
+      new Request("https://we-met.link/api/exchange", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: validExchangeBody(),
+      }),
+    );
+    expect(response.status).toBe(404);
+    expectSingleOutcome("4xx");
+  });
+
   it("records 2xx on success", async () => {
     const response = await POST(
       new Request("https://we-met.link/api/exchange", {

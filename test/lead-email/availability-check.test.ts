@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { exchangeOutcomeClassForLeadEmailDenial } from "@/exchange/exchange-outcome-analytics";
 import { checkLeadEmailCapacity } from "@/lead-email/availability";
 
 describe("checkLeadEmailCapacity (unit)", () => {
@@ -30,21 +29,27 @@ describe("checkLeadEmailCapacity (unit)", () => {
     ).toEqual({ allowed: false, reason: "cap_config_error" });
   });
 
+  it("allows exchange at exact global and per-card cap boundaries", () => {
+    expect(
+      checkLeadEmailCapacity(baseControls, { globalUsed: 148, cardUsed: 0 }, 2),
+    ).toEqual({ allowed: true });
+    expect(
+      checkLeadEmailCapacity(baseControls, { globalUsed: 149, cardUsed: 0 }, 1),
+    ).toEqual({ allowed: true });
+    expect(
+      checkLeadEmailCapacity(baseControls, { globalUsed: 0, cardUsed: 48 }, 2),
+    ).toEqual({ allowed: true });
+    expect(
+      checkLeadEmailCapacity(baseControls, { globalUsed: 0, cardUsed: 49 }, 1),
+    ).toEqual({ allowed: true });
+  });
+
   it("returns cap_reached when usage would exceed caps", () => {
     expect(
       checkLeadEmailCapacity(baseControls, { globalUsed: 149, cardUsed: 0 }, 2),
     ).toEqual({ allowed: false, reason: "cap_reached" });
-  });
-});
-
-describe("exchangeOutcomeClassForLeadEmailDenial (unit)", () => {
-  it("maps denial reasons to Analytics Engine status classes", () => {
-    expect(exchangeOutcomeClassForLeadEmailDenial("kill_switch")).toBe(
-      "kill-switch 503",
-    );
-    expect(exchangeOutcomeClassForLeadEmailDenial("cap_reached")).toBe("cap_reached");
-    expect(exchangeOutcomeClassForLeadEmailDenial("cap_config_error")).toBe(
-      "cap_config_error",
-    );
+    expect(
+      checkLeadEmailCapacity(baseControls, { globalUsed: 0, cardUsed: 49 }, 2),
+    ).toEqual({ allowed: false, reason: "cap_reached" });
   });
 });

@@ -48,13 +48,3 @@ export async function readLeadEmailCapacityCheck(
   };
   return checkLeadEmailCapacity(controls, usage, needed);
 }
-
-export async function assertLeadEmailCapacity(
-  db: D1Database,
-  cardId: string,
-  needed: number,
-  now: Date,
-): Promise<boolean> {
-  const check = await readLeadEmailCapacityCheck(db, cardId, needed, now);
-  return check.allowed;
-}
