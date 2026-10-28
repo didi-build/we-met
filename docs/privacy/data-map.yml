@@ -700,6 +700,24 @@ other_items:
       https://developers.cloudflare.com/email-service/observability/metrics-analytics/;
       https://developers.cloudflare.com/email-service/observability/logs/
     verified: false
+  - id: binding.we_met_exchange_outcome_analytics
+    binding: WE_MET_EXCHANGE_OUTCOME_ANALYTICS
+    whose: operational
+    data: Workers Analytics Engine datapoint per POST /api/exchange (except honeypot
+      bot posts, which are omitted to match the exchange acceptance SLI). index1
+      exchange_outcome; blob1 status class only (2xx, 4xx, 429, 5xx, kill-switch
+      503); double1 counter 1. No visitor, card, slug, or IP dimensions.
+    purpose: production monitoring exchange acceptance SLI (monitoring plan M8)
+    storage: Cloudflare Workers Analytics Engine dataset (production
+      we-met-exchange-outcome; staging we-met-exchange-outcome-staging; preview
+      we-met-exchange-outcome-preview in wrangler configs)
+    processors:
+      - Cloudflare
+    retention: unknown (Workers Analytics Engine retention not documented in repo)
+    who_can_see: operator
+    source: src/exchange/exchange-outcome-analytics.ts; wrangler.jsonc;
+      wrangler.staging.jsonc
+    verified: false
   - id: binding.worker_assets
     binding: ASSETS
     whose: operational

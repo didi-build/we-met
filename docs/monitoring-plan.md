@@ -22,7 +22,7 @@ Sources: committed Wrangler configs, [`.github/workflows/deploy-production.yml`]
 
 All three set `workers_dev: false` and have no public Workers.dev URL for the consumer or warmup Worker ([environments](./architecture/environments.md)).
 
-**App Worker bindings (production):** D1 `we-met-db` (`WE_MET_DB`), R2 `we-met-assets` (`WE_MET_ASSETS`), queue producer `we-met-followup-email` (`WE_MET_FOLLOWUP_EMAIL_QUEUE`), rate limiters (exchange **2002**, auth **2004**, app **2006**), Images, and `WORKER_SELF_REFERENCE` ([`wrangler.jsonc`](../wrangler.jsonc)).
+**App Worker bindings (production):** D1 `we-met-db` (`WE_MET_DB`), R2 `we-met-assets` (`WE_MET_ASSETS`), queue producer `we-met-followup-email` (`WE_MET_FOLLOWUP_EMAIL_QUEUE`), Analytics Engine `we-met-exchange-outcome` (`WE_MET_EXCHANGE_OUTCOME_ANALYTICS`), rate limiters (exchange **2002**, auth **2004**, app **2006**), Images, and `WORKER_SELF_REFERENCE` ([`wrangler.jsonc`](../wrangler.jsonc)).
 
 **Follow-up consumer bindings:** same D1 and R2 names, `send_email` as `EMAIL` with `allowed_sender_addresses: ["hello@mail.we-met.link"]`, consumes `we-met-followup-email` with `max_retries: 30`, `retry_delay: 30`, `max_batch_size: 5` ([`wrangler.production.jsonc`](../workers/we-met-followup-email-consumer/wrangler.production.jsonc), [0023](./decisions/0023-owner-email-lead-sink-consumer.md)).
 
@@ -271,7 +271,78 @@ Rolling **30-day** window; measured from **synthetic + Workers analytics** (not 
 
 **Not an SLO (operational guardrails):** warmup send caps, `lead_email_enabled`, Turnstile pass rate.
 
-When an SLO budget is exhausted in a month, proposed policy: **freeze non-urgent production deploys** and prioritize reliability tickets ([error budget policy](https://sre.google/workbook/error-budget-policy/)). **Diadem must confirm** targets and freeze rules (open question §6).
+When an SLO budget is exhausted in a month, the draft plan proposed **freeze non-urgent production deploys** and prioritize reliability tickets ([error budget policy](https://sre.google/workbook/error-budget-policy/)). **Diadem confirmed the SLO targets with no deploy freeze** ([DIDI-861](https://linear.app/didi-build/issue/DIDI-861), answer 11b, Oct 25, 2026). See [section 4.1](#41-slo-measurement-queries-m10) for measurement queries.
+
+---
+
+## 4.1 SLO measurement queries (M10)
+
+Rolling **30-day** window. Targets match [section 4](#4-proposed-slos-user-facing-flows). **Error budget policy:** no deploy freeze when a monthly budget is spent (Diadem, [DIDI-861](https://linear.app/didi-build/issue/DIDI-861) 11b).
+
+Run production SLI math against **production** datasets and D1 only (`we-met-db`). Staging and preview use their own Analytics Engine dataset names in [`wrangler.staging.jsonc`](../wrangler.staging.jsonc) and the [`wrangler.jsonc`](../wrangler.jsonc) `previews` block.
+
+### Card availability (target 99.9%)
+
+**SLI:** share of successful synthetic `GET https://we-met.link/hi/<probe-slug>` checks (HTTP 200 and body contains the probe marker). Source: external monitor or Cloudflare Health Check (M5), not Workers Analytics Engine.
+
+**Example (operator monitor export):**
+
+```text
+successful_probe_checks / total_probe_checks
+WHERE check_target = probe_slug_url AND window = last_30_days
+```
+
+Compare result to **0.999**.
+
+### Exchange acceptance (target 99.5%)
+
+**SLI:** share of `POST /api/exchange` outcomes classified **2xx** among requests that count toward the SLO (excludes **429**, **kill-switch 503**, and honeypot fake 200; honeypot posts do not write Analytics Engine points). Implemented in [`src/exchange/exchange-outcome-analytics.ts`](../src/exchange/exchange-outcome-analytics.ts) ([M8](#5-proposed-build-tickets), [DIDI-940](https://linear.app/didi-build/issue/DIDI-940)).
+
+**Production query** (Workers Analytics Engine SQL API on dataset `we-met-exchange-outcome`):
+
+```sql
+SELECT
+  100.0 * SUM(CASE WHEN blob1 = '2xx' THEN double1 ELSE 0 END)
+    / NULLIF(
+        SUM(
+          CASE
+            WHEN blob1 NOT IN ('429', 'kill-switch 503') THEN double1
+            ELSE 0
+          END
+        ),
+        0
+      ) AS exchange_acceptance_pct
+FROM events.analyticsEngine."we-met-exchange-outcome"
+WHERE index1 = 'exchange_outcome'
+  AND timestamp >= NOW() - INTERVAL '30' DAY
+```
+
+Compare `exchange_acceptance_pct` to **99.5**.
+
+### Owner email timeliness (target 99% within 15 minutes)
+
+**SLI:** among successful exchanges, share where the owner email sink **record** phase reaches `lead_delivery_ledger.status = 'sent'` within **15 minutes** of `created_at`. Source: production D1 (`we-met-db`), not Analytics Engine.
+
+**Example query** (run in D1 SQL console or approved tooling; metadata only, no visitor PII in ledger rows):
+
+```sql
+SELECT
+  100.0 * SUM(
+    CASE
+      WHEN status = 'sent'
+        AND sent_at IS NOT NULL
+        AND (julianday(sent_at) - julianday(created_at)) * 1440.0 <= 15
+      THEN 1
+      ELSE 0
+    END
+  ) / NULLIF(COUNT(*), 0) AS owner_email_timely_pct
+FROM lead_delivery_ledger
+WHERE phase = 'record'
+  AND sink_kind = 'email'
+  AND created_at >= datetime('now', '-30 days')
+```
+
+Compare `owner_email_timely_pct` to **99.0**.
 
 ---
 

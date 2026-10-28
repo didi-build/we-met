@@ -6,27 +6,34 @@ import { clientIpFromHeaders } from "@/exchange/client-ip";
 import { processExchange } from "@/exchange/process-exchange";
 import { createProcessExchangeDeps } from "@/exchange/runtime";
 import { parseExchangeBody } from "@/exchange/validation";
+import { recordExchangeOutcomeFromResponse } from "@/exchange/exchange-outcome-analytics";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 
 export async function POST(request: Request) {
+  const { env } = await getCloudflareContext({ async: true });
+
   let body: unknown;
   try {
     body = await request.json();
   } catch {
-    return Response.json({ error: "invalid_input" }, { status: 400 });
+    const response = Response.json({ error: "invalid_input" }, { status: 400 });
+    await recordExchangeOutcomeFromResponse(env, response);
+    return response;
   }
 
   const parsed = parseExchangeBody(body);
   if (!parsed.ok) {
-    return Response.json({ error: "invalid_input" }, { status: 400 });
+    const response = Response.json({ error: "invalid_input" }, { status: 400 });
+    await recordExchangeOutcomeFromResponse(env, response);
+    return response;
   }
   if ("honeypot" in parsed) {
+    // Honeypot fake 200 is excluded from the exchange acceptance SLI (monitoring plan section 4).
     return Response.json({ token: "" }, { status: 200 });
   }
 
   const headerList = await headers();
   const hostname = headerList.get("host") ?? "localhost";
-  const { env } = await getCloudflareContext({ async: true });
   const hostConfig = readWeMetHostConfig(env);
   if (!isCardServingHost(hostname, hostConfig)) {
     return Response.json({ error: "card_not_found" }, { status: 404 });
@@ -45,20 +52,29 @@ export async function POST(request: Request) {
   const deps = await createProcessExchangeDeps(clientIp);
   const result = await processExchange(exchangeInput, card, sinks, deps);
 
+  let response: Response;
   switch (result.status) {
     case "success":
-      return Response.json(result.body, { status: 200 });
+      response = Response.json(result.body, { status: 200 });
+      break;
     case "turnstile_failed":
-      return Response.json({ error: "turnstile_failed" }, { status: 403 });
+      response = Response.json({ error: "turnstile_failed" }, { status: 403 });
+      break;
     case "rate_limited":
-      return Response.json({ error: "rate_limited" }, { status: 429 });
+      response = Response.json({ error: "rate_limited" }, { status: 429 });
+      break;
     case "card_not_found":
-      return Response.json({ error: "card_not_found" }, { status: 404 });
+      response = Response.json({ error: "card_not_found" }, { status: 404 });
+      break;
     case "lead_email_unavailable":
-      return Response.json({ error: "lead_email_unavailable" }, { status: 503 });
+      response = Response.json({ error: "lead_email_unavailable" }, { status: 503 });
+      break;
     case "enqueue_failed":
-      return Response.json({ error: "server_error" }, { status: 500 });
+      response = Response.json({ error: "server_error" }, { status: 500 });
+      break;
     default:
-      return Response.json({ error: "server_error" }, { status: 500 });
+      response = Response.json({ error: "server_error" }, { status: 500 });
   }
+  await recordExchangeOutcomeFromResponse(env, response);
+  return response;
 }
