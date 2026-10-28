@@ -15,15 +15,58 @@ import { ensureAppApiHost, readAppAuthBindings } from "@/app-auth/route-context"
 import { createSession } from "@/app-auth/sessions";
 import { headers } from "next/headers";
 
-export async function POST(request: Request) {
+async function previewLoginRouteGuard(): Promise<
+  Response | Awaited<ReturnType<typeof readAppAuthBindings>>
+> {
   const ctx = await readAppAuthBindings();
   if (!ensureAppApiHost(ctx.hostname, ctx.hostConfig)) {
     return apiNotFound();
   }
-
   if (!isPreviewLoginRouteEnabled(ctx.env)) {
     return apiNotFound();
   }
+  return ctx;
+}
+
+async function previewLoginNonPostResponse(): Promise<Response> {
+  const guardResult = await previewLoginRouteGuard();
+  if (guardResult instanceof Response) {
+    return guardResult;
+  }
+  // Preview login is POST-only; app API host and env already passed the guard.
+  return apiNotFound();
+}
+
+export async function GET() {
+  return previewLoginNonPostResponse();
+}
+
+export async function HEAD() {
+  return previewLoginNonPostResponse();
+}
+
+export async function PUT() {
+  return previewLoginNonPostResponse();
+}
+
+export async function PATCH() {
+  return previewLoginNonPostResponse();
+}
+
+export async function DELETE() {
+  return previewLoginNonPostResponse();
+}
+
+export async function OPTIONS() {
+  return previewLoginNonPostResponse();
+}
+
+export async function POST(request: Request) {
+  const guardResult = await previewLoginRouteGuard();
+  if (guardResult instanceof Response) {
+    return guardResult;
+  }
+  const ctx = guardResult;
 
   const headerList = await headers();
   const allowed = await ctx.authRateLimiter.check(
@@ -34,14 +77,14 @@ export async function POST(request: Request) {
     return apiError("rate-limited", 429);
   }
 
-  const blocked = guardMutationRequest(
+  const mutationBlocked = guardMutationRequest(
     request,
     ctx.hostConfig,
     ctx.env,
     "application/json",
   );
-  if (blocked) {
-    return blocked;
+  if (mutationBlocked) {
+    return mutationBlocked;
   }
 
   let body: unknown;
