@@ -53,12 +53,10 @@ jobs:
         run: node scripts/check-deploy-guards.mjs --target staging --config wrangler.staging.ci.jsonc
       - name: Activate waitlisted account in non-prod D1
         env:
-          ACTIVATE_EMAIL: ${{ inputs.email }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_STAGING }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           WE_MET_D1_DATABASE_ID_NONPROD: ${{ secrets.WE_MET_D1_DATABASE_ID_NONPROD }}
         run: |
           set -euo pipefail
           node scripts/activate-staging-account.mjs \
-            --email "$ACTIVATE_EMAIL" \
             --config wrangler.staging.ci.jsonc

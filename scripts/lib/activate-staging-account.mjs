@@ -81,6 +81,69 @@ export function validateActivationEmail(raw) {
 }
 
 /**
+ * @param {string | undefined} eventPath
+ * @param {(path: string, encoding: BufferEncoding) => string} [readFile]
+ * @returns {{ ok: true; email: string } | { ok: false; reason: string }}
+ */
+export function readWorkflowDispatchEmailFromGithubEvent(
+  eventPath,
+  readFile = readFileSync,
+) {
+  if (!eventPath || typeof eventPath !== "string") {
+    return { ok: false, reason: "GITHUB_EVENT_PATH is missing" };
+  }
+  try {
+    const parsed = JSON.parse(readFile(eventPath, "utf8"));
+    const email = parsed?.inputs?.email;
+    if (typeof email !== "string" || email.trim().length === 0) {
+      return { ok: false, reason: "workflow dispatch email input is missing" };
+    }
+    return { ok: true, email: email.trim() };
+  } catch {
+    return { ok: false, reason: "could not read GITHUB_EVENT_PATH" };
+  }
+}
+
+/**
+ * @param {string | undefined} cliEmail
+ * @param {NodeJS.ProcessEnv} env
+ * @param {(path: string, encoding: BufferEncoding) => string} [readFile]
+ * @returns {{
+ *   ok: true;
+ *   email: string;
+ *   maskDispatchEmailFirst: boolean;
+ * } | { ok: false; reason: string }}
+ */
+export function resolveActivationEmailSource(cliEmail, env, readFile = readFileSync) {
+  if (cliEmail) {
+    return { ok: true, email: cliEmail, maskDispatchEmailFirst: false };
+  }
+  const fromEvent = readWorkflowDispatchEmailFromGithubEvent(
+    env.GITHUB_EVENT_PATH,
+    readFile,
+  );
+  if (!fromEvent.ok) {
+    return fromEvent;
+  }
+  return {
+    ok: true,
+    email: fromEvent.email,
+    maskDispatchEmailFirst: true,
+  };
+}
+
+/**
+ * @param {string} email
+ * @param {(line: string) => void} [logLine]
+ */
+export function logActivationEmailMaskLine(
+  email,
+  logLine = (line) => console.log(line),
+) {
+  logLine(`::add-mask::${email}`);
+}
+
+/**
  * @param {unknown} parsed
  * @param {string} expectedDatabaseId
  * @returns {{ ok: true } | { ok: false; reason: string }}

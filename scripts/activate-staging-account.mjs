@@ -3,7 +3,10 @@
  * Activate a waitlisted staging account in we-met-db-nonprod (GitHub Actions only).
  *
  * Usage:
+ *   node scripts/activate-staging-account.mjs --config wrangler.staging.ci.jsonc
  *   node scripts/activate-staging-account.mjs --email <email> --config wrangler.staging.ci.jsonc
+ *
+ * Without --email, reads workflow_dispatch inputs.email from GITHUB_EVENT_PATH (CI only).
  *
  * Requires CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, and WE_MET_D1_DATABASE_ID_NONPROD.
  */
@@ -14,17 +17,26 @@ import {
   assertWranglerConfigTargetsNonprodD1,
   buildActivationUpdateCommand,
   buildWranglerD1ExecuteArgv,
+  logActivationEmailMaskLine,
   maskActivationEmailForLogs,
   maskD1DatabaseId,
   parseWranglerD1ExecuteRowChanges,
+  readWorkflowDispatchEmailFromGithubEvent,
+  resolveActivationEmailSource,
   resolveActivationRowOutcome,
   validateActivationEmail,
   WRANGLER_D1_EXECUTE_SPAWN_OPTIONS,
 } from "./lib/activate-staging-account.mjs";
 
+export {
+  logActivationEmailMaskLine,
+  readWorkflowDispatchEmailFromGithubEvent,
+  resolveActivationEmailSource,
+};
+
 function usage() {
   console.error(
-    "Usage: activate-staging-account.mjs --email <email> --config <wrangler.jsonc>",
+    "Usage: activate-staging-account.mjs --config <wrangler.jsonc> [--email <email>]",
   );
   process.exit(1);
 }
@@ -135,12 +147,53 @@ export function runActivation(options) {
   return 1;
 }
 
+/**
+ * @param {{
+ *   cliEmail?: string;
+ *   config: string;
+ *   env?: NodeJS.ProcessEnv;
+ *   readEventFile?: (path: string, encoding: BufferEncoding) => string;
+ *   logLine?: (line: string) => void;
+ *   logError?: (line: string) => void;
+ * } & Omit<Parameters<typeof runActivation>[0], "email" | "config">
+ * } options
+ * @returns {number}
+ */
+export function runActivationFromCliOrEvent(options) {
+  const {
+    cliEmail,
+    config,
+    env = process.env,
+    readEventFile,
+    logLine = (line) => console.log(line),
+    logError = (line) => console.error(line),
+    ...runOptions
+  } = options;
+
+  const resolved = resolveActivationEmailSource(cliEmail, env, readEventFile);
+  if (!resolved.ok) {
+    logError(`Activation email rejected: ${resolved.reason}`);
+    return 1;
+  }
+  if (resolved.maskDispatchEmailFirst) {
+    logActivationEmailMaskLine(resolved.email, logLine);
+  }
+  return runActivation({
+    ...runOptions,
+    email: resolved.email,
+    config,
+    env,
+    onLog: runOptions.onLog ?? logLine,
+    onError: runOptions.onError ?? logError,
+  });
+}
+
 function main() {
-  const { email, config } = parseArgs(process.argv.slice(2));
-  if (!email || !config) {
+  const { email: cliEmail, config } = parseArgs(process.argv.slice(2));
+  if (!config) {
     usage();
   }
-  process.exit(runActivation({ email, config }));
+  process.exit(runActivationFromCliOrEvent({ cliEmail, config }));
 }
 
 const isMain =

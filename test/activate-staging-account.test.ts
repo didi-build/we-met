@@ -3,7 +3,10 @@ import type { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { runActivation } from "../scripts/activate-staging-account.mjs";
+import {
+  runActivation,
+  runActivationFromCliOrEvent,
+} from "../scripts/activate-staging-account.mjs";
 import {
   ACTIVATION_D1_BINDING,
   ACTIVATION_D1_DATABASE_NAME,
@@ -533,6 +536,33 @@ describe("runActivation (unit)", () => {
   });
 });
 
+describe("runActivationFromCliOrEvent (unit)", () => {
+  it("masks dispatch email before any other stdout when --email is omitted", () => {
+    const eventPath = join(tmpdir(), "github-event.json");
+    writeFileSync(eventPath, JSON.stringify({ inputs: { email: "test@example.com" } }));
+    const stdoutLines: string[] = [];
+    const logLine = (line: string) => {
+      stdoutLines.push(line);
+    };
+    runActivationFromCliOrEvent({
+      config: validWranglerConfig(),
+      env: testEnv({ GITHUB_EVENT_PATH: eventPath }),
+      readEventFile: () => JSON.stringify({ inputs: { email: "test@example.com" } }),
+      logLine,
+      logError: () => {},
+      spawnSyncFn: mockSpawn(() => ({
+        status: 0,
+        stdout: wranglerSuccessStdout(1),
+        stderr: "",
+      })),
+      maskD1DatabaseIdFn: () => {},
+      maskActivationEmailForLogsFn: () => {},
+      now: () => new Date("2026-10-28T12:00:00.000Z"),
+    });
+    expect(stdoutLines[0]).toBe("::add-mask::test@example.com");
+  });
+});
+
 describe("Activate staging account workflow structure (unit)", () => {
   const workflow = readFileSync(
     ".github/workflows/activate-staging-account.yml",
@@ -572,6 +602,11 @@ describe("Activate staging account workflow structure (unit)", () => {
     expect(workflow).toContain(
       "check-deploy-guards.mjs --target staging --config wrangler.staging.ci.jsonc",
     );
+  });
+
+  it("does not reference workflow inputs.email expressions", () => {
+    expect(workflow).not.toContain("inputs.email");
+    expect(workflow).not.toContain("ACTIVATE_EMAIL");
   });
 
   it("does not interpolate workflow inputs or secrets inside run scripts", () => {
