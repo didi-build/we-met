@@ -18,10 +18,7 @@ import {
   WRANGLER_D1_EXECUTE_SPAWN_OPTIONS,
 } from "../scripts/lib/activate-staging-account.mjs";
 import { D1_PLACEHOLDER_PRODUCTION } from "../scripts/lib/wrangler-placeholders.mjs";
-import {
-  extractWorkflowPermissionsMaps,
-  permissionsMapEquals,
-} from "../scripts/lib/workflow-permissions-parse.mjs";
+import { workflowPermissionsAllowOnly } from "../scripts/lib/workflow-permissions-parse.mjs";
 
 const EXPECTED_D1_ID = "11111111-2222-3333-4444-555555555555";
 
@@ -36,6 +33,55 @@ function mockSpawn(
   impl: () => { status: number; stdout: string; stderr: string },
 ): typeof spawnSync {
   return vi.fn(impl) as unknown as typeof spawnSync;
+}
+
+function captureIo() {
+  const stdout: unknown[] = [];
+  const stderr: unknown[] = [];
+  const consoleCalls: { method: string; args: unknown[] }[] = [];
+  const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+    stdout.push(chunk);
+    return true;
+  });
+  const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+    stderr.push(chunk);
+    return true;
+  });
+  for (const method of ["log", "info", "warn", "error"] as const) {
+    vi.spyOn(console, method).mockImplementation((...args: unknown[]) => {
+      consoleCalls.push({ method, args });
+    });
+  }
+  return {
+    stdout,
+    stderr,
+    consoleCalls,
+    allText() {
+      return [
+        ...stdout.map(String),
+        ...stderr.map(String),
+        ...consoleCalls.flatMap((entry) => entry.args.map(String)),
+      ].join("\n");
+    },
+    restore() {
+      stdoutSpy.mockRestore();
+      stderrSpy.mockRestore();
+      vi.restoreAllMocks();
+    },
+  };
+}
+
+function expectIoExcludesWranglerAndRawEmail(
+  io: ReturnType<typeof captureIo>,
+  rawEmail: string,
+  wranglerPayload: string,
+) {
+  const text = io.allText();
+  expect(text).not.toContain(wranglerPayload);
+  expect(text.toLowerCase()).not.toContain(rawEmail.toLowerCase());
+  if (rawEmail !== rawEmail.toLowerCase()) {
+    expect(text).not.toContain(rawEmail);
+  }
 }
 
 function writeWranglerConfig(config: Record<string, unknown>) {
@@ -90,6 +136,22 @@ describe("validateActivationEmail (unit)", () => {
     expect(validateActivationEmail("a..b@c.co").ok).toBe(false);
     expect(validateActivationEmail("-a@b.co").ok).toBe(false);
     expect(validateActivationEmail("+@b.co").ok).toBe(false);
+    expect(validateActivationEmail("a@-b.co").ok).toBe(false);
+    expect(validateActivationEmail("a@b-.co").ok).toBe(false);
+    expect(validateActivationEmail("a@b.-c.co").ok).toBe(false);
+  });
+
+  it("rejects punycode domains and overlong labels", () => {
+    expect(validateActivationEmail("user@xn--abc.example.com").ok).toBe(false);
+    const longLabel = "a".repeat(64);
+    expect(validateActivationEmail(`user@${longLabel}.example.com`).ok).toBe(false);
+  });
+
+  it("rejects overlong local part and whole address", () => {
+    const longLocal = `${"a".repeat(65)}@example.com`;
+    expect(validateActivationEmail(longLocal).ok).toBe(false);
+    const longEmail = `${"a".repeat(243)}@example.com`;
+    expect(validateActivationEmail(longEmail).ok).toBe(false);
   });
 
   it("rejects SQL injection attempts", () => {
@@ -183,6 +245,25 @@ describe("assertWranglerConfigD1Binding (unit)", () => {
       ).ok,
     ).toBe(false);
   });
+
+  it("refuses missing database_id", () => {
+    const parsed = {
+      d1_databases: [
+        {
+          binding: ACTIVATION_D1_BINDING,
+          database_name: ACTIVATION_D1_DATABASE_NAME,
+        },
+      ],
+    };
+    expect(assertWranglerConfigD1Binding(parsed, EXPECTED_D1_ID).ok).toBe(false);
+  });
+
+  it("refuses unreadable config paths", () => {
+    const missing = join(tmpdir(), "activate-staging-missing-config.jsonc");
+    expect(assertWranglerConfigTargetsNonprodD1(missing, EXPECTED_D1_ID).ok).toBe(
+      false,
+    );
+  });
 });
 
 describe("buildActivationUpdateCommand (unit)", () => {
@@ -192,6 +273,20 @@ describe("buildActivationUpdateCommand (unit)", () => {
   it("places email only in the WHERE string literal", () => {
     const sql = buildActivationUpdateCommand(email, iso);
     expect(emailAppearsOnlyInWhereLiteral(sql, email)).toBe(true);
+  });
+
+  it("limits UPDATE to waitlisted and active rows", () => {
+    const sql = buildActivationUpdateCommand(email, iso);
+    expect(sql).toContain("AND status IN ('waitlisted', 'active')");
+  });
+});
+
+describe("buildWranglerD1ExecuteArgv (unit)", () => {
+  it("targets remote non-prod binding with JSON output", () => {
+    const argv = buildWranglerD1ExecuteArgv("wrangler.staging.ci.jsonc", "SELECT 1;");
+    expect(argv).toContain("--remote");
+    expect(argv).toContain("--json");
+    expect(argv).toContain(ACTIVATION_D1_BINDING);
   });
 });
 
@@ -295,31 +390,103 @@ describe("runActivation (unit)", () => {
     expect(code).toBe(1);
   });
 
-  it("does not forward wrangler stdout to the console", () => {
+  it("does not forward wrangler stdout or stderr through process or console sinks", () => {
     const configPath = validWranglerConfig();
-    const secretPayload = "leaked-from-wrangler@example.com";
-    const logs: string[] = [];
+    const wranglerPayload = "leaked-from-wrangler@example.com";
+    const rawEmail = "Operator@Example.com";
+    const io = captureIo();
+    try {
+      runActivation({
+        email: rawEmail,
+        config: configPath,
+        env: testEnv(),
+        spawnSyncFn: mockSpawn(() => ({
+          status: 0,
+          stdout: JSON.stringify([
+            {
+              success: true,
+              meta: { changes: 1 },
+              debug: wranglerPayload,
+            },
+          ]),
+          stderr: "stderr-noise-from-wrangler",
+        })),
+        now: () => new Date("2026-10-28T12:00:00.000Z"),
+        maskD1DatabaseIdFn: () => {},
+        maskActivationEmailForLogsFn: () => {},
+      });
+      expectIoExcludesWranglerAndRawEmail(io, rawEmail, wranglerPayload);
+      expect(io.allText()).not.toContain("stderr-noise-from-wrangler");
+    } finally {
+      io.restore();
+    }
+  });
+
+  it("rejects invalid email before spawn is called", () => {
+    const spawnSyncFn = vi.fn();
+    const io = captureIo();
+    try {
+      const code = runActivation({
+        email: "not-an-email",
+        config: validWranglerConfig(),
+        env: testEnv(),
+        spawnSyncFn,
+        maskD1DatabaseIdFn: () => {},
+        maskActivationEmailForLogsFn: () => {},
+      });
+      expect(code).toBe(1);
+      expect(spawnSyncFn).not.toHaveBeenCalled();
+    } finally {
+      io.restore();
+    }
+  });
+
+  it("uses the normalized email in wrangler SQL argv", () => {
+    const configPath = validWranglerConfig();
+    const spawnSyncFn = mockSpawn(() => ({
+      status: 0,
+      stdout: wranglerSuccessStdout(1),
+      stderr: "",
+    }));
     runActivation({
-      email: "user@example.com",
+      email: "Operator@Example.com",
       config: configPath,
       env: testEnv(),
-      spawnSyncFn: mockSpawn(() => ({
-        status: 0,
-        stdout: JSON.stringify([
-          {
-            success: true,
-            meta: { changes: 1 },
-            debug: secretPayload,
-          },
-        ]),
-        stderr: "stderr noise",
-      })),
+      spawnSyncFn,
+      now: () => new Date("2026-10-28T12:00:00.000Z"),
       maskD1DatabaseIdFn: () => {},
       maskActivationEmailForLogsFn: () => {},
-      onLog: (msg) => logs.push(msg),
     });
-    expect(logs.join("\n")).not.toContain(secretPayload);
-    expect(logs.join("\n")).not.toContain("stderr noise");
+    const argv = vi.mocked(spawnSyncFn).mock.calls[0]?.[1] as string[] | undefined;
+    const sql = argv?.[argv.indexOf("--command") + 1];
+    expect(sql).toContain("operator@example.com");
+    expect(sql).not.toContain("Operator@Example.com");
+  });
+
+  it("reports a safe wrangler failure with exit code only", () => {
+    const io = captureIo();
+    try {
+      const code = runActivation({
+        email: "user@example.com",
+        config: validWranglerConfig(),
+        env: testEnv(),
+        spawnSyncFn: mockSpawn(() => ({
+          status: 42,
+          stdout: "secret-d1-id-in-wrangler-output",
+          stderr: "operator@example.com leaked",
+        })),
+        maskD1DatabaseIdFn: () => {},
+        maskActivationEmailForLogsFn: () => {},
+      });
+      expect(code).toBe(42);
+      expect(io.allText()).toContain(
+        "Staging account activation failed: database command error (exit 42).",
+      );
+      expect(io.allText()).not.toContain("secret-d1-id-in-wrangler-output");
+      expect(io.allText()).not.toContain("operator@example.com leaked");
+    } finally {
+      io.restore();
+    }
   });
 
   it("masks the operator email before D1 execute", () => {
@@ -379,11 +546,14 @@ describe("Activate staging account workflow structure (unit)", () => {
   });
 
   it("limits permissions to exactly contents read at every level", () => {
-    const maps = extractWorkflowPermissionsMaps(workflow);
-    expect(maps.length).toBeGreaterThan(0);
-    for (const map of maps) {
-      expect(permissionsMapEquals(map, { contents: "read" })).toBe(true);
-    }
+    expect(workflowPermissionsAllowOnly(workflow, { contents: "read" })).toBe(true);
+  });
+
+  it("checks out main only after the step-level main ref guard", () => {
+    expect(workflow).toContain("name: Require main branch ref");
+    expect(workflow).toMatch(
+      /name: Require main branch ref[\s\S]*?\$\{GITHUB_REF\}" != "refs\/heads\/main"[\s\S]*?exit 1/,
+    );
   });
 
   it("requires main ref, staging environment, timeout, and main checkout", () => {

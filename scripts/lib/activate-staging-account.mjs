@@ -66,6 +66,17 @@ export function validateActivationEmail(raw) {
   if (!/^[a-zA-Z0-9]/.test(local)) {
     return { ok: false, reason: "email local part has invalid leading character" };
   }
+  if (domain.includes("xn--")) {
+    return { ok: false, reason: "email domain punycode (xn--) is not allowed" };
+  }
+  for (const label of domain.split(".")) {
+    if (label.length === 0 || label.length > 63) {
+      return { ok: false, reason: "email domain label length is invalid" };
+    }
+    if (label.startsWith("-") || label.endsWith("-")) {
+      return { ok: false, reason: "email domain label has invalid hyphens" };
+    }
+  }
   return { ok: true, normalized: email.toLowerCase() };
 }
 
@@ -112,6 +123,9 @@ export function assertWranglerConfigD1Binding(parsed, expectedDatabaseId) {
     };
   }
   const id = entry?.database_id;
+  if (!id || typeof id !== "string" || id.trim() === "") {
+    return { ok: false, reason: "D1 database_id is missing" };
+  }
   if (id === D1_PLACEHOLDER_PRODUCTION) {
     return { ok: false, reason: "refusing production D1 placeholder database_id" };
   }

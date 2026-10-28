@@ -118,8 +118,11 @@ export function runActivation(options) {
   const result = spawnSyncFn("npx", wranglerArgv, WRANGLER_D1_EXECUTE_SPAWN_OPTIONS);
 
   if (result.status !== 0) {
-    onError("Staging account activation failed: database command error.");
-    return result.status ?? 1;
+    const exitCode = result.status ?? 1;
+    onError(
+      `Staging account activation failed: database command error (exit ${exitCode}).`,
+    );
+    return exitCode;
   }
 
   const changes = parseWranglerD1ExecuteRowChanges(result.stdout ?? "");
