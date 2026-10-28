@@ -124,6 +124,8 @@ describe("privacy and terms pages (unit)", () => {
         /In this default mode, we email the follow-up letter to you, not to them\. When you hit Reply, they get it from your own inbox, with your name, role and photo, and your contact card, ready to save\. The contact card uses your full Google name and includes your Google account email address, your phone number if you added one, and the links on your card\./,
       ),
     ).toBeTruthy();
+    expect(screen.queryByText(/does not expire/)).toBeNull();
+    expect(screen.queryByText(/forwarded to/)).toBeNull();
   });
 
   it("discloses visitor receipt screen and default email wording (DIDI-924)", () => {
@@ -144,6 +146,39 @@ describe("privacy and terms pages (unit)", () => {
         /By default, we don't email them your contact card or your Google account email address;/,
       ),
     ).toBeNull();
+  });
+
+  it("orders paragraphs in What the people you meet can see", () => {
+    render(<PrivacyPolicyContent />);
+
+    const heading = screen.getByRole("heading", {
+      level: 2,
+      name: "What the people you meet can see",
+    });
+    const paragraphs: HTMLElement[] = [];
+    let el = heading.nextElementSibling;
+    while (el && el.tagName !== "H2") {
+      if (el.tagName === "P") {
+        paragraphs.push(el as HTMLElement);
+      }
+      el = el.nextElementSibling;
+    }
+
+    expect(paragraphs).toHaveLength(6);
+    expect(paragraphs[0]?.textContent).toMatch(/don't email them anything/);
+    expect(paragraphs[1]?.textContent).toMatch(/In this default mode/);
+    expect(paragraphs[2]?.textContent).toMatch(
+      /Whether or not visitor follow-up email is on/,
+    );
+    expect(paragraphs[3]?.textContent).toMatch(
+      /creating an exchange on your own card first/,
+    );
+    expect(paragraphs[4]?.textContent).toMatch(
+      /When we turn on visitor follow-up email/,
+    );
+    expect(paragraphs[5]?.textContent).toMatch(
+      /When we send that optional follow-up email/,
+    );
   });
 
   it("renders terms h1, sections, contact link, and last updated", () => {
