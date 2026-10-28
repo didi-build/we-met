@@ -22,6 +22,7 @@ describe("gallery build output (unit)", () => {
     expect(headers).toContain("X-Robots-Tag: noindex, nofollow");
     expect(headers).toContain(`${prefix}/*`);
     expect(headers).toContain("/*");
+    expect(headers).not.toContain(`${prefix}/assets/*`);
     expect(headers).not.toContain(`${galleryDir}/_headers`);
   });
 });

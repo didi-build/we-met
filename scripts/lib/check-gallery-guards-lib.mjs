@@ -169,6 +169,71 @@ function referencesGalleryWranglerConfig(segment) {
 }
 
 /**
+ * Best-effort: spawnSync / execFile( Sync)? with a wrangler + deploy argv array and gallery config.
+ * @param {string} text
+ * @returns {boolean}
+ */
+export function detectArrayFormGalleryDeploy(text) {
+  const callRe = /(?:spawnSync|execFileSync|execFile)\s*\(/g;
+  let callMatch = callRe.exec(text);
+  while (callMatch) {
+    const slice = text.slice(callMatch.index, callMatch.index + 4000);
+    const arrayMatch = slice.match(/\[[^\]]*\]/);
+    if (arrayMatch) {
+      const block = arrayMatch[0];
+      if (
+        /['"]wrangler(?:@\S+)?['"]/.test(block) &&
+        /['"]deploy['"]/.test(block) &&
+        /wrangler\.gallery\.jsonc/.test(block)
+      ) {
+        return true;
+      }
+    }
+    callMatch = callRe.exec(text);
+  }
+  return false;
+}
+
+/**
+ * @param {string} argString
+ * @returns {boolean}
+ */
+function previewArgStringReferencesGalleryConfig(argString) {
+  const { flags } = parsePreviewArgv(tokenizeShellArgs(argString));
+  if (flags.get("--config") === "wrangler.gallery.jsonc") {
+    return true;
+  }
+  if (flags.get("-c") === "wrangler.gallery.jsonc") {
+    return true;
+  }
+  return /\bwrangler\.gallery\.jsonc\b/.test(argString);
+}
+
+/**
+ * @param {string} text
+ * @param {string} label
+ * @param {{ isGalleryWorkflow?: boolean, isYaml?: boolean }} [options]
+ * @returns {string[]}
+ */
+export function collectGalleryPreviewLocationViolations(text, label, options = {}) {
+  if (options.isGalleryWorkflow || label === GALLERY_WORKFLOW) {
+    return [];
+  }
+  const normalized = normalizeForDeployScan(text, {
+    isYaml: options.isYaml ?? (label.endsWith(".yml") || label.endsWith(".yaml")),
+  });
+  const argStrings = extractWranglerPreviewArgStrings(normalized);
+  for (const argString of argStrings) {
+    if (previewArgStringReferencesGalleryConfig(argString)) {
+      return [
+        `${label} must not run wrangler preview with wrangler.gallery.jsonc (only ${GALLERY_WORKFLOW}).`,
+      ];
+    }
+  }
+  return [];
+}
+
+/**
  * @param {string} s
  * @returns {string[]}
  */
@@ -233,26 +298,45 @@ function extractWranglerPreviewArgStrings(normalizedWorkflow) {
  * @param {string[]} tokens
  * @returns {{ flags: Map<string, string | true>, positionals: string[] }}
  */
+const ALLOWED_PREVIEW_FLAGS = new Set([
+  "--config",
+  "--worker-name",
+  "--ignore-base-config",
+  "--name",
+  "--json",
+]);
+
 function parsePreviewArgv(tokens) {
   const flags = new Map();
   const positionals = [];
   const booleanFlags = new Set(["--ignore-base-config", "--json"]);
   for (let i = 0; i < tokens.length; i += 1) {
-    const token = tokens[i];
+    let token = tokens[i];
     if (!token.startsWith("-")) {
       positionals.push(token);
       continue;
     }
-    if (booleanFlags.has(token)) {
-      flags.set(token, true);
+    let flag = token;
+    let valueFromEquals;
+    const eqIdx = token.indexOf("=");
+    if (eqIdx > 0 && token.startsWith("--")) {
+      flag = token.slice(0, eqIdx);
+      valueFromEquals = token.slice(eqIdx + 1);
+    }
+    if (booleanFlags.has(flag)) {
+      flags.set(flag, true);
+      continue;
+    }
+    if (valueFromEquals !== undefined) {
+      flags.set(flag, valueFromEquals);
       continue;
     }
     const next = tokens[i + 1];
     if (next !== undefined && !next.startsWith("-")) {
-      flags.set(token, next);
+      flags.set(flag, next);
       i += 1;
     } else {
-      flags.set(token, true);
+      flags.set(flag, true);
     }
   }
   return { flags, positionals };
@@ -272,9 +356,8 @@ export function collectGalleryPreviewArgvViolations(argString) {
     );
   }
 
-  const forbidden = ["--secrets-file", "--var", "--env", "-c"];
-  for (const flag of forbidden) {
-    if (flags.has(flag)) {
+  for (const flag of flags.keys()) {
+    if (!ALLOWED_PREVIEW_FLAGS.has(flag)) {
       errors.push(`gallery-preview.yml wrangler preview must not pass ${flag}.`);
     }
   }
@@ -378,15 +461,30 @@ export function collectGalleryWorkflowViolations(workflowText) {
  */
 export function collectGalleryDeployViolations(text, label, options = {}) {
   const errors = [];
+  if (options.isGalleryWorkflow) {
+    const normalizedWorkflow = normalizeForDeployScan(text, {
+      isYaml: options.isYaml ?? true,
+    });
+    const segments = extractWranglerDeploySegments(normalizedWorkflow);
+    if (segments.length > 0) {
+      errors.push(`${label} must not run wrangler deploy or wrangler versions deploy.`);
+    }
+    if (detectArrayFormGalleryDeploy(text)) {
+      errors.push(`${label} must not run wrangler deploy or wrangler versions deploy.`);
+    }
+    return errors;
+  }
+  if (detectArrayFormGalleryDeploy(text)) {
+    errors.push(
+      `${label} must not run wrangler deploy/versions deploy with wrangler.gallery.jsonc.`,
+    );
+    return errors;
+  }
   const normalized = normalizeForDeployScan(text, {
     isYaml: options.isYaml ?? (label.endsWith(".yml") || label.endsWith(".yaml")),
   });
   const segments = extractWranglerDeploySegments(normalized);
   if (segments.length === 0) {
-    return errors;
-  }
-  if (options.isGalleryWorkflow) {
-    errors.push(`${label} must not run wrangler deploy or wrangler versions deploy.`);
     return errors;
   }
   for (const segment of segments) {
@@ -472,6 +570,12 @@ export function runGalleryGuards(repoRoot = process.cwd()) {
         `package.json scripts.${scriptName}`,
       ),
     );
+    errors.push(
+      ...collectGalleryPreviewLocationViolations(
+        scriptBody,
+        `package.json scripts.${scriptName}`,
+      ),
+    );
   }
 
   const filesToScan = new Set();
@@ -495,6 +599,7 @@ export function runGalleryGuards(repoRoot = process.cwd()) {
     }
     const text = readFileSync(file, "utf8");
     errors.push(...collectGalleryDeployViolations(text, rel));
+    errors.push(...collectGalleryPreviewLocationViolations(text, rel));
   }
 
   return errors;

@@ -5,7 +5,9 @@ import {
   collectGalleryConfigViolations,
   collectGalleryDeployViolations,
   collectGalleryPreviewArgvViolations,
+  collectGalleryPreviewLocationViolations,
   collectGalleryWorkflowViolations,
+  detectArrayFormGalleryDeploy,
   extractWranglerDeploySegments,
   flattenYamlRunBlocks,
   joinShellContinuations,
@@ -93,6 +95,37 @@ describe("gallery guards (unit)", () => {
     );
   });
 
+  it("rejects wrangler preview with disallowed flags including = spellings and -e", () => {
+    const cases: { args: string; flag: string }[] = [
+      {
+        args: `${VALID_PREVIEW_ARGS} --secrets-file=.dev.vars`,
+        flag: "--secrets-file",
+      },
+      { args: `${VALID_PREVIEW_ARGS} --var=FOO:bar`, flag: "--var" },
+      { args: `${VALID_PREVIEW_ARGS} -e staging`, flag: "-e" },
+      { args: `${VALID_PREVIEW_ARGS} --env production`, flag: "--env" },
+      {
+        args: `--config=wrangler.gallery.jsonc --worker-name we-met --ignore-base-config --name x --json --dry-run`,
+        flag: "--dry-run",
+      },
+    ];
+    for (const { args, flag } of cases) {
+      expect(collectGalleryPreviewArgvViolations(args)).toContain(
+        `gallery-preview.yml wrangler preview must not pass ${flag}.`,
+      );
+    }
+    expect(
+      collectGalleryPreviewArgvViolations(
+        `--config=wrangler.gallery.jsonc --worker-name=we-met --ignore-base-config --name x --json`,
+      ),
+    ).toEqual([]);
+    expect(
+      collectGalleryPreviewArgvViolations(
+        `--config=wrangler.gallery.jsonc --worker-name=evil --ignore-base-config --name x --json`,
+      ),
+    ).toContain("gallery-preview.yml wrangler preview must pass --worker-name we-met.");
+  });
+
   it("rejects wrangler preview with --var and -c", () => {
     expect(
       collectGalleryPreviewArgvViolations(`${VALID_PREVIEW_ARGS} --var FOO:bar`),
@@ -110,6 +143,39 @@ describe("gallery guards (unit)", () => {
     ).toContain(
       "gallery-preview.yml wrangler preview must not pass a positional Worker script.",
     );
+  });
+
+  it("detects array-form wrangler deploy with gallery config", () => {
+    const script = `
+      import { spawnSync } from "node:child_process";
+      spawnSync("npx", ["wrangler", "deploy", "--config", "wrangler.gallery.jsonc"]);
+    `;
+    expect(detectArrayFormGalleryDeploy(script)).toBe(true);
+    expect(
+      collectGalleryDeployViolations(script, "scripts/publish-gallery.mjs"),
+    ).toContain(
+      "scripts/publish-gallery.mjs must not run wrangler deploy/versions deploy with wrangler.gallery.jsonc.",
+    );
+  });
+
+  it("rejects gallery wrangler preview outside gallery-preview.yml", () => {
+    const snippet = `npx wrangler preview --config wrangler.gallery.jsonc --worker-name we-met --ignore-base-config --name x --json`;
+    expect(
+      collectGalleryPreviewLocationViolations(
+        snippet,
+        ".github/workflows/evil-preview.yml",
+        { isYaml: true },
+      ),
+    ).toContain(
+      ".github/workflows/evil-preview.yml must not run wrangler preview with wrangler.gallery.jsonc (only .github/workflows/gallery-preview.yml).",
+    );
+    expect(
+      collectGalleryPreviewLocationViolations(
+        snippet,
+        ".github/workflows/gallery-preview.yml",
+        { isGalleryWorkflow: true, isYaml: true },
+      ),
+    ).toEqual([]);
   });
 
   it("rejects wrangler deploy in gallery-preview.yml", () => {
