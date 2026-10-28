@@ -1,5 +1,6 @@
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import type { spawnSync } from "node:child_process";
+import { spawnSync as nodeSpawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
@@ -8,6 +9,7 @@ import {
   runActivationFromCliOrEvent,
 } from "../scripts/activate-staging-account.mjs";
 import {
+  ACTIVATION_EVENT_EMAIL_CONTROL_REJECTED,
   ACTIVATION_D1_BINDING,
   ACTIVATION_D1_DATABASE_NAME,
   assertWranglerConfigD1Binding,
@@ -16,6 +18,7 @@ import {
   buildWranglerD1ExecuteArgv,
   emailAppearsOnlyInWhereLiteral,
   parseWranglerD1ExecuteRowChanges,
+  readWorkflowDispatchEmailFromGithubEvent,
   resolveActivationRowOutcome,
   validateActivationEmail,
   WRANGLER_D1_EXECUTE_SPAWN_OPTIONS,
@@ -536,20 +539,44 @@ describe("runActivation (unit)", () => {
   });
 });
 
+describe("readWorkflowDispatchEmailFromGithubEvent (unit)", () => {
+  it("rejects newline in event email before trimming", () => {
+    const result = readWorkflowDispatchEmailFromGithubEvent("event.json", () =>
+      JSON.stringify({ inputs: { email: "qa@example.com\n::warning::x" } }),
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toBe(ACTIVATION_EVENT_EMAIL_CONTROL_REJECTED);
+    }
+  });
+
+  it("rejects carriage return in event email before trimming", () => {
+    const result = readWorkflowDispatchEmailFromGithubEvent("event.json", () =>
+      JSON.stringify({ inputs: { email: "qa@example.com\r\n" } }),
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toBe(ACTIVATION_EVENT_EMAIL_CONTROL_REJECTED);
+    }
+  });
+});
+
 describe("runActivationFromCliOrEvent (unit)", () => {
-  it("masks dispatch email before any other stdout when --email is omitted", () => {
+  it("masks raw dispatch email before any other output when reading GITHUB_EVENT_PATH", () => {
     const eventPath = join(tmpdir(), "github-event.json");
-    writeFileSync(eventPath, JSON.stringify({ inputs: { email: "test@example.com" } }));
-    const stdoutLines: string[] = [];
+    writeFileSync(eventPath, JSON.stringify({ inputs: { email: "QA@Example.com" } }));
+    const outputLines: string[] = [];
     const logLine = (line: string) => {
-      stdoutLines.push(line);
+      outputLines.push(line);
+    };
+    const logError = (line: string) => {
+      outputLines.push(line);
     };
     runActivationFromCliOrEvent({
       config: validWranglerConfig(),
       env: testEnv({ GITHUB_EVENT_PATH: eventPath }),
-      readEventFile: () => JSON.stringify({ inputs: { email: "test@example.com" } }),
       logLine,
-      logError: () => {},
+      logError,
       spawnSyncFn: mockSpawn(() => ({
         status: 0,
         stdout: wranglerSuccessStdout(1),
@@ -559,7 +586,26 @@ describe("runActivationFromCliOrEvent (unit)", () => {
       maskActivationEmailForLogsFn: () => {},
       now: () => new Date("2026-10-28T12:00:00.000Z"),
     });
-    expect(stdoutLines[0]).toBe("::add-mask::test@example.com");
+    expect(outputLines[0]).toBe("::add-mask::QA@Example.com");
+    expect(outputLines[1]).toBe("::add-mask::qa@example.com");
+    expect(outputLines[0]).not.toBe("::add-mask::qa@example.com");
+  });
+});
+
+describe("activate-staging-account CLI (unit)", () => {
+  it("prints usage when --email has no value", () => {
+    const result = nodeSpawnSync(
+      "node",
+      [
+        "scripts/activate-staging-account.mjs",
+        "--email",
+        "--config",
+        validWranglerConfig(),
+      ],
+      { encoding: "utf8" },
+    );
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("Usage: activate-staging-account.mjs --config");
   });
 });
 
@@ -604,9 +650,18 @@ describe("Activate staging account workflow structure (unit)", () => {
     );
   });
 
-  it("does not reference workflow inputs.email expressions", () => {
+  it("does not leak dispatch email via workflow expressions or shell event reads", () => {
     expect(workflow).not.toContain("inputs.email");
     expect(workflow).not.toContain("ACTIVATE_EMAIL");
+    expect(workflow).not.toContain("github.event.inputs");
+    expect(workflow).not.toContain("toJSON(github.event");
+    expect(workflow).not.toContain("inputs[");
+    const runBlocks =
+      workflow.match(/run:\s*\|[\s\S]*?(?=\n\s{6}\S|\n\s{4}\S|$)/g) ?? [];
+    const runLines = workflow.match(/^\s+run:\s+[^\n|]+$/gm) ?? [];
+    for (const block of [...runBlocks, ...runLines]) {
+      expect(block).not.toContain("GITHUB_EVENT_PATH");
+    }
   });
 
   it("does not interpolate workflow inputs or secrets inside run scripts", () => {

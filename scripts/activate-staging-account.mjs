@@ -47,9 +47,17 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--email") {
-      out.email = argv[++i];
+      const value = argv[++i];
+      if (!value || value.startsWith("-")) {
+        usage();
+      }
+      out.email = value;
     } else if (arg === "--config") {
-      out.config = argv[++i];
+      const value = argv[++i];
+      if (!value || value.startsWith("-")) {
+        usage();
+      }
+      out.config = value;
     } else if (arg.startsWith("-")) {
       console.error(`Unknown option: ${arg}`);
       process.exit(1);
@@ -177,6 +185,10 @@ export function runActivationFromCliOrEvent(options) {
   }
   if (resolved.maskDispatchEmailFirst) {
     logActivationEmailMaskLine(resolved.email, logLine);
+    const validatedDispatch = validateActivationEmail(resolved.email);
+    if (validatedDispatch.ok && validatedDispatch.normalized !== resolved.email) {
+      logActivationEmailMaskLine(validatedDispatch.normalized, logLine);
+    }
   }
   return runActivation({
     ...runOptions,

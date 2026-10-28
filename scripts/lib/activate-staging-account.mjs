@@ -21,6 +21,19 @@ const FORBIDDEN_EMAIL_CHARS = /[\s'"\\;]/;
 /** Conservative operator email: local@domain.tld (ASCII subset only). */
 const ACTIVATION_EMAIL_PATTERN = /^[a-zA-Z0-9._+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,63}$/;
 
+export const ACTIVATION_EMAIL_CONTROL_CHAR_PATTERN =
+  /[\u0000-\u001f\u007f\u2028\u2029]/;
+
+export const ACTIVATION_EVENT_EMAIL_CONTROL_REJECTED =
+  "workflow dispatch email input contains control characters";
+
+/**
+ * @param {string} raw
+ */
+export function activationEmailHasControlCharacters(raw) {
+  return ACTIVATION_EMAIL_CONTROL_CHAR_PATTERN.test(raw);
+}
+
 /**
  * @param {unknown} raw
  * @returns {EmailOk | EmailFail}
@@ -95,10 +108,17 @@ export function readWorkflowDispatchEmailFromGithubEvent(
   try {
     const parsed = JSON.parse(readFile(eventPath, "utf8"));
     const email = parsed?.inputs?.email;
-    if (typeof email !== "string" || email.trim().length === 0) {
+    if (typeof email !== "string" || email.length === 0) {
       return { ok: false, reason: "workflow dispatch email input is missing" };
     }
-    return { ok: true, email: email.trim() };
+    if (activationEmailHasControlCharacters(email)) {
+      return { ok: false, reason: ACTIVATION_EVENT_EMAIL_CONTROL_REJECTED };
+    }
+    const trimmed = email.trim();
+    if (trimmed.length === 0) {
+      return { ok: false, reason: "workflow dispatch email input is missing" };
+    }
+    return { ok: true, email: trimmed };
   } catch {
     return { ok: false, reason: "could not read GITHUB_EVENT_PATH" };
   }
