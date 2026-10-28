@@ -8,6 +8,8 @@ describe("privileged-paths (table)", () => {
   const cases: { path: string; privileged: boolean }[] = [
     { path: ".github/workflows/ci.yml", privileged: true },
     { path: "scripts/check-deploy-guards.mjs", privileged: true },
+    { path: "scripts/check-gallery-guards.mjs", privileged: true },
+    { path: "scripts/lib/check-gallery-guards-lib.mjs", privileged: true },
     { path: "scripts/apply-migrations.mjs", privileged: true },
     { path: "scripts/prepare-wrangler-config.mjs", privileged: true },
     { path: "scripts/dry-run-generated-config.mjs", privileged: true },
@@ -47,6 +49,7 @@ describe("privileged-paths (table)", () => {
     expect(privilegedPathMatchers.map((m) => m.id)).toEqual([
       "github-tree",
       "deploy-guards",
+      "gallery-guards",
       "migrate-script",
       "deploy-prepare-wrangler",
       "deploy-dry-run-generated",

@@ -10,7 +10,7 @@ const prefix = getGalleryUrlPrefix();
 const assetsRoot = getGalleryAssetsRoot();
 const headersPath = join(assetsRoot, "_headers");
 
-const blocks = [`${prefix}/*`, `${prefix}/assets/*`, "/*"].map(
+const blocks = [`${prefix}/*`, "/*"].map(
   (pattern) => `${pattern}\n\tX-Robots-Tag: noindex, nofollow`,
 );
 
