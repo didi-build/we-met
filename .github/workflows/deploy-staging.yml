@@ -118,7 +118,7 @@ jobs:
           if ! npx wrangler d1 migrations apply WE_MET_DB --remote \
             --config wrangler.staging.ci.jsonc >"$APPLY_LOG" 2>&1; then
             echo "::error::wrangler d1 migrations apply failed for staging"
-            grep -E '\[code: [0-9]+\]' "$APPLY_LOG" || true
+            grep -oE '\[code: [0-9]+\]' "$APPLY_LOG" | sort -u || true
             exit 1
           fi
           MIGRATION_REPORT="D1 migration drift report unavailable."
@@ -133,7 +133,7 @@ jobs:
             DRIFT_STDERR=$(mktemp)
             DRIFT_MARKDOWN=$(node scripts/staging-d1-migration-drift.mjs --wrangler-json "$EXEC_JSON" 2>"$DRIFT_STDERR")
             if [ -s "$DRIFT_STDERR" ]; then
-              sed -E 's/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/<redacted-d1-id>/g' "$DRIFT_STDERR" >&2
+              node scripts/staging-d1-migration-drift.mjs --print-redacted-stderr "$DRIFT_STDERR" >&2 || true
             fi
             if [ -n "$DRIFT_MARKDOWN" ]; then
               MIGRATION_REPORT="$DRIFT_MARKDOWN"

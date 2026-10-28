@@ -12,17 +12,21 @@ import {
   buildStagingMigrationDriftReport,
   formatAppliedMigrationNamesForLog,
   parseAppliedMigrationNamesFromWranglerExecute,
+  redactD1UuidsInText,
 } from "./lib/staging-d1-migration-drift.mjs";
 
 function parseArgs(argv) {
   let wranglerJsonPath = null;
   let logAppliedNames = false;
+  let printRedactedStderrPath = null;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--wrangler-json") {
       wranglerJsonPath = resolve(argv[++i] ?? "");
     } else if (arg === "--log-applied-names") {
       logAppliedNames = true;
+    } else if (arg === "--print-redacted-stderr") {
+      printRedactedStderrPath = resolve(argv[++i] ?? "");
     } else if (arg === "--help" || arg === "-h") {
       console.log("Usage: staging-d1-migration-drift.mjs --wrangler-json <path>");
       process.exit(0);
@@ -31,15 +35,25 @@ function parseArgs(argv) {
       process.exit(1);
     }
   }
+  if (printRedactedStderrPath) {
+    return { wranglerJsonPath, logAppliedNames, printRedactedStderrPath };
+  }
   if (!wranglerJsonPath) {
     console.error("--wrangler-json is required");
     process.exit(1);
   }
-  return { wranglerJsonPath, logAppliedNames };
+  return { wranglerJsonPath, logAppliedNames, printRedactedStderrPath };
 }
 
 function main() {
-  const { wranglerJsonPath, logAppliedNames } = parseArgs(process.argv.slice(2));
+  const { wranglerJsonPath, logAppliedNames, printRedactedStderrPath } = parseArgs(
+    process.argv.slice(2),
+  );
+  if (printRedactedStderrPath) {
+    const raw = readFileSync(printRedactedStderrPath, "utf8");
+    process.stderr.write(redactD1UuidsInText(raw));
+    return;
+  }
   const raw = readFileSync(wranglerJsonPath, "utf8");
   let parsed;
   try {

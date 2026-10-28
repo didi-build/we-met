@@ -20,8 +20,10 @@ function seededExchangeOwnerEmailStore(): MemoryExchangeOwnerEmailStore {
 import type { CardEmailSnapshot } from "@/exchange/types";
 import followupEmailConsumer from "../../workers/we-met-followup-email-consumer/index";
 import type { FollowupConsumerEnv } from "@/followup-email-consumer/process-batch";
+import * as leadDeliveryLedger from "@/followup-email-consumer/lead-delivery-ledger";
 import type { D1Database } from "@cloudflare/workers-types";
 import type { CloudflareOutboundMessage } from "@/email/cloudflare-sender";
+import { MemoryConsumerLeadDeliveryLedger } from "./memory-consumer-ledger";
 
 function createNoopConsumerD1(
   appSettings: Record<string, string> = {
@@ -280,4 +282,68 @@ describe("follow-up email consumer worker queue (integration)", () => {
       expect(retry).not.toHaveBeenCalled();
     },
   );
+
+  it("redirects owner email sink mail to the test inbox when WE_MET_ENV is missing (integration)", async () => {
+    const ledger = new MemoryConsumerLeadDeliveryLedger();
+    ledger.seedQueued("lead-1", "sink-1", "record");
+    vi.spyOn(leadDeliveryLedger, "createConsumerLeadDeliveryLedger").mockReturnValue(
+      ledger,
+    );
+
+    let capturedPayload: CloudflareOutboundMessage | undefined;
+    const emailSend = vi.fn(async (message: CloudflareOutboundMessage) => {
+      capturedPayload = message;
+      return { messageId: "<msg@mail.we-met.link>" };
+    });
+    const ack = vi.fn();
+    const retry = vi.fn();
+
+    const env = {
+      WE_MET_BASE_URL: "https://we-met.link",
+      WE_MET_EMAIL_FROM_CLOUDFLARE: "hello@mail.we-met.link",
+      WE_MET_FROM_DISPLAY_NAME: "Diadem at We Met",
+      WE_MET_TEST_MAIL_TO: "test-inbox@example.com",
+      WE_MET_ASSETS: { get: vi.fn() } as never,
+      WE_MET_DB: createNoopConsumerD1(),
+      EMAIL: { send: emailSend },
+    } as unknown as FollowupConsumerEnv;
+
+    await followupEmailConsumer.queue(
+      {
+        messages: [
+          {
+            id: "m1",
+            attempts: 1,
+            body: {
+              type: "lead_sink_record",
+              sinkId: "sink-1",
+              sinkKind: "email",
+              sinkConfig: { to: "owner@example.com" },
+              lead: {
+                leadId: "lead-1",
+                submittedAt: "2026-10-12T00:00:00.000Z",
+                environment: "preview",
+                isTestLead: true,
+                name: "Alex Visitor",
+                email: "visitor@example.com",
+                phone: null,
+              },
+              cardId: "card-1",
+              cardSlug: "demo",
+              sourceUrl: "https://we-met.link/hi/demo",
+            },
+            ack,
+            retry,
+          },
+        ],
+      },
+      env,
+    );
+
+    expect(ack).toHaveBeenCalledOnce();
+    expect(retry).not.toHaveBeenCalled();
+    expect(emailSend).toHaveBeenCalledOnce();
+    expect(capturedPayload?.to).toBe("test-inbox@example.com");
+    expect(capturedPayload?.subject).toContain("[we-met test → owner@example.com]");
+  });
 });

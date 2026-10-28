@@ -92,7 +92,7 @@ Values live in GitHub Environments, the Cloudflare dashboard, or local `.env`. *
 
 When the production Google OAuth client rotates, update `PROD_GOOGLE_CLIENT_ID_SHA256` in [`scripts/check-google-oauth-client-ids.mjs`](../../scripts/check-google-oauth-client-ids.mjs):
 
-1. Request `https://app.we-met.link/api/auth/google/start?mode=redirect` once with redirects disabled (for example `curl -sS -D - -o /dev/null` and read the `Location` header).
+1. Request `https://app.we-met.link/api/auth/google/start?mode=redirect` once with redirects disabled (for example `curl -sS -D - -o /dev/null` and read the `Location` header). **CI must never call the production host.** This curl is a manual step for a person only.
 2. Parse `client_id` from the Google `Location` URL query string.
 3. SHA-256 hash the `client_id` string (UTF-8), lowercase hex, 64 characters. Commit only that fingerprint.
 

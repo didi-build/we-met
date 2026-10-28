@@ -4,6 +4,7 @@ import {
   formatAppliedMigrationNamesForLog,
   formatMigrationDriftMarkdown,
   parseAppliedMigrationNamesFromWranglerExecute,
+  redactD1UuidsInText,
 } from "../scripts/lib/staging-d1-migration-drift.mjs";
 
 describe("staging D1 migration drift (unit)", () => {
@@ -38,5 +39,12 @@ describe("staging D1 migration drift (unit)", () => {
     const text = formatMigrationDriftMarkdown(["9999_pr_only.sql"]);
     expect(text).toContain("Warning");
     expect(text).toContain("9999_pr_only.sql");
+  });
+
+  it("redacts D1 UUIDs from drift stderr text", () => {
+    const sample = "database abcdef12-3456-7890-abcd-ef1234567890 failed with error";
+    expect(redactD1UuidsInText(sample)).toBe(
+      "database <redacted-d1-id> failed with error",
+    );
   });
 });
