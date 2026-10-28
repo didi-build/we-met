@@ -22,6 +22,12 @@ export const privilegedPathMatchers = [
     test: (filename) => filename === "scripts/check-deploy-guards.mjs",
   },
   {
+    id: "gallery-guards",
+    test: (filename) =>
+      filename === "scripts/check-gallery-guards.mjs" ||
+      filename === "scripts/lib/check-gallery-guards-lib.mjs",
+  },
+  {
     id: "migrate-script",
     test: (filename) => filename === "scripts/apply-migrations.mjs",
   },

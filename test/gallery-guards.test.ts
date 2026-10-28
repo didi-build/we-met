@@ -10,8 +10,11 @@ import {
   collectGalleryPreviewLocationViolations,
   collectGalleryWorkflowViolations,
   detectArrayFormGalleryDeploy,
+  detectArrayFormGalleryPreview,
   extractWranglerDeploySegments,
   extractWranglerPreviewArgStrings,
+  extractWranglerPreviewInvocations,
+  findWranglerPreviewSubcommand,
   flattenYamlRunBlocks,
   joinShellContinuations,
   normalizeForDeployScan,
@@ -47,6 +50,7 @@ function writeGalleryFixtureRoot(
     galleryWorkflow?: string;
     extraWorkflow?: string;
     scriptSh?: string;
+    scriptMjs?: string;
     pkgScripts?: Record<string, string>;
   } = {},
 ) {
@@ -66,6 +70,9 @@ function writeGalleryFixtureRoot(
   }
   if (overrides.scriptSh) {
     writeFileSync(join(root, "scripts/evil.sh"), overrides.scriptSh);
+  }
+  if (overrides.scriptMjs) {
+    writeFileSync(join(root, "scripts/evil.mjs"), overrides.scriptMjs);
   }
   writeFileSync(
     join(root, "package.json"),
@@ -131,8 +138,147 @@ describe("gallery guards (unit)", () => {
     ).toContain('wrangler.gallery.jsonc assets.directory must be "./dist".');
   });
 
-  it("parses wrangler preview across shell line continuations", () => {
+  it("parses wrangler preview across shell line continuations and committed 2>&1 redirect", () => {
     expect(collectGalleryWorkflowViolations(VALID_WORKFLOW_SNIPPET)).toEqual([]);
+  });
+
+  it("rejects global flags before preview subcommand including short = forms", () => {
+    const suffix =
+      "--config wrangler.gallery.jsonc --worker-name we-met --ignore-base-config --name x --json";
+    const cases: { cmd: string; expectError: string }[] = [
+      {
+        cmd: `npx wrangler -c=wrangler.gallery.jsonc preview ${suffix} --env prod`,
+        expectError: "must not pass -c.",
+      },
+      {
+        cmd: `npx wrangler -e=prod preview --config wrangler.gallery.jsonc --worker-name we-met --ignore-base-config --name gallery-pr-1 --json`,
+        expectError: "must not pass -e.",
+      },
+      {
+        cmd: `npx wrangler --install-skills preview ${suffix} --env prod`,
+        expectError:
+          "must not pass wrangler global flag --install-skills before the preview subcommand.",
+      },
+      {
+        cmd: `npx wrangler --env=prod preview --config wrangler.gallery.jsonc --worker-name we-met --ignore-base-config --name x --json`,
+        expectError: "must not pass --env.",
+      },
+    ];
+    for (const { cmd, expectError } of cases) {
+      const errors = collectGalleryWorkflowViolations(cmd);
+      expect(errors.some((entry) => entry.includes(expectError))).toBe(true);
+    }
+  });
+
+  it("rejects flags smuggled after 2>&1 on gallery preview", () => {
+    const suffix =
+      "--config wrangler.gallery.jsonc --worker-name we-met --ignore-base-config --name gallery-pr-1 --json";
+    expect(
+      collectGalleryWorkflowViolations(
+        `npx wrangler preview ${suffix} 2>&1 --env production`,
+      ),
+    ).toContain("gallery-preview.yml wrangler preview must not pass --env.");
+    expect(
+      collectGalleryWorkflowViolations(`npx wrangler preview ${suffix} 2>&1 --var=A:1`),
+    ).toContain("gallery-preview.yml wrangler preview must not pass --var.");
+    expect(
+      collectGalleryPreviewLocationViolations(
+        `npx wrangler preview 2>&1 --config wrangler.gallery.jsonc --worker-name we-met --ignore-base-config --name x --json`,
+        "scripts/evil.sh",
+      ),
+    ).toContain(
+      "scripts/evil.sh must not run wrangler preview with wrangler.gallery.jsonc (only .github/workflows/gallery-preview.yml).",
+    );
+  });
+
+  it("detects deploy when global flags use short = forms or unknown booleans", () => {
+    expect(
+      collectGalleryDeployViolations(
+        'execSync("npx wrangler -c=wrangler.gallery.jsonc deploy")',
+        "scripts/x.mjs",
+      ),
+    ).toContain(
+      "scripts/x.mjs must not run wrangler deploy/versions deploy with wrangler.gallery.jsonc.",
+    );
+    expect(
+      collectGalleryDeployViolations(
+        'execSync("npx wrangler --install-skills deploy -c wrangler.gallery.jsonc")',
+        "scripts/x.mjs",
+      ),
+    ).toContain(
+      "scripts/x.mjs must not run wrangler deploy/versions deploy with wrangler.gallery.jsonc.",
+    );
+  });
+
+  it("rejects shell quote tricks, env prefixes, and unquoted --name with shell expansion", () => {
+    const suffix =
+      "--worker-name we-met --ignore-base-config --name gallery-pr-1 --json";
+    expect(
+      collectGalleryWorkflowViolations(
+        `npx wrangler pre''view --config wrangler.gallery.jsonc ${suffix}`,
+      ),
+    ).toEqual([]);
+    expect(
+      collectGalleryWorkflowViolations(
+        `npx wrangler "pre"view --config wrangler.gallery.jsonc ${suffix}`,
+      ),
+    ).toEqual([]);
+    expect(
+      collectGalleryWorkflowViolations(
+        `CLOUDFLARE_ENV=production npx wrangler preview --config wrangler.gallery.jsonc ${suffix}`,
+      ),
+    ).toContain(
+      "gallery-preview.yml wrangler preview must not use shell env assignments on the command line.",
+    );
+    expect(
+      collectGalleryPreviewArgvViolations(
+        `--config wrangler.gallery.json'c' --worker-name we-met --ignore-base-config --name x --json`,
+      ),
+    ).toEqual([]);
+    expect(
+      collectGalleryWorkflowViolations(
+        `npx wrangler preview --config wrangler.gallery.jsonc --worker-name we-met --ignore-base-config --name $PR --json`,
+      ),
+    ).toContain(
+      "gallery-preview.yml wrangler preview --name must be a literal or double-quoted string.",
+    );
+  });
+
+  it("detects spawn( array-form gallery deploy and preview", () => {
+    const deploySpawn = `spawn("npx", ["wrangler", "deploy", "--config", "wrangler.gallery.jsonc"]);`;
+    expect(detectArrayFormGalleryDeploy(deploySpawn)).toBe(true);
+    const previewSpawn = `spawnSync("npx", ["wrangler", "preview", "--config", "wrangler.gallery.jsonc"]);`;
+    expect(detectArrayFormGalleryPreview(previewSpawn)).toBe(true);
+    expect(
+      collectGalleryPreviewLocationViolations(previewSpawn, "scripts/evil.mjs"),
+    ).toContain(
+      "scripts/evil.mjs must not run wrangler preview with wrangler.gallery.jsonc (only .github/workflows/gallery-preview.yml).",
+    );
+  });
+
+  it("does not treat preview as a separate -c value token", () => {
+    expect(
+      findWranglerPreviewSubcommand(["-c", "preview", "--config", "x"], 0).index,
+    ).toBe(-1);
+    const suffix =
+      "--config wrangler.gallery.jsonc --worker-name we-met --ignore-base-config --name x --json";
+    expect(
+      collectGalleryWorkflowViolations(`npx wrangler -c preview ${suffix}`).some(
+        (entry) => entry.includes("must invoke wrangler preview"),
+      ),
+    ).toBe(true);
+  });
+
+  it("uses shared preview subcommand scan for --env= before preview", () => {
+    const tokens = ["--env=prod", "preview", "--config", "wrangler.gallery.jsonc"];
+    expect(findWranglerPreviewSubcommand(tokens, 0).index).toBe(1);
+    const cmd =
+      "npx wrangler --env=prod preview --config wrangler.gallery.jsonc --worker-name we-met --ignore-base-config --name x --json";
+    const inv = extractWranglerPreviewInvocations(normalizeForDeployScan(cmd));
+    expect(inv).toHaveLength(1);
+    expect(collectGalleryPreviewArgvViolations(inv[0]!.argString)).toContain(
+      "gallery-preview.yml wrangler preview must not pass --env.",
+    );
   });
 
   it("rejects wrangler preview missing --ignore-base-config", () => {
@@ -507,6 +653,37 @@ jobs:
       });
       expect(runGalleryGuards(root)).toContain(
         "package.json scripts.gallery:preview:evil must not run wrangler preview with wrangler.gallery.jsonc (only .github/workflows/gallery-preview.yml).",
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("fails when scripts/evil.mjs uses spawn gallery deploy", () => {
+    const root = mkdtempSync(join(tmpdir(), "gallery-guards-fixture-"));
+    try {
+      writeGalleryFixtureRoot(root, {
+        scriptMjs: `import { spawn } from "node:child_process";
+spawn("npx", ["wrangler", "deploy", "--config", "wrangler.gallery.jsonc"]);`,
+      });
+      expect(runGalleryGuards(root)).toContain(
+        "scripts/evil.mjs must not run wrangler deploy/versions deploy with wrangler.gallery.jsonc.",
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("fails when a package.json script runs gallery wrangler deploy", () => {
+    const root = mkdtempSync(join(tmpdir(), "gallery-guards-fixture-"));
+    try {
+      writeGalleryFixtureRoot(root, {
+        pkgScripts: {
+          "gallery:deploy:evil": "wrangler deploy --config wrangler.gallery.jsonc",
+        },
+      });
+      expect(runGalleryGuards(root)).toContain(
+        "package.json scripts.gallery:deploy:evil must not run wrangler deploy/versions deploy with wrangler.gallery.jsonc.",
       );
     } finally {
       rmSync(root, { recursive: true, force: true });
