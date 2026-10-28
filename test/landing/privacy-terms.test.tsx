@@ -100,6 +100,22 @@ describe("privacy and terms pages (unit)", () => {
     expect(screen.getByText("Last updated: October 2026")).toBeTruthy();
   });
 
+  it("uses approved contact card wording in visitor follow-up copy (DIDI-917)", () => {
+    render(<PrivacyPolicyContent />);
+
+    expect(
+      screen.getByText(
+        /That email also includes your display name on the card \(or your Google name if you left display name blank\), your role and photo, and your contact card, ready to save\./,
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        /When we send that optional follow-up email, if you added a phone number it is included in the contact card\./,
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/contact card attached/)).toBeNull();
+  });
+
   it("renders terms h1, sections, contact link, and last updated", () => {
     render(<TermsPolicyContent urls={urls} />);
 

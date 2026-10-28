@@ -75,11 +75,11 @@ export function PrivacyPolicyContent() {
         signature shows your Google first name, your display name in brackets when you
         use one, and your Google last name. That email also includes your display name
         on the card (or your Google name if you left display name blank), your role and
-        photo, and your contact card attached.
+        photo, and your contact card, ready to save.
       </p>
       <p className="lp-body">
         When we send that optional follow-up email, if you added a phone number it is
-        included in the contact card attached.{" "}
+        included in the contact card.{" "}
         <strong>
           Your Google account email address is included for visitors who receive that
           optional follow-up:
