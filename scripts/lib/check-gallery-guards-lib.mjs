@@ -174,10 +174,20 @@ function referencesGalleryWranglerConfig(segment) {
  * @returns {boolean}
  */
 export function detectArrayFormGalleryDeploy(text) {
-  const callRe = /(?:spawnSync|execFileSync|execFile)\s*\(/g;
+  const callRe = /(?:spawnSync|execFileSync|execFile|spawn)\s*\(/g;
   let callMatch = callRe.exec(text);
   while (callMatch) {
     const slice = text.slice(callMatch.index, callMatch.index + 4000);
+    const wranglerCmdMatch = slice.match(
+      /["']wrangler(?:@\S+)?["']\s*,\s*\[([^\]]*)\]/,
+    );
+    if (
+      wranglerCmdMatch &&
+      /['"]deploy['"]/.test(wranglerCmdMatch[1]) &&
+      /wrangler\.gallery\.jsonc/.test(wranglerCmdMatch[1])
+    ) {
+      return true;
+    }
     const arrayMatch = slice.match(/\[[^\]]*\]/);
     if (arrayMatch) {
       const block = arrayMatch[0];
@@ -275,21 +285,108 @@ export function tokenizeShellArgs(s) {
   return tokens;
 }
 
+const WRANGLER_BIN_RE =
+  /\b(?:(?:npx|npm)\s+(?:exec\s+)?)?["']?wrangler(?:@\S+)?["']?(?=\s|$)/g;
+
+/**
+ * @param {string} s
+ * @returns {string}
+ */
+function truncateBeforeRedirect(s) {
+  const idx = s.search(/\s2>&1\b/);
+  return idx === -1 ? s : s.slice(0, idx);
+}
+
+/**
+ * @param {string[]} tokens
+ * @param {number} i
+ * @returns {number}
+ */
+function skipOneCliFlag(tokens, i) {
+  const token = tokens[i];
+  const eqIdx = token.indexOf("=");
+  if (eqIdx > 0 && token.startsWith("--")) {
+    return i + 1;
+  }
+  const booleanFlags = new Set(["--dry-run", "--experimental-json-config"]);
+  if (booleanFlags.has(token)) {
+    return i + 1;
+  }
+  const next = tokens[i + 1];
+  if (next !== undefined && !next.startsWith("-")) {
+    return i + 2;
+  }
+  return i + 1;
+}
+
+/**
+ * @param {string[]} tokens
+ * @returns {number}
+ */
+function indexOfPreviewSubcommand(tokens) {
+  let i = 0;
+  while (i < tokens.length) {
+    const token = tokens[i];
+    if (token === "preview") {
+      return i;
+    }
+    if (token === "--") {
+      i += 1;
+      continue;
+    }
+    if (token.startsWith("-")) {
+      i = skipOneCliFlag(tokens, i);
+      continue;
+    }
+    break;
+  }
+  return -1;
+}
+
+/**
+ * @param {string[]} tokens
+ * @param {number} start
+ * @returns {number}
+ */
+function endOfWranglerCommandIndex(tokens, start) {
+  let j = start;
+  while (j < tokens.length && ![";", "&&", "||", "|"].includes(tokens[j])) {
+    j += 1;
+  }
+  return j;
+}
+
 /**
  * @param {string} normalizedWorkflow
  * @returns {string[]}
  */
-function extractWranglerPreviewArgStrings(normalizedWorkflow) {
+export function extractWranglerPreviewArgStrings(normalizedWorkflow) {
   const argStrings = [];
-  const re = /\b(?:npx\s+)?wrangler(?:@\S+)?\s+preview\b/g;
-  let match = re.exec(normalizedWorkflow);
+  let match = WRANGLER_BIN_RE.exec(normalizedWorkflow);
   while (match) {
-    const rest = normalizedWorkflow.slice(match.index + match[0].length);
-    const end = rest.search(/\s2>&1\b/);
-    let slice = end === -1 ? rest : rest.slice(0, end);
-    slice = slice.trim().replace(/[")]+$/, "");
-    argStrings.push(slice.trim());
-    match = re.exec(normalizedWorkflow);
+    const rest = truncateBeforeRedirect(
+      normalizedWorkflow.slice(match.index + match[0].length),
+    );
+    let tokens = tokenizeShellArgs(rest.trim());
+    if (tokens[0] === "--") {
+      tokens = tokens.slice(1);
+    }
+    const previewIdx = indexOfPreviewSubcommand(tokens);
+    if (previewIdx === -1) {
+      match = WRANGLER_BIN_RE.exec(normalizedWorkflow);
+      continue;
+    }
+    const end = endOfWranglerCommandIndex(tokens, previewIdx + 1);
+    const argTokens = [
+      ...tokens.slice(0, previewIdx),
+      ...tokens.slice(previewIdx + 1, end),
+    ];
+    let argString = argTokens
+      .join(" ")
+      .trim()
+      .replace(/[")]+$/, "");
+    argStrings.push(argString);
+    match = WRANGLER_BIN_RE.exec(normalizedWorkflow);
   }
   return argStrings;
 }
@@ -308,8 +405,16 @@ const ALLOWED_PREVIEW_FLAGS = new Set([
 
 function parsePreviewArgv(tokens) {
   const flags = new Map();
+  const flagCounts = new Map();
   const positionals = [];
   const booleanFlags = new Set(["--ignore-base-config", "--json"]);
+  const booleanWithValueErrors = [];
+
+  const recordFlag = (flag, value) => {
+    flagCounts.set(flag, (flagCounts.get(flag) ?? 0) + 1);
+    flags.set(flag, value);
+  };
+
   for (let i = 0; i < tokens.length; i += 1) {
     let token = tokens[i];
     if (!token.startsWith("-")) {
@@ -324,22 +429,26 @@ function parsePreviewArgv(tokens) {
       valueFromEquals = token.slice(eqIdx + 1);
     }
     if (booleanFlags.has(flag)) {
-      flags.set(flag, true);
+      if (valueFromEquals !== undefined) {
+        booleanWithValueErrors.push(flag);
+        continue;
+      }
+      recordFlag(flag, true);
       continue;
     }
     if (valueFromEquals !== undefined) {
-      flags.set(flag, valueFromEquals);
+      recordFlag(flag, valueFromEquals);
       continue;
     }
     const next = tokens[i + 1];
     if (next !== undefined && !next.startsWith("-")) {
-      flags.set(flag, next);
+      recordFlag(flag, next);
       i += 1;
     } else {
-      flags.set(flag, true);
+      recordFlag(flag, true);
     }
   }
-  return { flags, positionals };
+  return { flags, positionals, flagCounts, booleanWithValueErrors };
 }
 
 /**
@@ -348,12 +457,26 @@ function parsePreviewArgv(tokens) {
  */
 export function collectGalleryPreviewArgvViolations(argString) {
   const errors = [];
-  const { flags, positionals } = parsePreviewArgv(tokenizeShellArgs(argString));
+  const { flags, positionals, flagCounts, booleanWithValueErrors } = parsePreviewArgv(
+    tokenizeShellArgs(argString),
+  );
 
   if (positionals.length > 0) {
     errors.push(
       "gallery-preview.yml wrangler preview must not pass a positional Worker script.",
     );
+  }
+
+  for (const flag of booleanWithValueErrors) {
+    errors.push(
+      `gallery-preview.yml wrangler preview must not pass ${flag} with a value.`,
+    );
+  }
+
+  for (const [flag, count] of flagCounts) {
+    if (count > 1) {
+      errors.push(`gallery-preview.yml wrangler preview must not repeat ${flag}.`);
+    }
   }
 
   for (const flag of flags.keys()) {
