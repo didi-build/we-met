@@ -242,16 +242,16 @@ describe("check-deploy-guards (unit)", () => {
     );
   });
 
-  it("fails preview-worker when previews rate limiter uses production namespace 2002", () => {
+  it("fails preview-worker when previews exchange rate limiter namespace is wrong", () => {
     const { path } = writeTempPreviewWorkerConfig((config) => {
       const previews = config.previews as Record<string, unknown>;
       const rl = previews.ratelimits as { namespace_id: string }[];
-      rl[0]!.namespace_id = "2002";
+      rl[0]!.namespace_id = "9999";
     });
     const result = runGuards("preview-worker", path);
     expect(result.status).toBe(1);
     expect(result.stderr).toContain(
-      'wrangler.preview.jsonc previews block references production resource "2002"',
+      "preview rate limiter namespace for WE_MET_EXCHANGE_RATE_LIMITER",
     );
   });
 
