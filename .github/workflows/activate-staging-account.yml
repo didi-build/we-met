@@ -19,6 +19,7 @@ jobs:
   activate:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     environment: staging
     steps:
       - name: Require main branch ref

@@ -20,8 +20,18 @@ When **`signups_open`** is off on shared non-prod D1, a first Google sign-in on 
 
 1. Open the repo on GitHub: **Actions** → **Activate staging account**.
 2. Choose **Run workflow**, branch **`main`**, enter the Google account **email** (lowercase in D1), then **Run workflow**.
-3. The run uses the **`staging`** environment and **`CLOUDFLARE_API_TOKEN_STAGING`**; it validates the email, refuses unless the Wrangler binding is **`we-met-db-nonprod`**, and runs the activation `UPDATE` against that database only.
+3. The run uses the **`staging`** environment and **`CLOUDFLARE_API_TOKEN_STAGING`**; it validates the email, refuses unless the Wrangler **`WE_MET_DB`** binding targets **`database_name` `we-met-db-nonprod`**, and runs the activation `UPDATE` against that database only.
 4. Ask the user to refresh the editor or call `GET /api/app/session` so the client sees `allowed: true`.
+
+If the run fails, the log shows one of these messages (no email is printed):
+
+| Message                                                                   | Meaning                                                                   |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `Staging account activation failed: account not found or not waitlisted.` | No matching row, or the account is not in `waitlisted` / `active` status. |
+| `Staging account activation failed: multiple accounts matched.`           | The `UPDATE` changed more than one row (unexpected duplicate emails).     |
+| `Staging account activation failed: could not verify activation result.`  | Wrangler returned no usable JSON, or `success` was not true.              |
+
+`Staging account activation failed: database command error.` means Wrangler exited non-zero (token, network, or SQL error).
 
 **Safety:** The workflow is **`workflow_dispatch` on `main` only** (no `pull_request` or `push` triggers). Do not run it from unmerged PR branch code.
 

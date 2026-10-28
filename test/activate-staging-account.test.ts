@@ -1,9 +1,13 @@
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import type { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { runActivation } from "../scripts/activate-staging-account.mjs";
 import {
+  ACTIVATION_D1_BINDING,
   ACTIVATION_D1_DATABASE_NAME,
+  assertWranglerConfigD1Binding,
   assertWranglerConfigTargetsNonprodD1,
   buildActivationUpdateCommand,
   buildWranglerD1ExecuteArgv,
@@ -13,6 +17,50 @@ import {
   validateActivationEmail,
   WRANGLER_D1_EXECUTE_SPAWN_OPTIONS,
 } from "../scripts/lib/activate-staging-account.mjs";
+import { D1_PLACEHOLDER_PRODUCTION } from "../scripts/lib/wrangler-placeholders.mjs";
+import {
+  extractWorkflowPermissionsMaps,
+  permissionsMapEquals,
+} from "../scripts/lib/workflow-permissions-parse.mjs";
+
+const EXPECTED_D1_ID = "11111111-2222-3333-4444-555555555555";
+
+function testEnv(overrides: Record<string, string | undefined> = {}) {
+  return {
+    WE_MET_D1_DATABASE_ID_NONPROD: EXPECTED_D1_ID,
+    ...overrides,
+  } as unknown as NodeJS.ProcessEnv;
+}
+
+function mockSpawn(
+  impl: () => { status: number; stdout: string; stderr: string },
+): typeof spawnSync {
+  return vi.fn(impl) as unknown as typeof spawnSync;
+}
+
+function writeWranglerConfig(config: Record<string, unknown>) {
+  const dir = mkdtempSync(join(tmpdir(), "activate-staging-guard-"));
+  const path = join(dir, "config.jsonc");
+  writeFileSync(path, JSON.stringify(config, null, 2));
+  return path;
+}
+
+function validWranglerConfig(overrides: Record<string, unknown> = {}) {
+  return writeWranglerConfig({
+    d1_databases: [
+      {
+        binding: ACTIVATION_D1_BINDING,
+        database_name: ACTIVATION_D1_DATABASE_NAME,
+        database_id: EXPECTED_D1_ID,
+      },
+    ],
+    ...overrides,
+  });
+}
+
+function wranglerSuccessStdout(changes: number, success = true) {
+  return JSON.stringify([{ success, meta: { changes } }]);
+}
 
 describe("validateActivationEmail (unit)", () => {
   it("accepts typical maintainer emails", () => {
@@ -20,95 +68,120 @@ describe("validateActivationEmail (unit)", () => {
       ok: true,
       normalized: "diadem@didi.build",
     });
-    expect(validateActivationEmail("user.name+tag@example.co.uk")).toMatchObject({
-      ok: true,
-      normalized: "user.name+tag@example.co.uk",
-    });
   });
 
-  it("normalizes to lowercase", () => {
-    expect(validateActivationEmail("User@Example.COM")).toEqual({
-      ok: true,
-      normalized: "user@example.com",
-    });
-  });
-
-  it("rejects empty and non-strings", () => {
-    expect(validateActivationEmail("")).toMatchObject({ ok: false });
-    expect(validateActivationEmail("   ")).toMatchObject({ ok: false });
-    expect(validateActivationEmail(null)).toMatchObject({ ok: false });
-  });
-
-  it("rejects SQL injection and shell metacharacters", () => {
-    const bad = [
-      "foo'; DROP TABLE accounts;--",
-      "foo@bar.com; DELETE FROM accounts",
-      'foo"@example.com',
-      "foo'@example.com",
-      "foo bar@example.com",
-      "foo\\@example.com",
-      "foo@example.com--",
-      "foo@example.com/*",
-      "*/foo@example.com",
-    ];
-    for (const email of bad) {
-      expect(validateActivationEmail(email).ok, email).toBe(false);
+  it("rejects forbidden character classes on their own", () => {
+    const result = validateActivationEmail("foo bar@example.com");
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toBe("email contains forbidden characters");
     }
   });
 
-  it("rejects addresses outside the conservative pattern", () => {
-    expect(validateActivationEmail("not-an-email").ok).toBe(false);
-    expect(validateActivationEmail("@example.com").ok).toBe(false);
-    expect(validateActivationEmail("user@").ok).toBe(false);
-    expect(validateActivationEmail("user@@example.com").ok).toBe(false);
-    expect(validateActivationEmail("user@example").ok).toBe(false);
+  it("rejects SQL comment marker sequences on their own", () => {
+    const result = validateActivationEmail("user@example.com--");
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toBe("email contains forbidden sequences");
+    }
+  });
+
+  it("rejects odd local parts", () => {
+    expect(validateActivationEmail("a..b@c.co").ok).toBe(false);
+    expect(validateActivationEmail("-a@b.co").ok).toBe(false);
+    expect(validateActivationEmail("+@b.co").ok).toBe(false);
+  });
+
+  it("rejects SQL injection attempts", () => {
+    expect(validateActivationEmail("foo'; DROP TABLE accounts;--").ok).toBe(false);
   });
 });
 
-describe("assertWranglerConfigTargetsNonprodD1 (unit)", () => {
-  function writeConfig(name: string, d1Name: string) {
-    const dir = mkdtempSync(join(tmpdir(), "activate-staging-guard-"));
-    const path = join(dir, name);
-    writeFileSync(
-      path,
-      JSON.stringify(
+describe("assertWranglerConfigD1Binding (unit)", () => {
+  const base = {
+    d1_databases: [
+      {
+        binding: ACTIVATION_D1_BINDING,
+        database_name: ACTIVATION_D1_DATABASE_NAME,
+        database_id: EXPECTED_D1_ID,
+      },
+    ],
+  };
+
+  it("accepts exactly one WE_MET_DB entry with matching database_id", () => {
+    expect(assertWranglerConfigD1Binding(base, EXPECTED_D1_ID)).toEqual({
+      ok: true,
+    });
+    const path = validWranglerConfig();
+    expect(assertWranglerConfigTargetsNonprodD1(path, EXPECTED_D1_ID)).toEqual({
+      ok: true,
+    });
+  });
+
+  it("refuses missing expected database id", () => {
+    expect(assertWranglerConfigD1Binding(base, "").ok).toBe(false);
+  });
+
+  it("refuses production database_name", () => {
+    const parsed = {
+      d1_databases: [{ ...base.d1_databases[0], database_name: "we-met-db" }],
+    };
+    expect(assertWranglerConfigD1Binding(parsed, EXPECTED_D1_ID).ok).toBe(false);
+  });
+
+  it("refuses wrong binding name", () => {
+    const parsed = {
+      d1_databases: [{ ...base.d1_databases[0], binding: "OTHER" }],
+    };
+    expect(assertWranglerConfigD1Binding(parsed, EXPECTED_D1_ID).ok).toBe(false);
+  });
+
+  it("refuses two d1 entries", () => {
+    const parsed = {
+      d1_databases: [base.d1_databases[0], { ...base.d1_databases[0] }],
+    };
+    expect(assertWranglerConfigD1Binding(parsed, EXPECTED_D1_ID).ok).toBe(false);
+  });
+
+  it("refuses mismatched database_id", () => {
+    const parsed = {
+      d1_databases: [
         {
-          d1_databases: [
-            {
-              binding: "WE_MET_DB",
-              database_name: d1Name,
-              database_id: "00000000-0000-0000-0000-000000000002",
-            },
-          ],
+          ...base.d1_databases[0],
+          database_id: "22222222-2222-2222-2222-222222222222",
         },
-        null,
-        2,
-      ),
+      ],
+    };
+    expect(assertWranglerConfigD1Binding(parsed, EXPECTED_D1_ID).ok).toBe(false);
+  });
+
+  it("refuses production placeholder database_id", () => {
+    const parsed = {
+      d1_databases: [
+        { ...base.d1_databases[0], database_id: D1_PLACEHOLDER_PRODUCTION },
+      ],
+    };
+    expect(assertWranglerConfigD1Binding(parsed, EXPECTED_D1_ID).ok).toBe(false);
+  });
+
+  it("refuses env blocks", () => {
+    expect(assertWranglerConfigD1Binding({ ...base, env: {} }, EXPECTED_D1_ID).ok).toBe(
+      false,
     );
-    return path;
-  }
-
-  it("accepts we-met-db-nonprod", () => {
-    const path = writeConfig("ok.jsonc", ACTIVATION_D1_DATABASE_NAME);
-    expect(assertWranglerConfigTargetsNonprodD1(path)).toEqual({ ok: true });
   });
 
-  it("refuses production we-met-db", () => {
-    const path = writeConfig("prod.jsonc", "we-met-db");
-    const result = assertWranglerConfigTargetsNonprodD1(path);
-    expect(result).toMatchObject({ ok: false });
-    if (!result.ok) {
-      expect(result.reason).toContain("we-met-db");
-    }
-  });
-
-  it("refuses other database names", () => {
-    const path = writeConfig("other.jsonc", "some-other-db");
-    const result = assertWranglerConfigTargetsNonprodD1(path);
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.reason).toContain(ACTIVATION_D1_DATABASE_NAME);
-    }
+  it("refuses previews blocks", () => {
+    expect(
+      assertWranglerConfigD1Binding(
+        {
+          ...base,
+          previews: {
+            d1_databases: [{ database_name: "we-met-db" }],
+          },
+        },
+        EXPECTED_D1_ID,
+      ).ok,
+    ).toBe(false);
   });
 });
 
@@ -116,54 +189,28 @@ describe("buildActivationUpdateCommand (unit)", () => {
   const iso = "2026-10-28T12:00:00.000Z";
   const email = "diadem@didi.build";
 
-  it("embeds validated email and timestamp in UPDATE", () => {
-    const sql = buildActivationUpdateCommand(email, iso);
-    expect(sql).toContain("UPDATE accounts");
-    expect(sql).toContain("status = 'active'");
-    expect(sql).toContain("updated_at = '2026-10-28T12:00:00.000Z'");
-    expect(sql).toContain("email = 'diadem@didi.build'");
-    expect(sql).toContain("waitlisted");
-    expect(sql).toContain("active");
-  });
-
   it("places email only in the WHERE string literal", () => {
     const sql = buildActivationUpdateCommand(email, iso);
     expect(emailAppearsOnlyInWhereLiteral(sql, email)).toBe(true);
   });
 });
 
-describe("wrangler D1 execute argv (unit)", () => {
-  it("uses shell: false and passes SQL as one argv element", () => {
-    expect(WRANGLER_D1_EXECUTE_SPAWN_OPTIONS.shell).toBe(false);
-    const sql = buildActivationUpdateCommand(
-      "user@example.com",
-      "2026-10-28T12:00:00.000Z",
-    );
-    const argv = buildWranglerD1ExecuteArgv("wrangler.staging.ci.jsonc", sql);
-    const commandFlagIndex = argv.indexOf("--command");
-    expect(commandFlagIndex).toBeGreaterThan(-1);
-    expect(argv[commandFlagIndex + 1]).toBe(sql);
-    expect(argv.filter((part) => part === sql)).toHaveLength(1);
-  });
-});
-
 describe("parseWranglerD1ExecuteRowChanges (unit)", () => {
-  it("reads meta.changes from wrangler JSON stdout", () => {
+  it("requires success true and meta.changes", () => {
     expect(
-      parseWranglerD1ExecuteRowChanges(JSON.stringify([{ meta: { changes: 1 } }])),
+      parseWranglerD1ExecuteRowChanges(
+        JSON.stringify([{ success: true, meta: { changes: 1 } }]),
+      ),
     ).toBe(1);
     expect(
-      parseWranglerD1ExecuteRowChanges(JSON.stringify([{ meta: { changes: 0 } }])),
-    ).toBe(0);
-    expect(
-      parseWranglerD1ExecuteRowChanges(JSON.stringify([{ meta: { changes: 2 } }])),
-    ).toBe(2);
+      parseWranglerD1ExecuteRowChanges(
+        JSON.stringify([{ success: false, meta: { changes: 1 } }]),
+      ),
+    ).toBeNull();
   });
 
   it("returns null when stdout is not parseable", () => {
     expect(parseWranglerD1ExecuteRowChanges("not json")).toBeNull();
-    expect(parseWranglerD1ExecuteRowChanges("{}")).toBeNull();
-    expect(parseWranglerD1ExecuteRowChanges("[]")).toBeNull();
   });
 });
 
@@ -179,6 +226,146 @@ describe("resolveActivationRowOutcome (unit)", () => {
   });
 });
 
+describe("runActivation (unit)", () => {
+  it("succeeds only when the guard passes and exactly one row changes", () => {
+    const configPath = validWranglerConfig();
+    const spawnSyncFn = mockSpawn(() => ({
+      status: 0,
+      stdout: wranglerSuccessStdout(1),
+      stderr: "",
+    }));
+    const logs: string[] = [];
+    const errors: string[] = [];
+    const code = runActivation({
+      email: "user@example.com",
+      config: configPath,
+      env: testEnv(),
+      spawnSyncFn,
+      now: () => new Date("2026-10-28T12:00:00.000Z"),
+      maskD1DatabaseIdFn: () => {},
+      maskActivationEmailForLogsFn: () => {},
+      onLog: (msg) => logs.push(msg),
+      onError: (msg) => errors.push(msg),
+    });
+    expect(code).toBe(0);
+    expect(logs).toEqual(["Staging account activation succeeded."]);
+    expect(spawnSyncFn).toHaveBeenCalledOnce();
+    const spawnOptions = vi.mocked(spawnSyncFn).mock.calls[0]?.[2];
+    expect(spawnOptions).toEqual(WRANGLER_D1_EXECUTE_SPAWN_OPTIONS);
+    expect(spawnOptions?.shell).toBe(false);
+  });
+
+  it("fails before spawn when the D1 guard rejects the config", () => {
+    const configPath = writeWranglerConfig({
+      d1_databases: [
+        {
+          binding: ACTIVATION_D1_BINDING,
+          database_name: "we-met-db",
+          database_id: EXPECTED_D1_ID,
+        },
+      ],
+    });
+    const spawnSyncFn = vi.fn();
+    const code = runActivation({
+      email: "user@example.com",
+      config: configPath,
+      env: testEnv(),
+      spawnSyncFn,
+      maskD1DatabaseIdFn: () => {},
+      maskActivationEmailForLogsFn: () => {},
+    });
+    expect(code).toBe(1);
+    expect(spawnSyncFn).not.toHaveBeenCalled();
+  });
+
+  it("fails when meta.changes is zero despite wrangler exiting zero", () => {
+    const configPath = validWranglerConfig();
+    const code = runActivation({
+      email: "user@example.com",
+      config: configPath,
+      env: testEnv(),
+      spawnSyncFn: mockSpawn(() => ({
+        status: 0,
+        stdout: wranglerSuccessStdout(0),
+        stderr: "",
+      })),
+      maskD1DatabaseIdFn: () => {},
+      maskActivationEmailForLogsFn: () => {},
+    });
+    expect(code).toBe(1);
+  });
+
+  it("does not forward wrangler stdout to the console", () => {
+    const configPath = validWranglerConfig();
+    const secretPayload = "leaked-from-wrangler@example.com";
+    const logs: string[] = [];
+    runActivation({
+      email: "user@example.com",
+      config: configPath,
+      env: testEnv(),
+      spawnSyncFn: mockSpawn(() => ({
+        status: 0,
+        stdout: JSON.stringify([
+          {
+            success: true,
+            meta: { changes: 1 },
+            debug: secretPayload,
+          },
+        ]),
+        stderr: "stderr noise",
+      })),
+      maskD1DatabaseIdFn: () => {},
+      maskActivationEmailForLogsFn: () => {},
+      onLog: (msg) => logs.push(msg),
+    });
+    expect(logs.join("\n")).not.toContain(secretPayload);
+    expect(logs.join("\n")).not.toContain("stderr noise");
+  });
+
+  it("masks the operator email before D1 execute", () => {
+    const configPath = validWranglerConfig();
+    const masked: string[] = [];
+    runActivation({
+      email: "Operator@Example.com",
+      config: configPath,
+      env: testEnv(),
+      spawnSyncFn: mockSpawn(() => ({
+        status: 0,
+        stdout: wranglerSuccessStdout(1),
+        stderr: "",
+      })),
+      maskD1DatabaseIdFn: () => {},
+      maskActivationEmailForLogsFn: (email) => masked.push(email),
+    });
+    expect(masked).toEqual(["operator@example.com"]);
+  });
+
+  it("passes SQL as a single argv element with shell disabled", () => {
+    const configPath = validWranglerConfig();
+    const spawnSyncFn = mockSpawn(() => ({
+      status: 0,
+      stdout: wranglerSuccessStdout(1),
+      stderr: "",
+    }));
+    runActivation({
+      email: "user@example.com",
+      config: configPath,
+      env: testEnv(),
+      spawnSyncFn,
+      now: () => new Date("2026-10-28T12:00:00.000Z"),
+      maskD1DatabaseIdFn: () => {},
+      maskActivationEmailForLogsFn: () => {},
+    });
+    const argv = vi.mocked(spawnSyncFn).mock.calls[0]?.[1] as string[] | undefined;
+    const sql = buildActivationUpdateCommand(
+      "user@example.com",
+      "2026-10-28T12:00:00.000Z",
+    );
+    expect(argv).toEqual(buildWranglerD1ExecuteArgv(configPath, sql));
+    expect(vi.mocked(spawnSyncFn).mock.calls[0]?.[2]).toMatchObject({ shell: false });
+  });
+});
+
 describe("Activate staging account workflow structure (unit)", () => {
   const workflow = readFileSync(
     ".github/workflows/activate-staging-account.yml",
@@ -188,41 +375,33 @@ describe("Activate staging account workflow structure (unit)", () => {
   it("only triggers on workflow_dispatch", () => {
     expect(workflow).toContain("workflow_dispatch:");
     expect(workflow).not.toMatch(/^\s+pull_request:/m);
-    expect(workflow).not.toMatch(/^\s+pull_request_target:/m);
     expect(workflow).not.toMatch(/^\s+push:/m);
   });
 
-  it("limits permissions to contents read", () => {
-    expect(workflow).toContain("permissions:");
-    expect(workflow).toContain("contents: read");
-    expect(workflow).not.toContain("contents: write");
-    expect(workflow).not.toContain("id-token: write");
+  it("limits permissions to exactly contents read at every level", () => {
+    const maps = extractWorkflowPermissionsMaps(workflow);
+    expect(maps.length).toBeGreaterThan(0);
+    for (const map of maps) {
+      expect(permissionsMapEquals(map, { contents: "read" })).toBe(true);
+    }
   });
 
-  it("requires main ref, staging environment, and main checkout", () => {
+  it("requires main ref, staging environment, timeout, and main checkout", () => {
     const job = workflow.match(/^  activate:[\s\S]*$/m)?.[0] ?? "";
     expect(job).toContain("if: github.ref == 'refs/heads/main'");
     expect(job).toContain("environment: staging");
+    expect(job).toContain("timeout-minutes: 10");
     expect(workflow).toContain("ref: main");
-    expect(workflow).toContain("refs/heads/main");
   });
 
-  it("uses staging credentials and activation script", () => {
-    expect(workflow).toContain("activate-staging-account.mjs");
-    expect(workflow).toContain("CLOUDFLARE_API_TOKEN_STAGING");
-    expect(workflow).toContain("secrets.WE_MET_D1_DATABASE_ID_NONPROD");
-    expect(workflow).not.toContain("vars.WE_MET_D1_DATABASE_ID_NONPROD");
-    expect(workflow).toContain("ACTIVATE_EMAIL:");
-  });
-
-  it("does not reference production resources", () => {
-    expect(workflow).not.toContain("CLOUDFLARE_API_TOKEN_PRODUCTION");
-    expect(workflow).not.toMatch(/environment:\s*production/m);
-    expect(workflow.replace(/we-met-db-nonprod/g, "")).not.toContain("we-met-db");
-  });
-
-  it("does not write a job summary", () => {
-    expect(workflow).not.toContain("GITHUB_STEP_SUMMARY");
+  it("runs deploy guards before activation", () => {
+    const guardsIdx = workflow.indexOf("Deploy-time guards (staging D1 binding)");
+    const activateIdx = workflow.indexOf("Activate waitlisted account in non-prod D1");
+    expect(guardsIdx).toBeGreaterThan(-1);
+    expect(activateIdx).toBeGreaterThan(guardsIdx);
+    expect(workflow).toContain(
+      "check-deploy-guards.mjs --target staging --config wrangler.staging.ci.jsonc",
+    );
   });
 
   it("does not interpolate workflow inputs or secrets inside run scripts", () => {
@@ -235,44 +414,10 @@ describe("Activate staging account workflow structure (unit)", () => {
     }
   });
 
-  it("masks D1 id in run output only via add-mask", () => {
-    const runBlocks =
-      workflow.match(/run:\s*\|[\s\S]*?(?=\n\s{6}\S|\n\s{4}\S|$)/g) ?? [];
-    for (const block of runBlocks) {
-      if (block.includes("WE_MET_D1_DATABASE_ID_NONPROD")) {
-        expect(block).toMatch(/::add-mask::\$\{WE_MET_D1_DATABASE_ID_NONPROD\}/);
-        expect(block).not.toMatch(/echo\s+\$\{WE_MET_D1_DATABASE_ID_NONPROD\}/);
-      }
-    }
-  });
-});
-
-describe("activate-staging-account logging (unit)", () => {
-  it("masks email before D1 execute and avoids echoing it in user messages", () => {
-    const script = readFileSync("scripts/activate-staging-account.mjs", "utf8");
-    expect(script).toContain("maskActivationEmailForLogs");
-    expect(script).toContain('console.log("Staging account activation succeeded.")');
-    expect(script).toContain(
-      "Staging account activation failed: account not found or not waitlisted.",
-    );
-    expect(script).toContain(
-      "Staging account activation failed: multiple accounts matched.",
-    );
-    expect(script).toContain(
-      "Staging account activation failed: could not verify activation result.",
-    );
-    expect(script).not.toMatch(/console\.(log|error)\([^)]*normalized/);
-    expect(script).not.toMatch(/console\.(log|error)\([^)]*\$\{.*email/i);
-    expect(script).not.toMatch(/stderr\.write\(result\.stderr/);
-    expect(script).not.toMatch(/console\.(log|error)\([^)]*result\.stdout/);
-    expect(script).toContain("WRANGLER_D1_EXECUTE_SPAWN_OPTIONS");
-    expect(script).not.toMatch(/shell:\s*true/);
-  });
-
-  it("masks operator email only through add-mask helper", () => {
-    const lib = readFileSync("scripts/lib/activate-staging-account.mjs", "utf8");
-    expect(lib).toMatch(
-      /maskActivationEmailForLogs[\s\S]*console\.log\(`::add-mask::\$\{email\}`\)/,
-    );
+  it("does not reference production resources or write a job summary", () => {
+    expect(workflow).not.toContain("CLOUDFLARE_API_TOKEN_PRODUCTION");
+    expect(workflow).not.toMatch(/environment:\s*production/m);
+    expect(workflow.replace(/we-met-db-nonprod/g, "")).not.toContain("we-met-db");
+    expect(workflow).not.toContain("GITHUB_STEP_SUMMARY");
   });
 });

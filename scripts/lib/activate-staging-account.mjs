@@ -1,11 +1,15 @@
 import { readFileSync } from "node:fs";
-import { NONPROD_RESOURCE_MARKERS } from "./wrangler-placeholders.mjs";
+import {
+  D1_PLACEHOLDER_PRODUCTION,
+  NONPROD_RESOURCE_MARKERS,
+} from "./wrangler-placeholders.mjs";
 import { parseJsonc } from "./parse-jsonc.mjs";
 
 /** @typedef {{ ok: true; normalized: string }} EmailOk */
 /** @typedef {{ ok: false; reason: string }} EmailFail */
 
 export const ACTIVATION_D1_DATABASE_NAME = NONPROD_RESOURCE_MARKERS.d1Name;
+export const ACTIVATION_D1_BINDING = "WE_MET_DB";
 
 const MAX_EMAIL_LEN = 254;
 const MAX_LOCAL_LEN = 64;
@@ -56,40 +60,80 @@ export function validateActivationEmail(raw) {
   if (domain.startsWith(".") || domain.endsWith(".")) {
     return { ok: false, reason: "email domain has invalid dots" };
   }
+  if (local.includes("..") || domain.includes("..")) {
+    return { ok: false, reason: "email contains consecutive dots" };
+  }
+  if (!/^[a-zA-Z0-9]/.test(local)) {
+    return { ok: false, reason: "email local part has invalid leading character" };
+  }
   return { ok: true, normalized: email.toLowerCase() };
 }
 
 /**
- * @param {string} configPath
+ * @param {unknown} parsed
+ * @param {string} expectedDatabaseId
  * @returns {{ ok: true } | { ok: false; reason: string }}
  */
-export function assertWranglerConfigTargetsNonprodD1(configPath) {
+export function assertWranglerConfigD1Binding(parsed, expectedDatabaseId) {
+  if (!expectedDatabaseId || typeof expectedDatabaseId !== "string") {
+    return { ok: false, reason: "expected non-prod D1 database id is missing" };
+  }
+  if (parsed?.env !== undefined) {
+    return { ok: false, reason: "wrangler config must not define env blocks" };
+  }
+  if (parsed?.previews !== undefined) {
+    return { ok: false, reason: "wrangler config must not define previews blocks" };
+  }
+  const entries = parsed?.d1_databases;
+  if (!Array.isArray(entries) || entries.length !== 1) {
+    return {
+      ok: false,
+      reason: "wrangler config must have exactly one d1_databases entry",
+    };
+  }
+  const entry = entries[0];
+  if (entry?.binding !== ACTIVATION_D1_BINDING) {
+    return {
+      ok: false,
+      reason: `refusing D1 binding ${String(entry?.binding)}; expected ${ACTIVATION_D1_BINDING}`,
+    };
+  }
+  const name = entry?.database_name;
+  if (name === "we-met-db") {
+    return {
+      ok: false,
+      reason: "refusing production D1 database_name we-met-db",
+    };
+  }
+  if (name !== ACTIVATION_D1_DATABASE_NAME) {
+    return {
+      ok: false,
+      reason: `refusing D1 database_name ${String(name)}; expected ${ACTIVATION_D1_DATABASE_NAME}`,
+    };
+  }
+  const id = entry?.database_id;
+  if (id === D1_PLACEHOLDER_PRODUCTION) {
+    return { ok: false, reason: "refusing production D1 placeholder database_id" };
+  }
+  if (id !== expectedDatabaseId) {
+    return { ok: false, reason: "D1 database_id does not match expected non-prod id" };
+  }
+  return { ok: true };
+}
+
+/**
+ * @param {string} configPath
+ * @param {string} expectedDatabaseId
+ * @returns {{ ok: true } | { ok: false; reason: string }}
+ */
+export function assertWranglerConfigTargetsNonprodD1(configPath, expectedDatabaseId) {
   let parsed;
   try {
     parsed = parseJsonc(readFileSync(configPath, "utf8"));
   } catch {
     return { ok: false, reason: "could not read wrangler config" };
   }
-  const entries = parsed?.d1_databases;
-  if (!Array.isArray(entries) || entries.length === 0) {
-    return { ok: false, reason: "wrangler config has no d1_databases bindings" };
-  }
-  for (const entry of entries) {
-    const name = entry?.database_name;
-    if (name === "we-met-db") {
-      return {
-        ok: false,
-        reason: "refusing production D1 database_name we-met-db",
-      };
-    }
-    if (name !== ACTIVATION_D1_DATABASE_NAME) {
-      return {
-        ok: false,
-        reason: `refusing D1 database_name ${String(name)}; expected ${ACTIVATION_D1_DATABASE_NAME}`,
-      };
-    }
-  }
-  return { ok: true };
+  return assertWranglerConfigD1Binding(parsed, expectedDatabaseId);
 }
 
 /**
@@ -143,7 +187,11 @@ export function buildWranglerD1ExecuteArgv(configPath, sqlCommand) {
 export function parseWranglerD1ExecuteRowChanges(stdout) {
   try {
     const parsed = JSON.parse(stdout);
-    const changes = parsed?.[0]?.meta?.changes;
+    const row = parsed?.[0];
+    if (!row || row.success !== true) {
+      return null;
+    }
+    const changes = row.meta?.changes;
     if (typeof changes === "number") {
       return changes;
     }

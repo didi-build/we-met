@@ -8,6 +8,7 @@
  * Requires CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, and WE_MET_D1_DATABASE_ID_NONPROD.
  */
 import { spawnSync } from "node:child_process";
+import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
 import {
   assertWranglerConfigTargetsNonprodD1,
@@ -50,20 +51,85 @@ function parseArgs(argv) {
 
 /**
  * @param {'not_found' | 'ambiguous' | 'unparseable'} outcome
+ * @param {(msg: string) => void} onError
  */
-function failActivationOutcome(outcome) {
+function failActivationOutcome(outcome, onError) {
   if (outcome === "not_found") {
-    console.error(
-      "Staging account activation failed: account not found or not waitlisted.",
-    );
+    onError("Staging account activation failed: account not found or not waitlisted.");
   } else if (outcome === "ambiguous") {
-    console.error("Staging account activation failed: multiple accounts matched.");
+    onError("Staging account activation failed: multiple accounts matched.");
   } else {
-    console.error(
-      "Staging account activation failed: could not verify activation result.",
-    );
+    onError("Staging account activation failed: could not verify activation result.");
   }
-  process.exit(1);
+}
+
+/**
+ * @param {{
+ *   email: string;
+ *   config: string;
+ *   env?: NodeJS.ProcessEnv;
+ *   spawnSyncFn?: typeof spawnSync;
+ *   resolvePath?: (path: string) => string;
+ *   now?: () => Date;
+ *   maskD1DatabaseIdFn?: typeof maskD1DatabaseId;
+ *   maskActivationEmailForLogsFn?: typeof maskActivationEmailForLogs;
+ *   onLog?: (msg: string) => void;
+ *   onError?: (msg: string) => void;
+ * }} options
+ * @returns {number}
+ */
+export function runActivation(options) {
+  const {
+    email,
+    config,
+    env = process.env,
+    spawnSyncFn = spawnSync,
+    resolvePath = resolve,
+    now = () => new Date(),
+    maskD1DatabaseIdFn = maskD1DatabaseId,
+    maskActivationEmailForLogsFn = maskActivationEmailForLogs,
+    onLog = (msg) => console.log(msg),
+    onError = (msg) => console.error(msg),
+  } = options;
+
+  const validated = validateActivationEmail(email);
+  if (!validated.ok) {
+    onError(`Activation email rejected: ${validated.reason}`);
+    return 1;
+  }
+
+  const configPath = resolvePath(config);
+  const expectedDatabaseId = env.WE_MET_D1_DATABASE_ID_NONPROD ?? "";
+  const guard = assertWranglerConfigTargetsNonprodD1(configPath, expectedDatabaseId);
+  if (!guard.ok) {
+    onError(`D1 database guard failed: ${guard.reason}`);
+    return 1;
+  }
+
+  maskD1DatabaseIdFn(env.WE_MET_D1_DATABASE_ID_NONPROD ?? "");
+  maskActivationEmailForLogsFn(validated.normalized);
+
+  const command = buildActivationUpdateCommand(
+    validated.normalized,
+    now().toISOString(),
+  );
+  const wranglerArgv = buildWranglerD1ExecuteArgv(config, command);
+
+  const result = spawnSyncFn("npx", wranglerArgv, WRANGLER_D1_EXECUTE_SPAWN_OPTIONS);
+
+  if (result.status !== 0) {
+    onError("Staging account activation failed: database command error.");
+    return result.status ?? 1;
+  }
+
+  const changes = parseWranglerD1ExecuteRowChanges(result.stdout ?? "");
+  const outcome = resolveActivationRowOutcome(changes);
+  if (outcome === "success") {
+    onLog("Staging account activation succeeded.");
+    return 0;
+  }
+  failActivationOutcome(outcome, onError);
+  return 1;
 }
 
 function main() {
@@ -71,41 +137,13 @@ function main() {
   if (!email || !config) {
     usage();
   }
-
-  const validated = validateActivationEmail(email);
-  if (!validated.ok) {
-    console.error(`Activation email rejected: ${validated.reason}`);
-    process.exit(1);
-  }
-
-  const configPath = resolve(config);
-  const guard = assertWranglerConfigTargetsNonprodD1(configPath);
-  if (!guard.ok) {
-    console.error(`D1 database guard failed: ${guard.reason}`);
-    process.exit(1);
-  }
-
-  maskD1DatabaseId(process.env.WE_MET_D1_DATABASE_ID_NONPROD ?? "");
-  maskActivationEmailForLogs(validated.normalized);
-
-  const updatedAt = new Date().toISOString();
-  const command = buildActivationUpdateCommand(validated.normalized, updatedAt);
-  const wranglerArgv = buildWranglerD1ExecuteArgv(config, command);
-
-  const result = spawnSync("npx", wranglerArgv, WRANGLER_D1_EXECUTE_SPAWN_OPTIONS);
-
-  if (result.status !== 0) {
-    console.error("Staging account activation failed: database command error.");
-    process.exit(result.status ?? 1);
-  }
-
-  const changes = parseWranglerD1ExecuteRowChanges(result.stdout ?? "");
-  const outcome = resolveActivationRowOutcome(changes);
-  if (outcome === "success") {
-    console.log("Staging account activation succeeded.");
-    return;
-  }
-  failActivationOutcome(outcome);
+  process.exit(runActivation({ email, config }));
 }
 
-main();
+const isMain =
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (isMain) {
+  main();
+}
