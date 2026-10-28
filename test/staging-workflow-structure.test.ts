@@ -167,9 +167,11 @@ describe("Deploy staging workflow structure (unit)", () => {
   it("treats migration drift listing as warn-only after apply", () => {
     const migrationsBlock = stepByName(steps, MIGRATIONS_STEP).block;
     expect(migrationsBlock).toContain("APPLY_LOG=$(mktemp)");
-    expect(migrationsBlock).toContain("grep -E '\\[code: [0-9]+\\]' \"$APPLY_LOG\"");
+    expect(migrationsBlock).toContain(
+      "grep -oE '\\[code: [0-9]+\\]' \"$APPLY_LOG\" | sort -u",
+    );
     expect(migrationsBlock).toContain("DRIFT_STDERR=$(mktemp)");
-    expect(migrationsBlock).toContain("<redacted-d1-id>");
+    expect(migrationsBlock).toContain("--print-redacted-stderr");
     expect(migrationsBlock).toContain("set +e");
     expect(migrationsBlock).toContain("continuing deploy");
     expect(migrationsBlock).toContain("set -e");
