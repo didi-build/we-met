@@ -14,6 +14,7 @@ import {
   extractWranglerDeploySegments,
   extractWranglerPreviewArgStrings,
   extractWranglerPreviewInvocations,
+  extractYamlRunCommands,
   findWranglerPreviewSubcommand,
   flattenYamlRunBlocks,
   joinShellContinuations,
@@ -502,6 +503,66 @@ describe("gallery guards (unit)", () => {
       ),
     ).toContain(
       "scripts/evil.mjs must not run wrangler deploy/versions deploy with wrangler.gallery.jsonc.",
+    );
+  });
+
+  it("detects gallery deploy inside realistic multiline execSync source (round 4)", () => {
+    const script = `import { execSync } from "node:child_process";
+
+export function publishGallery() {
+  execSync(
+    "npx wrangler -c=wrangler.gallery.jsonc deploy",
+  );
+}
+`;
+    expect(
+      collectGalleryDeployViolations(script, "scripts/publish-gallery.mjs"),
+    ).toContain(
+      "scripts/publish-gallery.mjs must not run wrangler deploy/versions deploy with wrangler.gallery.jsonc.",
+    );
+  });
+
+  it("keeps full yaml run blocks with printf/set/if and still catches deploy (round 4)", () => {
+    const yaml = `
+jobs:
+  evil:
+    steps:
+      - run: |-
+          set -euo pipefail
+          preview_status=0
+          if [ "\${preview_status}" -ne 0 ]; then
+            printf '%s\\n' "skip"
+          fi
+          ./node_modules/.bin/wrangler deploy --config wrangler.gallery.jsonc
+`;
+    const flat = flattenYamlRunBlocks(yaml);
+    expect(extractYamlRunCommands(flat).join("\n")).toContain("preview_status=");
+    expect(extractYamlRunCommands(flat).join("\n")).toContain("printf");
+    expect(
+      collectGalleryDeployViolations(flat, ".github/workflows/evil.yml", {
+        isYaml: true,
+      }),
+    ).toContain(
+      ".github/workflows/evil.yml must not run wrangler deploy/versions deploy with wrangler.gallery.jsonc.",
+    );
+  });
+
+  it("detects path-prefixed wrangler binary in sh, workflow, and package.json (round 4)", () => {
+    const cmd = "./node_modules/.bin/wrangler deploy --config wrangler.gallery.jsonc";
+    expect(collectGalleryDeployViolations(cmd, "scripts/evil.sh")).toContain(
+      "scripts/evil.sh must not run wrangler deploy/versions deploy with wrangler.gallery.jsonc.",
+    );
+    expect(
+      collectGalleryDeployViolations(cmd, ".github/workflows/evil.yml", {
+        isYaml: true,
+      }),
+    ).toContain(
+      ".github/workflows/evil.yml must not run wrangler deploy/versions deploy with wrangler.gallery.jsonc.",
+    );
+    expect(
+      collectGalleryDeployViolations(cmd, "package.json scripts.gallery:evil"),
+    ).toContain(
+      "package.json scripts.gallery:evil must not run wrangler deploy/versions deploy with wrangler.gallery.jsonc.",
     );
   });
 

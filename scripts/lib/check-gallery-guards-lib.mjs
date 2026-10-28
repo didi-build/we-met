@@ -33,7 +33,7 @@ export function flattenYamlRunBlocks(text) {
   let i = 0;
   while (i < lines.length) {
     const line = lines[i];
-    const pipeRun = line.match(/^(\s+)run:\s*\|\s*$/);
+    const pipeRun = line.match(/^(\s+)run:\s*[|>]-?\s*$/);
     if (pipeRun) {
       const baseIndent = pipeRun[1].length;
       const parts = [];
@@ -85,6 +85,111 @@ export function joinShellContinuations(text) {
   return merged.join("\n");
 }
 
+const WRANGLER_BINARY = String.raw`wrangler(?:@\S+)?`;
+
+const WRANGLER_BIN_RE = new RegExp(
+  `(?:(?:npx|npm\\s+exec|bunx|pnpm\\s+(?:exec|dlx)|yarn)\\s+|(?:[\\w.~-]+/)+|^|[\\s;(;&|])(?:["']?${WRANGLER_BINARY}["']?)(?=[\\s);,]|$|["'])`,
+  "gi",
+);
+
+/**
+ * @param {string} text
+ * @returns {string[]}
+ */
+export function splitShellStatements(text) {
+  return text
+    .split(/\s*(?:;|&&|\|\|)\s*/)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+}
+
+/**
+ * @param {string} source
+ * @returns {string[]}
+ */
+export function extractJsStringLiteralBodies(source) {
+  const bodies = [];
+  const patterns = [
+    /"(?:\\.|[^"\\])*"/g,
+    /'(?:\\.|[^'\\])*'/g,
+    /`(?:\\.|[^`\\]|\\$\{(?:\\.|[^}\\])*\})*`/g,
+  ];
+  for (const pattern of patterns) {
+    let match = pattern.exec(source);
+    while (match) {
+      bodies.push(match[0].slice(1, -1));
+      match = pattern.exec(source);
+    }
+  }
+  return bodies;
+}
+
+/**
+ * @param {string} segment
+ * @param {"deploy" | "preview"} subcommand
+ * @returns {boolean}
+ */
+export function failClosedSegmentHasWranglerSubcommand(segment, subcommand) {
+  const statements = splitShellStatements(
+    joinShellContinuations(segment).replace(/\r?\n/g, " "),
+  );
+  const invocationRe = new RegExp(WRANGLER_BIN_RE.source, WRANGLER_BIN_RE.flags);
+  for (const stmt of statements) {
+    let match = invocationRe.exec(stmt);
+    while (match) {
+      const after = stmt.slice(match.index + match[0].length);
+      if (subcommand === "deploy") {
+        if (/\bversions\s+deploy\b/.test(after) || /\bdeploy\b/.test(after)) {
+          return true;
+        }
+      } else if (/\bpreview\b/.test(after) || /pre''view/.test(after)) {
+        return true;
+      }
+      match = invocationRe.exec(stmt);
+    }
+  }
+  return false;
+}
+
+/**
+ * @param {string} label
+ * @returns {boolean}
+ */
+export function isJsSourceFile(label) {
+  return /\.(mjs|js|cjs|ts|mts)(?:$|[\s:])/.test(label);
+}
+
+/**
+ * @param {string} text
+ * @param {{ isYaml?: boolean, isJs?: boolean }} [options]
+ * @returns {string[]}
+ */
+export function scanSegments(text, options = {}) {
+  const segments = [];
+  if (options.isYaml) {
+    for (const command of extractYamlRunCommands(text)) {
+      segments.push(joinShellContinuations(command).replace(/\r?\n/g, " "));
+      for (const line of command.split(/\r?\n/)) {
+        const trimmed = line.trim();
+        if (trimmed.length > 0) {
+          segments.push(trimmed);
+        }
+      }
+    }
+    if (segments.length === 0) {
+      segments.push(normalizeForDeployScan(text, { isYaml: true }));
+    }
+    return segments;
+  }
+  if (options.isJs) {
+    for (const body of extractJsStringLiteralBodies(text)) {
+      segments.push(body);
+    }
+  }
+  segments.push(joinShellContinuations(text).replace(/\r?\n/g, " "));
+  return segments;
+}
+
 /**
  * @param {string} yamlText
  * @returns {string[]}
@@ -113,16 +218,7 @@ export function extractYamlRunCommands(yamlText) {
         j += 1;
         continue;
       }
-      const trimmed = next.trim();
-      if (
-        j > i + 1 &&
-        /^(?:preview_status=|if\s+\[|printf|echo\s|set\s|-\s*name:|-\s*uses:)/.test(
-          trimmed,
-        )
-      ) {
-        break;
-      }
-      parts.push(trimmed);
+      parts.push(next.trim());
       j += 1;
     }
     commands.push(joinShellContinuations(parts.join("\n")));
@@ -133,20 +229,14 @@ export function extractYamlRunCommands(yamlText) {
 
 /**
  * @param {string} text
+ * @param {string} label
  * @param {{ isYaml?: boolean }} [options]
  * @returns {string[]}
  */
-function normalizedScanSegments(text, options = {}) {
-  if (options.isYaml) {
-    const commands = extractYamlRunCommands(text).map((command) =>
-      joinShellContinuations(command).replace(/\r?\n/g, " "),
-    );
-    if (commands.length > 0) {
-      return commands;
-    }
-    return [normalizeForDeployScan(text, { isYaml: true })];
-  }
-  return [normalizeForDeployScan(text, options)];
+function normalizedScanSegments(text, label, options = {}) {
+  const isYaml = options.isYaml ?? (label.endsWith(".yml") || label.endsWith(".yaml"));
+  const isJs = isJsSourceFile(label) && !isYaml;
+  return scanSegments(text, { isYaml, isJs });
 }
 
 /**
@@ -180,7 +270,7 @@ const WRANGLER_GLOBAL_BOOLEAN_FLAGS = new Set([
  * @returns {string}
  */
 function cleanShellToken(token) {
-  return token.replace(/[")]+$/g, "");
+  return token.replace(/(?:["']|[);,])+$/g, "");
 }
 
 /**
@@ -317,15 +407,18 @@ const SHELL_COMMAND_TERMINATORS = new Set([";", "&&", "||", "|"]);
 export function stripShellRedirections(tokens) {
   const out = [];
   for (let i = 0; i < tokens.length; i += 1) {
-    const token = tokens[i];
+    let token = tokens[i];
     if (token === "2>&1") {
       continue;
+    }
+    if (token.startsWith("2>&1") && token.length > 4) {
+      token = token.slice(4);
     }
     if (token === ">" || token === ">>" || token === "<") {
       i += 1;
       continue;
     }
-    if (/^[12]?>>?\/?/.test(token)) {
+    if (/^[12]?>>?\/?$/.test(token)) {
       continue;
     }
     out.push(token);
@@ -362,6 +455,9 @@ function endOfWranglerCommandIndex(tokens, start, initialParenDepth = 0) {
   while (j < tokens.length) {
     const token = tokens[j];
     if (depth <= 0 && SHELL_COMMAND_TERMINATORS.has(token)) {
+      break;
+    }
+    if (depth <= 0 && (token === ")" || /\)"$/.test(token))) {
       break;
     }
     if (token === "$(") {
@@ -405,9 +501,13 @@ function shellEnvAssignmentsBeforeWrangler(normalized, wranglerIndex) {
  * @param {string} normalized
  * @returns {string[]}
  */
+/**
+ * @param {string} normalized
+ * @returns {string[]}
+ */
 export function extractWranglerDeploySegments(normalized) {
   const segments = [];
-  const re = /(?<![/.\w-])wrangler(?:@\S+)?(?=\s|$)/g;
+  const re = new RegExp(WRANGLER_BIN_RE.source, WRANGLER_BIN_RE.flags);
   let match = re.exec(normalized);
   while (match) {
     const wranglerEndIndex = match.index + match[0].length;
@@ -442,6 +542,32 @@ function referencesGalleryWranglerConfig(segment) {
     /--config[= ]wrangler\.gallery\.jsonc/.test(segment) ||
     /-c[= ]wrangler\.gallery\.jsonc/.test(segment)
   );
+}
+
+/**
+ * @param {string} segment
+ * @returns {boolean}
+ */
+function segmentRunsGalleryWranglerDeploy(segment) {
+  if (!failClosedSegmentHasWranglerSubcommand(segment, "deploy")) {
+    return false;
+  }
+  const deploySegments = extractWranglerDeploySegments(segment);
+  if (deploySegments.some(referencesGalleryWranglerConfig)) {
+    return true;
+  }
+  return referencesGalleryWranglerConfig(segment);
+}
+
+/**
+ * @param {string} segment
+ * @returns {boolean}
+ */
+function segmentRunsWranglerDeploy(segment) {
+  if (failClosedSegmentHasWranglerSubcommand(segment, "deploy")) {
+    return true;
+  }
+  return extractWranglerDeploySegments(segment).length > 0;
 }
 
 /**
@@ -544,7 +670,7 @@ export function collectGalleryPreviewLocationViolations(text, label, options = {
       `${label} must not run wrangler preview with wrangler.gallery.jsonc (only ${GALLERY_WORKFLOW}).`,
     ];
   }
-  for (const segment of normalizedScanSegments(text, { isYaml })) {
+  for (const segment of normalizedScanSegments(text, label, { isYaml })) {
     const invocations = extractWranglerPreviewInvocations(segment);
     for (const inv of invocations) {
       if (
@@ -581,6 +707,11 @@ export function tokenizeShellArgs(s) {
     while (i < s.length && !/\s/.test(s[i])) {
       const ch = s[i];
       if (ch === "'" || ch === '"') {
+        if (ch === '"' && token.endsWith(")")) {
+          token += ch;
+          i += 1;
+          break;
+        }
         const quote = ch;
         i += 1;
         while (i < s.length && s[i] !== quote) {
@@ -606,9 +737,6 @@ export function tokenizeShellArgs(s) {
   }
   return tokens;
 }
-
-const WRANGLER_BIN_RE =
-  /(?<![/.\w-])(?:(?:npx|npm)\s+(?:exec\s+)?)?["']?wrangler(?:@\S+)?["']?(?=\s|$)/g;
 
 /**
  * @param {string} normalizedWorkflow
@@ -890,11 +1018,10 @@ export function collectGalleryWorkflowViolations(workflowText) {
 export function collectGalleryDeployViolations(text, label, options = {}) {
   const errors = [];
   if (options.isGalleryWorkflow) {
-    for (const segment of normalizedScanSegments(text, {
+    for (const segment of normalizedScanSegments(text, label, {
       isYaml: options.isYaml ?? true,
     })) {
-      const segments = extractWranglerDeploySegments(segment);
-      if (segments.length > 0) {
+      if (segmentRunsWranglerDeploy(segment)) {
         errors.push(
           `${label} must not run wrangler deploy or wrangler versions deploy.`,
         );
@@ -913,18 +1040,12 @@ export function collectGalleryDeployViolations(text, label, options = {}) {
     return errors;
   }
   const isYaml = options.isYaml ?? (label.endsWith(".yml") || label.endsWith(".yaml"));
-  for (const segment of normalizedScanSegments(text, { isYaml })) {
-    const segments = extractWranglerDeploySegments(segment);
-    if (segments.length === 0) {
-      continue;
-    }
-    for (const deploySegment of segments) {
-      if (referencesGalleryWranglerConfig(deploySegment)) {
-        errors.push(
-          `${label} must not run wrangler deploy/versions deploy with wrangler.gallery.jsonc.`,
-        );
-        return errors;
-      }
+  for (const segment of normalizedScanSegments(text, label, { isYaml })) {
+    if (segmentRunsGalleryWranglerDeploy(segment)) {
+      errors.push(
+        `${label} must not run wrangler deploy/versions deploy with wrangler.gallery.jsonc.`,
+      );
+      return errors;
     }
   }
   return errors;
