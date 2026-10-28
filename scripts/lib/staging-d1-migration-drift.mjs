@@ -1,6 +1,19 @@
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
 
+const D1_UUID_PATTERN =
+  /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/g;
+
+/**
+ * Redact Cloudflare D1 database ids (UUIDs) from CI log text.
+ *
+ * @param {string} text
+ * @returns {string}
+ */
+export function redactD1UuidsInText(text) {
+  return text.replace(D1_UUID_PATTERN, "<redacted-d1-id>");
+}
+
 /**
  * @param {unknown} wranglerExecuteJson
  * @returns {string[]}
