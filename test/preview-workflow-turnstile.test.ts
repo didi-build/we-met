@@ -16,6 +16,13 @@ describe("Cloudflare credentials in deploy workflows (unit)", () => {
     );
   });
 
+  it("production OpenNext build does not set WE_MET_BASE_URL (production card origin fallback)", () => {
+    const buildMatch = production.match(
+      /- name: Build OpenNext \(production Turnstile site key\)[\s\S]*?run: npm run build/,
+    );
+    expect(buildMatch?.[0] ?? "").not.toContain("WE_MET_BASE_URL");
+  });
+
   it("production workflow uses production Turnstile variable", () => {
     expect(production).toContain("vars.WE_MET_TURNSTILE_SITE_KEY_PRODUCTION");
     expect(production).not.toContain("WE_MET_TURNSTILE_SITE_KEY_NONPROD");

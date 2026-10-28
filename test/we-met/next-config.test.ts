@@ -22,4 +22,13 @@ describe("next.config staging build guard (unit)", () => {
     const headers = await mod.default.headers?.();
     expect(headers).toEqual([]);
   });
+
+  it("inlines https://we-met.link when WE_MET_BASE_URL is unset (production build default)", async () => {
+    vi.unstubAllEnvs();
+    delete process.env.WE_MET_ENV;
+    delete process.env.WE_MET_BASE_URL;
+    vi.resetModules();
+    const mod = await import("../../next.config");
+    expect(mod.default.env?.NEXT_PUBLIC_WE_MET_BASE_URL).toBe("https://we-met.link");
+  });
 });
