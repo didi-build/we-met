@@ -4,7 +4,7 @@ Design-only section spec for the We Met privacy page (`/privacy`, `src/component
 
 **Approved by Diadem, Oct 27, 2026, 4:13 PM ET ([DIDI-920](https://linear.app/didi-build/issue/DIDI-920)). Any edit to this text needs a fresh approval.**
 
-This file sits next to the privacy page spec ([spec.md](spec.md), merged in `dfeee96`). A later design-only follow-up links it from `spec.md` (or folds it in) and adds it to `design/README.md`.
+This file sits next to the privacy page spec ([spec.md](spec.md)), which links here; it is listed in `design/README.md`. See also [visitor-receipt-disclosure.md](visitor-receipt-disclosure.md) (DIDI-923).
 
 ## Purpose
 

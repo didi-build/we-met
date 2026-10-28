@@ -92,12 +92,13 @@ Attach custom domain **`we-met.didi.build`** only after Diadem approves that DNS
 ```bash
 npx wrangler secret put WE_MET_TOKEN_SECRET --name we-met-staging
 npx wrangler secret put TURNSTILE_SECRET_KEY --name we-met-staging
-npx wrangler secret put BOOKING_URL --name we-met-staging
 npx wrangler secret put GOOGLE_CLIENT_ID --name we-met-staging
 npx wrangler secret put GOOGLE_CLIENT_SECRET --name we-met-staging
 # optional:
 npx wrangler secret put CONTACTS_SETUP_ALLOWLIST --name we-met-staging
 ```
+
+The public booking link on a card comes from that card's **`links`** data in D1 ([0004](../decisions/0004-card-data-and-branding.md), [0010](../decisions/0010-card-data-d1-and-load-script.md)). Do **not** set a **`BOOKING_URL`** Worker secret on staging.
 
 Do **not** set **`WE_MET_PREVIEW_LOGIN_SECRET`** on staging (preview-only; [0025](../decisions/0025-we-met-mvp-accounts-sign-in-and-app-backend.md)).
 

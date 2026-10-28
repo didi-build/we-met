@@ -1,7 +1,7 @@
 import { vi } from "vitest";
 
 export const leadEmailCapacityAlwaysAllowed = {
-  assertLeadEmailCapacity: vi.fn(async () => true),
+  checkLeadEmailCapacity: vi.fn(async () => ({ allowed: true as const })),
   incrementDailySendCounts: vi.fn(async () => {}),
 };
 

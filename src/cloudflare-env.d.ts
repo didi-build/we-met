@@ -1,4 +1,5 @@
 import type {
+  AnalyticsEngineDataset,
   D1Database,
   ImagesBinding,
   Queue,
@@ -33,6 +34,7 @@ declare global {
     WE_MET_CONTACT_SENDER_ADDRESSES?: string;
     CONTACTS_SETUP_ALLOWLIST?: string;
     CONTACTS_SETUP_ENABLED_FOR_ALL?: string;
+    WE_MET_EXCHANGE_OUTCOME_ANALYTICS?: AnalyticsEngineDataset;
   }
 }
 

@@ -16,6 +16,10 @@ describe("Cloudflare credentials in deploy workflows (unit)", () => {
     );
   });
 
+  it("production deploy workflow does not set WE_MET_BASE_URL anywhere (next.config fallback)", () => {
+    expect(production).not.toContain("WE_MET_BASE_URL");
+  });
+
   it("production workflow uses production Turnstile variable", () => {
     expect(production).toContain("vars.WE_MET_TURNSTILE_SITE_KEY_PRODUCTION");
     expect(production).not.toContain("WE_MET_TURNSTILE_SITE_KEY_NONPROD");

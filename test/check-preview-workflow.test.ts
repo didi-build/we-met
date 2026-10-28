@@ -117,6 +117,21 @@ describe("preview-workflow guard regressions (unit)", () => {
       ),
     ).toBe(true);
 
+    const badAe = {
+      ...preview,
+      analytics_engine_datasets: [
+        {
+          binding: "WE_MET_EXCHANGE_OUTCOME_ANALYTICS",
+          dataset: "we-met-exchange-outcome",
+        },
+      ],
+    };
+    expect(
+      findProductionResourceMarkerViolations(badAe, "wrangler.preview.jsonc").some(
+        (m) => m.includes("we-met-exchange-outcome"),
+      ),
+    ).toBe(true);
+
     const badRl = {
       ...preview,
       ratelimits: [{ name: "EXCHANGE", namespace_id: "2002" }],

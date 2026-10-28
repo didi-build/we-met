@@ -25,6 +25,10 @@ import {
   D1_PLACEHOLDER_PRODUCTION,
   NONPROD_RESOURCE_MARKERS,
   PRODUCTION_APP_HOST,
+  PRODUCTION_EXCHANGE_OUTCOME_DATASET,
+  PREVIEW_EXCHANGE_OUTCOME_DATASET,
+  STAGING_EXCHANGE_OUTCOME_DATASET,
+  EXCHANGE_OUTCOME_ANALYTICS_BINDING,
   PRODUCTION_RESOURCE_MARKERS,
   STAGING_RESOURCE_MARKERS,
   RATE_LIMIT_BINDINGS,
@@ -170,6 +174,26 @@ function expectedRateLimitNamespace(bindingName, isProduction) {
       return markers.appRateLimiterNamespaceId;
     default:
       return null;
+  }
+}
+
+function exchangeOutcomeDatasetName(configSection) {
+  const rows = configSection?.analytics_engine_datasets ?? [];
+  const row = rows.find(
+    (entry) => entry?.binding === EXCHANGE_OUTCOME_ANALYTICS_BINDING,
+  );
+  return typeof row?.dataset === "string" ? row.dataset : null;
+}
+
+function checkExchangeOutcomeAnalyticsDataset(configSection, expectedDataset, label) {
+  const dataset = exchangeOutcomeDatasetName(configSection);
+  if (!dataset) {
+    fail(
+      `${label} must declare analytics_engine_datasets ${EXCHANGE_OUTCOME_ANALYTICS_BINDING}`,
+    );
+  }
+  if (dataset !== expectedDataset) {
+    fail(`${label} exchange outcome dataset must be "${expectedDataset}"`);
   }
 }
 
@@ -403,6 +427,15 @@ function checkPreviewResourceBindings(previews) {
   checkRateLimitBindings(previews?.ratelimits, false);
 }
 
+function checkNestedPreviewsBlockNoExchangeOutcomeAnalytics(previews) {
+  const rows = previews?.analytics_engine_datasets ?? [];
+  if (rows.length > 0) {
+    fail(
+      "previews block must not declare analytics_engine_datasets (use wrangler.preview.jsonc)",
+    );
+  }
+}
+
 function assertNestedPreviewHostSuffix(previewVars) {
   const previewHostSuffix = previewVars?.WE_MET_PREVIEW_HOST_SUFFIX ?? "";
   if (!previewHostSuffix.trim()) {
@@ -427,6 +460,7 @@ function assertPreviewWorkerHostSuffix(previewVars) {
 
 function checkPreviewBlock(previews) {
   checkPreviewResourceBindings(previews);
+  checkNestedPreviewsBlockNoExchangeOutcomeAnalytics(previews);
   assertNestedPreviewHostSuffix(previews?.vars);
 }
 
@@ -476,6 +510,11 @@ function checkPreviewWorkerBlock(config) {
     routes: config.routes,
   });
   assertPreviewWorkerHostSuffix(config.vars);
+  checkExchangeOutcomeAnalyticsDataset(
+    config,
+    PREVIEW_EXCHANGE_OUTCOME_DATASET,
+    PREVIEW_CONFIG_LABEL,
+  );
   const topD1 = config.d1_databases ?? [];
   for (const row of topD1) {
     if (row.database_id === D1_PLACEHOLDER_PRODUCTION) {
@@ -930,6 +969,11 @@ function checkStagingBlock(config) {
   if (consumers.length > 0) {
     fail("staging must not define queue consumers");
   }
+  checkExchangeOutcomeAnalyticsDataset(
+    config,
+    STAGING_EXCHANGE_OUTCOME_DATASET,
+    "staging",
+  );
 }
 
 function checkProductionBlock(config) {
@@ -993,6 +1037,11 @@ function checkProductionBlock(config) {
   }
   checkRateLimitBindings(rlRows, true);
   checkProductionAppHostRoute(config);
+  checkExchangeOutcomeAnalyticsDataset(
+    config,
+    PRODUCTION_EXCHANGE_OUTCOME_DATASET,
+    "production",
+  );
 }
 
 function main() {

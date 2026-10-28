@@ -2,7 +2,10 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { parseJsonc } from "./parse-jsonc.mjs";
-import { PRODUCTION_RESOURCE_MARKERS } from "./wrangler-placeholders.mjs";
+import {
+  PRODUCTION_EXCHANGE_OUTCOME_DATASET,
+  PRODUCTION_RESOURCE_MARKERS,
+} from "./wrangler-placeholders.mjs";
 import {
   GALLERY_PREVIEW_CONFIG,
   PREVIEW_CONFIG,
@@ -102,6 +105,7 @@ export function findProductionResourceMarkerViolations(config, label) {
     PRODUCTION_RESOURCE_MARKERS.exchangeRateLimiterNamespaceId,
     PRODUCTION_RESOURCE_MARKERS.authRateLimiterNamespaceId,
     PRODUCTION_RESOURCE_MARKERS.appRateLimiterNamespaceId,
+    PRODUCTION_EXCHANGE_OUTCOME_DATASET,
   ];
   const strings = collectStrings(config);
   const violations = [];

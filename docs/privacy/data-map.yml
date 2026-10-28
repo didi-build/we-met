@@ -700,6 +700,27 @@ other_items:
       https://developers.cloudflare.com/email-service/observability/metrics-analytics/;
       https://developers.cloudflare.com/email-service/observability/logs/
     verified: false
+  - id: binding.we_met_exchange_outcome_analytics
+    binding: WE_MET_EXCHANGE_OUTCOME_ANALYTICS
+    whose: operational
+    data: Workers Analytics Engine datapoint per POST /api/exchange (except honeypot
+      bot posts, which are omitted to match the exchange acceptance SLI). index1
+      exchange_outcome; blob1 status class only (2xx, 4xx, 429, 5xx, kill-switch
+      503, cap_reached, cap_config_error); double1 counter 1. No visitor, card,
+      slug, or IP dimensions. Same HTTP 503 JSON for kill switch, cap reached, and
+      invalid cap config; class is chosen from the capacity check path in code.
+    purpose: production monitoring exchange acceptance SLI (monitoring plan M8)
+    storage: Cloudflare Workers Analytics Engine dataset (production
+      we-met-exchange-outcome; staging we-met-exchange-outcome-staging; preview
+      we-met-exchange-outcome-preview in wrangler configs)
+    processors:
+      - Cloudflare
+    retention: 3 months per Cloudflare Workers Analytics Engine limits
+      (https://developers.cloudflare.com/analytics/analytics-engine/limits/)
+    who_can_see: operator
+    source: src/exchange/exchange-outcome-analytics.ts; wrangler.jsonc;
+      wrangler.staging.jsonc; wrangler.preview.jsonc
+    verified: false
   - id: binding.worker_assets
     binding: ASSETS
     whose: operational

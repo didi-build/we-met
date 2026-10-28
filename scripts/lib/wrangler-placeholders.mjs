@@ -24,6 +24,11 @@ export const WARMUP_EMAIL_EVENTS_DLQ_PLACEHOLDER =
 
 export const PRODUCTION_APP_HOST = "app.we-met.link";
 
+export const PRODUCTION_EXCHANGE_OUTCOME_DATASET = "we-met-exchange-outcome";
+export const PREVIEW_EXCHANGE_OUTCOME_DATASET = "we-met-exchange-outcome-preview";
+export const STAGING_EXCHANGE_OUTCOME_DATASET = "we-met-exchange-outcome-staging";
+export const EXCHANGE_OUTCOME_ANALYTICS_BINDING = "WE_MET_EXCHANGE_OUTCOME_ANALYTICS";
+
 export const PRODUCTION_RESOURCE_MARKERS = {
   d1Name: "we-met-db",
   r2Bucket: "we-met-assets",

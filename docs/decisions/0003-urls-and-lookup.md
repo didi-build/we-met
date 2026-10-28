@@ -15,7 +15,7 @@ Cards need stable shareable links, support for a default host now and custom dom
 - **Default card path:** **`/hi/<slug>`** on the configured host (production host: `we-met.link`).
 - **Step 1 legacy mapping in this app:** `didi.build/hi` → `/hi/didi`. **`didi.build` is not redirected in step 1.**
 - **Lookup order:** hostname → path (`/hi/<slug>`) → card record. Reserved hostnames and paths: [0014](./0014-reserved-hostnames-and-paths.md).
-- **`WE_MET_BASE_URL`** (one value per environment) is the canonical origin for links in code and email. It is **never** derived from the incoming request host. On **previews**, `WE_MET_BASE_URL` is **`https://we-met.link`** (set in the `previews` block) so links in test emails point at production card pages.
+- **`WE_MET_BASE_URL`** (one value per environment) is the canonical origin for links in code and email. It is **never** derived from the incoming request host. On **previews**, runtime `WE_MET_BASE_URL` in the `previews` block and preview CI build env are **`https://we-met.didi.build`** ([DIDI-902](https://linear.app/didi-build/issue/DIDI-902)); preview bundles inline the same origin for client links such as the editor published-card URL.
 
 ## Reasons
 

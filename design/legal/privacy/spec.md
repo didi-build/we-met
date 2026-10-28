@@ -57,9 +57,11 @@ Section "What the people you meet can see". BEFORE is the old rendered sentence,
 ## Related
 
 - Approved relay-mode paragraph for "What the people you meet can see": [relay-disclosure.md](./relay-disclosure.md) ([DIDI-920](https://linear.app/didi-build/issue/DIDI-920)).
+- Approved visitor receipt paragraph and line 65 rewording for "What the people you meet can see": [visitor-receipt-disclosure.md](./visitor-receipt-disclosure.md) ([DIDI-923](https://linear.app/didi-build/issue/DIDI-923)).
 
 ## Changes
 
 - 2026-10-27: Spec created with proposed wording for the two "attached" lines, awaiting Diadem approval ([DIDI-916](https://linear.app/didi-build/issue/DIDI-916), from [DIDI-869](https://linear.app/didi-build/issue/DIDI-869)).
 - 2026-10-27, 3:56 PM ET: Diadem: "Approve the shorter wording: "your contact card, ready to save", plus dropping "attached" from the phone number sentence". Final privacy copy approved ([DIDI-916](https://linear.app/didi-build/issue/DIDI-916)).
 - 2026-10-27: Linked the relay-mode disclosure (relay-disclosure.md) ([DIDI-920](https://linear.app/didi-build/issue/DIDI-920)).
+- 2026-10-28: Linked the visitor receipt disclosure (visitor-receipt-disclosure.md) ([DIDI-923](https://linear.app/didi-build/issue/DIDI-923)).

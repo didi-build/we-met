@@ -51,6 +51,12 @@
       },
     ],
   },
+  "analytics_engine_datasets": [
+    {
+      "binding": "WE_MET_EXCHANGE_OUTCOME_ANALYTICS",
+      "dataset": "we-met-exchange-outcome",
+    },
+  ],
   "ratelimits": [
     {
       "name": "WE_MET_EXCHANGE_RATE_LIMITER",

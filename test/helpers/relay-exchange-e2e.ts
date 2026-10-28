@@ -22,7 +22,7 @@ import {
 } from "@/followup-email-consumer/process-batch";
 import { processLeadSinkQueueMessage } from "@/followup-email-consumer/process-lead-sink";
 import { createLeadDeliveryLedgerFromD1 } from "@/lead-delivery-ledger/d1-repository";
-import { assertLeadEmailCapacity } from "@/lead-email/availability";
+import { readLeadEmailCapacityCheck } from "@/lead-email/availability";
 import {
   incrementDailySendCounts,
   utcDayFromDate,
@@ -320,8 +320,8 @@ export async function setupRelayExchange(
     createLedgerId: () => `ledger-${leadId}`,
     now,
     baseUrl: "https://we-met.link",
-    assertLeadEmailCapacity: (cardId, needed) =>
-      assertLeadEmailCapacity(db, cardId, needed, now()),
+    checkLeadEmailCapacity: (cardId, needed) =>
+      readLeadEmailCapacityCheck(db, cardId, needed, now()),
     incrementDailySendCounts: (cardId, kinds) =>
       incrementDailySendCounts(db, RELAY_E2E_DAY, cardId, kinds),
     logExchangeVisitorLetterEnqueueFailed: vi.fn(),

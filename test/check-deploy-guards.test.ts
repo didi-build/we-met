@@ -157,6 +157,86 @@ describe("check-deploy-guards (unit)", () => {
     expect(result.stderr).toContain("production resource");
   });
 
+  it("fails when previews block declares analytics_engine_datasets", () => {
+    const { path } = writeTempConfig((config) => {
+      const previews = config.previews as Record<string, unknown>;
+      previews.analytics_engine_datasets = [
+        {
+          binding: "WE_MET_EXCHANGE_OUTCOME_ANALYTICS",
+          dataset: "we-met-exchange-outcome-preview",
+        },
+      ];
+    });
+    const result = runGuards("preview", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      "previews block must not declare analytics_engine_datasets",
+    );
+  });
+
+  it("fails when preview-worker exchange outcome dataset matches production", () => {
+    const { path } = writeTempPreviewWorkerConfig((config) => {
+      config.analytics_engine_datasets = [
+        {
+          binding: "WE_MET_EXCHANGE_OUTCOME_ANALYTICS",
+          dataset: "we-met-exchange-outcome",
+        },
+      ];
+    });
+    const result = runGuards("preview-worker", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("we-met-exchange-outcome-preview");
+  });
+
+  it("fails when staging exchange outcome dataset matches production", () => {
+    const { path } = writeTempStagingConfig((config) => {
+      config.analytics_engine_datasets = [
+        {
+          binding: "WE_MET_EXCHANGE_OUTCOME_ANALYTICS",
+          dataset: "we-met-exchange-outcome",
+        },
+      ];
+    });
+    const result = runGuards("staging", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      'staging exchange outcome dataset must be "we-met-exchange-outcome-staging"',
+    );
+  });
+
+  it("fails when production exchange outcome analytics binding is missing", () => {
+    const { path } = writeTempConfig((config) => {
+      delete config.analytics_engine_datasets;
+    });
+    const result = runGuards("production", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("WE_MET_EXCHANGE_OUTCOME_ANALYTICS");
+  });
+
+  it("fails when production exchange outcome dataset is wrongly named", () => {
+    const { path } = writeTempConfig((config) => {
+      config.analytics_engine_datasets = [
+        {
+          binding: "WE_MET_EXCHANGE_OUTCOME_ANALYTICS",
+          dataset: "we-met-exchange-outcome-wrong",
+        },
+      ];
+    });
+    const result = runGuards("production", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      'production exchange outcome dataset must be "we-met-exchange-outcome"',
+    );
+  });
+
+  it("check-deploy-guards production block calls exchange outcome dataset guard", () => {
+    const source = readFileSync(SCRIPT, "utf8");
+    expect(source).toContain("PRODUCTION_EXCHANGE_OUTCOME_DATASET");
+    expect(source).toMatch(
+      /checkExchangeOutcomeAnalyticsDataset\(\n    config,\n    PRODUCTION_EXCHANGE_OUTCOME_DATASET,\n    "production",\n  \)/,
+    );
+  });
+
   it("fails when a non-first preview queue is not non-prod", () => {
     const { path } = writeTempConfig((config) => {
       const previews = config.previews as Record<string, unknown>;
