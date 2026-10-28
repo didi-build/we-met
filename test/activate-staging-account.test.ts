@@ -29,7 +29,7 @@ import { workflowPermissionsAllowOnly } from "../scripts/lib/workflow-permission
 const EXPECTED_D1_ID = "11111111-2222-3333-4444-555555555555";
 
 const ACTIVATION_WORKFLOW_RUN_BLOCK =
-  /^\s+(?:-\s+)?run:\s*\|[\s\S]*?(?=\n\s{6}\S|\n\s{4}\S|$)/gm;
+  /^\s+(?:-\s+)?run:\s*\|[\s\S]*?(?=\n\s{6}\S|\n\s{4}\S|(?![\s\S]))/gm;
 const ACTIVATION_WORKFLOW_RUN_LINE = /^\s+(?:-\s+)?run:\s+[^\n|]+$/gm;
 
 const wranglerConfigTempDirs: string[] = [];
@@ -712,8 +712,19 @@ describe("Activate staging account workflow structure (unit)", () => {
   });
 
   it("run-line regex matches list-item run steps in this workflow", () => {
-    expect(workflow).toMatch(ACTIVATION_WORKFLOW_RUN_LINE);
-    expect(workflow).toMatch(/^\s+- run: npm ci$/m);
+    const scripts = activationWorkflowRunScripts(workflow);
+    expect(scripts).toContain("      - run: npm ci");
+  });
+
+  it("run-block regex captures multiline script bodies", () => {
+    const runBlocks = workflow.match(ACTIVATION_WORKFLOW_RUN_BLOCK) ?? [];
+    expect(runBlocks.length).toBeGreaterThanOrEqual(3);
+    expect(
+      runBlocks.some((block) =>
+        block.includes("node scripts/activate-staging-account.mjs"),
+      ),
+    ).toBe(true);
+    expect(runBlocks.every((block) => block.length > "run: |".length + 8)).toBe(true);
   });
 
   it("does not leak dispatch email via workflow expressions or shell event reads", () => {
