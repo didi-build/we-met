@@ -5,10 +5,11 @@ import { absoluteUrl } from "@/config/we-met";
  * Production keeps the historical `https://we-met.link/hi/<slug>` string.
  */
 export function editorPublishedCardUrl(slug: string): string {
-  if (process.env.NEXT_PUBLIC_WE_MET_ENV === "staging") {
+  const weMetEnv = process.env.NEXT_PUBLIC_WE_MET_ENV;
+  if (weMetEnv === "staging" || weMetEnv === "preview") {
     const base = process.env.NEXT_PUBLIC_WE_MET_BASE_URL?.trim();
     if (!base) {
-      throw new Error("Missing NEXT_PUBLIC_WE_MET_BASE_URL for staging editor");
+      throw new Error(`Missing NEXT_PUBLIC_WE_MET_BASE_URL for ${weMetEnv} editor`);
     }
     return absoluteUrl(base, `/hi/${slug}`);
   }

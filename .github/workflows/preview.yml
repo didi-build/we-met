@@ -58,6 +58,7 @@ jobs:
         env:
           NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.WE_MET_TURNSTILE_SITE_KEY_NONPROD }}
           WE_MET_ENV: preview
+          WE_MET_BASE_URL: https://we-met.didi.build
         run: npm run build
       - name: Create or update Cloudflare Preview
         id: preview
