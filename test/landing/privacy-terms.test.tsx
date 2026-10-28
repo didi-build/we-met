@@ -100,6 +100,87 @@ describe("privacy and terms pages (unit)", () => {
     expect(screen.getByText("Last updated: October 2026")).toBeTruthy();
   });
 
+  it("uses approved contact card wording in visitor follow-up copy (DIDI-917)", () => {
+    render(<PrivacyPolicyContent />);
+
+    expect(
+      screen.getByText(
+        /That email also includes your display name on the card \(or your Google name if you left display name blank\), your role and photo, and your contact card, ready to save\./,
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        /When we send that optional follow-up email, if you added a phone number it is included in the contact card\./,
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/contact card attached/)).toBeNull();
+  });
+
+  it("discloses relay default follow-up mode (DIDI-921)", () => {
+    render(<PrivacyPolicyContent />);
+
+    expect(
+      screen.getByText(
+        /In this default mode, we email the follow-up letter to you, not to them\. When you hit Reply, they get it from your own inbox, with your name, role and photo, and your contact card, ready to save\. The contact card uses your full Google name and includes your Google account email address, your phone number if you added one, and the links on your card\./,
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/does not expire/)).toBeNull();
+    expect(screen.queryByText(/forwarded to/)).toBeNull();
+  });
+
+  it("discloses visitor receipt screen and default email wording (DIDI-924)", () => {
+    render(<PrivacyPolicyContent />);
+
+    expect(
+      screen.getByText(
+        /By default, we don't email them anything; you follow up from your own inbox, with Reply-To set to them\./,
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        /Whether or not visitor follow-up email is on, right after someone exchanges details with you, their screen shows your Google account email address and your phone number if you added one, with buttons to email or call you, and your contact card, ready to save\. That screen stays available in their browser tab for up to two hours\./,
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.queryByText(
+        /By default, we don't email them your contact card or your Google account email address;/,
+      ),
+    ).toBeNull();
+  });
+
+  it("orders paragraphs in What the people you meet can see", () => {
+    render(<PrivacyPolicyContent />);
+
+    const heading = screen.getByRole("heading", {
+      level: 2,
+      name: "What the people you meet can see",
+    });
+    const paragraphs: HTMLElement[] = [];
+    let el = heading.nextElementSibling;
+    while (el && el.tagName !== "H2") {
+      if (el.tagName === "P") {
+        paragraphs.push(el as HTMLElement);
+      }
+      el = el.nextElementSibling;
+    }
+
+    expect(paragraphs).toHaveLength(6);
+    expect(paragraphs[0]?.textContent).toMatch(/don't email them anything/);
+    expect(paragraphs[1]?.textContent).toMatch(/In this default mode/);
+    expect(paragraphs[2]?.textContent).toMatch(
+      /Whether or not visitor follow-up email is on/,
+    );
+    expect(paragraphs[3]?.textContent).toMatch(
+      /creating an exchange on your own card first/,
+    );
+    expect(paragraphs[4]?.textContent).toMatch(
+      /When we turn on visitor follow-up email/,
+    );
+    expect(paragraphs[5]?.textContent).toMatch(
+      /When we send that optional follow-up email/,
+    );
+  });
+
   it("renders terms h1, sections, contact link, and last updated", () => {
     render(<TermsPolicyContent urls={urls} />);
 
