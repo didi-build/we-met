@@ -62,8 +62,8 @@ export function PrivacyPolicyContent() {
 
       <h2 className="lp-legal-h2">What the people you meet can see</h2>
       <p className="lp-body">
-        By default, we don&apos;t email them your contact card or your Google account
-        email address; you follow up from your own inbox, with Reply-To set to them.
+        By default, we don&apos;t email them anything; you follow up from your own
+        inbox, with Reply-To set to them.
       </p>
       <p className="lp-body">
         In this default mode, we email the follow-up letter to you, not to them. When
@@ -71,6 +71,13 @@ export function PrivacyPolicyContent() {
         and your contact card, ready to save. The contact card uses your full Google
         name and includes your Google account email address, your phone number if you
         added one, and the links on your card.
+      </p>
+      <p className="lp-body">
+        Whether or not visitor follow-up email is on, right after someone exchanges
+        details with you, their screen shows your Google account email address and your
+        phone number if you added one, with buttons to email or call you, and your
+        contact card, ready to save. That screen stays available in their browser tab
+        for up to two hours.
       </p>
       <p className="lp-body">
         We recommend creating an exchange on your own card first so you can see what

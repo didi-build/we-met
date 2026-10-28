@@ -126,6 +126,26 @@ describe("privacy and terms pages (unit)", () => {
     ).toBeTruthy();
   });
 
+  it("discloses visitor receipt screen and default email wording (DIDI-924)", () => {
+    render(<PrivacyPolicyContent />);
+
+    expect(
+      screen.getByText(
+        /By default, we don't email them anything; you follow up from your own inbox, with Reply-To set to them\./,
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        /Whether or not visitor follow-up email is on, right after someone exchanges details with you, their screen shows your Google account email address and your phone number if you added one, with buttons to email or call you, and your contact card, ready to save\. That screen stays available in their browser tab for up to two hours\./,
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.queryByText(
+        /By default, we don't email them your contact card or your Google account email address;/,
+      ),
+    ).toBeNull();
+  });
+
   it("renders terms h1, sections, contact link, and last updated", () => {
     render(<TermsPolicyContent urls={urls} />);
 
