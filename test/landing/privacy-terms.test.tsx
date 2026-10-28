@@ -116,6 +116,16 @@ describe("privacy and terms pages (unit)", () => {
     expect(screen.queryByText(/contact card attached/)).toBeNull();
   });
 
+  it("discloses relay default follow-up mode (DIDI-921)", () => {
+    render(<PrivacyPolicyContent />);
+
+    expect(
+      screen.getByText(
+        /In this default mode, we email the follow-up letter to you, not to them\. When you hit Reply, they get it from your own inbox, with your name, role and photo, and your contact card, ready to save\. The contact card uses your full Google name and includes your Google account email address, your phone number if you added one, and the links on your card\./,
+      ),
+    ).toBeTruthy();
+  });
+
   it("renders terms h1, sections, contact link, and last updated", () => {
     render(<TermsPolicyContent urls={urls} />);
 

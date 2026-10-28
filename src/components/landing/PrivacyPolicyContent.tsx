@@ -66,6 +66,13 @@ export function PrivacyPolicyContent() {
         email address; you follow up from your own inbox, with Reply-To set to them.
       </p>
       <p className="lp-body">
+        In this default mode, we email the follow-up letter to you, not to them. When
+        you hit Reply, they get it from your own inbox, with your name, role and photo,
+        and your contact card, ready to save. The contact card uses your full Google
+        name and includes your Google account email address, your phone number if you
+        added one, and the links on your card.
+      </p>
+      <p className="lp-body">
         We recommend creating an exchange on your own card first so you can see what
         visitors will get.
       </p>
