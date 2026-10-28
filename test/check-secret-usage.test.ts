@@ -42,10 +42,14 @@ describe("check-secret-usage (unit)", () => {
     expect(findBootstrapTokenViolations(dir)).toEqual(["evil.yml"]);
   });
 
-  it("allows staging token only in deploy-staging.yml", () => {
+  it("allows staging token only in deploy-staging.yml and activate-staging-account.yml", () => {
     const dir = mkdtempSync(join(tmpdir(), "secret-usage-staging-"));
     writeFileSync(
       join(dir, "deploy-staging.yml"),
+      "secrets.CLOUDFLARE_API_TOKEN_STAGING\n",
+    );
+    writeFileSync(
+      join(dir, "activate-staging-account.yml"),
       "secrets.CLOUDFLARE_API_TOKEN_STAGING\n",
     );
     writeFileSync(join(dir, "ci.yml"), "name: CI\n");

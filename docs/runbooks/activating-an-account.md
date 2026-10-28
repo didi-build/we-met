@@ -14,6 +14,17 @@ When `signups_open` is `0` / false / missing:
 - They receive a session with **`allowed: false`**; `/api/app/*` card routes return **403** `forbidden`.
 - Turning **`signups_open` on** does **not** retroactively activate waitlisted users unless they sign in again (waitlisted → active on next login when sign-ups are open).
 
+## Activate on staging (GitHub Actions)
+
+When **`signups_open`** is off on shared non-prod D1, a first Google sign-in on **`https://we-met.didi.build`** creates a **waitlisted** account. To activate without laptop Wrangler:
+
+1. Open the repo on GitHub: **Actions** → **Activate staging account**.
+2. Choose **Run workflow**, branch **`main`**, enter the Google account **email** (lowercase in D1), then **Run workflow**.
+3. The run uses the **`staging`** environment and **`CLOUDFLARE_API_TOKEN_STAGING`**; it validates the email, refuses unless the Wrangler binding is **`we-met-db-nonprod`**, and runs the activation `UPDATE` against that database only.
+4. Ask the user to refresh the editor or call `GET /api/app/session` so the client sees `allowed: true`.
+
+**Safety:** The workflow is **`workflow_dispatch` on `main` only** (no `pull_request` or `push` triggers). Do not run it from unmerged PR branch code.
+
 ## Find the account
 
 By email (lowercase in DB):
