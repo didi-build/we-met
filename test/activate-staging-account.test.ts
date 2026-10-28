@@ -146,5 +146,28 @@ describe("Activate staging account workflow structure (unit)", () => {
     expect(workflow).toContain("CLOUDFLARE_API_TOKEN_STAGING");
     expect(workflow).toContain("secrets.WE_MET_D1_DATABASE_ID_NONPROD");
     expect(workflow).not.toContain("vars.WE_MET_D1_DATABASE_ID_NONPROD");
+    expect(workflow).toContain("ACTIVATE_EMAIL:");
+  });
+
+  it("does not interpolate workflow inputs inside run scripts", () => {
+    const runBlocks =
+      workflow.match(/run:\s*\|[\s\S]*?(?=\n\s{6}\S|\n\s{4}\S|$)/g) ?? [];
+    const runLines = workflow.match(/^\s+run:\s+[^\n|]+$/gm) ?? [];
+    for (const block of [...runBlocks, ...runLines]) {
+      expect(block).not.toMatch(/\$\{\{\s*inputs\./);
+    }
+  });
+});
+
+describe("activate-staging-account logging (unit)", () => {
+  it("masks email before D1 execute and avoids echoing it in user messages", () => {
+    const script = readFileSync("scripts/activate-staging-account.mjs", "utf8");
+    expect(script).toContain("maskActivationEmailForLogs");
+    expect(script).toContain('console.log("Staging account activation succeeded.")');
+    expect(script).toContain(
+      "Staging account activation failed: account not found or not waitlisted.",
+    );
+    expect(script).not.toMatch(/console\.(log|error)\([^)]*normalized/);
+    expect(script).not.toMatch(/console\.(log|error)\([^)]*\$\{.*email/i);
   });
 });

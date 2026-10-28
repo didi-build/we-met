@@ -110,6 +110,15 @@ export function buildActivationUpdateCommand(normalizedEmail, updatedAtIso) {
 }
 
 /**
+ * @param {string} email validated normalized email
+ */
+export function maskActivationEmailForLogs(email) {
+  if (email) {
+    console.log(`::add-mask::${email}`);
+  }
+}
+
+/**
  * @param {string} id
  */
 export function maskD1DatabaseId(id) {

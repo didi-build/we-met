@@ -12,6 +12,7 @@ import { resolve } from "node:path";
 import {
   assertWranglerConfigTargetsNonprodD1,
   buildActivationUpdateCommand,
+  maskActivationEmailForLogs,
   maskD1DatabaseId,
   validateActivationEmail,
 } from "./lib/activate-staging-account.mjs";
@@ -63,6 +64,7 @@ function main() {
   }
 
   maskD1DatabaseId(process.env.WE_MET_D1_DATABASE_ID_NONPROD ?? "");
+  maskActivationEmailForLogs(validated.normalized);
 
   const updatedAt = new Date().toISOString();
   const command = buildActivationUpdateCommand(validated.normalized, updatedAt);
@@ -85,10 +87,7 @@ function main() {
   );
 
   if (result.status !== 0) {
-    if (result.stderr) {
-      process.stderr.write(result.stderr);
-    }
-    console.error("wrangler d1 execute failed for staging account activation");
+    console.error("Staging account activation failed: database command error.");
     process.exit(result.status ?? 1);
   }
 
@@ -105,14 +104,12 @@ function main() {
 
   if (rowsWritten === 0) {
     console.error(
-      "Activation UPDATE matched no rows (unknown email or account not waitlisted).",
+      "Staging account activation failed: account not found or not waitlisted.",
     );
     process.exit(1);
   }
 
-  console.log(
-    `Staging account activation succeeded (${rowsWritten ?? "unknown"} row(s) changed).`,
-  );
+  console.log("Staging account activation succeeded.");
 }
 
 main();
