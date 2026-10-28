@@ -1,24 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  exchangeOutcomeStatusClassFromHttp,
-  recordExchangeOutcomeFromResponse,
+  exchangeOutcomeClassForLeadEmailDenial,
   writeExchangeOutcomeDataPoint,
 } from "@/exchange/exchange-outcome-analytics";
-
-describe("exchangeOutcomeStatusClassFromHttp (unit)", () => {
-  it("maps HTTP outcomes to the five status classes", () => {
-    expect(exchangeOutcomeStatusClassFromHttp(200)).toBe("2xx");
-    expect(exchangeOutcomeStatusClassFromHttp(400)).toBe("4xx");
-    expect(exchangeOutcomeStatusClassFromHttp(403)).toBe("4xx");
-    expect(exchangeOutcomeStatusClassFromHttp(404)).toBe("4xx");
-    expect(exchangeOutcomeStatusClassFromHttp(429)).toBe("429");
-    expect(exchangeOutcomeStatusClassFromHttp(500)).toBe("5xx");
-    expect(exchangeOutcomeStatusClassFromHttp(503)).toBe("5xx");
-    expect(exchangeOutcomeStatusClassFromHttp(503, "lead_email_unavailable")).toBe(
-      "kill-switch 503",
-    );
-  });
-});
 
 describe("writeExchangeOutcomeDataPoint (unit)", () => {
   it("writes index exchange_outcome, blob status class, and counter double", () => {
@@ -57,23 +41,14 @@ describe("writeExchangeOutcomeDataPoint (unit)", () => {
   });
 });
 
-describe("recordExchangeOutcomeFromResponse (unit)", () => {
-  it("classifies kill-switch 503 from JSON error body", async () => {
-    const writeDataPoint = vi.fn();
-    const response = Response.json(
-      { error: "lead_email_unavailable" },
-      { status: 503 },
+describe("exchangeOutcomeClassForLeadEmailDenial (unit)", () => {
+  it("maps kill switch, cap reached, and cap config errors", () => {
+    expect(exchangeOutcomeClassForLeadEmailDenial("kill_switch")).toBe(
+      "kill-switch 503",
     );
-    await recordExchangeOutcomeFromResponse(
-      {
-        WE_MET_EXCHANGE_OUTCOME_ANALYTICS: { writeDataPoint },
-      } as unknown as CloudflareEnv,
-      response,
+    expect(exchangeOutcomeClassForLeadEmailDenial("cap_reached")).toBe("cap_reached");
+    expect(exchangeOutcomeClassForLeadEmailDenial("cap_config_error")).toBe(
+      "cap_config_error",
     );
-    expect(writeDataPoint).toHaveBeenCalledWith({
-      indexes: ["exchange_outcome"],
-      blobs: ["kill-switch 503"],
-      doubles: [1],
-    });
   });
 });

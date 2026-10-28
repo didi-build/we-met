@@ -263,11 +263,11 @@ Monitoring-specific notes:
 
 Rolling **30-day** window; measured from **synthetic + Workers analytics** (not yet implemented). Error budgets use [Google's definition](https://sre.google/workbook/error-budget-policy/). Ledger statuses are `queued`, `sent`, and `failed` only ([`migrations/0002_lead_delivery_ledger.sql`](../migrations/0002_lead_delivery_ledger.sql)).
 
-| Flow                       | SLI                                                                                       | SLO target                    | Error budget (30d)                        | Notes                                                                    |
-| -------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------- | ----------------------------------------- | ------------------------------------------------------------------------ |
-| **Card availability**      | Successful synthetic GET (200, body contains probe marker)                                | **99.9%**                     | ~43 minutes downtime                      | Aligns with "can open the card"                                          |
-| **Exchange acceptance**    | `POST /api/exchange` returns 2xx excluding honeypot fake 200                              | **99.5%**                     | ~3.6 hours                                | Excludes 429 abuse and 503 when kill switch intentionally on             |
-| **Owner email timeliness** | Time from successful exchange to ledger `status = 'sent'` for the email sink record phase | **99%** within **15 minutes** | 1% of exchanges may exceed 15 min or fail | Queue retries up to ~12h; SLO forces backlog alerting before max retries |
+| Flow                       | SLI                                                                                       | SLO target                    | Error budget (30d)                        | Notes                                                                                                                                              |
+| -------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Card availability**      | Successful synthetic GET (200, body contains probe marker)                                | **99.9%**                     | ~43 minutes downtime                      | Aligns with "can open the card"                                                                                                                    |
+| **Exchange acceptance**    | `POST /api/exchange` returns 2xx excluding honeypot fake 200                              | **99.5%**                     | ~3.6 hours                                | Excludes 429 abuse, intentional kill switch (`kill-switch 503`), and daily cap blocks (`cap_reached`); `cap_config_error` counts as an SLO failure |
+| **Owner email timeliness** | Time from successful exchange to ledger `status = 'sent'` for the email sink record phase | **99%** within **15 minutes** | 1% of exchanges may exceed 15 min or fail | Queue retries up to ~12h; SLO forces backlog alerting before max retries                                                                           |
 
 **Not an SLO (operational guardrails):** warmup send caps, `lead_email_enabled`, Turnstile pass rate.
 
@@ -296,25 +296,26 @@ Compare result to **0.999**.
 
 ### Exchange acceptance (target 99.5%)
 
-**SLI:** share of `POST /api/exchange` outcomes classified **2xx** among requests that count toward the SLO (excludes **429**, **kill-switch 503**, and honeypot fake 200; honeypot posts do not write Analytics Engine points). Implemented in [`src/exchange/exchange-outcome-analytics.ts`](../src/exchange/exchange-outcome-analytics.ts) ([M8](#5-proposed-build-tickets), [DIDI-940](https://linear.app/didi-build/issue/DIDI-940)).
+**SLI:** share of `POST /api/exchange` outcomes classified **2xx** among requests that count toward the SLO (excludes **429**, **kill-switch 503**, **cap_reached**, and honeypot fake 200; honeypot posts do not write Analytics Engine points; **cap_config_error** counts as a failure). Implemented in [`src/exchange/exchange-outcome-analytics.ts`](../src/exchange/exchange-outcome-analytics.ts) ([M8](#5-proposed-build-tickets), [DIDI-940](https://linear.app/didi-build/issue/DIDI-940)).
 
-**Production query** (Workers Analytics Engine SQL API on dataset `we-met-exchange-outcome`):
+**Production query** ([Workers Analytics Engine SQL API](/analytics/analytics-engine/sql-api/) on dataset `we-met-exchange-outcome`; use sample weights per [Analytics Engine limits](/analytics/analytics-engine/limits/)):
 
 ```sql
 SELECT
-  100.0 * SUM(CASE WHEN blob1 = '2xx' THEN double1 ELSE 0 END)
+  100.0 * SUM(CASE WHEN blob1 = '2xx' THEN _sample_interval * double1 ELSE 0 END)
     / NULLIF(
         SUM(
           CASE
-            WHEN blob1 NOT IN ('429', 'kill-switch 503') THEN double1
+            WHEN blob1 NOT IN ('429', 'kill-switch 503', 'cap_reached')
+            THEN _sample_interval * double1
             ELSE 0
           END
         ),
         0
       ) AS exchange_acceptance_pct
-FROM events.analyticsEngine."we-met-exchange-outcome"
+FROM "we-met-exchange-outcome"
 WHERE index1 = 'exchange_outcome'
-  AND timestamp >= NOW() - INTERVAL '30' DAY
+  AND timestamp > NOW() - INTERVAL '30' DAY
 ```
 
 Compare `exchange_acceptance_pct` to **99.5**.

@@ -139,6 +139,37 @@ describe("check-deploy-guards (unit)", () => {
     expect(result.stderr).toContain("production resource");
   });
 
+  it("fails when previews exchange outcome dataset matches production", () => {
+    const { path } = writeTempConfig((config) => {
+      const previews = config.previews as Record<string, unknown>;
+      previews.analytics_engine_datasets = [
+        {
+          binding: "WE_MET_EXCHANGE_OUTCOME_ANALYTICS",
+          dataset: "we-met-exchange-outcome",
+        },
+      ];
+    });
+    const result = runGuards("preview", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("previews exchange outcome dataset");
+  });
+
+  it("fails when staging exchange outcome dataset matches production", () => {
+    const { path } = writeTempStagingConfig((config) => {
+      config.analytics_engine_datasets = [
+        {
+          binding: "WE_MET_EXCHANGE_OUTCOME_ANALYTICS",
+          dataset: "we-met-exchange-outcome",
+        },
+      ];
+    });
+    const result = runGuards("staging", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      'staging exchange outcome dataset must be "we-met-exchange-outcome-staging"',
+    );
+  });
+
   it("fails when a non-first preview queue is not non-prod", () => {
     const { path } = writeTempConfig((config) => {
       const previews = config.previews as Record<string, unknown>;
