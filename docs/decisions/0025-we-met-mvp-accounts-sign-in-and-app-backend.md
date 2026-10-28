@@ -15,7 +15,7 @@ Facts this design rests on (read from the repo on 2026-10-15):
 - `cards.slug` is `NOT NULL UNIQUE` and `cards.email` is `NOT NULL`. `hostnames` and `lead_sinks` reference `cards` with `ON DELETE CASCADE`. `lead_delivery_ledger` has no foreign keys.
 - The public lookup is `SELECT ... FROM cards WHERE slug = ?` with no status filter. `slug.ts` allows 1 to 48 characters. No reserved slug list exists; `reserved.ts` only reserves the hostname labels `app`, `www` and `api`.
 - The consumer takes the sink destination from the queue `sinkConfig` snapshot and reads D1 only for the ledger ([0022](./0022-lead-delivery-ledger.md), [0023](./0023-owner-email-lead-sink-consumer.md)).
-- PR previews live on `https://pr-<N>-we-met.<subdomain>.workers.dev` and share one non-prod D1 ([0019](./0019-pr-preview-github-action.md)). On previews `WE_MET_BASE_URL` is the production origin.
+- PR previews live on `https://pr-<N>-we-met.<subdomain>.workers.dev` and share one non-prod D1 ([0019](./0019-pr-preview-github-action.md)). Preview runtime and build-time `WE_MET_BASE_URL` is **`https://we-met.didi.build`** ([DIDI-902](https://linear.app/didi-build/issue/DIDI-902)).
 - Google rejects wildcard redirect URIs and requires exact matches.
 
 ## Decision

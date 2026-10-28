@@ -156,7 +156,7 @@ describe("card editor full flow (integration)", () => {
         createLedgerId: () => "ledger-flow-1",
         now: () => new Date("2026-10-12T12:00:00.000Z"),
         baseUrl: "https://we-met.link",
-        assertLeadEmailCapacity: async () => true,
+        checkLeadEmailCapacity: async () => ({ allowed: true as const }),
         incrementDailySendCounts: async () => undefined,
         logExchangeVisitorLetterEnqueueFailed: vi.fn(),
         resolveVisitorEmailMode: async () => "owner_relay",

@@ -13,8 +13,8 @@ describe("editorPublishedCardUrl (unit)", () => {
 
   it("uses WE_MET_BASE_URL on preview builds", () => {
     vi.stubEnv("NEXT_PUBLIC_WE_MET_ENV", "preview");
-    vi.stubEnv("NEXT_PUBLIC_WE_MET_BASE_URL", "https://we-met.link");
-    expect(editorPublishedCardUrl("ada")).toBe("https://we-met.link/hi/ada");
+    vi.stubEnv("NEXT_PUBLIC_WE_MET_BASE_URL", "https://we-met.didi.build");
+    expect(editorPublishedCardUrl("ada")).toBe("https://we-met.didi.build/hi/ada");
   });
 
   it("uses WE_MET_BASE_URL on staging builds", () => {

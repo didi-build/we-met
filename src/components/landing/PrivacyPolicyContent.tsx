@@ -62,8 +62,22 @@ export function PrivacyPolicyContent() {
 
       <h2 className="lp-legal-h2">What the people you meet can see</h2>
       <p className="lp-body">
-        By default, we don&apos;t email them your contact card or your Google account
-        email address; you follow up from your own inbox, with Reply-To set to them.
+        By default, we don&apos;t email them anything; you follow up from your own
+        inbox, with Reply-To set to them.
+      </p>
+      <p className="lp-body">
+        In this default mode, we email the follow-up letter to you, not to them. When
+        you hit Reply, they get it from your own inbox, with your name, role and photo,
+        and your contact card, ready to save. The contact card uses your full Google
+        name and includes your Google account email address, your phone number if you
+        added one, and the links on your card.
+      </p>
+      <p className="lp-body">
+        Whether or not visitor follow-up email is on, right after someone exchanges
+        details with you, their screen shows your Google account email address and your
+        phone number if you added one, with buttons to email or call you, and your
+        contact card, ready to save. That screen stays available in their browser tab
+        for up to two hours.
       </p>
       <p className="lp-body">
         We recommend creating an exchange on your own card first so you can see what
@@ -75,11 +89,11 @@ export function PrivacyPolicyContent() {
         signature shows your Google first name, your display name in brackets when you
         use one, and your Google last name. That email also includes your display name
         on the card (or your Google name if you left display name blank), your role and
-        photo, and your contact card attached.
+        photo, and your contact card, ready to save.
       </p>
       <p className="lp-body">
         When we send that optional follow-up email, if you added a phone number it is
-        included in the contact card attached.{" "}
+        included in the contact card.{" "}
         <strong>
           Your Google account email address is included for visitors who receive that
           optional follow-up:

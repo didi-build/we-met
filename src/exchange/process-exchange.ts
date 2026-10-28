@@ -23,6 +23,10 @@ import { leadFirstNameFromFullName } from "@/email/email-template-vars";
 import type { ExchangeSuccessResponse, VisitorLead } from "@/exchange/types";
 import type { ValidatedExchangeInput } from "@/exchange/validation";
 import { OWNER_EMAIL_FALLBACK_DELAY_SECONDS } from "@/exchange/owner-email-timing";
+import type {
+  LeadEmailCapacityCheck,
+  LeadEmailCapacityDenialReason,
+} from "@/lead-email/availability";
 import type { DailySendKind } from "@/lead-email/daily-send-counts";
 import { utcDayFromDate } from "@/lead-email/daily-send-counts";
 
@@ -42,7 +46,10 @@ export type ProcessExchangeDeps = {
   createLedgerId: () => string;
   now: () => Date;
   baseUrl: string;
-  assertLeadEmailCapacity: (cardId: string, needed: number) => Promise<boolean>;
+  checkLeadEmailCapacity: (
+    cardId: string,
+    needed: number,
+  ) => Promise<LeadEmailCapacityCheck>;
   incrementDailySendCounts: (
     cardId: string,
     kinds: readonly DailySendKind[],
@@ -56,7 +63,7 @@ export type ProcessExchangeResult =
   | { status: "turnstile_failed" }
   | { status: "rate_limited" }
   | { status: "card_not_found" }
-  | { status: "lead_email_unavailable" }
+  | { status: "lead_email_unavailable"; reason: LeadEmailCapacityDenialReason }
   | { status: "enqueue_failed" };
 
 function buildVisitorLead(
@@ -99,8 +106,9 @@ export async function processExchange(
 
   const emailSlotsNeeded = 2;
 
-  if (!(await deps.assertLeadEmailCapacity(card.id, emailSlotsNeeded))) {
-    return { status: "lead_email_unavailable" };
+  const capacity = await deps.checkLeadEmailCapacity(card.id, emailSlotsNeeded);
+  if (!capacity.allowed) {
+    return { status: "lead_email_unavailable", reason: capacity.reason };
   }
 
   const leadId = deps.createLeadId();

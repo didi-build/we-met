@@ -70,10 +70,10 @@ describe("processExchange (unit)", () => {
   it("returns rate_limited before lead email capacity is checked", async () => {
     const repo = new MemoryCardRepository();
     const card = await repo.upsertCard(exampleCardInput());
-    const capacityCheck = vi.fn(async () => true);
+    const capacityCheck = vi.fn(async () => ({ allowed: true as const }));
     const deps = createDeps({
       rateLimiter: { check: async () => ({ allowed: false }) },
-      assertLeadEmailCapacity: capacityCheck,
+      checkLeadEmailCapacity: capacityCheck,
     });
     const result = await processExchange(baseInput(), card, [], deps);
     expect(result.status).toBe("rate_limited");
@@ -131,10 +131,16 @@ describe("processExchange (unit)", () => {
     const repo = new MemoryCardRepository();
     const card = await repo.upsertCard(exampleCardInput());
     const deps = createDeps({
-      assertLeadEmailCapacity: async () => false,
+      checkLeadEmailCapacity: async () => ({
+        allowed: false,
+        reason: "cap_reached",
+      }),
     });
     const result = await processExchange(baseInput(), card, [], deps);
     expect(result.status).toBe("lead_email_unavailable");
+    if (result.status === "lead_email_unavailable") {
+      expect(result.reason).toBe("cap_reached");
+    }
     expect(deps.followupMessages).toHaveLength(0);
   });
 
@@ -368,10 +374,10 @@ describe("processExchange (unit)", () => {
         updatedAt: "",
       },
     ];
-    const capacityCheck = vi.fn(async () => true);
+    const capacityCheck = vi.fn(async () => ({ allowed: true as const }));
     const incrementDailySendCounts = vi.fn(async () => {});
     const deps = createDeps({
-      assertLeadEmailCapacity: capacityCheck,
+      checkLeadEmailCapacity: capacityCheck,
       incrementDailySendCounts,
     });
 
