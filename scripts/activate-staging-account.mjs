@@ -12,9 +12,13 @@ import { resolve } from "node:path";
 import {
   assertWranglerConfigTargetsNonprodD1,
   buildActivationUpdateCommand,
+  buildWranglerD1ExecuteArgv,
   maskActivationEmailForLogs,
   maskD1DatabaseId,
+  parseWranglerD1ExecuteRowChanges,
+  resolveActivationRowOutcome,
   validateActivationEmail,
+  WRANGLER_D1_EXECUTE_SPAWN_OPTIONS,
 } from "./lib/activate-staging-account.mjs";
 
 function usage() {
@@ -44,6 +48,24 @@ function parseArgs(argv) {
   return out;
 }
 
+/**
+ * @param {'not_found' | 'ambiguous' | 'unparseable'} outcome
+ */
+function failActivationOutcome(outcome) {
+  if (outcome === "not_found") {
+    console.error(
+      "Staging account activation failed: account not found or not waitlisted.",
+    );
+  } else if (outcome === "ambiguous") {
+    console.error("Staging account activation failed: multiple accounts matched.");
+  } else {
+    console.error(
+      "Staging account activation failed: could not verify activation result.",
+    );
+  }
+  process.exit(1);
+}
+
 function main() {
   const { email, config } = parseArgs(process.argv.slice(2));
   if (!email || !config) {
@@ -68,48 +90,22 @@ function main() {
 
   const updatedAt = new Date().toISOString();
   const command = buildActivationUpdateCommand(validated.normalized, updatedAt);
+  const wranglerArgv = buildWranglerD1ExecuteArgv(config, command);
 
-  const result = spawnSync(
-    "npx",
-    [
-      "wrangler",
-      "d1",
-      "execute",
-      "WE_MET_DB",
-      "--remote",
-      "-c",
-      config,
-      "--command",
-      command,
-      "--json",
-    ],
-    { encoding: "utf8", shell: true },
-  );
+  const result = spawnSync("npx", wranglerArgv, WRANGLER_D1_EXECUTE_SPAWN_OPTIONS);
 
   if (result.status !== 0) {
     console.error("Staging account activation failed: database command error.");
     process.exit(result.status ?? 1);
   }
 
-  let rowsWritten = null;
-  try {
-    const parsed = JSON.parse(result.stdout);
-    const meta = parsed?.[0]?.meta;
-    if (meta && typeof meta.changes === "number") {
-      rowsWritten = meta.changes;
-    }
-  } catch {
-    // ignore parse errors; success still means wrangler exited 0
+  const changes = parseWranglerD1ExecuteRowChanges(result.stdout ?? "");
+  const outcome = resolveActivationRowOutcome(changes);
+  if (outcome === "success") {
+    console.log("Staging account activation succeeded.");
+    return;
   }
-
-  if (rowsWritten === 0) {
-    console.error(
-      "Staging account activation failed: account not found or not waitlisted.",
-    );
-    process.exit(1);
-  }
-
-  console.log("Staging account activation succeeded.");
+  failActivationOutcome(outcome);
 }
 
 main();

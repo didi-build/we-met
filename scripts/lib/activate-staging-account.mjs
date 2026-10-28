@@ -109,6 +109,84 @@ export function buildActivationUpdateCommand(normalizedEmail, updatedAtIso) {
   return sql;
 }
 
+/** @typedef {'success' | 'not_found' | 'ambiguous' | 'unparseable'} ActivationRowOutcome */
+
+export const WRANGLER_D1_EXECUTE_SPAWN_OPTIONS = {
+  encoding: "utf8",
+  shell: false,
+};
+
+/**
+ * @param {string} configPath
+ * @param {string} sqlCommand
+ * @returns {string[]}
+ */
+export function buildWranglerD1ExecuteArgv(configPath, sqlCommand) {
+  return [
+    "wrangler",
+    "d1",
+    "execute",
+    "WE_MET_DB",
+    "--remote",
+    "-c",
+    configPath,
+    "--command",
+    sqlCommand,
+    "--json",
+  ];
+}
+
+/**
+ * @param {string} stdout
+ * @returns {number | null}
+ */
+export function parseWranglerD1ExecuteRowChanges(stdout) {
+  try {
+    const parsed = JSON.parse(stdout);
+    const changes = parsed?.[0]?.meta?.changes;
+    if (typeof changes === "number") {
+      return changes;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * @param {number | null} changes
+ * @returns {ActivationRowOutcome}
+ */
+export function resolveActivationRowOutcome(changes) {
+  if (changes === null) {
+    return "unparseable";
+  }
+  if (changes === 0) {
+    return "not_found";
+  }
+  if (changes === 1) {
+    return "success";
+  }
+  return "ambiguous";
+}
+
+/**
+ * @param {string} sql
+ * @param {string} normalizedEmail
+ */
+export function emailAppearsOnlyInWhereLiteral(sql, normalizedEmail) {
+  const literal = `WHERE email = '${normalizedEmail}'`;
+  if (!sql.includes(literal)) {
+    return false;
+  }
+  const escaped = normalizedEmail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const withoutWhere = sql.replace(
+    new RegExp(`WHERE email = '${escaped}'`),
+    "WHERE email = ''",
+  );
+  return !withoutWhere.includes(normalizedEmail);
+}
+
 /**
  * @param {string} email validated normalized email
  */
