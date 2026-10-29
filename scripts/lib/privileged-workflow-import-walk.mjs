@@ -13,6 +13,7 @@
 
 import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { join, resolve, dirname, relative } from "node:path";
+import ts from "typescript";
 import { parse as parseYaml } from "yaml";
 
 /** @typedef {{ entrypoints: string[]; reachable: string[]; unlisted: string[] }} WalkResult */
@@ -55,25 +56,6 @@ const INDEX_FILES = [
 
 const TS_ALIAS_PREFIX = "@/";
 
-const STATIC_FROM_RE =
-  /(?:import\s+(?:[\s\S]*?\sfrom|)|export\s+(?:\*|[\s\S]*?\sfrom))[\s]*['"]([^'"]+)['"]/g;
-
-const COMPACT_IMPORT_FROM_RE =
-  /import\s*(?:\{[\s\S]*?\}|\*\s*(?:as\s+\w+)?)\s*from\s*['"]([^'"]+)['"]/g;
-
-const COMPACT_EXPORT_FROM_RE =
-  /export\s*(?:\*|\{[\s\S]*?\})\s*from\s*['"]([^'"]+)['"]/g;
-
-const COMPACT_SIDE_EFFECT_IMPORT_RE = /import\s*['"]([^'"]+)['"]/g;
-
-const STATIC_IMPORT_SIDE_EFFECT_RE = /^\s*import\s+['"]([^'"]+)['"]/gm;
-
-const DYNAMIC_IMPORT_RE = /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
-
-const REQUIRE_RE = /\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
-
-const CREATE_REQUIRE_RE = /createRequire\s*\([^)]*\)\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
-
 const NODE_ENTRY_RE =
   /\bnode(?:\s+(?:--[\w-]+(?:=\S+|(?:\s+[^\s]+)?)|-r\s+\S+))*\s+(?:['"](\.\.?\/[^'"]+|(?:scripts|test|src)\/[^'"]+)['"]|(\.\.?\/[^\s'"]+|(?:scripts|test|src)\/[^\s'"]+))/g;
 
@@ -91,25 +73,399 @@ const SHELL_WRAPPER_RE =
 const BASH_SH_SCRIPT_FILE_RE =
   /\b(?:bash|sh)\s+(?:-[^\s]+\s+)*['"]?((?:\.\.?\/|scripts\/|test\/)[^\s'"]+)['"]?/g;
 
-const SPAWN_NODE_ARRAY_RE =
-  /(?:spawnSync|execFileSync|spawn|execFile)\s*\(\s*(?:process\.execPath|"node"|'node')\s*,\s*\[([\s\S]*?)\]/g;
+const SPAWN_CALLEE_NAMES = new Set([
+  "spawnSync",
+  "execFileSync",
+  "spawn",
+  "execFile",
+  "exec",
+  "execSync",
+]);
 
-const SPAWN_NPM_ARRAY_RE =
-  /(?:spawnSync|execFileSync|spawn|execFile)\s*\(\s*["']npm["']\s*,\s*\[([\s\S]*?)\]/g;
+const REPO_SCRIPT_PATH_IN_LITERAL = /^(\.\.?\/[^"']+|(?:scripts|test|src)\/[^"']+)$/;
 
-const SPAWN_PLAIN_NODE_RE =
-  /(?:spawnSync|execFileSync|spawn|execFile)\s*\(\s*["']node["']\s*,\s*\[([\s\S]*?)\]/g;
+/**
+ * @param {string} relPath
+ */
+function scriptKindFromRelPath(relPath) {
+  const lower = relPath.toLowerCase();
+  if (lower.endsWith(".tsx")) {
+    return ts.ScriptKind.TSX;
+  }
+  if (lower.endsWith(".jsx")) {
+    return ts.ScriptKind.JSX;
+  }
+  if (lower.endsWith(".ts") || lower.endsWith(".mts") || lower.endsWith(".cts")) {
+    return ts.ScriptKind.TS;
+  }
+  return ts.ScriptKind.JS;
+}
 
-const SPAWN_BASH_ARRAY_RE =
-  /(?:spawnSync|execFileSync|spawn|execFile)\s*\(\s*["']bash["']\s*,\s*\[([\s\S]*?)\]/g;
+/**
+ * @param {string} relPath
+ */
+function isJsLikeSourcePath(relPath) {
+  return /\.(mjs|cjs|js|ts|tsx|mts|cts)$/.test(relPath);
+}
 
-const SPAWN_SH_ARRAY_RE =
-  /(?:spawnSync|execFileSync|spawn|execFile)\s*\(\s*["']sh["']\s*,\s*\[([\s\S]*?)\]/g;
+/**
+ * @param {string} content
+ * @param {string} relPath
+ * @returns {import("typescript").SourceFile}
+ */
+function createParsedSourceFile(content, relPath) {
+  const fileName = relPath || "snippet.js";
+  const kind = scriptKindFromRelPath(relPath);
+  const sourceFile = ts.createSourceFile(
+    fileName,
+    content,
+    ts.ScriptTarget.Latest,
+    true,
+    kind,
+  );
+  if (sourceFile.parseDiagnostics.length > 0) {
+    const detail = sourceFile.parseDiagnostics[0];
+    const message = ts.flattenDiagnosticMessageText(detail.messageText, " ");
+    throw new WorkflowImportWalkError(
+      `Source did not parse cleanly (${fileName}): ${message}`,
+      { module: fileName },
+    );
+  }
+  return sourceFile;
+}
 
-const RUN_NPM_LITERAL_RE =
-  /\brunNpm\s*\(\s*\[\s*["']run["']\s*,\s*["']([a-z0-9:_-]+)["']/g;
+/**
+ * @param {import("typescript").Node} node
+ * @returns {string | null}
+ */
+function getStringLiteralText(node) {
+  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
+    return node.text;
+  }
+  return null;
+}
 
-const ARRAY_STRING_LITERAL_RE = /["'](\.\.?\/[^"']+|(?:scripts|test|src)\/[^"']+)["']/g;
+/**
+ * @param {import("typescript").LeftHandSideExpression} expression
+ * @returns {string | null}
+ */
+function getCallCalleeName(expression) {
+  if (ts.isIdentifier(expression)) {
+    return expression.text;
+  }
+  if (ts.isPropertyAccessExpression(expression)) {
+    return expression.name.text;
+  }
+  return null;
+}
+
+/**
+ * @param {import("typescript").Node} node
+ */
+function isCreateRequireCall(node) {
+  if (!ts.isCallExpression(node)) {
+    return false;
+  }
+  const expr = node.expression;
+  if (ts.isIdentifier(expr) && expr.text === "createRequire") {
+    return true;
+  }
+  if (ts.isPropertyAccessExpression(expr) && expr.name.text === "createRequire") {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * @param {import("typescript").SourceFile} sourceFile
+ * @returns {Set<string>}
+ */
+function collectCreateRequireBindings(sourceFile) {
+  /** @type {Set<string>} */
+  const bindings = new Set();
+  function visit(node) {
+    if (ts.isVariableStatement(node)) {
+      for (const decl of node.declarationList.declarations) {
+        if (
+          ts.isIdentifier(decl.name) &&
+          decl.initializer &&
+          isCreateRequireCall(decl.initializer)
+        ) {
+          bindings.add(decl.name.text);
+        }
+      }
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(sourceFile);
+  return bindings;
+}
+
+/**
+ * @param {import("typescript").SourceFile} sourceFile
+ * @returns {Set<string>}
+ */
+function collectModuleSpecifiersFromSourceFile(sourceFile) {
+  /** @type {Set<string>} */
+  const specs = new Set();
+  const createRequireBindings = collectCreateRequireBindings(sourceFile);
+
+  function addModuleSpecifier(node) {
+    const text = getStringLiteralText(node);
+    if (text) {
+      specs.add(text);
+    }
+  }
+
+  function visit(node) {
+    if (ts.isImportDeclaration(node) && node.moduleSpecifier) {
+      addModuleSpecifier(node.moduleSpecifier);
+    }
+
+    if (ts.isImportEqualsDeclaration(node) && node.moduleReference) {
+      if (ts.isExternalModuleReference(node.moduleReference)) {
+        addModuleSpecifier(node.moduleReference.expression);
+      }
+    }
+
+    if (ts.isExportDeclaration(node) && node.moduleSpecifier) {
+      addModuleSpecifier(node.moduleSpecifier);
+    }
+
+    if (ts.isCallExpression(node)) {
+      const callee = node.expression;
+      if (ts.isIdentifier(callee) && callee.text === "require") {
+        const arg = node.arguments[0];
+        if (arg) {
+          addModuleSpecifier(arg);
+        }
+      }
+
+      if (callee.kind === ts.SyntaxKind.ImportKeyword) {
+        const arg = node.arguments[0];
+        if (arg) {
+          addModuleSpecifier(arg);
+        }
+      }
+
+      if (ts.isCallExpression(callee) && isCreateRequireCall(callee)) {
+        const arg = node.arguments[0];
+        if (arg) {
+          addModuleSpecifier(arg);
+        }
+      }
+
+      if (ts.isIdentifier(callee) && createRequireBindings.has(callee.text)) {
+        const arg = node.arguments[0];
+        if (arg) {
+          addModuleSpecifier(arg);
+        }
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+  return specs;
+}
+
+/**
+ * @param {import("typescript").Expression} arg
+ */
+function isNodeSpawnCommandArg(arg) {
+  if (ts.isStringLiteral(arg)) {
+    return arg.text === "node";
+  }
+  if (ts.isPropertyAccessExpression(arg)) {
+    return (
+      ts.isIdentifier(arg.expression) &&
+      arg.expression.text === "process" &&
+      arg.name.text === "execPath"
+    );
+  }
+  return false;
+}
+
+/**
+ * @param {import("typescript").Expression} arg
+ */
+function isNpmSpawnCommandArg(arg) {
+  return ts.isStringLiteral(arg) && arg.text === "npm";
+}
+
+/**
+ * @param {import("typescript").Expression} arg
+ */
+function isBashOrShSpawnCommandArg(arg) {
+  if (!ts.isStringLiteral(arg)) {
+    return false;
+  }
+  const text = arg.text;
+  return (
+    text === "bash" ||
+    text === "sh" ||
+    text === "/usr/bin/bash" ||
+    text === "/usr/bin/sh"
+  );
+}
+
+/**
+ * @param {import("typescript").Expression} element
+ * @param {string} contextLabel
+ */
+function assertNoTemplateSubstitutionInSpawnElement(element, contextLabel) {
+  if (ts.isTemplateExpression(element) && element.templateSpans.length > 0) {
+    throw new WorkflowImportWalkError(
+      `Template literal with substitution in spawn array (${contextLabel})`,
+      { module: element.getText().slice(0, 120) },
+    );
+  }
+}
+
+/**
+ * @param {import("typescript").Expression} element
+ * @param {Set<string>} entries
+ * @param {string} contextLabel
+ */
+function collectRepoScriptLiteralsFromArrayElement(element, entries, contextLabel) {
+  assertNoTemplateSubstitutionInSpawnElement(element, contextLabel);
+  /** @type {string[]} */
+  const literalTexts = [];
+  function visitLiteralNodes(node) {
+    if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
+      literalTexts.push(node.text);
+      return;
+    }
+    if (ts.isTemplateExpression(node) && node.templateSpans.length > 0) {
+      throw new WorkflowImportWalkError(
+        `Template literal with substitution in spawn array (${contextLabel})`,
+        { module: node.getText().slice(0, 120) },
+      );
+    }
+    ts.forEachChild(node, visitLiteralNodes);
+  }
+  visitLiteralNodes(element);
+  for (const text of literalTexts) {
+    if (!REPO_SCRIPT_PATH_IN_LITERAL.test(text)) {
+      continue;
+    }
+    const rel = normalizeEntrypointToken(text);
+    if (rel) {
+      entries.add(rel);
+      continue;
+    }
+    const looksRepoRelative =
+      text.startsWith("./") ||
+      text.startsWith("../") ||
+      text.startsWith("scripts/") ||
+      text.startsWith("test/");
+    if (looksRepoRelative) {
+      throw new WorkflowImportWalkError(
+        `Unresolved spawn script: ${text} (${contextLabel})`,
+        { module: text },
+      );
+    }
+  }
+}
+
+/**
+ * @param {import("typescript").Expression} arrayArg
+ * @param {Set<string>} entries
+ * @param {string} contextLabel
+ */
+function collectRepoScriptLiteralsFromArrayArg(arrayArg, entries, contextLabel) {
+  if (!ts.isArrayLiteralExpression(arrayArg)) {
+    return;
+  }
+  for (const element of arrayArg.elements) {
+    if (element.kind === ts.SyntaxKind.OmittedExpression) {
+      continue;
+    }
+    collectRepoScriptLiteralsFromArrayElement(element, entries, contextLabel);
+  }
+}
+
+/**
+ * @param {import("typescript").Expression} arrayArg
+ * @param {Record<string, string>} scripts
+ * @param {Set<string>} seenNpm
+ * @param {Set<string>} entries
+ */
+function collectNpmRunFromSpawnArray(arrayArg, scripts, seenNpm, entries) {
+  if (!ts.isArrayLiteralExpression(arrayArg)) {
+    return;
+  }
+  /** @type {string[]} */
+  const literals = [];
+  for (const element of arrayArg.elements) {
+    const text = getStringLiteralText(element);
+    if (text) {
+      literals.push(text);
+    }
+  }
+  for (let i = 0; i < literals.length - 1; i++) {
+    if (literals[i] === "run") {
+      const scriptName = literals[i + 1];
+      if (/^[a-z0-9:_-]+$/.test(scriptName)) {
+        for (const rel of resolveNpmRunScriptEntrypoints(
+          scriptName,
+          scripts,
+          seenNpm,
+        )) {
+          entries.add(rel);
+        }
+      }
+    }
+  }
+}
+
+/**
+ * @param {import("typescript").SourceFile} sourceFile
+ * @param {Record<string, string>} scripts
+ * @param {Set<string>} entries
+ * @param {Set<string>} seenNpm
+ */
+function collectSpawnEntrypointsFromSourceFile(sourceFile, scripts, entries, seenNpm) {
+  function visit(node) {
+    if (ts.isCallExpression(node)) {
+      const calleeName = getCallCalleeName(node.expression);
+      if (calleeName === "runNpm") {
+        const arrayArg = node.arguments[0];
+        if (arrayArg) {
+          collectNpmRunFromSpawnArray(arrayArg, scripts, seenNpm, entries);
+        }
+      }
+
+      if (calleeName && SPAWN_CALLEE_NAMES.has(calleeName)) {
+        const cmdArg = node.arguments[0];
+        const arrayArg = node.arguments[1];
+        if (cmdArg && arrayArg) {
+          if (isNodeSpawnCommandArg(cmdArg)) {
+            collectRepoScriptLiteralsFromArrayArg(
+              arrayArg,
+              entries,
+              "node spawn array",
+            );
+          }
+          if (isNpmSpawnCommandArg(cmdArg)) {
+            collectRepoScriptLiteralsFromArrayArg(arrayArg, entries, "npm spawn array");
+            collectNpmRunFromSpawnArray(arrayArg, scripts, seenNpm, entries);
+          }
+          if (isBashOrShSpawnCommandArg(cmdArg)) {
+            collectRepoScriptLiteralsFromArrayArg(
+              arrayArg,
+              entries,
+              "bash/sh spawn array",
+            );
+          }
+        }
+      }
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(sourceFile);
+}
 
 /**
  * @param {string} packageJsonPath
@@ -227,10 +583,37 @@ function normalizeSpawnScriptToken(token, contextLabel) {
 
 /**
  * @param {string} content
+ * @returns {Set<string>}
  */
-function collectSpawnScriptLiteralsFromSource(content) {
+function collectBashShTargetsFromShellContent(content) {
   /** @type {Set<string>} */
   const entries = new Set();
+  BASH_SH_SCRIPT_FILE_RE.lastIndex = 0;
+  for (const match of content.matchAll(BASH_SH_SCRIPT_FILE_RE)) {
+    const rel = normalizeSpawnScriptToken(match[1], "bash/sh in shell script");
+    if (rel) {
+      entries.add(rel);
+    }
+  }
+  return entries;
+}
+
+/**
+ * @param {string} content
+ * @param {string} relPath
+ */
+function collectSpawnScriptLiteralsFromSource(content, relPath) {
+  /** @type {Set<string>} */
+  const entries = new Set();
+  if (relPath.endsWith(".sh")) {
+    for (const rel of collectBashShTargetsFromShellContent(content)) {
+      entries.add(rel);
+    }
+    return entries;
+  }
+  if (!isJsLikeSourcePath(relPath)) {
+    return entries;
+  }
   BASH_SH_SCRIPT_FILE_RE.lastIndex = 0;
   for (const match of content.matchAll(BASH_SH_SCRIPT_FILE_RE)) {
     const rel = normalizeSpawnScriptToken(match[1], "bash/sh spawn in source");
@@ -322,53 +705,27 @@ export function extractRepoScriptEntrypointsFromRun(
 /**
  * @param {string} content
  * @param {Record<string, string>} scripts
+ * @param {string} relPath
  * @returns {string[]}
  */
-export function extractSpawnedRepoScriptEntrypointsFromSource(content, scripts) {
+export function extractSpawnedRepoScriptEntrypointsFromSource(
+  content,
+  scripts,
+  relPath,
+) {
+  if (relPath.endsWith(".sh")) {
+    return [...collectBashShTargetsFromShellContent(content)];
+  }
+  if (!isJsLikeSourcePath(relPath)) {
+    return [];
+  }
   /** @type {Set<string>} */
   const entries = new Set();
   const seenNpm = new Set();
+  const sourceFile = createParsedSourceFile(content, relPath);
+  collectSpawnEntrypointsFromSourceFile(sourceFile, scripts, entries, seenNpm);
 
-  for (const re of [
-    SPAWN_NODE_ARRAY_RE,
-    SPAWN_PLAIN_NODE_RE,
-    SPAWN_NPM_ARRAY_RE,
-    SPAWN_BASH_ARRAY_RE,
-    SPAWN_SH_ARRAY_RE,
-  ]) {
-    re.lastIndex = 0;
-    for (const match of content.matchAll(re)) {
-      const block = match[1];
-      ARRAY_STRING_LITERAL_RE.lastIndex = 0;
-      for (const lit of block.matchAll(ARRAY_STRING_LITERAL_RE)) {
-        const rel = normalizeEntrypointToken(lit[1]);
-        if (rel) {
-          entries.add(rel);
-        }
-      }
-      if (re === SPAWN_NPM_ARRAY_RE) {
-        const runMatch = /["']run["']\s*,\s*["']([a-z0-9:_-]+)["']/.exec(block);
-        if (runMatch) {
-          for (const rel of resolveNpmRunScriptEntrypoints(
-            runMatch[1],
-            scripts,
-            seenNpm,
-          )) {
-            entries.add(rel);
-          }
-        }
-      }
-    }
-  }
-
-  RUN_NPM_LITERAL_RE.lastIndex = 0;
-  for (const match of content.matchAll(RUN_NPM_LITERAL_RE)) {
-    for (const rel of resolveNpmRunScriptEntrypoints(match[1], scripts, seenNpm)) {
-      entries.add(rel);
-    }
-  }
-
-  for (const rel of collectSpawnScriptLiteralsFromSource(content)) {
+  for (const rel of collectSpawnScriptLiteralsFromSource(content, relPath)) {
     entries.add(rel);
   }
 
@@ -413,6 +770,7 @@ export function walkReachableWithImportsAndSpawns(
     for (const spawned of extractSpawnedRepoScriptEntrypointsFromSource(
       content,
       scripts,
+      rel,
     )) {
       assertEntrypointExists(repoRoot, spawned);
       entrypoints.add(spawned);
@@ -421,7 +779,11 @@ export function walkReachableWithImportsAndSpawns(
       }
     }
 
-    for (const spec of collectStaticModuleSpecifiers(content)) {
+    if (rel.endsWith(".sh")) {
+      continue;
+    }
+
+    for (const spec of collectStaticModuleSpecifiers(content, rel)) {
       if (!isRepoRelativeSpecifier(spec, tsAliasRoot)) {
         continue;
       }
@@ -587,29 +949,18 @@ export function resolveRepoModuleOrThrow(repoRoot, fromAbs, spec, tsAliasRoot) {
 
 /**
  * @param {string} content
+ * @param {string} [relPath]
  * @returns {string[]}
  */
-export function collectStaticModuleSpecifiers(content) {
-  /** @type {Set<string>} */
-  const specs = new Set();
-
-  for (const re of [
-    STATIC_FROM_RE,
-    COMPACT_IMPORT_FROM_RE,
-    COMPACT_EXPORT_FROM_RE,
-    COMPACT_SIDE_EFFECT_IMPORT_RE,
-    STATIC_IMPORT_SIDE_EFFECT_RE,
-    DYNAMIC_IMPORT_RE,
-    REQUIRE_RE,
-    CREATE_REQUIRE_RE,
-  ]) {
-    re.lastIndex = 0;
-    for (const match of content.matchAll(re)) {
-      specs.add(match[1]);
-    }
+export function collectStaticModuleSpecifiers(content, relPath = "snippet.js") {
+  if (relPath.endsWith(".sh")) {
+    return [];
   }
-
-  return [...specs];
+  if (!isJsLikeSourcePath(relPath)) {
+    return [];
+  }
+  const sourceFile = createParsedSourceFile(content, relPath);
+  return [...collectModuleSpecifiersFromSourceFile(sourceFile)];
 }
 
 /**
@@ -627,9 +978,12 @@ export function walkStaticImportsFromEntry(repoRoot, entryRel, visited, tsAliasR
   if (!REPO_SOURCE_EXT.test(entryRel)) {
     return;
   }
+  if (entryRel.endsWith(".sh")) {
+    return;
+  }
   const abs = resolve(repoRoot, entryRel);
   const content = readFileSync(abs, "utf8");
-  for (const spec of collectStaticModuleSpecifiers(content)) {
+  for (const spec of collectStaticModuleSpecifiers(content, entryRel)) {
     if (!isRepoRelativeSpecifier(spec, tsAliasRoot)) {
       continue;
     }
