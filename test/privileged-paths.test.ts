@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  isPrivilegedFlagInfrastructurePath,
   isPrivilegedPath,
   privilegedPathMatchers,
 } from "../scripts/lib/privileged-paths.mjs";
@@ -52,6 +53,27 @@ describe("privileged-paths (table)", () => {
     { path: "scripts/lib/parse-jsonc.test.mjs", privileged: false },
     { path: "scripts/lib/parse-jsonc.mjs.bak", privileged: false },
     { path: "scripts/lib/parse-json.mjs", privileged: false },
+    { path: "scripts/lib/workflow-permissions-parse.mjs.bak", privileged: false },
+    { path: "scripts/workflow-permissions-parse.mjs", privileged: false },
+    { path: "scripts/wrangler-placeholders.mjs", privileged: false },
+    { path: "scripts/parse-jsonc.mjs", privileged: false },
+    { path: "scripts/lib/vendor/parse-jsonc.mjs", privileged: false },
+    { path: "scripts/lib/vendor/activate-staging-account.mjs", privileged: false },
+    { path: "src/lib/wrangler-placeholders.mjs", privileged: false },
+    { path: "workers/warmup/scripts/activate-staging-account.mjs", privileged: false },
+    {
+      path: "workers/warmup/scripts/lib/activate-staging-account.mjs",
+      privileged: false,
+    },
+    { path: "./scripts/lib/parse-jsonc.mjs", privileged: false },
+    { path: "scripts/lib/Parse-JSONC.mjs", privileged: false },
+    { path: "scripts/Activate-Staging-Account.mjs", privileged: false },
+    { path: "scripts/lib/Activate-Staging-Account.mjs", privileged: false },
+    { path: "scripts/lib/Wrangler-Placeholders.mjs", privileged: false },
+    {
+      path: "scripts/lib/Workflow-Permissions-Parse.mjs",
+      privileged: false,
+    },
     { path: "src/app/page.tsx", privileged: false },
     { path: "scripts/preview-comment-body.mjs", privileged: false },
     { path: "package.json", privileged: false },
@@ -62,6 +84,15 @@ describe("privileged-paths (table)", () => {
       expect(isPrivilegedPath(path)).toBe(privileged);
     });
   }
+
+  it("wrong-directory paths are not infrastructure matchers", () => {
+    expect(
+      isPrivilegedFlagInfrastructurePath("scripts/workflow-permissions-parse.mjs"),
+    ).toBe(false);
+    expect(isPrivilegedFlagInfrastructurePath("./scripts/lib/parse-jsonc.mjs")).toBe(
+      false,
+    );
+  });
 
   it("documents matcher ids for review", () => {
     expect(privilegedPathMatchers.map((m) => m.id)).toEqual([
