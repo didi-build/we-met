@@ -8,6 +8,7 @@ import {
 } from "../scripts/lib/privileged-paths.mjs";
 import {
   analyzeWorkflowImportWalk,
+  collectStaticModuleSpecifiers,
   WorkflowImportWalkError,
 } from "../scripts/lib/privileged-workflow-import-walk.mjs";
 
@@ -17,11 +18,22 @@ const fixtureUnlistedPath =
 const resolutionFixtureRoot = join(
   "test/fixtures/privileged-workflow-import-walk/resolution",
 );
+const reachableBaselinePath = join(fixtureWorkflowsDir, "reachable-baseline-main.json");
 
 describe("privileged-workflow-import-walk", () => {
   it("lists every workflow-reachable repo module as privileged", () => {
     const { unlisted } = analyzeWorkflowImportWalk({ isPrivilegedPath });
     expect(unlisted).toEqual([]);
+  });
+
+  it("does not drop workflow-reachable files vs pinned main baseline", () => {
+    const baseline = JSON.parse(
+      readFileSync(reachableBaselinePath, "utf8"),
+    ) as string[];
+    const { reachable } = analyzeWorkflowImportWalk({ isPrivilegedPath });
+    const reachableSet = new Set(reachable);
+    const missing = baseline.filter((file) => !reachableSet.has(file));
+    expect(missing).toEqual([]);
   });
 
   it("documents accepted gaps in the walk module header (ADR 0005)", () => {
@@ -168,6 +180,124 @@ describe("privileged-workflow-import-walk", () => {
       workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
     });
     expect(entrypoints).toContain("scripts/apply-migrations.mjs");
+  });
+
+  it("parses imports after a regex literal with a quote (fixture)", () => {
+    const { reachable } = analyzeWorkflowImportWalk({
+      isPrivilegedPath: () => true,
+      extraEntrypoints: [`${resolutionFixtureRoot}/entry-regex-literal.mjs`],
+      skipSpawnExpansion: true,
+      workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
+    });
+    expect(reachable).toContain(
+      "test/fixtures/privileged-workflow-import-walk/resolution/after-regex.mjs",
+    );
+  });
+
+  it("parses return /'/ then glob string then import (fixture)", () => {
+    const { reachable } = analyzeWorkflowImportWalk({
+      isPrivilegedPath: () => true,
+      extraEntrypoints: [`${resolutionFixtureRoot}/entry-return-regex.mjs`],
+      skipSpawnExpansion: true,
+      workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
+    });
+    expect(reachable).toContain(
+      "test/fixtures/privileged-workflow-import-walk/resolution/after-return-regex.mjs",
+    );
+  });
+
+  it("parses /[/']/ regex class with single-quoted URL (fixture)", () => {
+    const { reachable } = analyzeWorkflowImportWalk({
+      isPrivilegedPath: () => true,
+      extraEntrypoints: [`${resolutionFixtureRoot}/entry-regex-char-class.mjs`],
+      skipSpawnExpansion: true,
+      workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
+    });
+    expect(reachable).toContain(
+      "test/fixtures/privileged-workflow-import-walk/resolution/after-regex-char.mjs",
+    );
+  });
+
+  it("parses nested template then import (fixture)", () => {
+    const { reachable } = analyzeWorkflowImportWalk({
+      isPrivilegedPath: () => true,
+      extraEntrypoints: [`${resolutionFixtureRoot}/entry-nested-template.mjs`],
+      skipSpawnExpansion: true,
+      workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
+    });
+    expect(reachable).toContain(
+      "test/fixtures/privileged-workflow-import-walk/resolution/after-nested-template.mjs",
+    );
+  });
+
+  it("parses node-array template shape then import (fixture)", () => {
+    const { reachable } = analyzeWorkflowImportWalk({
+      isPrivilegedPath: () => true,
+      extraEntrypoints: [`${resolutionFixtureRoot}/entry-apply-template-shape.mjs`],
+      skipSpawnExpansion: true,
+      workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
+    });
+    expect(reachable).toContain(
+      "test/fixtures/privileged-workflow-import-walk/resolution/after-apply-shape.mjs",
+    );
+  });
+
+  it("follows createRequire(import.meta.url)(...) (fixture)", () => {
+    const { reachable } = analyzeWorkflowImportWalk({
+      isPrivilegedPath: () => true,
+      extraEntrypoints: [`${resolutionFixtureRoot}/entry-create-require-inline.mjs`],
+      skipSpawnExpansion: true,
+      workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
+    });
+    expect(reachable).toContain(
+      "test/fixtures/privileged-workflow-import-walk/resolution/cr-target.cjs",
+    );
+  });
+
+  it("follows require() with a string literal (fixture)", () => {
+    const { reachable } = analyzeWorkflowImportWalk({
+      isPrivilegedPath: () => true,
+      extraEntrypoints: [`${resolutionFixtureRoot}/entry-require.mjs`],
+      skipSpawnExpansion: true,
+      workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
+    });
+    expect(reachable).toContain(
+      "test/fixtures/privileged-workflow-import-walk/resolution/require-target.cjs",
+    );
+  });
+
+  it("fail closed on parse errors", () => {
+    expect(() =>
+      collectStaticModuleSpecifiers(
+        'export const broken = (;\nimport "./leaf.mjs";\n',
+        "parse-error-snippet.mjs",
+      ),
+    ).toThrow(WorkflowImportWalkError);
+  });
+
+  it.each([
+    ["return", "function f(){return /'/;} import './same-line-target.mjs';"],
+    ["typeof", "const x=1; typeof y==='z'; import './same-line-target.mjs';"],
+    ["await", "await Promise.resolve(); import './same-line-target.mjs';"],
+    ["case", "switch(0){case 1:break}; import './same-line-target.mjs';"],
+    ["brace", "{ const r = /'/; } import './same-line-target.mjs';"],
+  ])(
+    "collectStaticModuleSpecifiers after %s with /'/ on same line",
+    (_label, snippet) => {
+      const specs = collectStaticModuleSpecifiers(snippet, "same-line-snippet.mjs");
+      expect(specs).toContain("./same-line-target.mjs");
+    },
+  );
+
+  it("collectStaticModuleSpecifiers reads scripts/migrate-nonprod/apply.ts", () => {
+    const content = readFileSync("scripts/migrate-nonprod/apply.ts", "utf8");
+    const specs = collectStaticModuleSpecifiers(
+      content,
+      "scripts/migrate-nonprod/apply.ts",
+    );
+    expect(specs).toContain("./comment-body.mjs");
+    expect(specs).toContain("./validate.mjs");
+    expect(specs.length).toBeGreaterThanOrEqual(8);
   });
 
   for (const entry of workflowModuleExactPrivilegedEntries) {
