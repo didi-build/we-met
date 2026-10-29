@@ -412,8 +412,8 @@ describe("POST /api/exchange/vcard", () => {
     expect(body).not.toContain("BEGIN:VCARD");
   });
 
-  it("returns 200 when lead_email_enabled is off", async () => {
-    // POST /api/exchange/vcard is not gated on app_settings (see 0008); memory repo only.
+  it("returns 200 for live card without lead_email app setting gate", async () => {
+    // POST /api/exchange/vcard is not gated on app_settings (docs/decisions/0008-api-routes-exchange-and-details.md); memory repo only.
     const repo = new MemoryCardRepository();
     const live = await seedLiveCard(repo, "lead-off-vcard");
     routeMocks.repo = repo;

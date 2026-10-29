@@ -82,6 +82,16 @@ const WORKFLOW_MODULE_SEVERITIES_LITERAL: readonly (readonly [string, boolean])[
   ["scripts/lib/repo-settings-target.mjs", true],
 ];
 
+/** Pinned infrastructure severities for base privileged-path matchers (DIDI-984). */
+const BASE_PRIVILEGED_INFRASTRUCTURE_LITERAL: readonly (readonly [string, boolean])[] =
+  [
+    ["scripts/apply-migrations.mjs", true],
+    ["migrations/0001_card_lookup_schema.sql", true],
+    ["scripts/dry-run-generated-config.mjs", true],
+    ["scripts/lib/privileged-paths.mjs", true],
+    ["scripts/check-secret-usage.mjs", true],
+  ];
+
 describe("privileged-paths (table)", () => {
   const cases: { path: string; privileged: boolean }[] = [
     { path: ".github/workflows/ci.yml", privileged: true },
@@ -159,6 +169,23 @@ describe("privileged-paths (table)", () => {
       expect(isPrivilegedPath(path)).toBe(privileged);
     });
   }
+
+  describe("base matcher infrastructure severities (DIDI-984)", () => {
+    for (const [path, infrastructure] of BASE_PRIVILEGED_INFRASTRUCTURE_LITERAL) {
+      it(`${path} infrastructure=${infrastructure}`, () => {
+        expect(isPrivilegedFlagInfrastructurePath(path)).toBe(infrastructure);
+      });
+    }
+
+    it("migrate-script and migrations matchers are infrastructure in config", () => {
+      const infraById = Object.fromEntries(
+        privilegedPathMatchers.map((m) => [m.id, m.infrastructure === true]),
+      );
+      expect(infraById["migrate-script"]).toBe(true);
+      expect(infraById["migrations"]).toBe(true);
+      expect(infraById["deploy-dry-run-generated"]).toBe(true);
+    });
+  });
 
   describe("workflow module matchers (DIDI-973)", () => {
     it("privileged-paths-workflow-modules matches pinned severities", () => {

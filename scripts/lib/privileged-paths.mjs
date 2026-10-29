@@ -42,6 +42,7 @@ const basePrivilegedPathMatchers = [
   },
   {
     id: "migrate-script",
+    infrastructure: true,
     test: (filename) => filename === "scripts/apply-migrations.mjs",
   },
   {
@@ -50,6 +51,7 @@ const basePrivilegedPathMatchers = [
   },
   {
     id: "deploy-dry-run-generated",
+    infrastructure: true,
     test: (filename) => filename === "scripts/dry-run-generated-config.mjs",
   },
   {
@@ -72,6 +74,7 @@ const basePrivilegedPathMatchers = [
   },
   {
     id: "migrations",
+    infrastructure: true,
     test: (filename) => filename.startsWith("migrations/"),
   },
   {

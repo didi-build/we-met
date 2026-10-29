@@ -228,7 +228,6 @@ describe("HiWhatIDoChips", () => {
     });
 
     it("skips the hint with prefers-reduced-motion", () => {
-      vi.unstubAllGlobals();
       stubMatchMedia(true);
       stubAnimate();
       renderChips();
@@ -246,17 +245,26 @@ describe("HiWhatIDoChips", () => {
     });
 
     it("still works when localStorage throws", async () => {
-      vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
-        throw new Error("blocked");
-      });
-      vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
-        throw new Error("blocked");
-      });
-      const { container } = renderChips();
-      fireEvent.click(chipButton(chips[1].label, container));
-      await waitFor(() => {
-        expect(queryPopover()?.textContent).toContain(chips[1].explanation);
-      });
+      const getItemSpy = vi
+        .spyOn(Storage.prototype, "getItem")
+        .mockImplementation(() => {
+          throw new Error("blocked");
+        });
+      const setItemSpy = vi
+        .spyOn(Storage.prototype, "setItem")
+        .mockImplementation(() => {
+          throw new Error("blocked");
+        });
+      try {
+        const { container } = renderChips();
+        fireEvent.click(chipButton(chips[1].label, container));
+        await waitFor(() => {
+          expect(queryPopover()?.textContent).toContain(chips[1].explanation);
+        });
+      } finally {
+        getItemSpy.mockRestore();
+        setItemSpy.mockRestore();
+      }
     });
   });
 });

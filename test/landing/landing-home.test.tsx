@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { LandingHome } from "@/components/landing/LandingHome";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { HOW_IT_WORKS_STEPS } from "@/components/landing/how-it-works-steps";
@@ -43,6 +43,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  cleanup();
   vi.unstubAllGlobals();
 });
 

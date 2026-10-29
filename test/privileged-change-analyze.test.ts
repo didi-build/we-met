@@ -67,6 +67,9 @@ jobs:
     "scripts/lib/activate-staging-account.mjs",
     "scripts/lib/wrangler-placeholders.mjs",
     "scripts/lib/parse-jsonc.mjs",
+    "scripts/apply-migrations.mjs",
+    "migrations/0001_card_lookup_schema.sql",
+    "scripts/dry-run-generated-config.mjs",
   ] as const;
 
   for (const filename of stagingActivationInfrastructurePaths) {
