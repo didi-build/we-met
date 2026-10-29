@@ -29,6 +29,7 @@ import {
   collectGalleryGithubEnvWriteViolations,
   textReferencesGalleryWranglerConfig,
   shellRunWritesGithubEnv,
+  PREVIEW_WORKFLOW_GUARD_LIB_PATH,
 } from "../scripts/lib/check-gallery-guards-lib.mjs";
 
 const FIXTURES = join(import.meta.dirname, "fixtures/gallery-guards");
@@ -607,6 +608,34 @@ steps:
     ).toContain(
       "package.json scripts.gallery:deploy must not run wrangler deploy/versions deploy with wrangler.gallery.jsonc.",
     );
+  });
+
+  it("exempts preview-workflow-guard.mjs from gallery preview location scan", () => {
+    const text = readFileSync(PREVIEW_WORKFLOW_GUARD_LIB_PATH, "utf8");
+    expect(
+      collectGalleryPreviewLocationViolations(text, PREVIEW_WORKFLOW_GUARD_LIB_PATH),
+    ).toEqual([]);
+  });
+
+  it("still flags wrangler.gallery.jsonc preview mentions in other scripts paths", () => {
+    const text = readFileSync(PREVIEW_WORKFLOW_GUARD_LIB_PATH, "utf8");
+    expect(
+      collectGalleryPreviewLocationViolations(text, "scripts/evil-gallery-preview.mjs"),
+    ).toContain(
+      "scripts/evil-gallery-preview.mjs must not run wrangler preview with wrangler.gallery.jsonc (only .github/workflows/gallery-preview.yml).",
+    );
+  });
+
+  it("does not exempt near-miss preview-workflow-guard paths", () => {
+    const text = readFileSync(PREVIEW_WORKFLOW_GUARD_LIB_PATH, "utf8");
+    for (const label of [
+      "scripts/lib/preview-workflow-guard.mjs.bak",
+      "scripts/lib/x/preview-workflow-guard.mjs",
+    ]) {
+      expect(collectGalleryPreviewLocationViolations(text, label)).toContain(
+        `${label} must not run wrangler preview with wrangler.gallery.jsonc (only .github/workflows/gallery-preview.yml).`,
+      );
+    }
   });
 
   it("accepts the committed gallery-preview workflow and runGalleryGuards", () => {

@@ -16,6 +16,8 @@ import { parseJsonc } from "./parse-jsonc.mjs";
 
 const GALLERY_CONFIG = "wrangler.gallery.jsonc";
 const GALLERY_WORKFLOW = ".github/workflows/gallery-preview.yml";
+/** Exact repo path: mentions wrangler.gallery.jsonc as audit data, not a wrangler run. */
+export const PREVIEW_WORKFLOW_GUARD_LIB_PATH = "scripts/lib/preview-workflow-guard.mjs";
 
 const GUARD_SOURCE_PATHS = new Set([
   "scripts/check-gallery-guards.mjs",
@@ -1029,6 +1031,9 @@ function previewArgStringReferencesGalleryConfig(argString) {
  */
 export function collectGalleryPreviewLocationViolations(text, label, options = {}) {
   if (options.isGalleryWorkflow || label === GALLERY_WORKFLOW) {
+    return [];
+  }
+  if (label === PREVIEW_WORKFLOW_GUARD_LIB_PATH) {
     return [];
   }
   const isYaml = options.isYaml ?? (label.endsWith(".yml") || label.endsWith(".yaml"));

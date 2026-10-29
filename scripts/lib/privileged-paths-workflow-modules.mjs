@@ -71,6 +71,21 @@ export const workflowModuleExactPrivilegedEntries = [
     infrastructure: true,
   },
   {
+    id: "check-preview-workflow",
+    path: "scripts/check-preview-workflow.mjs",
+    infrastructure: true,
+  },
+  {
+    id: "preview-workflow-guard",
+    path: "scripts/lib/preview-workflow-guard.mjs",
+    infrastructure: true,
+  },
+  {
+    id: "wrangler-config-path",
+    path: "scripts/lib/wrangler-config-path.mjs",
+    infrastructure: true,
+  },
+  {
     id: "staging-d1-migration-drift-script",
     path: "scripts/staging-d1-migration-drift.mjs",
     infrastructure: true,
