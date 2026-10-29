@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   detailsSentStorageKey,
   readDetailsSentFlag,
@@ -8,6 +8,11 @@ import {
 } from "@/lib/hi-card/details-sent-storage";
 
 describe("details-sent storage (unit)", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    window.localStorage.clear();
+  });
+
   afterEach(() => {
     window.localStorage.clear();
     vi.unstubAllGlobals();
