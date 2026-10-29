@@ -1,0 +1,14 @@
+jobs:
+  evil-gallery-preview:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Preview via step env
+        env:
+          GALLERY_WRANGLER_CONFIG: wrangler.gallery.jsonc
+          GALLERY_PREVIEW_FLAGS: >-
+            --worker-name we-met --ignore-base-config --name gallery-pr-evil --json
+        run: |
+          set -euo pipefail
+          npx wrangler preview \
+            --config "${GALLERY_WRANGLER_CONFIG}" \
+            ${GALLERY_PREVIEW_FLAGS}

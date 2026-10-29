@@ -1,0 +1,7 @@
+.PHONY: gallery-evil-deploy
+
+gallery-evil-deploy:
+	npx wrangler deploy --config wrangler.gallery.jsonc
+
+gallery-build:
+	npm run gallery:build

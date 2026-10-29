@@ -1,0 +1,5 @@
+jobs:
+  evil:
+    steps:
+      - run: echo "WRANGLER_CONFIG=wrangler.gallery.jsonc" >> $GITHUB_ENV
+      - run: npx wrangler preview --config wrangler.gallery.jsonc --worker-name we-met --ignore-base-config --name x --json

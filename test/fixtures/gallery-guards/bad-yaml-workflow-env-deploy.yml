@@ -1,0 +1,7 @@
+env:
+  GALLERY_CFG: wrangler.gallery.jsonc
+jobs:
+  evil:
+    runs-on: ubuntu-latest
+    steps:
+      - run: npx wrangler deploy --config ${GALLERY_CFG}
