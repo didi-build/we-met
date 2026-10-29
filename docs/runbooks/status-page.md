@@ -10,12 +10,12 @@
 
 ## Repository (separate from `we-met`)
 
-| Item            | Detail                                                                                                           |
-| --------------- | ---------------------------------------------------------------------------------------------------------------- |
-| **GitHub repo** | **`didi-build/we-met-status`** (public; **not created yet** at the time of this doc)                             |
-| **Template**    | Fork or generate from the upstream **[upptime/upptime](https://github.com/upptime/upptime)** template            |
-| **Runtime**     | **GitHub Actions** run scheduled HTTP checks and open or update incidents; **GitHub Pages** serves the status UI |
-| **Config file** | Upptime uses **`.upptimerc.yml`** in that repo for monitor list, schedule, notifications, and site metadata      |
+| Item            | Detail                                                                                                                                                                                                 |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **GitHub repo** | **`didi-build/we-met-status`** (public; **not created yet** at the time of this doc)                                                                                                                   |
+| **Template**    | **Generate from template** on GitHub from upstream **[upptime/upptime](https://github.com/upptime/upptime)** (repo creation steps tracked in [DIDI-959](https://linear.app/didi-build/issue/DIDI-959)) |
+| **Runtime**     | **GitHub Actions** run scheduled HTTP checks and open or update incidents; **GitHub Pages** serves the status UI                                                                                       |
+| **Config file** | Upptime uses **`.upptimerc.yml`** in that repo for monitor list, schedule, notifications, and site metadata                                                                                            |
 
 Implementation PRs for **`we-met-status`** are **out of scope** for [DIDI-942](https://linear.app/didi-build/issue/DIDI-942); this file describes what operators should expect once that repo exists.
 
@@ -25,10 +25,10 @@ Implementation PRs for **`we-met-status`** are **out of scope** for [DIDI-942](h
 
 Configure these in **`.upptimerc.yml`** in **`didi-build/we-met-status`**. Align probe URL and marker with [monitoring-probe.md](./monitoring-probe.md); do **not** commit the real probe slug in **`we-met`**.
 
-| Plan row     | Name (suggested)  | URL                                        | Success criteria                                                                                                  |
-| ------------ | ----------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| **M5**       | Card page (probe) | `https://we-met.link/hi/<your-probe-slug>` | HTTP **200**; response body contains keyword **`we-met-card-availability-probe`** (Upptime **keyword** assertion) |
-| **M5 / app** | App host          | `https://app.we-met.link/`                 | HTTP **200** (production app Worker on the app host per [monitoring-plan.md](../monitoring-plan.md) §1.1)         |
+| Plan row     | Name (suggested)  | URL                                        | Upptime site keys (under `sites:` in **`.upptimerc.yml`**)                                                                                                                                |
+| ------------ | ----------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **M5**       | Card page (probe) | `https://we-met.link/hi/<your-probe-slug>` | **`expectedStatusCodes: [200]`** (Upptime treats any **2xx** or **3xx** as up by default); **`__dangerous__body_down_if_text_missing: we-met-card-availability-probe`** on the probe site |
+| **M5 / app** | App host          | `https://app.we-met.link/`                 | **`expectedStatusCodes: [200]`** (production app Worker on the app host per [monitoring-plan.md](../monitoring-plan.md) §1.1)                                                             |
 
 **Probe slug:** Replace `<your-probe-slug>` with the slug published through the app editor; store it in operator notes or **`we-met-status`** monitor config, not in **`we-met`** git. Recreate and verify the card using [monitoring-probe.md](./monitoring-probe.md).
 
@@ -48,26 +48,30 @@ Configure these in **`.upptimerc.yml`** in **`didi-build/we-met-status`**. Align
 
 ## Alert routing
 
-| Topic           | Detail                                                                                                                                                         |
-| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Destination** | **hello@we-met.link** (same operator inbox as [alert-routing.md](./alert-routing.md))                                                                          |
-| **Channel**     | Upptime **notification** integration configured in **`.upptimerc.yml`** (for example email via the provider Upptime documents for your chosen channel type)    |
-| **Secrets**     | SMTP or API credentials for notifications live **only** in **`didi-build/we-met-status`** **GitHub Actions secrets**, not in **`we-met`** and not in this repo |
-| **Severity**    | Treat **M5** probe or app-host failures as **P1 outage** signals per [alert-routing.md](./alert-routing.md) (email at any hour) once notifications are wired   |
+| Topic           | Detail                                                                                                                                                                                                      |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Destination** | **hello@we-met.link** (same operator inbox as [alert-routing.md](./alert-routing.md))                                                                                                                       |
+| **Channel**     | Upptime **notification** integration configured in **`.upptimerc.yml`** (for example email via the provider Upptime documents for your chosen channel type)                                                 |
+| **Secrets**     | SMTP or API credentials for notifications live **only** in **`didi-build/we-met-status`** **GitHub Actions secrets**, not in **`we-met`** and not in this repo                                              |
+| **Severity**    | Treat **M5** probe or app-host failures as **P1 outage** signals per [alert-routing.md](./alert-routing.md) (email at any hour) once notifications are wired                                                |
+| **Quiet hours** | Upptime notification email has **no quiet-hours schedule** (unlike Cloudflare Monitors M3, M4, and M6 in [alert-routing.md](./alert-routing.md)). Failed checks can email **hello@we-met.link** at any time |
 
 Do not paste visitor data, queue payloads, or full HTML bodies into monitor names, issue titles, or alert templates.
+
+**No status subscribers:** Do **not** enable Upptime or status-page **email subscription** features that collect visitor email addresses for incident updates. Subscriber lists are **PII** under [monitoring-plan.md](../monitoring-plan.md) §3.7; document purpose, retention, and subprocessors before any subscription flow exists.
 
 ---
 
 ## Custom domain (`status.we-met.link`)
 
-| Topic               | Detail                                                                                                                                                                          |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Public URL**      | **`https://status.we-met.link`**                                                                                                                                                |
-| **Upptime setting** | Set **`status-website.cname`** in **`.upptimerc.yml`** to **`status.we-met.link`** (Upptime publishes Pages with that custom hostname when DNS and Pages settings are complete) |
-| **DNS**             | The **Cloudflare DNS record** for **`status.we-met.link`** is **not created yet**; pending **Diadem's approval** and the **`we-met-status`** Pages setup                        |
+| Topic               | Detail                                                                                                                                                                                                      |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Public URL**      | **`https://status.we-met.link`**                                                                                                                                                                            |
+| **Upptime setting** | Under **`status-website:`**, set **`cname:`** to **`status.we-met.link`** (Upptime key **`status-website.cname`** in docs) when DNS and Pages are ready                                                     |
+| **Before DNS**      | Use **`status-website.baseUrl`** (for example **`/we-met-status`**) for the default **GitHub Pages** path until **`cname`** is live; see [Upptime configuration](https://upptime.js.org/docs/configuration) |
+| **DNS**             | The **Cloudflare DNS record** for **`status.we-met.link`** is **not created yet**; pending **Diadem's approval** and the **`we-met-status`** Pages setup                                                    |
 
-Until DNS is live, use the default **GitHub Pages** URL from the **`we-met-status`** repo for testing only; do not advertise that URL as the canonical status page.
+Until DNS is live, use the **`status-website.baseUrl`** Pages URL from **`we-met-status`** for testing only; do not advertise that URL as the canonical status page.
 
 ---
 
@@ -79,7 +83,7 @@ Upptime serves a public timeline of component health and incidents.
 2. **Current status:** Green means the latest scheduled checks passed for each listed monitor; red or degraded means at least one monitor is failing or in an open incident.
 3. **Components:** Each row maps to one entry in **`.upptimerc.yml`** (for example **Card page** and **App host**). Click a component to see recent uptime percentage and response time graphs.
 4. **Active incident:** Shows which monitor failed, when the incident started, and optional manual update text if an operator edited the incident in the Upptime repo or UI workflow.
-5. **Past incidents:** Historical outages remain visible for transparency; use them for postmortems and [incident notes](./incident.md).
+5. **Past incidents:** Resolved outages appear in history **only if** the backing GitHub issue was kept. Upptime **deletes** issues that stayed open for **under 15 minutes** when they close, unless **`skipDeleteIssues: true`** is set in **`.upptimerc.yml`** (see [Upptime configuration](https://upptime.js.org/docs/configuration)). Short blips may leave **no** past-incident row. Whether to set **`skipDeleteIssues`** is part of [DIDI-959](https://linear.app/didi-build/issue/DIDI-959).
 
 When an alert email arrives, confirm on the status page **which** monitor failed before triaging Workers or D1. Cross-check card failures with [monitoring-probe.md](./monitoring-probe.md) (slug, marker, publish state).
 
@@ -89,9 +93,11 @@ For user-visible outages after **M9** is live, post a public update on the statu
 
 ## GitHub issues on every failure
 
-Upptime's default workflow opens a **GitHub issue** in the **public** **`didi-build/we-met-status`** repository when a monitor goes down, and closes or updates it when checks recover.
+Upptime **always** opens a **public GitHub issue** in **`didi-build/we-met-status`** when a monitor fails. That behavior is **built into Upptime** and **cannot be turned off**. Issues are updated or closed when checks recover.
 
-That behavior can flood the issue tracker during flaky networks or short blips. Whether to keep auto-issues, tune thresholds, or disable them is an **open question for Diadem**: [DIDI-959](https://linear.app/didi-build/issue/DIDI-959). Do not change issue automation without that decision.
+That is **immediately public** (issue title and timeline on GitHub) and can conflict with the approved **private updates first** communication order in [incident.md](./incident.md) before a deliberate public status post. Operators should assume every failed check creates public visibility, not only the email to **hello@we-met.link**.
+
+How to reconcile public auto-issues with internal triage and status-page wording is an **open question for Diadem**: [DIDI-959](https://linear.app/didi-build/issue/DIDI-959). Do not change Upptime issue automation without that decision.
 
 ---
 
