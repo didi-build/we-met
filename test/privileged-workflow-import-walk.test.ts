@@ -251,7 +251,7 @@ describe("privileged-workflow-import-walk", () => {
     ).toThrow(WorkflowImportWalkError);
   });
 
-  it("strips shell redirection when parsing node run lines", () => {
+  it("strips shell redirection when parsing node run lines (quoted target)", () => {
     const entries = extractRepoScriptEntrypointsFromRun(
       'node scripts/ci-test-summary.mjs >> "$GITHUB_OUTPUT"',
       {},
@@ -259,12 +259,138 @@ describe("privileged-workflow-import-walk", () => {
     expect(entries).toEqual(["scripts/ci-test-summary.mjs"]);
   });
 
-  it("parses bash scripts/x.sh in workflow run lines", () => {
+  it("strips shell redirection when parsing node run lines (no space before >>)", () => {
+    const entries = extractRepoScriptEntrypointsFromRun(
+      "node scripts/ci-test-summary.mjs>>out",
+      {},
+    );
+    expect(entries).toEqual(["scripts/ci-test-summary.mjs"]);
+  });
+
+  it("parses ./scripts/ paths in workflow run lines", () => {
+    const entries = extractRepoScriptEntrypointsFromRun(
+      "./scripts/ci-test-summary.mjs",
+      {},
+    );
+    expect(entries).toContain("scripts/ci-test-summary.mjs");
+  });
+
+  it("fail closed on bash scripts/$X.sh in workflow run lines", () => {
+    expect(() => extractRepoScriptEntrypointsFromRun("bash scripts/$X.sh", {})).toThrow(
+      WorkflowImportWalkError,
+    );
+  });
+
+  it('fail closed on bash "$X" in workflow run lines', () => {
+    expect(() => extractRepoScriptEntrypointsFromRun('bash "$X"', {})).toThrow(
+      WorkflowImportWalkError,
+    );
+  });
+
+  it("fail closed on bash $X in workflow run lines", () => {
+    expect(() => extractRepoScriptEntrypointsFromRun("bash $X", {})).toThrow(
+      WorkflowImportWalkError,
+    );
+  });
+
+  it("parses bash with repo script path in workflow run lines", () => {
     const entries = extractRepoScriptEntrypointsFromRun(
       "bash scripts/check-deploy-guards.mjs",
       {},
     );
     expect(entries).toContain("scripts/check-deploy-guards.mjs");
+  });
+
+  it("parses npx --yes tsx run lines", () => {
+    const entries = extractRepoScriptEntrypointsFromRun(
+      "npx --yes tsx scripts/migrate-nonprod/plan.ts",
+      {},
+    );
+    expect(entries).toContain("scripts/migrate-nonprod/plan.ts");
+  });
+
+  it("parses bare tsx run lines", () => {
+    const entries = extractRepoScriptEntrypointsFromRun(
+      "tsx scripts/migrate-nonprod/plan.ts",
+      {},
+    );
+    expect(entries).toContain("scripts/migrate-nonprod/plan.ts");
+  });
+
+  it("parses npm exec run lines", () => {
+    const entries = extractRepoScriptEntrypointsFromRun(
+      "npm exec -- scripts/migrate-nonprod/plan.ts",
+      {},
+    );
+    expect(entries).toContain("scripts/migrate-nonprod/plan.ts");
+  });
+
+  it("parses node workers/ run lines", () => {
+    const entries = extractRepoScriptEntrypointsFromRun(
+      "node workers/warmup/index.ts",
+      {},
+    );
+    expect(entries).toContain("workers/warmup/index.ts");
+  });
+
+  it("parses node gallery/ run lines", () => {
+    const entries = extractRepoScriptEntrypointsFromRun("node gallery/main.tsx", {});
+    expect(entries).toContain("gallery/main.tsx");
+  });
+
+  it('follows execSync("bash <script.sh>") in source (fixture)', () => {
+    const { reachable } = analyzeWorkflowImportWalk({
+      isPrivilegedPath: () => true,
+      extraEntrypoints: [`${resolutionFixtureRoot}/entry-execsync-bash.mjs`],
+      workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
+    });
+    expect(reachable).toContain(
+      "test/fixtures/privileged-workflow-import-walk/resolution/execsync-target.sh",
+    );
+  });
+
+  it("ignores bash script paths mentioned only in comments (fixture)", () => {
+    const { reachable } = analyzeWorkflowImportWalk({
+      isPrivilegedPath: () => true,
+      extraEntrypoints: [`${resolutionFixtureRoot}/entry-bash-comment-only.mjs`],
+      workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
+    });
+    expect(reachable).not.toContain(
+      "test/fixtures/privileged-workflow-import-walk/resolution/execsync-target.sh",
+    );
+  });
+
+  it("parses imports after a regex literal (fixture)", () => {
+    const { reachable } = analyzeWorkflowImportWalk({
+      isPrivilegedPath: () => true,
+      extraEntrypoints: [`${resolutionFixtureRoot}/entry-regex-literal.mjs`],
+      skipSpawnExpansion: true,
+      workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
+    });
+    expect(reachable).toContain(
+      "test/fixtures/privileged-workflow-import-walk/resolution/after-regex.mjs",
+    );
+  });
+
+  it("follows /usr/bin/bash spawnSync arrays (fixture)", () => {
+    const { reachable } = analyzeWorkflowImportWalk({
+      isPrivilegedPath: () => true,
+      extraEntrypoints: [`${resolutionFixtureRoot}/entry-usr-bin-bash.mjs`],
+      workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
+    });
+    expect(reachable).toContain(
+      "test/fixtures/privileged-workflow-import-walk/resolution/execsync-target.sh",
+    );
+  });
+
+  it("fail closed on template literals in bash spawn arrays (fixture)", () => {
+    expect(() =>
+      analyzeWorkflowImportWalk({
+        isPrivilegedPath: () => true,
+        extraEntrypoints: [`${resolutionFixtureRoot}/entry-template-literal-bash.mjs`],
+        workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
+      }),
+    ).toThrow(WorkflowImportWalkError);
   });
 
   for (const entry of workflowModuleExactPrivilegedEntries) {

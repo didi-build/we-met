@@ -111,33 +111,87 @@ const SHELL_WRAPPER_RE =
   /\b(?:bash|sh)\s+(?:-[^\s]+\s+)*(-(?:lc|c)\s+)?(['"])([\s\S]*?)\2/g;
 
 const BASH_SH_SCRIPT_FILE_RE =
-  /\b(?:bash|sh)\s+(?:-[^\s]+\s+)*['"]?((?:\.\.?\/|scripts\/|test\/|workers\/|gallery\/)[^\s'"]+)['"]?/g;
+  /\b(?:\/?(?:usr\/)?bin\/)?(?:bash|sh)\s+(?:-[^\s]+\s+)*['"]?((?:\.\.?\/|scripts\/|test\/|workers\/|gallery\/)[^\s'"]+)['"]?/g;
 
-const SPAWN_NODE_ARRAY_RE =
-  /(?:spawnSync|execFileSync|spawn|execFile)\s*\(\s*(?:process\.execPath|"node"|'node')\s*,\s*\[([\s\S]*?)\]/g;
+const BASH_SH_NONLITERAL_ARG_RE =
+  /\b(?:\/?(?:usr\/)?bin\/)?(?:bash|sh)\s+(?:-[^\s]+\s+)*(\$[^\s/]+|"[^"]*\$[^"']*"|'[^']*\$[^']*')/g;
 
-const SPAWN_NPM_ARRAY_RE =
-  /(?:spawnSync|execFileSync|spawn|execFile)\s*\(\s*["']npm["']\s*,\s*\[([\s\S]*?)\]/g;
+const EXEC_BASH_ONE_STRING_RE =
+  /(?:execSync|exec)\s*\(\s*['"](?:\/?(?:usr\/)?bin\/)?(?:bash|sh)\s+((?:\.\.?\/|scripts\/|test\/|workers\/|gallery\/)[^\s'"]+)['"]/g;
 
-const SPAWN_PLAIN_NODE_RE =
-  /(?:spawnSync|execFileSync|spawn|execFile)\s*\(\s*["']node["']\s*,\s*\[([\s\S]*?)\]/g;
+const DIRECT_DOT_SLASH_SCRIPT_RUN_RE = new RegExp(
+  String.raw`(?:^|\s)(['"]?(\.\/(?:${REPO_ROOT_PREFIX})\/[^\s'"]+)['"]?)`,
+  "g",
+);
 
-const SPAWN_BASH_ARRAY_RE =
-  /(?:spawnSync|execFileSync|spawn|execFile)\s*\(\s*["']bash["']\s*,\s*\[([\s\S]*?)\]/g;
+const SPAWN_CHILD_PROCESS_RE = String.raw`(?:spawnSync|execFileSync|execSync|spawn|execFile|exec)`;
 
-const SPAWN_SH_ARRAY_RE =
-  /(?:spawnSync|execFileSync|spawn|execFile)\s*\(\s*["']sh["']\s*,\s*\[([\s\S]*?)\]/g;
+const SPAWN_NODE_ARRAY_RE = new RegExp(
+  `${SPAWN_CHILD_PROCESS_RE}\\s*\\(\\s*(?:process\\.execPath|"node"|'node')\\s*,\\s*\\[([\\s\\S]*?)\\]`,
+  "g",
+);
+
+const SPAWN_NPM_ARRAY_RE = new RegExp(
+  `${SPAWN_CHILD_PROCESS_RE}\\s*\\(\\s*["']npm["']\\s*,\\s*\\[([\\s\\S]*?)\\]`,
+  "g",
+);
+
+const SPAWN_PLAIN_NODE_RE = new RegExp(
+  `${SPAWN_CHILD_PROCESS_RE}\\s*\\(\\s*["']node["']\\s*,\\s*\\[([\\s\\S]*?)\\]`,
+  "g",
+);
+
+const SPAWN_BASH_ARRAY_RE = new RegExp(
+  `${SPAWN_CHILD_PROCESS_RE}\\s*\\(\\s*["'](?:\\/?(?:usr\\/)?bin\\/)?bash["']\\s*,\\s*\\[([\\s\\S]*?)\\]`,
+  "g",
+);
+
+const SPAWN_SH_ARRAY_RE = new RegExp(
+  `${SPAWN_CHILD_PROCESS_RE}\\s*\\(\\s*["'](?:\\/?(?:usr\\/)?bin\\/)?sh["']\\s*,\\s*\\[([\\s\\S]*?)\\]`,
+  "g",
+);
 
 const RUN_NPM_LITERAL_RE =
   /\brunNpm\s*\(\s*\[\s*["']run["']\s*,\s*["']([a-z0-9:_-]+)["']/g;
 
 const ARRAY_STRING_LITERAL_RE = new RegExp(
-  String.raw`["'](\.\.?\/[^"']+|${REPO_ROOT_PREFIX}\/[^"']+)["']`,
+  String.raw`["'](\.\/?[^"']+|${REPO_ROOT_PREFIX}\/[^"']+)["']`,
   "g",
 );
 
 /**
- * Remove line and block comments; preserve string literal contents.
+ * @param {string | undefined} prevNonWs
+ */
+function isRegexLiteralStart(prevNonWs) {
+  if (
+    prevNonWs === undefined ||
+    prevNonWs === "\n" ||
+    prevNonWs === "\r" ||
+    prevNonWs === "(" ||
+    prevNonWs === "[" ||
+    prevNonWs === "{" ||
+    prevNonWs === "," ||
+    prevNonWs === "=" ||
+    prevNonWs === ":" ||
+    prevNonWs === ";" ||
+    prevNonWs === "!" ||
+    prevNonWs === "?" ||
+    prevNonWs === "|" ||
+    prevNonWs === "&" ||
+    prevNonWs === "+" ||
+    prevNonWs === "-" ||
+    prevNonWs === "*" ||
+    prevNonWs === "~" ||
+    prevNonWs === "^" ||
+    prevNonWs === "/"
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Remove line and block comments; preserve string and regex literal contents.
  * @param {string} content
  */
 export function stripJsComments(content) {
@@ -146,9 +200,57 @@ export function stripJsComments(content) {
   let i = 0;
   /** @type {"'" | '"' | "`" | null} */
   let inString = null;
+  let inRegex = false;
+  let inRegexClass = false;
+  /** @type {string | undefined} */
+  let prevNonWs = undefined;
+
   while (i < content.length) {
     const ch = content[i];
     const next = content[i + 1];
+
+    if (inRegex) {
+      parts.push(ch);
+      if (inRegexClass) {
+        if (ch === "\\") {
+          if (i + 1 < content.length) {
+            parts.push(content[i + 1]);
+            i += 2;
+            continue;
+          }
+        }
+        if (ch === "]") {
+          inRegexClass = false;
+        }
+        i++;
+        continue;
+      }
+      if (ch === "\\") {
+        if (i + 1 < content.length) {
+          parts.push(content[i + 1]);
+          i += 2;
+          continue;
+        }
+      }
+      if (ch === "[") {
+        inRegexClass = true;
+        i++;
+        continue;
+      }
+      if (ch === "/") {
+        inRegex = false;
+        i++;
+        while (i < content.length && /[gimsuy]/.test(content[i])) {
+          parts.push(content[i]);
+          i++;
+        }
+        prevNonWs = "/";
+        continue;
+      }
+      i++;
+      continue;
+    }
+
     if (inString) {
       parts.push(ch);
       if (ch === "\\") {
@@ -160,24 +262,29 @@ export function stripJsComments(content) {
       }
       if (ch === inString) {
         inString = null;
+        prevNonWs = ch;
       }
       i++;
       continue;
     }
+
     if (ch === "'" || ch === '"' || ch === "`") {
       inString = ch;
       parts.push(ch);
       i++;
       continue;
     }
+
     if (ch === "/" && next === "/") {
       i += 2;
       while (i < content.length && content[i] !== "\n") {
         i++;
       }
       parts.push(" ");
+      prevNonWs = " ";
       continue;
     }
+
     if (ch === "/" && next === "*") {
       i += 2;
       while (i < content.length && !(content[i] === "*" && content[i + 1] === "/")) {
@@ -185,50 +292,36 @@ export function stripJsComments(content) {
       }
       i += 2;
       parts.push(" ");
+      prevNonWs = " ";
       continue;
     }
+
+    if (ch === "/" && isRegexLiteralStart(prevNonWs)) {
+      inRegex = true;
+      inRegexClass = false;
+      parts.push(ch);
+      i++;
+      continue;
+    }
+
     parts.push(ch);
+    if (!/\s/.test(ch)) {
+      prevNonWs = ch;
+    }
     i++;
   }
   return parts.join("");
 }
 
 /**
- * @param {RegExp} re global regex with one capture group
- * @param {string} content
- * @yields {RegExpExecArray}
+ * @param {string} token
  */
-function* matchRegexOutsideStrings(re, content) {
-  let segmentStart = 0;
-  let i = 0;
-  while (i < content.length) {
-    const ch = content[i];
-    if (ch === "'" || ch === '"' || ch === "`") {
-      const quote = ch;
-      if (i > segmentStart) {
-        re.lastIndex = 0;
-        yield* content.slice(segmentStart, i).matchAll(re);
-      }
-      i++;
-      while (i < content.length) {
-        if (content[i] === "\\") {
-          i += 2;
-          continue;
-        }
-        if (content[i] === quote) {
-          i++;
-          break;
-        }
-        i++;
-      }
-      segmentStart = i;
-      continue;
-    }
-    i++;
-  }
-  if (segmentStart < content.length) {
-    re.lastIndex = 0;
-    yield* content.slice(segmentStart).matchAll(re);
+function assertNonLiteralShellPath(token, contextLabel) {
+  if (/\$\{|\$[({\w]/.test(token)) {
+    throw new WorkflowImportWalkError(
+      `Non-literal spawn script path: ${token} (${contextLabel})`,
+      { module: token },
+    );
   }
 }
 
@@ -307,6 +400,7 @@ export function normalizeRepoRelativeSpecifier(spec, tsAliasRoot) {
 function normalizeEntrypointToken(token) {
   let trimmed = token.trim().replace(/^['"]|['"]$/g, "");
   trimmed = trimmed.replace(/\s*[012]?>>?[^\s]*(?:\s+[^\s]+)?$/, "");
+  trimmed = trimmed.replace(/[012]?>>[^\s'"]*(?:\s+[^\s]+)?$/, "");
   trimmed = trimmed.replace(/\s*>>?\s*["'][^"']*["']\s*$/, "");
   trimmed = trimmed.replace(/[);]+$/g, "");
   if (!trimmed || trimmed.startsWith("-")) {
@@ -332,19 +426,36 @@ function normalizeSpawnScriptToken(token, contextLabel) {
     .trim()
     .replace(/^['"]|['"]$/g, "")
     .replace(/\s*[012]?>>?[^\s]*(?:\s+[^\s]+)?$/, "")
+    .replace(/[012]?>>[^\s'"]*(?:\s+[^\s]+)?$/, "")
     .replace(/\s*>>?\s*["'][^"']*["']\s*$/, "")
     .replace(/[);]+$/g, "");
   if (!trimmed || trimmed.startsWith("-")) {
     return null;
   }
-  if (/\$\{|\$[({\w]/.test(trimmed)) {
-    throw new WorkflowImportWalkError(
-      `Non-literal spawn script path: ${trimmed} (${contextLabel})`,
-      { module: trimmed },
-    );
-  }
+  assertNonLiteralShellPath(trimmed, contextLabel);
   const rel = normalizeEntrypointToken(trimmed);
   return rel;
+}
+
+/**
+ * @param {string} runText
+ * @param {string} contextLabel
+ */
+function assertNonLiteralBashShRunArgs(runText, contextLabel) {
+  BASH_SH_NONLITERAL_ARG_RE.lastIndex = 0;
+  for (const match of runText.matchAll(BASH_SH_NONLITERAL_ARG_RE)) {
+    let inner = (match[1] ?? "").trim();
+    if (
+      (inner.startsWith('"') && inner.endsWith('"')) ||
+      (inner.startsWith("'") && inner.endsWith("'"))
+    ) {
+      inner = inner.slice(1, -1);
+    }
+    if (/\s/.test(inner)) {
+      continue;
+    }
+    assertNonLiteralShellPath(inner, contextLabel);
+  }
 }
 
 /**
@@ -354,8 +465,16 @@ function collectSpawnScriptLiteralsFromSource(content) {
   /** @type {Set<string>} */
   const entries = new Set();
   const stripped = stripJsComments(content);
-  for (const match of matchRegexOutsideStrings(BASH_SH_SCRIPT_FILE_RE, stripped)) {
+  BASH_SH_SCRIPT_FILE_RE.lastIndex = 0;
+  for (const match of stripped.matchAll(BASH_SH_SCRIPT_FILE_RE)) {
     const rel = normalizeSpawnScriptToken(match[1], "bash/sh spawn in source");
+    if (rel) {
+      entries.add(rel);
+    }
+  }
+  EXEC_BASH_ONE_STRING_RE.lastIndex = 0;
+  for (const match of stripped.matchAll(EXEC_BASH_ONE_STRING_RE)) {
+    const rel = normalizeSpawnScriptToken(match[1], "execSync bash/sh string");
     if (rel) {
       entries.add(rel);
     }
@@ -446,6 +565,17 @@ export function extractRepoScriptEntrypointsFromRun(
     }
   }
 
+  assertNonLiteralBashShRunArgs(runText, "bash/sh in workflow run");
+
+  DIRECT_DOT_SLASH_SCRIPT_RUN_RE.lastIndex = 0;
+  for (const match of runText.matchAll(DIRECT_DOT_SLASH_SCRIPT_RUN_RE)) {
+    const raw = match[2] ?? match[1];
+    const rel = normalizeEntrypointToken(raw);
+    if (rel) {
+      entries.add(rel);
+    }
+  }
+
   BASH_SH_SCRIPT_FILE_RE.lastIndex = 0;
   for (const match of runText.matchAll(BASH_SH_SCRIPT_FILE_RE)) {
     const rel = normalizeSpawnScriptToken(match[1], "bash/sh in workflow run");
@@ -478,14 +608,15 @@ export function extractSpawnedRepoScriptEntrypointsFromSource(content, scripts) 
     for (const match of content.matchAll(re)) {
       const block = match[1];
       if (re === SPAWN_BASH_ARRAY_RE || re === SPAWN_SH_ARRAY_RE) {
+        if (/`/.test(block)) {
+          throw new WorkflowImportWalkError(
+            "Template literal in bash/sh spawn array (spawn array literal)",
+            { module: block.slice(0, 80) },
+          );
+        }
         const SPAWN_ARRAY_ANY_QUOTED_RE = /["']([^"']+)["']/g;
         for (const lit of block.matchAll(SPAWN_ARRAY_ANY_QUOTED_RE)) {
-          if (/\$\{|\$[({\w]/.test(lit[1])) {
-            throw new WorkflowImportWalkError(
-              `Non-literal spawn script path: ${lit[1]} (spawn array literal)`,
-              { module: lit[1] },
-            );
-          }
+          assertNonLiteralShellPath(lit[1], "spawn array literal");
         }
       }
       ARRAY_STRING_LITERAL_RE.lastIndex = 0;
