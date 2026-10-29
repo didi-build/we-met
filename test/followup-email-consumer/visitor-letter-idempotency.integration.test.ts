@@ -203,10 +203,10 @@ describe("visitor letter idempotency (local D1 integration)", () => {
     const handle = await openIsolatedLocalD1();
     db = handle.db;
     closeD1 = handle.close;
-  }, 30_000);
+  });
 
   afterAll(async () => {
-    await closeD1();
+    await closeD1?.();
   });
 
   beforeEach(async () => {
