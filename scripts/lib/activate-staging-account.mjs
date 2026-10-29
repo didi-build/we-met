@@ -46,13 +46,10 @@ export function validateActivationEmail(raw) {
   if (email.length === 0) {
     return { ok: false, reason: "email is empty" };
   }
-  if (email.length > MAX_EMAIL_LEN) {
-    return { ok: false, reason: "email is too long" };
-  }
   if (FORBIDDEN_EMAIL_CHARS.test(email)) {
     return { ok: false, reason: "email contains forbidden characters" };
   }
-  if (email.includes("--") || email.includes("/*") || email.includes("*/")) {
+  if (email.includes("/*") || email.includes("*/")) {
     return { ok: false, reason: "email contains forbidden sequences" };
   }
   if (!ACTIVATION_EMAIL_PATTERN.test(email)) {
@@ -61,11 +58,20 @@ export function validateActivationEmail(raw) {
   const at = email.indexOf("@");
   const local = email.slice(0, at);
   const domain = email.slice(at + 1);
+  if (domain.includes("xn--")) {
+    return { ok: false, reason: "email domain punycode (xn--) is not allowed" };
+  }
+  if (email.includes("--")) {
+    return { ok: false, reason: "email contains forbidden sequences" };
+  }
   if (local.length === 0 || local.length > MAX_LOCAL_LEN) {
     return { ok: false, reason: "email local part length is invalid" };
   }
   if (domain.length === 0 || domain.length > MAX_DOMAIN_LEN) {
     return { ok: false, reason: "email domain length is invalid" };
+  }
+  if (email.length > MAX_EMAIL_LEN) {
+    return { ok: false, reason: "email is too long" };
   }
   if (local.startsWith(".") || local.endsWith(".")) {
     return { ok: false, reason: "email local part has invalid dots" };
@@ -78,9 +84,6 @@ export function validateActivationEmail(raw) {
   }
   if (!/^[a-zA-Z0-9]/.test(local)) {
     return { ok: false, reason: "email local part has invalid leading character" };
-  }
-  if (domain.includes("xn--")) {
-    return { ok: false, reason: "email domain punycode (xn--) is not allowed" };
   }
   for (const label of domain.split(".")) {
     if (label.length === 0 || label.length > 63) {
