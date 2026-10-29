@@ -8,6 +8,7 @@ import {
 } from "../scripts/lib/privileged-paths.mjs";
 import {
   analyzeWorkflowImportWalk,
+  collectStaticModuleSpecifiers,
   extractRepoScriptEntrypointsFromRun,
   WorkflowImportWalkError,
 } from "../scripts/lib/privileged-workflow-import-walk.mjs";
@@ -21,8 +22,12 @@ const resolutionFixtureRoot = join(
 
 describe("privileged-workflow-import-walk", () => {
   it("lists every workflow-reachable repo module as privileged", () => {
-    const { unlisted } = analyzeWorkflowImportWalk({ isPrivilegedPath });
+    const { unlisted, entrypoints, reachable } = analyzeWorkflowImportWalk({
+      isPrivilegedPath,
+    });
     expect(unlisted).toEqual([]);
+    expect(entrypoints.length).toBeGreaterThanOrEqual(40);
+    expect(reachable.length).toBeGreaterThanOrEqual(96);
   });
 
   it("documents accepted gaps in the walk module header (ADR 0005)", () => {
@@ -391,6 +396,64 @@ describe("privileged-workflow-import-walk", () => {
         workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
       }),
     ).toThrow(WorkflowImportWalkError);
+  });
+
+  it("collectStaticModuleSpecifiers reads scripts/migrate-nonprod/apply.ts", () => {
+    const content = readFileSync("scripts/migrate-nonprod/apply.ts", "utf8");
+    const specs = collectStaticModuleSpecifiers(
+      content,
+      "scripts/migrate-nonprod/apply.ts",
+    );
+    expect(specs).toContain("./comment-body.mjs");
+    expect(specs).toContain("./validate.mjs");
+    expect(specs.length).toBeGreaterThanOrEqual(8);
+  });
+
+  it("parses nested template then import (fixture)", () => {
+    const { reachable } = analyzeWorkflowImportWalk({
+      isPrivilegedPath: () => true,
+      extraEntrypoints: [`${resolutionFixtureRoot}/entry-nested-template.mjs`],
+      skipSpawnExpansion: true,
+      workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
+    });
+    expect(reachable).toContain(
+      "test/fixtures/privileged-workflow-import-walk/resolution/after-nested-template.mjs",
+    );
+  });
+
+  it("parses return /'/ then glob string then import (fixture)", () => {
+    const { reachable } = analyzeWorkflowImportWalk({
+      isPrivilegedPath: () => true,
+      extraEntrypoints: [`${resolutionFixtureRoot}/entry-return-regex.mjs`],
+      skipSpawnExpansion: true,
+      workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
+    });
+    expect(reachable).toContain(
+      "test/fixtures/privileged-workflow-import-walk/resolution/after-return-regex.mjs",
+    );
+  });
+
+  it("parses /[/']/ regex class with single-quoted URL (fixture)", () => {
+    const { reachable } = analyzeWorkflowImportWalk({
+      isPrivilegedPath: () => true,
+      extraEntrypoints: [`${resolutionFixtureRoot}/entry-regex-char-class.mjs`],
+      skipSpawnExpansion: true,
+      workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
+    });
+    expect(reachable).toContain(
+      "test/fixtures/privileged-workflow-import-walk/resolution/after-regex-char.mjs",
+    );
+  });
+
+  it("follows sh -c bash spawnSync arrays (fixture)", () => {
+    const { reachable } = analyzeWorkflowImportWalk({
+      isPrivilegedPath: () => true,
+      extraEntrypoints: [`${resolutionFixtureRoot}/entry-sh-c-bash.mjs`],
+      workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
+    });
+    expect(reachable).toContain(
+      "test/fixtures/privileged-workflow-import-walk/resolution/execsync-target.sh",
+    );
   });
 
   for (const entry of workflowModuleExactPrivilegedEntries) {

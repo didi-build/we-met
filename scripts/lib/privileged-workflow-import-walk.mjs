@@ -5,7 +5,7 @@
  * - Dynamic import() when the module specifier is not a string literal.
  * - Node built-in modules (node:fs, etc.) and npm package specifiers.
  * - Shell tools (gh, git, wrangler, npx wrangler, etc.) and inline node -e / --eval scripts.
- * - Spawned commands whose script path is not a string literal in source (variables, template strings, bash "$VAR", /bin/bash wrappers).
+ * - Spawned commands whose script path is not a string literal in source (variables, non-literal template literals in spawn arrays, bash "$VAR", /bin/bash wrappers).
  * - Type-only imports erased at runtime (still parsed if written as value imports; type-only from is skipped when detectable).
  *
  * Unresolved relative repo imports and missing workflow entrypoint files fail closed (throw), naming the module.
@@ -13,6 +13,7 @@
 
 import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { join, resolve, dirname, relative } from "node:path";
+import ts from "typescript";
 import { parse as parseYaml } from "yaml";
 
 /** @typedef {{ entrypoints: string[]; reachable: string[]; unlisted: string[] }} WalkResult */
@@ -57,30 +58,11 @@ const TS_ALIAS_PREFIX = "@/";
 
 const REPO_ROOT_PREFIX = "(?:scripts|test|src|workers|gallery)";
 
-const STATIC_FROM_RE =
-  /(?:import\s+(?:[\s\S]*?\sfrom|)|export\s+(?:\*|[\s\S]*?\sfrom))[\s]*['"]([^'"]+)['"]/g;
-
-const COMPACT_IMPORT_FROM_RE =
-  /import\s*(?:\{[\s\S]*?\}|\*\s*(?:as\s+\w+)?)\s*from\s*['"]([^'"]+)['"]/g;
-
-const COMPACT_IMPORT_DEFAULT_NAMED_FROM_RE =
-  /import\s+\w+\s*,\s*\{[\s\S]*?\}\s*from\s*['"]([^'"]+)['"]/g;
-
-const COMPACT_EXPORT_FROM_RE =
-  /export\s*(?:\*|\{[\s\S]*?\})\s*from\s*['"]([^'"]+)['"]/g;
-
-const COMPACT_SIDE_EFFECT_IMPORT_RE = /import\s*['"]([^'"]+)['"]/g;
-
-const STATIC_IMPORT_SIDE_EFFECT_RE = /^\s*import\s+['"]([^'"]+)['"]/gm;
-
-const DYNAMIC_IMPORT_RE = /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
-
-const REQUIRE_RE = /\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
-
-const CREATE_REQUIRE_RE = /createRequire\s*\([^)]*\)\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
-
 const CREATE_REQUIRE_THEN_CALL_RE =
   /createRequire\s*\([^)]*\)[\s\S]{0,500}?\b\w+\s*\(\s*['"](\.\.?\/[^'"]+)['"]\s*\)/g;
+
+const BASH_IN_QUOTED_ARRAY_STRING_RE =
+  /["'](?:\/?(?:usr\/)?bin\/)?bash\s+((?:\.\.?\/|scripts\/|test\/|workers\/|gallery\/)[^\s'"]+)["']/g;
 
 const NODE_ENTRY_RE = new RegExp(
   String.raw`\bnode(?:\s+(?:--[\w-]+(?:=\S+|(?:\s+[^\s]+)?)|-r\s+\S+))*\s+(?:['"](\.\.?\/[^'"]+|${REPO_ROOT_PREFIX}\/[^'"]+)['"]|(\.\.?\/[^\s'"]+|${REPO_ROOT_PREFIX}\/[^\s'"]+))`,
@@ -155,162 +137,79 @@ const RUN_NPM_LITERAL_RE =
   /\brunNpm\s*\(\s*\[\s*["']run["']\s*,\s*["']([a-z0-9:_-]+)["']/g;
 
 const ARRAY_STRING_LITERAL_RE = new RegExp(
-  String.raw`["'](\.\/?[^"']+|${REPO_ROOT_PREFIX}\/[^"']+)["']`,
+  String.raw`["'](\.\.?\/[^"']+|${REPO_ROOT_PREFIX}\/[^"']+)["']`,
   "g",
 );
 
 /**
- * @param {string | undefined} prevNonWs
+ * @param {string} relPath
  */
-function isRegexLiteralStart(prevNonWs) {
-  if (
-    prevNonWs === undefined ||
-    prevNonWs === "\n" ||
-    prevNonWs === "\r" ||
-    prevNonWs === "(" ||
-    prevNonWs === "[" ||
-    prevNonWs === "{" ||
-    prevNonWs === "," ||
-    prevNonWs === "=" ||
-    prevNonWs === ":" ||
-    prevNonWs === ";" ||
-    prevNonWs === "!" ||
-    prevNonWs === "?" ||
-    prevNonWs === "|" ||
-    prevNonWs === "&" ||
-    prevNonWs === "+" ||
-    prevNonWs === "-" ||
-    prevNonWs === "*" ||
-    prevNonWs === "~" ||
-    prevNonWs === "^" ||
-    prevNonWs === "/"
-  ) {
-    return true;
+function scriptKindFromRelPath(relPath) {
+  const lower = relPath.toLowerCase();
+  if (lower.endsWith(".tsx")) {
+    return ts.ScriptKind.TSX;
   }
-  return false;
+  if (lower.endsWith(".jsx")) {
+    return ts.ScriptKind.JSX;
+  }
+  if (lower.endsWith(".ts") || lower.endsWith(".mts") || lower.endsWith(".cts")) {
+    return ts.ScriptKind.TS;
+  }
+  return ts.ScriptKind.JS;
 }
 
 /**
- * Remove line and block comments; preserve string and regex literal contents.
  * @param {string} content
+ * @param {string} relPath
  */
-export function stripJsComments(content) {
-  /** @type {string[]} */
-  const parts = [];
-  let i = 0;
-  /** @type {"'" | '"' | "`" | null} */
-  let inString = null;
-  let inRegex = false;
-  let inRegexClass = false;
-  /** @type {string | undefined} */
-  let prevNonWs = undefined;
-
-  while (i < content.length) {
-    const ch = content[i];
-    const next = content[i + 1];
-
-    if (inRegex) {
-      parts.push(ch);
-      if (inRegexClass) {
-        if (ch === "\\") {
-          if (i + 1 < content.length) {
-            parts.push(content[i + 1]);
-            i += 2;
-            continue;
-          }
-        }
-        if (ch === "]") {
-          inRegexClass = false;
-        }
-        i++;
-        continue;
-      }
-      if (ch === "\\") {
-        if (i + 1 < content.length) {
-          parts.push(content[i + 1]);
-          i += 2;
-          continue;
-        }
-      }
-      if (ch === "[") {
-        inRegexClass = true;
-        i++;
-        continue;
-      }
-      if (ch === "/") {
-        inRegex = false;
-        i++;
-        while (i < content.length && /[gimsuy]/.test(content[i])) {
-          parts.push(content[i]);
-          i++;
-        }
-        prevNonWs = "/";
-        continue;
-      }
-      i++;
-      continue;
-    }
-
-    if (inString) {
-      parts.push(ch);
-      if (ch === "\\") {
-        if (i + 1 < content.length) {
-          parts.push(content[i + 1]);
-          i += 2;
-          continue;
-        }
-      }
-      if (ch === inString) {
-        inString = null;
-        prevNonWs = ch;
-      }
-      i++;
-      continue;
-    }
-
-    if (ch === "'" || ch === '"' || ch === "`") {
-      inString = ch;
-      parts.push(ch);
-      i++;
-      continue;
-    }
-
-    if (ch === "/" && next === "/") {
-      i += 2;
-      while (i < content.length && content[i] !== "\n") {
-        i++;
-      }
-      parts.push(" ");
-      prevNonWs = " ";
-      continue;
-    }
-
-    if (ch === "/" && next === "*") {
-      i += 2;
-      while (i < content.length && !(content[i] === "*" && content[i + 1] === "/")) {
-        i++;
-      }
-      i += 2;
-      parts.push(" ");
-      prevNonWs = " ";
-      continue;
-    }
-
-    if (ch === "/" && isRegexLiteralStart(prevNonWs)) {
-      inRegex = true;
-      inRegexClass = false;
-      parts.push(ch);
-      i++;
-      continue;
-    }
-
-    parts.push(ch);
-    if (!/\s/.test(ch)) {
-      prevNonWs = ch;
-    }
-    i++;
+function assertSourceParsesCleanly(content, relPath) {
+  const fileName = relPath || "snippet.js";
+  const kind = scriptKindFromRelPath(relPath);
+  const sourceFile = ts.createSourceFile(
+    fileName,
+    content,
+    ts.ScriptTarget.Latest,
+    true,
+    kind,
+  );
+  if (sourceFile.parseDiagnostics.length > 0) {
+    const detail = sourceFile.parseDiagnostics[0];
+    const message = ts.flattenDiagnosticMessageText(detail.messageText, " ");
+    throw new WorkflowImportWalkError(
+      `Source did not parse cleanly (${fileName}): ${message}`,
+      { module: fileName },
+    );
   }
-  return parts.join("");
+}
+
+/**
+ * Remove comments with the TypeScript scanner; preserve strings, templates, and regex literals.
+ * @param {string} content
+ * @param {string} [relPath]
+ */
+export function stripJsComments(content, relPath = "snippet.js") {
+  assertSourceParsesCleanly(content, relPath);
+  const kind = scriptKindFromRelPath(relPath);
+  const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, kind, content);
+  /** @type {string[]} */
+  const chunks = [];
+  while (true) {
+    const token = scanner.scan();
+    const start = scanner.getTokenPos();
+    const end = scanner.getTextPos();
+    if (token === ts.SyntaxKind.EndOfFileToken) {
+      break;
+    }
+    if (
+      token === ts.SyntaxKind.SingleLineCommentTrivia ||
+      token === ts.SyntaxKind.MultiLineCommentTrivia
+    ) {
+      chunks.push(" ".repeat(Math.max(0, end - start)));
+    } else {
+      chunks.push(content.slice(start, end));
+    }
+  }
+  return chunks.join("");
 }
 
 /**
@@ -459,12 +358,49 @@ function assertNonLiteralBashShRunArgs(runText, contextLabel) {
 }
 
 /**
- * @param {string} content
+ * @param {string} relPath
  */
-function collectSpawnScriptLiteralsFromSource(content) {
+function isJsLikeSourcePath(relPath) {
+  return /\.(mjs|cjs|js|ts|tsx|mts|cts)$/.test(relPath);
+}
+
+/**
+ * @param {string} block
+ */
+function assertNoTemplateLiteralsInSpawnArrayBlock(block) {
+  if (/`/.test(block)) {
+    throw new WorkflowImportWalkError(
+      "Template literal in spawn array (spawn array literal)",
+      { module: block.slice(0, 80) },
+    );
+  }
+}
+
+/**
+ * @param {string} block
+ * @param {Set<string>} entries
+ */
+function collectBashPathsFromSpawnArrayBlock(block, entries) {
+  BASH_IN_QUOTED_ARRAY_STRING_RE.lastIndex = 0;
+  for (const match of block.matchAll(BASH_IN_QUOTED_ARRAY_STRING_RE)) {
+    const rel = normalizeSpawnScriptToken(match[1], "bash in spawn array string");
+    if (rel) {
+      entries.add(rel);
+    }
+  }
+}
+
+/**
+ * @param {string} content
+ * @param {string} relPath
+ */
+function collectSpawnScriptLiteralsFromSource(content, relPath) {
+  if (!isJsLikeSourcePath(relPath)) {
+    return new Set();
+  }
   /** @type {Set<string>} */
   const entries = new Set();
-  const stripped = stripJsComments(content);
+  const stripped = stripJsComments(content, relPath);
   BASH_SH_SCRIPT_FILE_RE.lastIndex = 0;
   for (const match of stripped.matchAll(BASH_SH_SCRIPT_FILE_RE)) {
     const rel = normalizeSpawnScriptToken(match[1], "bash/sh spawn in source");
@@ -590,9 +526,17 @@ export function extractRepoScriptEntrypointsFromRun(
 /**
  * @param {string} content
  * @param {Record<string, string>} scripts
+ * @param {string} relPath
  * @returns {string[]}
  */
-export function extractSpawnedRepoScriptEntrypointsFromSource(content, scripts) {
+export function extractSpawnedRepoScriptEntrypointsFromSource(
+  content,
+  scripts,
+  relPath,
+) {
+  if (!isJsLikeSourcePath(relPath)) {
+    return [];
+  }
   /** @type {Set<string>} */
   const entries = new Set();
   const seenNpm = new Set();
@@ -607,17 +551,13 @@ export function extractSpawnedRepoScriptEntrypointsFromSource(content, scripts) 
     re.lastIndex = 0;
     for (const match of content.matchAll(re)) {
       const block = match[1];
+      assertNoTemplateLiteralsInSpawnArrayBlock(block);
       if (re === SPAWN_BASH_ARRAY_RE || re === SPAWN_SH_ARRAY_RE) {
-        if (/`/.test(block)) {
-          throw new WorkflowImportWalkError(
-            "Template literal in bash/sh spawn array (spawn array literal)",
-            { module: block.slice(0, 80) },
-          );
-        }
         const SPAWN_ARRAY_ANY_QUOTED_RE = /["']([^"']+)["']/g;
         for (const lit of block.matchAll(SPAWN_ARRAY_ANY_QUOTED_RE)) {
           assertNonLiteralShellPath(lit[1], "spawn array literal");
         }
+        collectBashPathsFromSpawnArrayBlock(block, entries);
       }
       ARRAY_STRING_LITERAL_RE.lastIndex = 0;
       for (const lit of block.matchAll(ARRAY_STRING_LITERAL_RE)) {
@@ -648,7 +588,7 @@ export function extractSpawnedRepoScriptEntrypointsFromSource(content, scripts) 
     }
   }
 
-  for (const rel of collectSpawnScriptLiteralsFromSource(content)) {
+  for (const rel of collectSpawnScriptLiteralsFromSource(content, relPath)) {
     entries.add(rel);
   }
 
@@ -693,6 +633,7 @@ export function walkReachableWithImportsAndSpawns(
     for (const spawned of extractSpawnedRepoScriptEntrypointsFromSource(
       content,
       scripts,
+      rel,
     )) {
       assertEntrypointExists(repoRoot, spawned);
       entrypoints.add(spawned);
@@ -701,13 +642,15 @@ export function walkReachableWithImportsAndSpawns(
       }
     }
 
-    for (const spec of collectStaticModuleSpecifiers(content)) {
-      if (!isRepoRelativeSpecifier(spec, tsAliasRoot)) {
-        continue;
-      }
-      const importRel = resolveRepoModuleOrThrow(repoRoot, abs, spec, tsAliasRoot);
-      if (!reachable.has(importRel)) {
-        queue.push(importRel);
+    if (isJsLikeSourcePath(rel)) {
+      for (const spec of collectStaticModuleSpecifiers(content, rel)) {
+        if (!isRepoRelativeSpecifier(spec, tsAliasRoot)) {
+          continue;
+        }
+        const importRel = resolveRepoModuleOrThrow(repoRoot, abs, spec, tsAliasRoot);
+        if (!reachable.has(importRel)) {
+          queue.push(importRel);
+        }
       }
     }
   }
@@ -867,29 +810,35 @@ export function resolveRepoModuleOrThrow(repoRoot, fromAbs, spec, tsAliasRoot) {
 
 /**
  * @param {string} content
+ * @param {string} [relPath]
  * @returns {string[]}
  */
-export function collectStaticModuleSpecifiers(content) {
+export function collectStaticModuleSpecifiers(content, relPath = "snippet.js") {
   /** @type {Set<string>} */
   const specs = new Set();
-  const stripped = stripJsComments(content);
+  assertSourceParsesCleanly(content, relPath);
 
-  for (const re of [
-    STATIC_FROM_RE,
-    COMPACT_IMPORT_FROM_RE,
-    COMPACT_IMPORT_DEFAULT_NAMED_FROM_RE,
-    COMPACT_EXPORT_FROM_RE,
-    COMPACT_SIDE_EFFECT_IMPORT_RE,
-    STATIC_IMPORT_SIDE_EFFECT_RE,
-    DYNAMIC_IMPORT_RE,
-    REQUIRE_RE,
-    CREATE_REQUIRE_RE,
-    CREATE_REQUIRE_THEN_CALL_RE,
-  ]) {
-    re.lastIndex = 0;
-    for (const match of stripped.matchAll(re)) {
-      specs.add(match[1]);
+  let preprocessed;
+  try {
+    preprocessed = ts.preProcessFile(content, true, true);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new WorkflowImportWalkError(
+      `preProcessFile failed (${relPath}): ${message}`,
+      { module: relPath },
+    );
+  }
+
+  for (const imported of preprocessed.importedFiles) {
+    if (imported.fileName) {
+      specs.add(imported.fileName);
     }
+  }
+
+  const stripped = stripJsComments(content, relPath);
+  CREATE_REQUIRE_THEN_CALL_RE.lastIndex = 0;
+  for (const match of stripped.matchAll(CREATE_REQUIRE_THEN_CALL_RE)) {
+    specs.add(match[1]);
   }
 
   return [...specs];
@@ -910,9 +859,12 @@ export function walkStaticImportsFromEntry(repoRoot, entryRel, visited, tsAliasR
   if (!REPO_SOURCE_EXT.test(entryRel)) {
     return;
   }
+  if (entryRel.endsWith(".sh")) {
+    return;
+  }
   const abs = resolve(repoRoot, entryRel);
   const content = readFileSync(abs, "utf8");
-  for (const spec of collectStaticModuleSpecifiers(content)) {
+  for (const spec of collectStaticModuleSpecifiers(content, entryRel)) {
     if (!isRepoRelativeSpecifier(spec, tsAliasRoot)) {
       continue;
     }

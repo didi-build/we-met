@@ -1,4 +1,5 @@
 const q = /'/g;
-const u = "http://a";
+// prettier-ignore
+const u = 'http://a';
 import "./after-regex.mjs";
 export { q, u };
