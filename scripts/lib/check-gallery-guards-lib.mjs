@@ -2,6 +2,17 @@ import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { join, relative } from "node:path";
 import { parseJsonc } from "./parse-jsonc.mjs";
 
+/**
+ * Gallery guard (ADR 0005): CI regression check only, not a security boundary.
+ *
+ * Accepted gaps (intentionally not flagged):
+ * - spread, push, or reassigned-let argv arrays
+ * - const cmd / subcommand aliases to wrangler
+ * - interpolated template literals building shell commands
+ * - concatenated config filename string expressions
+ * - npx wr"angler" style broken-token spellings
+ */
+
 const GALLERY_CONFIG = "wrangler.gallery.jsonc";
 const GALLERY_WORKFLOW = ".github/workflows/gallery-preview.yml";
 
@@ -125,6 +136,35 @@ export function extractJsStringLiteralBodies(source) {
 }
 
 /**
+ * @param {string} text
+ * @returns {boolean}
+ */
+export function textReferencesGalleryWranglerConfig(text) {
+  if (text.includes("wrangler.gallery.jsonc")) {
+    return true;
+  }
+  if (/--config[= ]wrangler\.gallery\.jsonc/.test(text)) {
+    return true;
+  }
+  if (/-c[= ]wrangler\.gallery\.jsonc/.test(text)) {
+    return true;
+  }
+  if (/wrangler\.gal[\s\S]*?lery\.jsonc/.test(text)) {
+    return true;
+  }
+  const collapsed = text.replace(/\s+/g, "");
+  return collapsed.includes("wrangler.gallery.jsonc");
+}
+
+/**
+ * @param {string} segment
+ * @returns {boolean}
+ */
+function referencesGalleryWranglerConfig(segment) {
+  return textReferencesGalleryWranglerConfig(segment);
+}
+
+/**
  * @param {string} segment
  * @param {"deploy" | "preview"} subcommand
  * @returns {boolean}
@@ -167,7 +207,7 @@ export function failClosedSegmentHasWranglerSubcommand(segment, subcommand) {
  * @returns {boolean}
  */
 export function isJsSourceFile(label) {
-  return /\.(mjs|js|cjs|ts|mts)(?:$|[\s:])/.test(label);
+  return /\.(mjs|js|cjs|ts|mts|tsx|jsx)(?:$|[\s:])/.test(label);
 }
 
 /**
@@ -566,18 +606,6 @@ export function extractWranglerDeploySegments(normalized) {
  * @param {string} segment
  * @returns {boolean}
  */
-function referencesGalleryWranglerConfig(segment) {
-  return (
-    segment.includes("wrangler.gallery.jsonc") ||
-    /--config[= ]wrangler\.gallery\.jsonc/.test(segment) ||
-    /-c[= ]wrangler\.gallery\.jsonc/.test(segment)
-  );
-}
-
-/**
- * @param {string} segment
- * @returns {boolean}
- */
 function segmentRunsGalleryWranglerDeploy(segment) {
   if (!failClosedSegmentHasWranglerSubcommand(segment, "deploy")) {
     return false;
@@ -715,14 +743,199 @@ export function extractYamlStepBlocks(yamlText) {
 
 /**
  * @param {string} block
+ * @returns {boolean}
+ */
+function yamlBlockHasEnvSection(block) {
+  return (
+    /(?:^|\n)\s+env:/m.test(block) ||
+    /(?:^|\n)\s+-\s+env:/m.test(block) ||
+    /^env:/m.test(block)
+  );
+}
+
+/**
+ * @param {string} yamlText
+ * @returns {string[]}
+ */
+export function extractYamlJobBlocks(yamlText) {
+  const blocks = [];
+  const lines = yamlText.split(/\r?\n/);
+  let inJobs = false;
+  let current = [];
+  for (const line of lines) {
+    if (/^jobs:/.test(line)) {
+      inJobs = true;
+      continue;
+    }
+    if (inJobs && /^[^\s#]/.test(line)) {
+      break;
+    }
+    if (inJobs && /^  [A-Za-z0-9_-]+:/.test(line)) {
+      if (current.length > 0) {
+        blocks.push(current.join("\n"));
+      }
+      current = [line];
+      continue;
+    }
+    if (inJobs && current.length > 0) {
+      current.push(line);
+    }
+  }
+  if (current.length > 0) {
+    blocks.push(current.join("\n"));
+  }
+  return blocks;
+}
+
+const GITHUB_ENV_APPEND_RES = [
+  />>\s*\$GITHUB_ENV\b/,
+  />>\s*"\$GITHUB_ENV"/,
+  />>\s*\$\{GITHUB_ENV\}/,
+  /\|\s*tee\s+-a\s+\$GITHUB_ENV\b/,
+  /\|\s*tee\s+-a\s+"\$GITHUB_ENV"/,
+  /\|\s*tee\s+-a\s+\$\{GITHUB_ENV\}/,
+];
+
+/**
+ * @param {string} runText
+ * @returns {boolean}
+ */
+export function shellRunWritesGithubEnv(runText) {
+  return GITHUB_ENV_APPEND_RES.some((re) => re.test(runText));
+}
+
+/**
+ * @param {string} block
+ * @returns {string[]}
+ */
+export function extractGuardedGalleryEnvVarNames(block) {
+  const names = new Set();
+  const lines = block.split(/\r?\n/);
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    const keyMatch = line.match(/^\s*(?:-\s+)?([A-Za-z_][A-Za-z0-9_]*):\s*(.*)$/);
+    if (!keyMatch) {
+      continue;
+    }
+    const key = keyMatch[1];
+    if (key === "env" || key === "run" || key === "steps" || key === "jobs") {
+      continue;
+    }
+    let valueParts = [keyMatch[2].trim()];
+    let j = i + 1;
+    while (j < lines.length) {
+      const next = lines[j];
+      if (/^\s+env:/.test(next) || /^\s+-\s+env:/.test(next)) {
+        break;
+      }
+      const nextKey = next.match(/^\s*(?:-\s+)?([A-Za-z_][A-Za-z0-9_]*):/);
+      if (nextKey && !/^\s{4,}/.test(next) && nextKey[1] !== "run") {
+        break;
+      }
+      if (/^\s+[A-Za-z_][A-Za-z0-9_]*:/.test(next)) {
+        break;
+      }
+      if (next.trim() === "" || /^\s{2,}/.test(next)) {
+        valueParts.push(next.trim());
+        j += 1;
+        continue;
+      }
+      break;
+    }
+    const valueText = valueParts.join(" ");
+    if (textReferencesGalleryWranglerConfig(valueText)) {
+      names.add(key);
+    }
+  }
+  return [...names];
+}
+
+/**
+ * @param {string} block
+ * @param {"deploy" | "preview"} subcommand
+ * @returns {boolean}
+ */
+function yamlBlockUsesGalleryWranglerViaEnv(block, subcommand) {
+  if (!yamlBlockHasEnvSection(block) || !textReferencesGalleryWranglerConfig(block)) {
+    return false;
+  }
+  return failClosedSegmentHasWranglerSubcommand(block, subcommand);
+}
+
+/**
+ * @param {string} yamlText
+ * @param {string} label
+ * @param {"deploy" | "preview"} subcommand
+ * @returns {string[]}
+ */
+function collectYamlEnvScopeViolations(yamlText, label, subcommand) {
+  const previewMsg =
+    subcommand === "preview"
+      ? `${label} must not run wrangler preview with wrangler.gallery.jsonc (only ${GALLERY_WORKFLOW}).`
+      : `${label} must not run wrangler deploy/versions deploy with wrangler.gallery.jsonc.`;
+
+  if (yamlBlockUsesGalleryWranglerViaEnv(yamlText, subcommand)) {
+    return [previewMsg];
+  }
+  for (const job of extractYamlJobBlocks(yamlText)) {
+    if (yamlBlockUsesGalleryWranglerViaEnv(job, subcommand)) {
+      return [previewMsg];
+    }
+    for (const step of extractYamlStepBlocks(job)) {
+      if (yamlBlockUsesGalleryWranglerViaEnv(step, subcommand)) {
+        return [previewMsg];
+      }
+    }
+  }
+  return [];
+}
+
+/**
+ * @param {string} yamlText
+ * @param {string} label
+ * @returns {string[]}
+ */
+export function collectGalleryGithubEnvWriteViolations(yamlText, label) {
+  const errors = [];
+  const workflowEnvNames = extractGuardedGalleryEnvVarNames(yamlText);
+  const jobBlocks = extractYamlJobBlocks(yamlText);
+  const jobs = jobBlocks.length > 0 ? jobBlocks : [yamlText];
+  for (const job of jobs) {
+    const guarded = new Set([
+      ...workflowEnvNames,
+      ...extractGuardedGalleryEnvVarNames(job),
+    ]);
+    if (guarded.size === 0) {
+      continue;
+    }
+    for (const run of extractYamlRunCommands(job)) {
+      if (!shellRunWritesGithubEnv(run)) {
+        continue;
+      }
+      if (textReferencesGalleryWranglerConfig(run)) {
+        errors.push(`${label} must not write gallery wrangler config to GITHUB_ENV.`);
+        return errors;
+      }
+      for (const name of guarded) {
+        if (new RegExp(String.raw`\$\{${name}\}|\$${name}\b`).test(run)) {
+          errors.push(
+            `${label} must not write gallery wrangler env vars to GITHUB_ENV.`,
+          );
+          return errors;
+        }
+      }
+    }
+  }
+  return errors;
+}
+
+/**
+ * @param {string} block
  * @param {"deploy" | "preview"} subcommand
  * @returns {boolean}
  */
 function yamlStepBlockUsesGalleryWranglerViaEnv(block, subcommand) {
-  if (!/^\s+env:/m.test(block) || !/wrangler\.gallery\.jsonc/.test(block)) {
-    return false;
-  }
-  return failClosedSegmentHasWranglerSubcommand(block, subcommand);
+  return yamlBlockUsesGalleryWranglerViaEnv(block, subcommand);
 }
 
 /**
@@ -836,12 +1049,13 @@ export function collectGalleryPreviewLocationViolations(text, label, options = {
     }
   }
   if (isYaml) {
-    for (const block of extractYamlStepBlocks(text)) {
-      if (yamlStepBlockUsesGalleryWranglerViaEnv(block, "preview")) {
-        return [
-          `${label} must not run wrangler preview with wrangler.gallery.jsonc (only ${GALLERY_WORKFLOW}).`,
-        ];
-      }
+    const envErrors = collectYamlEnvScopeViolations(text, label, "preview");
+    if (envErrors.length > 0) {
+      return envErrors;
+    }
+    const githubEnvErrors = collectGalleryGithubEnvWriteViolations(text, label);
+    if (githubEnvErrors.length > 0) {
+      return githubEnvErrors;
     }
   }
   for (const segment of normalizedScanSegments(text, label, { isYaml })) {
@@ -1247,13 +1461,13 @@ export function collectGalleryDeployViolations(text, label, options = {}) {
   }
   const isYaml = options.isYaml ?? (label.endsWith(".yml") || label.endsWith(".yaml"));
   if (isYaml) {
-    for (const block of extractYamlStepBlocks(text)) {
-      if (yamlStepBlockUsesGalleryWranglerViaEnv(block, "deploy")) {
-        errors.push(
-          `${label} must not run wrangler deploy/versions deploy with wrangler.gallery.jsonc.`,
-        );
-        return errors;
-      }
+    const envErrors = collectYamlEnvScopeViolations(text, label, "deploy");
+    if (envErrors.length > 0) {
+      return envErrors;
+    }
+    const githubEnvErrors = collectGalleryGithubEnvWriteViolations(text, label);
+    if (githubEnvErrors.length > 0) {
+      return githubEnvErrors;
     }
   }
   for (const segment of normalizedScanSegments(text, label, { isYaml })) {
@@ -1267,7 +1481,7 @@ export function collectGalleryDeployViolations(text, label, options = {}) {
   return errors;
 }
 
-const SCANNED_FILE_RE = /\.(yml|yaml|mjs|js|cjs|ts|mts|sh)$/;
+const SCANNED_FILE_RE = /\.(yml|yaml|mjs|js|cjs|ts|mts|tsx|jsx|sh)$/;
 
 function walkFiles(dir, files = []) {
   for (const entry of readdirSync(dir)) {

@@ -25,6 +25,8 @@ import {
   normalizeForDeployScan,
   runGalleryGuards,
   scanSegments,
+  collectGalleryGithubEnvWriteViolations,
+  textReferencesGalleryWranglerConfig,
 } from "../scripts/lib/check-gallery-guards-lib.mjs";
 
 const FIXTURES = join(import.meta.dirname, "fixtures/gallery-guards");
@@ -653,7 +655,7 @@ steps:
       ).toContain(
         "scripts/evil.ts must not run wrangler preview with wrangler.gallery.jsonc (only .github/workflows/gallery-preview.yml).",
       );
-      const goodExeca = readFixture("good-execa-app-deploy.mjs");
+      const goodExeca = readFixture("good-execa-app-deploy.ts");
       expect(detectArrayFormGalleryDeploy(goodExeca)).toBe(false);
       expect(collectGalleryDeployViolations(goodExeca, "scripts/deploy.mjs")).toEqual(
         [],
@@ -755,6 +757,89 @@ steps:
       } finally {
         rmSync(root, { recursive: true, force: true });
       }
+    });
+
+    it("QA round 1: YAML env scopes, GITHUB_ENV writes, mutants, and benign fixtures", () => {
+      const previewMsg =
+        "evil.yml must not run wrangler preview with wrangler.gallery.jsonc (only .github/workflows/gallery-preview.yml).";
+      const yamlCases = [
+        "bad-yaml-env-list-item-preview.yml",
+        "bad-yaml-split-config-preview.yml",
+        "bad-yaml-job-env-preview.yml",
+        "bad-yaml-workflow-env-preview.yml",
+        "bad-yaml-step-env-preview.yml",
+      ];
+      for (const name of yamlCases) {
+        expect(
+          collectGalleryPreviewLocationViolations(readFixture(name), "evil.yml", {
+            isYaml: true,
+          }),
+        ).toContain(previewMsg);
+      }
+
+      const githubMsg =
+        "evil.yml must not write gallery wrangler env vars to GITHUB_ENV.";
+      for (const name of [
+        "bad-yaml-github-env-plain.yml",
+        "bad-yaml-github-env-quoted.yml",
+        "bad-yaml-github-env-braced.yml",
+        "bad-yaml-github-env-tee.yml",
+      ]) {
+        expect(
+          collectGalleryGithubEnvWriteViolations(readFixture(name), "evil.yml"),
+        ).toContain(githubMsg);
+      }
+
+      const singleQuoteFixture = readFixture("bad-js-single-quote-preview.mjs");
+      expect(
+        extractJsStringLiteralBodies(singleQuoteFixture).some((body) =>
+          body.includes("wrangler preview"),
+        ),
+      ).toBe(true);
+      expect(
+        collectGalleryPreviewLocationViolations(singleQuoteFixture, "scripts/evil.mjs"),
+      ).toContain(
+        "scripts/evil.mjs must not run wrangler preview with wrangler.gallery.jsonc (only .github/workflows/gallery-preview.yml).",
+      );
+
+      const prequoteWorkflow = readFixture("bad-workflow-prequote-unknown-global.yml");
+      expect(
+        collectGalleryWorkflowViolations(prequoteWorkflow).some((e) =>
+          e.includes("global flag --x-provision"),
+        ),
+      ).toBe(true);
+      expect(
+        extractWranglerPreviewInvocations(
+          normalizeForDeployScan(
+            "npx wrangler --x-provision false pre''view --config wrangler.gallery.jsonc --worker-name we-met --ignore-base-config --name x --json",
+          ),
+        )[0]?.unknownGlobals,
+      ).toContain("--x-provision");
+
+      expect(textReferencesGalleryWranglerConfig("wrangler.gal\n  lery.jsonc")).toBe(
+        true,
+      );
+      expect(
+        collectGalleryDeployViolations(
+          readFixture("good-valued-global-deploy.sh"),
+          "scripts/ok.sh",
+        ),
+      ).toEqual([]);
+      expect(
+        collectGalleryDeployViolations(
+          readFixture("good-makefile-gallery"),
+          "Makefile",
+        ),
+      ).toEqual([]);
+      expect(
+        collectGalleryPreviewLocationViolations(
+          readFixture("good-src-component.tsx"),
+          "src/components/GalleryLink.tsx",
+        ),
+      ).toEqual([]);
+      const goodExeca = readFixture("good-execa-app-deploy.ts");
+      expect(goodExeca).toContain("execaSync");
+      expect(detectArrayFormGalleryDeploy(goodExeca)).toBe(false);
     });
   });
 });

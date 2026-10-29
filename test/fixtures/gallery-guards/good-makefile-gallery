@@ -1,0 +1,4 @@
+.PHONY: gallery-build
+
+gallery-build:
+	npm run gallery:build
