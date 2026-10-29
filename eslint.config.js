@@ -23,11 +23,26 @@ const eslintConfig = [
       "out/**",
       "next-env.d.ts",
       "design/**",
+      "test/fixtures/privileged-workflow-import-walk/resolution/entry-same-line-typeof.mjs",
+      "test/fixtures/privileged-workflow-import-walk/resolution/entry-same-line-await.mjs",
+      "test/fixtures/privileged-workflow-import-walk/resolution/entry-same-line-case.mjs",
+      "test/fixtures/privileged-workflow-import-walk/resolution/entry-same-line-brace.mjs",
+      "test/fixtures/privileged-workflow-import-walk/resolution/entry-same-line-return.mjs",
+      "test/fixtures/privileged-workflow-import-walk/resolution/entry-regex-glob-bash.mjs",
     ],
   },
   ...compat.extends("next/core-web-vitals", "next/typescript", "prettier"),
   {
     files: ["scripts/**/*.{js,mjs}", "test/**/*.ts", "vitest.config.ts"],
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
+    },
+  },
+  {
+    files: [
+      "test/fixtures/privileged-workflow-import-walk/resolution/entry-plain-require.cjs",
+      "test/fixtures/privileged-workflow-import-walk/resolution/entry-import-equals.cts",
+    ],
     rules: {
       "@typescript-eslint/no-require-imports": "off",
     },
