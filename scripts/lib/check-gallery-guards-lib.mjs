@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { join, relative } from "node:path";
 import { parseJsonc } from "./parse-jsonc.mjs";
 
@@ -138,12 +138,23 @@ export function failClosedSegmentHasWranglerSubcommand(segment, subcommand) {
     let match = invocationRe.exec(stmt);
     while (match) {
       const after = stmt.slice(match.index + match[0].length);
+      let tokens = stripShellRedirections(tokenizeShellArgs(after.trim()));
+      if (tokens[0] === "--") {
+        tokens = tokens.slice(1);
+      }
       if (subcommand === "deploy") {
-        if (/\bversions\s+deploy\b/.test(after) || /\bdeploy\b/.test(after)) {
+        const { index, kind } = findWranglerDeploySubcommand(tokens, 0);
+        if (index !== -1 && kind !== null) {
           return true;
         }
-      } else if (/\bpreview\b/.test(after) || /pre''view/.test(after)) {
-        return true;
+      } else {
+        const { index } = findWranglerPreviewSubcommand(tokens, 0);
+        if (index !== -1) {
+          return true;
+        }
+        if (/pre''view/.test(after)) {
+          return true;
+        }
       }
       match = invocationRe.exec(stmt);
     }
@@ -299,6 +310,17 @@ function tokenIsPreviewSubcommand(tokens, i) {
   return false;
 }
 
+const WRANGLER_SUBCOMMAND_WORDS = new Set([
+  "deploy",
+  "preview",
+  "dev",
+  "tail",
+  "versions",
+  "whoami",
+  "docs",
+  "types",
+]);
+
 /**
  * @param {string[]} tokens
  * @param {number} i
@@ -321,6 +343,14 @@ function advancePastWranglerGlobalFlag(tokens, i) {
       return i + 2;
     }
     return i + 1;
+  }
+  const next = tokens[i + 1];
+  if (
+    next !== undefined &&
+    !next.startsWith("-") &&
+    !WRANGLER_SUBCOMMAND_WORDS.has(cleanShellToken(next))
+  ) {
+    return i + 2;
   }
   return i + 1;
 }
@@ -563,6 +593,22 @@ function segmentRunsGalleryWranglerDeploy(segment) {
  * @param {string} segment
  * @returns {boolean}
  */
+function segmentRunsGalleryWranglerPreview(segment) {
+  if (!failClosedSegmentHasWranglerSubcommand(segment, "preview")) {
+    return false;
+  }
+  for (const inv of extractWranglerPreviewInvocations(segment)) {
+    if (previewArgStringReferencesGalleryConfig(inv.argString)) {
+      return true;
+    }
+  }
+  return referencesGalleryWranglerConfig(segment);
+}
+
+/**
+ * @param {string} segment
+ * @returns {boolean}
+ */
 function segmentRunsWranglerDeploy(segment) {
   if (failClosedSegmentHasWranglerSubcommand(segment, "deploy")) {
     return true;
@@ -575,12 +621,108 @@ function segmentRunsWranglerDeploy(segment) {
  * @param {string} subcommand
  * @returns {boolean}
  */
-function arrayBlockReferencesGalleryWrangler(block, subcommand) {
+function arrayBlockReferencesGalleryWrangler(block, subcommand, source = "") {
+  const hasGalleryConfig =
+    /wrangler\.gallery\.jsonc/.test(block) ||
+    (source.length > 0 && arrayBlockReferencesGalleryConfigViaConst(block, source));
   return (
     /['"]wrangler(?:@\S+)?['"]/.test(block) &&
     new RegExp(`['"]${subcommand}['"]`).test(block) &&
-    /wrangler\.gallery\.jsonc/.test(block)
+    hasGalleryConfig
   );
+}
+
+/**
+ * @param {string} block
+ * @param {string} source
+ * @returns {boolean}
+ */
+function arrayBlockReferencesGalleryConfigViaConst(block, source) {
+  const assignRe = /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*["']([^"']*)["']/g;
+  let assignMatch = assignRe.exec(source);
+  while (assignMatch) {
+    const [, name, value] = assignMatch;
+    if (
+      value === "wrangler.gallery.jsonc" &&
+      (new RegExp(`['"]${name}['"]`).test(block) ||
+        new RegExp(String.raw`\b${name}\b`).test(block))
+    ) {
+      return true;
+    }
+    assignMatch = assignRe.exec(source);
+  }
+  return false;
+}
+
+const SPAWN_WRAPPER_CALL_RE =
+  /(?:spawnSync|execFileSync|execFile|spawn|execaSync|execaCommand|execa)\s*\(/g;
+
+const JS_ARRAY_ASSIGN_RE = /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*\[([^\]]*)\]/g;
+
+/**
+ * @param {string} text
+ * @param {"deploy" | "preview"} subcommand
+ * @returns {boolean}
+ */
+export function detectVariableArrayFormGallery(text, subcommand) {
+  /** @type {Map<string, string>} */
+  const assignments = new Map();
+  JS_ARRAY_ASSIGN_RE.lastIndex = 0;
+  let assignMatch = JS_ARRAY_ASSIGN_RE.exec(text);
+  while (assignMatch) {
+    assignments.set(assignMatch[1], assignMatch[2]);
+    assignMatch = JS_ARRAY_ASSIGN_RE.exec(text);
+  }
+  if (assignments.size === 0) {
+    return false;
+  }
+  const spawnRe = new RegExp(
+    String.raw`(?:spawnSync|execFileSync|execFile|spawn|execaSync|execaCommand|execa)\s*\(\s*[^,]+,\s*([A-Za-z_$][\w$]*)`,
+    "g",
+  );
+  let spawnMatch = spawnRe.exec(text);
+  while (spawnMatch) {
+    const body = assignments.get(spawnMatch[1]);
+    if (body && arrayBlockReferencesGalleryWrangler(`[${body}]`, subcommand, text)) {
+      return true;
+    }
+    spawnMatch = spawnRe.exec(text);
+  }
+  return false;
+}
+
+/**
+ * @param {string} yamlText
+ * @returns {string[]}
+ */
+export function extractYamlStepBlocks(yamlText) {
+  const blocks = [];
+  const lines = yamlText.split(/\r?\n/);
+  let current = [];
+  for (const line of lines) {
+    if (/^\s*-\s+/.test(line) && current.length > 0) {
+      blocks.push(current.join("\n"));
+      current = [line];
+    } else if (current.length > 0 || /^\s*-\s+/.test(line)) {
+      current.push(line);
+    }
+  }
+  if (current.length > 0) {
+    blocks.push(current.join("\n"));
+  }
+  return blocks;
+}
+
+/**
+ * @param {string} block
+ * @param {"deploy" | "preview"} subcommand
+ * @returns {boolean}
+ */
+function yamlStepBlockUsesGalleryWranglerViaEnv(block, subcommand) {
+  if (!/^\s+env:/m.test(block) || !/wrangler\.gallery\.jsonc/.test(block)) {
+    return false;
+  }
+  return failClosedSegmentHasWranglerSubcommand(block, subcommand);
 }
 
 /**
@@ -588,8 +730,11 @@ function arrayBlockReferencesGalleryWrangler(block, subcommand) {
  * @returns {boolean}
  */
 export function detectArrayFormGalleryDeploy(text) {
-  const callRe = /(?:spawnSync|execFileSync|execFile|spawn)\s*\(/g;
-  let callMatch = callRe.exec(text);
+  if (detectVariableArrayFormGallery(text, "deploy")) {
+    return true;
+  }
+  SPAWN_WRAPPER_CALL_RE.lastIndex = 0;
+  let callMatch = SPAWN_WRAPPER_CALL_RE.exec(text);
   while (callMatch) {
     const slice = text.slice(callMatch.index, callMatch.index + 4000);
     const wranglerCmdMatch = slice.match(
@@ -603,10 +748,13 @@ export function detectArrayFormGalleryDeploy(text) {
       return true;
     }
     const arrayMatch = slice.match(/\[[^\]]*\]/);
-    if (arrayMatch && arrayBlockReferencesGalleryWrangler(arrayMatch[0], "deploy")) {
+    if (
+      arrayMatch &&
+      arrayBlockReferencesGalleryWrangler(arrayMatch[0], "deploy", text)
+    ) {
       return true;
     }
-    callMatch = callRe.exec(text);
+    callMatch = SPAWN_WRAPPER_CALL_RE.exec(text);
   }
   return false;
 }
@@ -616,8 +764,11 @@ export function detectArrayFormGalleryDeploy(text) {
  * @returns {boolean}
  */
 export function detectArrayFormGalleryPreview(text) {
-  const callRe = /(?:spawnSync|execFileSync|execFile|spawn)\s*\(/g;
-  let callMatch = callRe.exec(text);
+  if (detectVariableArrayFormGallery(text, "preview")) {
+    return true;
+  }
+  SPAWN_WRAPPER_CALL_RE.lastIndex = 0;
+  let callMatch = SPAWN_WRAPPER_CALL_RE.exec(text);
   while (callMatch) {
     const slice = text.slice(callMatch.index, callMatch.index + 4000);
     const wranglerCmdMatch = slice.match(
@@ -631,10 +782,13 @@ export function detectArrayFormGalleryPreview(text) {
       return true;
     }
     const arrayMatch = slice.match(/\[[^\]]*\]/);
-    if (arrayMatch && arrayBlockReferencesGalleryWrangler(arrayMatch[0], "preview")) {
+    if (
+      arrayMatch &&
+      arrayBlockReferencesGalleryWrangler(arrayMatch[0], "preview", text)
+    ) {
       return true;
     }
-    callMatch = callRe.exec(text);
+    callMatch = SPAWN_WRAPPER_CALL_RE.exec(text);
   }
   return false;
 }
@@ -670,7 +824,32 @@ export function collectGalleryPreviewLocationViolations(text, label, options = {
       `${label} must not run wrangler preview with wrangler.gallery.jsonc (only ${GALLERY_WORKFLOW}).`,
     ];
   }
+  if (isJsSourceFile(label) && !isYaml) {
+    const bodies = extractJsStringLiteralBodies(text);
+    const previewInStrings = bodies.some((body) =>
+      failClosedSegmentHasWranglerSubcommand(body, "preview"),
+    );
+    if (previewInStrings && referencesGalleryWranglerConfig(text)) {
+      return [
+        `${label} must not run wrangler preview with wrangler.gallery.jsonc (only ${GALLERY_WORKFLOW}).`,
+      ];
+    }
+  }
+  if (isYaml) {
+    for (const block of extractYamlStepBlocks(text)) {
+      if (yamlStepBlockUsesGalleryWranglerViaEnv(block, "preview")) {
+        return [
+          `${label} must not run wrangler preview with wrangler.gallery.jsonc (only ${GALLERY_WORKFLOW}).`,
+        ];
+      }
+    }
+  }
   for (const segment of normalizedScanSegments(text, label, { isYaml })) {
+    if (segmentRunsGalleryWranglerPreview(segment)) {
+      return [
+        `${label} must not run wrangler preview with wrangler.gallery.jsonc (only ${GALLERY_WORKFLOW}).`,
+      ];
+    }
     const invocations = extractWranglerPreviewInvocations(segment);
     for (const inv of invocations) {
       if (
@@ -679,11 +858,6 @@ export function collectGalleryPreviewLocationViolations(text, label, options = {
       ) {
         return [
           `${label} must not run wrangler preview with shell env assignments and wrangler.gallery.jsonc (only ${GALLERY_WORKFLOW}).`,
-        ];
-      }
-      if (previewArgStringReferencesGalleryConfig(inv.argString)) {
-        return [
-          `${label} must not run wrangler preview with wrangler.gallery.jsonc (only ${GALLERY_WORKFLOW}).`,
         ];
       }
     }
@@ -766,6 +940,17 @@ export function extractWranglerPreviewInvocations(normalizedWorkflow) {
       previewSpan,
     } = findWranglerPreviewSubcommand(tokens, 0);
     if (previewIdx === -1) {
+      const segmentFromMatch = normalizedWorkflow.slice(match.index);
+      if (
+        failClosedSegmentHasWranglerSubcommand(segmentFromMatch, "preview") &&
+        unknownGlobals.length > 0
+      ) {
+        invocations.push({
+          argString: segmentFromMatch,
+          unknownGlobals,
+          envAssignments,
+        });
+      }
       match = WRANGLER_BIN_RE.exec(normalizedWorkflow);
       continue;
     }
@@ -976,7 +1161,10 @@ export function collectGalleryWorkflowViolations(workflowText) {
   const errors = [];
   let runCommands = extractYamlRunCommands(workflowText).filter((command) => {
     const normalized = joinShellContinuations(command).replace(/\r?\n/g, " ");
-    return extractWranglerPreviewInvocations(normalized).length > 0;
+    return (
+      extractWranglerPreviewInvocations(normalized).length > 0 ||
+      failClosedSegmentHasWranglerSubcommand(normalized, "preview")
+    );
   });
   if (runCommands.length === 0 && /\bwrangler(?:@\S+)?\b/.test(workflowText)) {
     runCommands = [joinShellContinuations(workflowText).replace(/\r?\n/g, " ")];
@@ -989,7 +1177,25 @@ export function collectGalleryWorkflowViolations(workflowText) {
     const normalized = joinShellContinuations(command).replace(/\r?\n/g, " ");
     const invocations = extractWranglerPreviewInvocations(normalized);
     if (invocations.length === 0) {
-      errors.push("gallery-preview.yml must invoke wrangler preview.");
+      if (failClosedSegmentHasWranglerSubcommand(normalized, "preview")) {
+        let match = WRANGLER_BIN_RE.exec(normalized);
+        while (match) {
+          const rest = normalized.slice(match.index + match[0].length);
+          let tokens = stripShellRedirections(tokenizeShellArgs(rest.trim()));
+          if (tokens[0] === "--") {
+            tokens = tokens.slice(1);
+          }
+          const { unknownGlobals } = findWranglerPreviewSubcommand(tokens, 0);
+          for (const flag of unknownGlobals) {
+            errors.push(
+              `gallery-preview.yml wrangler preview must not pass wrangler global flag ${flag} before the preview subcommand.`,
+            );
+          }
+          match = WRANGLER_BIN_RE.exec(normalized);
+        }
+      } else {
+        errors.push("gallery-preview.yml must invoke wrangler preview.");
+      }
       continue;
     }
     for (const inv of invocations) {
@@ -1040,6 +1246,16 @@ export function collectGalleryDeployViolations(text, label, options = {}) {
     return errors;
   }
   const isYaml = options.isYaml ?? (label.endsWith(".yml") || label.endsWith(".yaml"));
+  if (isYaml) {
+    for (const block of extractYamlStepBlocks(text)) {
+      if (yamlStepBlockUsesGalleryWranglerViaEnv(block, "deploy")) {
+        errors.push(
+          `${label} must not run wrangler deploy/versions deploy with wrangler.gallery.jsonc.`,
+        );
+        return errors;
+      }
+    }
+  }
   for (const segment of normalizedScanSegments(text, label, { isYaml })) {
     if (segmentRunsGalleryWranglerDeploy(segment)) {
       errors.push(
@@ -1136,13 +1352,21 @@ export function runGalleryGuards(repoRoot = process.cwd()) {
     join(repoRoot, ".github"),
     join(repoRoot, "scripts"),
     join(repoRoot, "workers"),
+    join(repoRoot, "src"),
   ]) {
+    if (!existsSync(root)) {
+      continue;
+    }
     for (const file of walkFiles(root)) {
       filesToScan.add(file);
     }
   }
   for (const file of listRepoRootScanFiles(repoRoot)) {
     filesToScan.add(file);
+  }
+  const makefilePath = join(repoRoot, "Makefile");
+  if (existsSync(makefilePath) && statSync(makefilePath).isFile()) {
+    filesToScan.add(makefilePath);
   }
 
   for (const file of filesToScan) {

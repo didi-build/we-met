@@ -11,16 +11,27 @@ import {
   collectGalleryWorkflowViolations,
   detectArrayFormGalleryDeploy,
   detectArrayFormGalleryPreview,
+  detectVariableArrayFormGallery,
+  extractJsStringLiteralBodies,
   extractWranglerDeploySegments,
   extractWranglerPreviewArgStrings,
   extractWranglerPreviewInvocations,
   extractYamlRunCommands,
+  extractYamlStepBlocks,
+  failClosedSegmentHasWranglerSubcommand,
   findWranglerPreviewSubcommand,
   flattenYamlRunBlocks,
   joinShellContinuations,
   normalizeForDeployScan,
   runGalleryGuards,
+  scanSegments,
 } from "../scripts/lib/check-gallery-guards-lib.mjs";
+
+const FIXTURES = join(import.meta.dirname, "fixtures/gallery-guards");
+
+function readFixture(name: string): string {
+  return readFileSync(join(FIXTURES, name), "utf8");
+}
 
 const BASE_CONFIG = {
   $schema: "node_modules/wrangler/config-schema.json",
@@ -618,6 +629,133 @@ steps:
       ),
     ).toEqual([]);
     expect(runGalleryGuards()).toEqual([]);
+  });
+
+  describe("DIDI-948 fixtures and call forms", () => {
+    it("flags bad fixtures and accepts good counterparts", () => {
+      const badDeploy = readFixture("bad-variable-array-deploy.mjs");
+      expect(detectVariableArrayFormGallery(badDeploy, "deploy")).toBe(true);
+      expect(
+        collectGalleryDeployViolations(badDeploy, "scripts/publish-evil.mjs"),
+      ).toContain(
+        "scripts/publish-evil.mjs must not run wrangler deploy/versions deploy with wrangler.gallery.jsonc.",
+      );
+      const goodDeploy = readFixture("good-variable-array-worker.mjs");
+      expect(detectVariableArrayFormGallery(goodDeploy, "deploy")).toBe(false);
+      expect(collectGalleryDeployViolations(goodDeploy, "scripts/deploy.mjs")).toEqual(
+        [],
+      );
+
+      const badExeca = readFixture("bad-execa-preview.ts");
+      expect(detectArrayFormGalleryPreview(badExeca)).toBe(true);
+      expect(
+        collectGalleryPreviewLocationViolations(badExeca, "scripts/evil.ts"),
+      ).toContain(
+        "scripts/evil.ts must not run wrangler preview with wrangler.gallery.jsonc (only .github/workflows/gallery-preview.yml).",
+      );
+      const goodExeca = readFixture("good-execa-app-deploy.mjs");
+      expect(detectArrayFormGalleryDeploy(goodExeca)).toBe(false);
+      expect(collectGalleryDeployViolations(goodExeca, "scripts/deploy.mjs")).toEqual(
+        [],
+      );
+
+      const badYaml = readFixture("bad-yaml-step-env-preview.yml");
+      expect(
+        collectGalleryPreviewLocationViolations(badYaml, "evil.yml", {
+          isYaml: true,
+        }),
+      ).toContain(
+        "evil.yml must not run wrangler preview with wrangler.gallery.jsonc (only .github/workflows/gallery-preview.yml).",
+      );
+      const goodYaml = readFixture("good-yaml-step-env.yml");
+      expect(
+        collectGalleryPreviewLocationViolations(goodYaml, "good.yml", {
+          isYaml: true,
+        }),
+      ).toEqual([]);
+
+      const badSrc = readFixture("bad-src-gallery-deploy.ts");
+      expect(collectGalleryDeployViolations(badSrc, "src/evil/publish.ts")).toContain(
+        "src/evil/publish.ts must not run wrangler deploy/versions deploy with wrangler.gallery.jsonc.",
+      );
+
+      const badMakefile = readFixture("bad-makefile-gallery-deploy");
+      expect(collectGalleryDeployViolations(badMakefile, "Makefile")).toContain(
+        "Makefile must not run wrangler deploy/versions deploy with wrangler.gallery.jsonc.",
+      );
+
+      const badExecSyncPreview = readFixture("bad-execsync-preview-multiline.mjs");
+      expect(
+        collectGalleryPreviewLocationViolations(badExecSyncPreview, "scripts/evil.mjs"),
+      ).toContain(
+        "scripts/evil.mjs must not run wrangler preview with wrangler.gallery.jsonc (only .github/workflows/gallery-preview.yml).",
+      );
+      const goodJs = readFixture("good-js-string-literal-scan.js");
+      expect(
+        collectGalleryPreviewLocationViolations(goodJs, "scripts/helper.js"),
+      ).toEqual([]);
+      expect(
+        extractJsStringLiteralBodies(goodJs).some((body) => body.includes("preview")),
+      ).toBe(true);
+    });
+
+    it("rejects valued boolean globals before preview in gallery workflow snippets", () => {
+      const snippet = readFixture("bad-valued-global-workflow-snippet.yml");
+      const errors = collectGalleryWorkflowViolations(snippet);
+      expect(errors).toContain(
+        "gallery-preview.yml wrangler preview must not pass wrangler global flag --x-provision before the preview subcommand.",
+      );
+      expect(errors).toContain(
+        "gallery-preview.yml wrangler preview must not pass --env.",
+      );
+
+      const suffix =
+        "--config wrangler.gallery.jsonc --worker-name we-met --ignore-base-config --name x --json";
+      for (const cmd of [
+        `npx wrangler --x-provision true preview ${suffix}`,
+        `npx wrangler -v true preview ${suffix} --var=A:1`,
+      ]) {
+        const inv = extractWranglerPreviewInvocations(normalizeForDeployScan(cmd));
+        expect(inv.length).toBeGreaterThan(0);
+        expect(inv[0]!.unknownGlobals.length).toBeGreaterThan(0);
+        expect(
+          collectGalleryWorkflowViolations(cmd).some((e) => e.includes("global flag")),
+        ).toBe(true);
+        expect(
+          collectGalleryPreviewLocationViolations(cmd, "scripts/evil.sh"),
+        ).toContain(
+          "scripts/evil.sh must not run wrangler preview with wrangler.gallery.jsonc (only .github/workflows/gallery-preview.yml).",
+        );
+      }
+    });
+
+    it("uses fail-closed preview token scan and yaml step blocks from fixtures", () => {
+      const badYaml = readFixture("bad-yaml-step-env-preview.yml");
+      const blocks = extractYamlStepBlocks(badYaml);
+      expect(blocks.length).toBeGreaterThan(0);
+      expect(failClosedSegmentHasWranglerSubcommand(blocks[0]!, "preview")).toBe(true);
+
+      const badDeploy = readFixture("bad-variable-array-deploy.mjs");
+      const segments = scanSegments(badDeploy, { isJs: true });
+      expect(segments.some((seg) => seg.includes("wrangler.gallery.jsonc"))).toBe(true);
+    });
+
+    it("scans src/ via runGalleryGuards on a fixture repo", () => {
+      const root = mkdtempSync(join(tmpdir(), "gallery-guards-didi948-"));
+      try {
+        writeGalleryFixtureRoot(root);
+        mkdirSync(join(root, "src/evil"), { recursive: true });
+        writeFileSync(
+          join(root, "src/evil/publish.ts"),
+          readFixture("bad-src-gallery-deploy.ts"),
+        );
+        expect(runGalleryGuards(root)).toContain(
+          "src/evil/publish.ts must not run wrangler deploy/versions deploy with wrangler.gallery.jsonc.",
+        );
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    });
   });
 });
 

@@ -1,0 +1,7 @@
+jobs:
+  deploy-app:
+    steps:
+      - name: Deploy main worker
+        env:
+          WRANGLER_CONFIG: wrangler.jsonc
+        run: npx wrangler deploy --config "${WRANGLER_CONFIG}"
