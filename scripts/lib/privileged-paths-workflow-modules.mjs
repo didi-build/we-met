@@ -93,7 +93,7 @@ export const workflowModuleExactPrivilegedEntries = [
   {
     id: "check-google-oauth-client-ids",
     path: "scripts/check-google-oauth-client-ids.mjs",
-    infrastructure: false,
+    infrastructure: true,
   },
   {
     id: "google-oauth-client-id-smoke",
@@ -118,7 +118,7 @@ export const workflowModuleExactPrivilegedEntries = [
   {
     id: "deploy-production-attribution",
     path: "scripts/deploy-production/attribution.mjs",
-    infrastructure: true,
+    infrastructure: false,
   },
   {
     id: "deploy-production-baseline",
@@ -143,7 +143,7 @@ export const workflowModuleExactPrivilegedEntries = [
   {
     id: "deploy-production-messages",
     path: "scripts/deploy-production/messages.mjs",
-    infrastructure: true,
+    infrastructure: false,
   },
   {
     id: "deploy-production-plan-soft-fail",
@@ -163,7 +163,7 @@ export const workflowModuleExactPrivilegedEntries = [
   {
     id: "deploy-production-workflow-output",
     path: "scripts/deploy-production/workflow-output.mjs",
-    infrastructure: true,
+    infrastructure: false,
   },
   {
     id: "migrate-nonprod-apply-guard",
@@ -268,7 +268,7 @@ export const workflowModuleExactPrivilegedEntries = [
   {
     id: "check-workflow-provision-policy",
     path: "scripts/check-workflow-provision-policy.mjs",
-    infrastructure: false,
+    infrastructure: true,
   },
   {
     id: "ci-test-summary",
@@ -283,7 +283,7 @@ export const workflowModuleExactPrivilegedEntries = [
   {
     id: "dry-run-staging-config",
     path: "scripts/dry-run-staging-config.mjs",
-    infrastructure: true,
+    infrastructure: false,
   },
   {
     id: "gallery-preview-mode-script",
@@ -339,5 +339,15 @@ export const workflowModuleExactPrivilegedEntries = [
     id: "init-project",
     path: "scripts/init-project.mjs",
     infrastructure: false,
+  },
+  {
+    id: "repo-settings-script",
+    path: "scripts/repo-settings.mjs",
+    infrastructure: true,
+  },
+  {
+    id: "repo-settings-target",
+    path: "scripts/lib/repo-settings-target.mjs",
+    infrastructure: true,
   },
 ];
