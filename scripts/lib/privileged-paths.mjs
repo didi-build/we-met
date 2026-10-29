@@ -11,6 +11,11 @@ export const secretUsageScriptPath = "scripts/check-secret-usage.mjs";
 
 export const ghApiErrorsPath = "scripts/lib/gh-api-errors.mjs";
 
+export const workflowPermissionsParsePath =
+  "scripts/lib/workflow-permissions-parse.mjs";
+
+export const activateStagingAccountScriptPath = "scripts/activate-staging-account.mjs";
+
 /** @type {readonly { id: string; infrastructure?: boolean; test: (filename: string) => boolean }[]} */
 export const privilegedPathMatchers = [
   {
@@ -90,6 +95,14 @@ export const privilegedPathMatchers = [
     id: "gh-api-errors",
     infrastructure: true,
     test: (filename) => filename === ghApiErrorsPath,
+  },
+  {
+    id: "workflow-permissions-parse",
+    test: (filename) => filename === workflowPermissionsParsePath,
+  },
+  {
+    id: "activate-staging-account",
+    test: (filename) => filename === activateStagingAccountScriptPath,
   },
   {
     id: "privileged-change-workflow",

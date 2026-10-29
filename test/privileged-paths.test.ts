@@ -34,6 +34,8 @@ describe("privileged-paths (table)", () => {
     { path: "scripts/check-secret-usage.mjs", privileged: true },
     { path: "scripts/dependabot-automerge.mjs", privileged: true },
     { path: "scripts/check-actions-policy-workflows.mjs", privileged: true },
+    { path: "scripts/lib/workflow-permissions-parse.mjs", privileged: true },
+    { path: "scripts/activate-staging-account.mjs", privileged: true },
     { path: "src/app/page.tsx", privileged: false },
     { path: "scripts/preview-comment-body.mjs", privileged: false },
     { path: "package.json", privileged: false },
@@ -64,6 +66,8 @@ describe("privileged-paths (table)", () => {
       "dependabot-automerge",
       "actions-policy-workflows",
       "gh-api-errors",
+      "workflow-permissions-parse",
+      "activate-staging-account",
       "privileged-change-workflow",
     ]);
   });

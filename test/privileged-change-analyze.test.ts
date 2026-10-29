@@ -61,6 +61,35 @@ jobs:
     ).toBe(true);
   });
 
+  it("workflow-permissions-parse change requires privileged-change review", () => {
+    const result = analyzePrivilegedChange(
+      [
+        {
+          filename: "scripts/lib/workflow-permissions-parse.mjs",
+          status: "modified",
+        },
+      ],
+      {},
+      { trustedOrg: "didi-build" },
+    );
+    expect(result.flagged).toBe(true);
+    expect(result.privilegedFiles).toEqual([
+      "scripts/lib/workflow-permissions-parse.mjs",
+    ]);
+    expect(privilegedChangeCheckState(result.flagged, [])).toBe("failure");
+  });
+
+  it("activate-staging-account.mjs change requires privileged-change review", () => {
+    const result = analyzePrivilegedChange(
+      [{ filename: "scripts/activate-staging-account.mjs", status: "modified" }],
+      {},
+      { trustedOrg: "didi-build" },
+    );
+    expect(result.flagged).toBe(true);
+    expect(result.privilegedFiles).toEqual(["scripts/activate-staging-account.mjs"]);
+    expect(privilegedChangeCheckState(result.flagged, [])).toBe("failure");
+  });
+
   it("check state succeeds when reviewed label present", () => {
     expect(privilegedChangeCheckState(true, [])).toBe("failure");
     expect(privilegedChangeCheckState(true, ["privileged-change-reviewed"])).toBe(
