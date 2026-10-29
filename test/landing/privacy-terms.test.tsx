@@ -10,10 +10,10 @@ import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { resolvePrivacyMetadata, resolveTermsMetadata } from "@/lib/landing/metadata";
 import { resolveLandingBrowseOrigin, resolveLandingUrls } from "@/lib/landing/urls";
 
-const previewHost = "pr-42-we-met.example.workers.dev";
+const previewHost = "pr-42-we-met-preview.example.workers.dev";
 const previewConfig = {
   baseUrl: "https://we-met.link",
-  previewHostSuffix: "-we-met.example.workers.dev",
+  previewHostSuffix: "-we-met-preview.example.workers.dev",
   weMetEnv: "preview",
 };
 

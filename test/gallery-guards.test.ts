@@ -39,8 +39,8 @@ function readFixture(name: string): string {
 
 const BASE_CONFIG = {
   $schema: "node_modules/wrangler/config-schema.json",
-  name: "we-met",
-  workers_dev: false,
+  name: "we-met-preview",
+  workers_dev: true,
   preview_urls: true,
   compatibility_date: "2026-09-24",
   assets: {
@@ -51,13 +51,13 @@ const BASE_CONFIG = {
   previews: {},
 };
 
-const VALID_PREVIEW_ARGS = `--config wrangler.gallery.jsonc --worker-name we-met --ignore-base-config --name "gallery-pr-1" --json`;
+const VALID_PREVIEW_ARGS = `--config wrangler.gallery.jsonc --name "gallery-pr-1" --json`;
 
 const MIN_GALLERY_WORKFLOW = `
 jobs:
   preview:
     steps:
-      - run: npx wrangler preview --config wrangler.gallery.jsonc --worker-name we-met --ignore-base-config --name gallery-pr-1 --json
+      - run: npx wrangler preview --config wrangler.gallery.jsonc --name gallery-pr-1 --json
 `;
 
 function writeGalleryFixtureRoot(
@@ -107,8 +107,6 @@ const VALID_WORKFLOW_SNIPPET = `
 run: |
   output="$(npx wrangler preview \\
     --config wrangler.gallery.jsonc \\
-    --worker-name we-met \\
-    --ignore-base-config \\
     --name "gallery-pr-\${PR_NUMBER}" \\
     --json 2>&1)"
 `;
@@ -139,10 +137,10 @@ describe("gallery guards (unit)", () => {
     ).toContain("wrangler.gallery.jsonc assets must not define binding.");
   });
 
-  it("requires workers_dev false and assets.directory ./dist", () => {
+  it("requires workers_dev true and assets.directory ./dist", () => {
     expect(
-      collectGalleryConfigViolations({ ...BASE_CONFIG, workers_dev: true }),
-    ).toContain("wrangler.gallery.jsonc must set workers_dev to false.");
+      collectGalleryConfigViolations({ ...BASE_CONFIG, workers_dev: false }),
+    ).toContain("wrangler.gallery.jsonc must set workers_dev to true.");
     expect(
       collectGalleryConfigViolations({
         ...BASE_CONFIG,
@@ -159,15 +157,14 @@ describe("gallery guards (unit)", () => {
   });
 
   it("rejects global flags before preview subcommand including short = forms", () => {
-    const suffix =
-      "--config wrangler.gallery.jsonc --worker-name we-met --ignore-base-config --name x --json";
+    const suffix = "--config wrangler.gallery.jsonc --name x --json";
     const cases: { cmd: string; expectError: string }[] = [
       {
         cmd: `npx wrangler -c=wrangler.gallery.jsonc preview ${suffix} --env prod`,
         expectError: "must not pass -c.",
       },
       {
-        cmd: `npx wrangler -e=prod preview --config wrangler.gallery.jsonc --worker-name we-met --ignore-base-config --name gallery-pr-1 --json`,
+        cmd: `npx wrangler -e=prod preview --config wrangler.gallery.jsonc --name gallery-pr-1 --json`,
         expectError: "must not pass -e.",
       },
       {
@@ -176,7 +173,7 @@ describe("gallery guards (unit)", () => {
           "must not pass wrangler global flag --install-skills before the preview subcommand.",
       },
       {
-        cmd: `npx wrangler --env=prod preview --config wrangler.gallery.jsonc --worker-name we-met --ignore-base-config --name x --json`,
+        cmd: `npx wrangler --env=prod preview --config wrangler.gallery.jsonc --name x --json`,
         expectError: "must not pass --env.",
       },
     ];
@@ -187,8 +184,7 @@ describe("gallery guards (unit)", () => {
   });
 
   it("rejects flags smuggled after 2>&1 on gallery preview", () => {
-    const suffix =
-      "--config wrangler.gallery.jsonc --worker-name we-met --ignore-base-config --name gallery-pr-1 --json";
+    const suffix = "--config wrangler.gallery.jsonc --name gallery-pr-1 --json";
     expect(
       collectGalleryWorkflowViolations(
         `npx wrangler preview ${suffix} 2>&1 --env production`,
@@ -199,7 +195,7 @@ describe("gallery guards (unit)", () => {
     ).toContain("gallery-preview.yml wrangler preview must not pass --var.");
     expect(
       collectGalleryPreviewLocationViolations(
-        `npx wrangler preview 2>&1 --config wrangler.gallery.jsonc --worker-name we-met --ignore-base-config --name x --json`,
+        `npx wrangler preview 2>&1 --config wrangler.gallery.jsonc --name x --json`,
         "scripts/evil.sh",
       ),
     ).toContain(
@@ -227,8 +223,7 @@ describe("gallery guards (unit)", () => {
   });
 
   it("rejects shell quote tricks, env prefixes, and unquoted --name with shell expansion", () => {
-    const suffix =
-      "--worker-name we-met --ignore-base-config --name gallery-pr-1 --json";
+    const suffix = "--name gallery-pr-1 --json";
     expect(
       collectGalleryWorkflowViolations(
         `npx wrangler pre''view --config wrangler.gallery.jsonc ${suffix}`,
@@ -248,12 +243,12 @@ describe("gallery guards (unit)", () => {
     );
     expect(
       collectGalleryPreviewArgvViolations(
-        `--config wrangler.gallery.json'c' --worker-name we-met --ignore-base-config --name x --json`,
+        `--config wrangler.gallery.json'c' --name x --json`,
       ),
     ).toEqual([]);
     expect(
       collectGalleryWorkflowViolations(
-        `npx wrangler preview --config wrangler.gallery.jsonc --worker-name we-met --ignore-base-config --name $PR --json`,
+        `npx wrangler preview --config wrangler.gallery.jsonc --name $PR --json`,
       ),
     ).toContain(
       "gallery-preview.yml wrangler preview --name must be a literal or double-quoted string.",
@@ -276,8 +271,7 @@ describe("gallery guards (unit)", () => {
     expect(
       findWranglerPreviewSubcommand(["-c", "preview", "--config", "x"], 0).index,
     ).toBe(-1);
-    const suffix =
-      "--config wrangler.gallery.jsonc --worker-name we-met --ignore-base-config --name x --json";
+    const suffix = "--config wrangler.gallery.jsonc --name x --json";
     expect(
       collectGalleryWorkflowViolations(`npx wrangler -c preview ${suffix}`).some(
         (entry) => entry.includes("must invoke wrangler preview"),
@@ -289,7 +283,7 @@ describe("gallery guards (unit)", () => {
     const tokens = ["--env=prod", "preview", "--config", "wrangler.gallery.jsonc"];
     expect(findWranglerPreviewSubcommand(tokens, 0).index).toBe(1);
     const cmd =
-      "npx wrangler --env=prod preview --config wrangler.gallery.jsonc --worker-name we-met --ignore-base-config --name x --json";
+      "npx wrangler --env=prod preview --config wrangler.gallery.jsonc --name x --json";
     const inv = extractWranglerPreviewInvocations(normalizeForDeployScan(cmd));
     expect(inv).toHaveLength(1);
     expect(collectGalleryPreviewArgvViolations(inv[0]!.argString)).toContain(
@@ -297,26 +291,26 @@ describe("gallery guards (unit)", () => {
     );
   });
 
-  it("rejects wrangler preview missing --ignore-base-config", () => {
+  it("rejects wrangler preview with --worker-name", () => {
     const bad = `
       npx wrangler preview --config wrangler.gallery.jsonc --worker-name we-met --name x --json
     `;
     expect(collectGalleryWorkflowViolations(bad)).toContain(
-      "gallery-preview.yml wrangler preview must pass --ignore-base-config.",
+      "gallery-preview.yml wrangler preview must not pass --worker-name.",
     );
   });
 
   it("rejects boolean preview flags with =value", () => {
     expect(
       collectGalleryPreviewArgvViolations(
-        `--config wrangler.gallery.jsonc --worker-name we-met --ignore-base-config=false --name x --json`,
+        `--config wrangler.gallery.jsonc --json=false --name x --json`,
       ),
     ).toContain(
-      "gallery-preview.yml wrangler preview must not pass --ignore-base-config with a value.",
+      "gallery-preview.yml wrangler preview must not pass --json with a value.",
     );
     expect(
       collectGalleryPreviewArgvViolations(
-        `--config wrangler.gallery.jsonc --worker-name we-met --ignore-base-config --name x --json=false`,
+        `--config wrangler.gallery.jsonc --name x --json=false`,
       ),
     ).toContain(
       "gallery-preview.yml wrangler preview must not pass --json with a value.",
@@ -326,28 +320,26 @@ describe("gallery guards (unit)", () => {
   it("rejects repeated preview flags even when the last value is allowed", () => {
     expect(
       collectGalleryPreviewArgvViolations(
-        `--config wrangler.jsonc --config wrangler.gallery.jsonc --worker-name we-met --ignore-base-config --name x --json`,
+        `--config wrangler.jsonc --config wrangler.gallery.jsonc --name x --json`,
       ),
     ).toContain("gallery-preview.yml wrangler preview must not repeat --config.");
     expect(
       collectGalleryPreviewArgvViolations(
-        `--config wrangler.gallery.jsonc --worker-name evil --worker-name we-met --ignore-base-config --name x --json`,
+        `--config wrangler.gallery.jsonc --name evil --name x --json`,
       ),
-    ).toContain("gallery-preview.yml wrangler preview must not repeat --worker-name.");
+    ).toContain("gallery-preview.yml wrangler preview must not repeat --name.");
   });
 
   it("rejects wrong --config value on gallery preview", () => {
     expect(
-      collectGalleryPreviewArgvViolations(
-        `--config wrangler.jsonc --worker-name we-met --ignore-base-config --name x --json`,
-      ),
+      collectGalleryPreviewArgvViolations(`--config wrangler.jsonc --name x --json`),
     ).toContain(
       "gallery-preview.yml wrangler preview must pass --config wrangler.gallery.jsonc.",
     );
   });
 
   it("finds wrangler preview with alternate spellings and applies argv or location guards", () => {
-    const suffix = "--worker-name we-met --ignore-base-config --name x --json";
+    const suffix = "--name x --json";
     const cases: {
       cmd: string;
       argvFlag?: string;
@@ -406,7 +398,7 @@ describe("gallery guards (unit)", () => {
       { args: `${VALID_PREVIEW_ARGS} -e staging`, flag: "-e" },
       { args: `${VALID_PREVIEW_ARGS} --env production`, flag: "--env" },
       {
-        args: `--config=wrangler.gallery.jsonc --worker-name we-met --ignore-base-config --name x --json --dry-run`,
+        args: `--config=wrangler.gallery.jsonc --name x --json --dry-run`,
         flag: "--dry-run",
       },
     ];
@@ -417,14 +409,14 @@ describe("gallery guards (unit)", () => {
     }
     expect(
       collectGalleryPreviewArgvViolations(
-        `--config=wrangler.gallery.jsonc --worker-name=we-met --ignore-base-config --name x --json`,
+        `--config=wrangler.gallery.jsonc --name x --json`,
       ),
     ).toEqual([]);
     expect(
       collectGalleryPreviewArgvViolations(
         `--config=wrangler.gallery.jsonc --worker-name=evil --ignore-base-config --name x --json`,
       ),
-    ).toContain("gallery-preview.yml wrangler preview must pass --worker-name we-met.");
+    ).toContain("gallery-preview.yml wrangler preview must not pass --worker-name.");
   });
 
   it("rejects wrangler preview with --var and -c", () => {
@@ -432,9 +424,7 @@ describe("gallery guards (unit)", () => {
       collectGalleryPreviewArgvViolations(`${VALID_PREVIEW_ARGS} --var FOO:bar`),
     ).toContain("gallery-preview.yml wrangler preview must not pass --var.");
     expect(
-      collectGalleryPreviewArgvViolations(
-        `-c wrangler.gallery.jsonc --worker-name we-met --ignore-base-config --name x --json`,
-      ),
+      collectGalleryPreviewArgvViolations(`-c wrangler.gallery.jsonc --name x --json`),
     ).toContain("gallery-preview.yml wrangler preview must not pass -c.");
   });
 
@@ -462,7 +452,7 @@ describe("gallery guards (unit)", () => {
   });
 
   it("rejects gallery wrangler preview outside gallery-preview.yml", () => {
-    const snippet = `npx wrangler preview --config wrangler.gallery.jsonc --worker-name we-met --ignore-base-config --name x --json`;
+    const snippet = `npx wrangler preview --config wrangler.gallery.jsonc --name x --json`;
     expect(
       collectGalleryPreviewLocationViolations(
         snippet,
@@ -617,6 +607,43 @@ steps:
     ).toContain(
       "package.json scripts.gallery:deploy must not run wrangler deploy/versions deploy with wrangler.gallery.jsonc.",
     );
+  });
+
+  it("exempts preview-workflow-guard.mjs from gallery preview location scan", () => {
+    const text = readFileSync("scripts/lib/preview-workflow-guard.mjs", "utf8");
+    expect(
+      collectGalleryPreviewLocationViolations(
+        text,
+        "scripts/lib/preview-workflow-guard.mjs",
+      ),
+    ).toEqual([]);
+  });
+
+  it("still flags wrangler.gallery.jsonc preview mentions in other scripts paths", () => {
+    const text = readFileSync("scripts/lib/preview-workflow-guard.mjs", "utf8");
+    expect(
+      collectGalleryPreviewLocationViolations(text, "scripts/evil-gallery-preview.mjs"),
+    ).toContain(
+      "scripts/evil-gallery-preview.mjs must not run wrangler preview with wrangler.gallery.jsonc (only .github/workflows/gallery-preview.yml).",
+    );
+  });
+
+  it("does not exempt near-miss preview-workflow-guard paths", () => {
+    const text = readFileSync("scripts/lib/preview-workflow-guard.mjs", "utf8");
+    for (const label of [
+      "scripts/lib/preview-workflow-guard.mjs.bak",
+      "scripts/lib/x/preview-workflow-guard.mjs",
+      "./scripts/lib/preview-workflow-guard.mjs",
+      "vendor/scripts/lib/preview-workflow-guard.mjs",
+      "/scripts/lib/preview-workflow-guard.mjs",
+      "Scripts/lib/Preview-workflow-guard.mjs",
+      "scripts/lib/xpreview-workflow-guard.mjs",
+      "scripts/lib/preview-workflow-guard.mjsextra",
+    ]) {
+      expect(collectGalleryPreviewLocationViolations(text, label)).toContain(
+        `${label} must not run wrangler preview with wrangler.gallery.jsonc (only .github/workflows/gallery-preview.yml).`,
+      );
+    }
   });
 
   it("accepts the committed gallery-preview workflow and runGalleryGuards", () => {
@@ -1202,7 +1229,7 @@ jobs:
   preview:
     steps:
       - run: node -e "require('child_process').spawnSync('wrangler', ['deploy', '--config', 'wrangler.gallery.jsonc'])"
-      - run: npx wrangler preview --config wrangler.gallery.jsonc --worker-name we-met --ignore-base-config --name x --json
+      - run: npx wrangler preview --config wrangler.gallery.jsonc --name x --json
 `,
       });
       expect(runGalleryGuards(root)).toContain(
@@ -1221,7 +1248,7 @@ jobs:
 jobs:
   evil:
     steps:
-      - run: npx wrangler preview --config wrangler.gallery.jsonc --worker-name we-met --ignore-base-config --name x --json
+      - run: npx wrangler preview --config wrangler.gallery.jsonc --name x --json
 `,
       });
       expect(runGalleryGuards(root)).toContain(
@@ -1237,7 +1264,7 @@ jobs:
     try {
       writeGalleryFixtureRoot(root, {
         scriptSh:
-          "npx wrangler preview --config wrangler.gallery.jsonc --worker-name we-met --ignore-base-config --name x --json\n",
+          "npx wrangler preview --config wrangler.gallery.jsonc --name x --json\n",
       });
       expect(runGalleryGuards(root)).toContain(
         "scripts/evil.sh must not run wrangler preview with wrangler.gallery.jsonc (only .github/workflows/gallery-preview.yml).",
@@ -1253,7 +1280,7 @@ jobs:
       writeGalleryFixtureRoot(root, {
         pkgScripts: {
           "gallery:preview:evil":
-            "npx wrangler preview --config wrangler.gallery.jsonc --worker-name we-met --ignore-base-config --name x --json",
+            "npx wrangler preview --config wrangler.gallery.jsonc --name x --json",
         },
       });
       expect(runGalleryGuards(root)).toContain(

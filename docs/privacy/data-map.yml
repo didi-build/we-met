@@ -719,7 +719,7 @@ other_items:
       (https://developers.cloudflare.com/analytics/analytics-engine/limits/)
     who_can_see: operator
     source: src/exchange/exchange-outcome-analytics.ts; wrangler.jsonc;
-      wrangler.staging.jsonc
+      wrangler.staging.jsonc; wrangler.preview.jsonc
     verified: false
   - id: binding.worker_assets
     binding: ASSETS

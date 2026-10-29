@@ -1,4 +1,11 @@
 import { spawnSync } from "node:child_process";
+import {
+  GALLERY_PREVIEW_CONFIG,
+  PREVIEW_CONFIG,
+  normalizeWranglerConfigPath,
+} from "./wrangler-config-path.mjs";
+
+const ALLOWED_DELETE_CONFIGS = new Set([PREVIEW_CONFIG, GALLERY_PREVIEW_CONFIG]);
 
 /**
  * @param {string} detail
@@ -24,18 +31,24 @@ export function isPreviewMissingError(detail, previewName) {
  * @returns {number}
  */
 export function deletePreviewByName(name, spawnOptions = {}) {
-  const args = ["wrangler", "preview", "delete", "--name", name, "--skip-confirmation"];
-  const config = process.env.WRANGLER_PREVIEW_CONFIG;
-  if (config) {
-    args.push("--config", config);
+  const configPath = normalizeWranglerConfigPath(process.env.WRANGLER_CONFIG ?? "");
+  if (!ALLOWED_DELETE_CONFIGS.has(configPath)) {
+    console.error(
+      `WRANGLER_CONFIG must be ${PREVIEW_CONFIG} or ${GALLERY_PREVIEW_CONFIG} for preview cleanup (found "${configPath}").`,
+    );
+    return 1;
   }
-  if (process.env.WRANGLER_PREVIEW_WORKER_NAME) {
-    args.push("--worker-name", process.env.WRANGLER_PREVIEW_WORKER_NAME);
-  }
-  if (process.env.WRANGLER_PREVIEW_IGNORE_BASE_CONFIG === "true") {
-    args.push("--ignore-base-config");
-  }
-  const result = spawnSync("npx", args, {
+  const wranglerArgs = [
+    "wrangler",
+    "preview",
+    "delete",
+    "--name",
+    name,
+    "--skip-confirmation",
+    "-c",
+    configPath,
+  ];
+  const result = spawnSync("npx", wranglerArgs, {
     encoding: "utf8",
     env: process.env,
     ...spawnOptions,

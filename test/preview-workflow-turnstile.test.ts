@@ -25,15 +25,15 @@ describe("Cloudflare credentials in deploy workflows (unit)", () => {
     expect(production).not.toContain("WE_MET_TURNSTILE_SITE_KEY_NONPROD");
   });
 
-  it("preview workflow uses non-prod Cloudflare API token only", () => {
-    expect(preview).toContain("secrets.CLOUDFLARE_API_TOKEN_NONPROD");
+  it("preview workflow uses preview-scoped Cloudflare API token only", () => {
+    expect(preview).toContain("secrets.CLOUDFLARE_API_TOKEN_PREVIEW");
     expect(preview).not.toContain("CLOUDFLARE_API_TOKEN_PRODUCTION");
     expect(preview).not.toMatch(/secrets\.CLOUDFLARE_API_TOKEN[^_]/);
   });
 
   it("production workflow uses production Cloudflare API token only", () => {
     expect(production).toContain("secrets.CLOUDFLARE_API_TOKEN_PRODUCTION");
-    expect(production).not.toContain("CLOUDFLARE_API_TOKEN_NONPROD");
+    expect(production).not.toContain("CLOUDFLARE_API_TOKEN_PREVIEW");
     expect(production).not.toMatch(/secrets\.CLOUDFLARE_API_TOKEN[^_]/);
   });
 

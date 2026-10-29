@@ -11,7 +11,7 @@ import { resolveLandingUrls } from "@/lib/landing/urls";
 const urls = resolveLandingUrls(
   {
     baseUrl: "https://we-met.link",
-    previewHostSuffix: "-we-met.example.workers.dev",
+    previewHostSuffix: "-we-met-preview.example.workers.dev",
     weMetEnv: "production",
   },
   "https://we-met.link",

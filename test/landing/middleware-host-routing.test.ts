@@ -20,7 +20,7 @@ describe("landing middleware host routing (unit)", () => {
       savedEnv[key] = process.env[key];
     }
     process.env.WE_MET_BASE_URL = "https://we-met.link";
-    process.env.WE_MET_PREVIEW_HOST_SUFFIX = "-we-met.example.workers.dev";
+    process.env.WE_MET_PREVIEW_HOST_SUFFIX = "-we-met-preview.example.workers.dev";
     process.env.WE_MET_ENV = "production";
   });
 
@@ -52,7 +52,9 @@ describe("landing middleware host routing (unit)", () => {
       expect(cardHost?.headers.get("x-middleware-rewrite")).toBeNull();
       expect(cardHost?.status).not.toBe(404);
 
-      const previewHost = middleware(request(path, "pr-42-we-met.example.workers.dev"));
+      const previewHost = middleware(
+        request(path, "pr-42-we-met-preview.example.workers.dev"),
+      );
       expect(previewHost?.headers.get("x-middleware-rewrite")).toBeNull();
       expect(previewHost?.status).not.toBe(404);
     }
@@ -78,7 +80,9 @@ describe("landing middleware host routing (unit)", () => {
 
   it("allows /app on preview hosts", () => {
     process.env.WE_MET_ENV = "preview";
-    const response = middleware(request("/app", "pr-42-we-met.example.workers.dev"));
+    const response = middleware(
+      request("/app", "pr-42-we-met-preview.example.workers.dev"),
+    );
     expect(response?.status).not.toBe(404);
   });
 

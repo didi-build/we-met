@@ -1,8 +1,8 @@
 // Preview-only: static component gallery assets. Never run `wrangler deploy` with this file.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "we-met",
-  "workers_dev": false,
+  "name": "we-met-preview",
+  "workers_dev": true,
   "preview_urls": true,
   "compatibility_date": "2026-09-24",
   "assets": {

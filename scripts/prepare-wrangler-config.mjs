@@ -20,6 +20,7 @@ import { parseJsonc } from "./lib/parse-jsonc.mjs";
 
 const SOURCE = resolve("wrangler.jsonc");
 const SOURCE_STAGING = resolve("wrangler.staging.jsonc");
+const SOURCE_PREVIEW = resolve("wrangler.preview.jsonc");
 const CONSUMER_DIR = resolve("workers/we-met-followup-email-consumer");
 const CONSUMER_SOURCE_PRODUCTION = resolve(CONSUMER_DIR, "wrangler.production.jsonc");
 const CONSUMER_SOURCE_NONPROD = resolve(CONSUMER_DIR, "wrangler.nonprod.jsonc");
@@ -121,7 +122,12 @@ function main() {
   if (!isConsumerTarget) {
     assertOutputInRepoRoot(output);
   }
-  const sourcePath = target === "staging" ? SOURCE_STAGING : SOURCE;
+  const sourcePath =
+    target === "staging"
+      ? SOURCE_STAGING
+      : target === "preview"
+        ? SOURCE_PREVIEW
+        : SOURCE;
   const sourceText = readFileSync(sourcePath, "utf8");
   const config = parseJsonc(sourceText);
   const provisionFile = loadProvisionFileFromEnv();
@@ -145,16 +151,7 @@ function main() {
 
   if (target === "preview") {
     const nonprodId = resolved.nonprodId;
-    const productionId = process.env.WE_MET_D1_DATABASE_ID_PRODUCTION?.trim();
-    let text = replaceD1Ids(sourceText, {
-      productionId: productionId || D1_PLACEHOLDER_PRODUCTION,
-      nonprodId,
-    });
-    if (!productionId) {
-      console.error(
-        "Warning: WE_MET_D1_DATABASE_ID_PRODUCTION unset; production placeholder left in file (preview deploy uses previews block only).",
-      );
-    }
+    const text = replaceD1Ids(sourceText, { nonprodId });
     const err = assertNoPlaceholderLeft(text, D1_PLACEHOLDER_NONPROD, "non-prod");
     if (err) {
       console.error(err);

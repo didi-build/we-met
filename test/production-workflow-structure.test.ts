@@ -562,7 +562,7 @@ describe("Deploy production workflow structure (unit)", () => {
   });
 
   it("does not reference non-prod Cloudflare token, D1 variable, or preview Turnstile variable", () => {
-    expect(workflow).not.toContain("CLOUDFLARE_API_TOKEN_NONPROD");
+    expect(workflow).not.toContain("CLOUDFLARE_API_TOKEN_PREVIEW");
     expect(workflow).not.toContain("WE_MET_D1_DATABASE_ID_NONPROD");
     expect(workflow).not.toContain("WE_MET_TURNSTILE_SITE_KEY_NONPROD");
   });

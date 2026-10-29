@@ -18,6 +18,9 @@ const MIGRATE_NONPROD_SECRET = "CLOUDFLARE_API_TOKEN_MIGRATE_NONPROD";
 const MIGRATE_NONPROD_ENV = "migrate-nonprod";
 const CONSUMER_PRODUCTION_SECRET = "CLOUDFLARE_API_TOKEN_CONSUMER_PRODUCTION";
 const STAGING_SECRET = "CLOUDFLARE_API_TOKEN_STAGING";
+const PREVIEW_SECRET = "CLOUDFLARE_API_TOKEN_PREVIEW";
+const LEGACY_PREVIEW_NONPROD_SECRET = "CLOUDFLARE_API_TOKEN_NONPROD";
+const ALLOWED_PREVIEW_TOKEN_FILES = new Set(["preview.yml", "gallery-preview.yml"]);
 
 /**
  * @param {string} workflowsDir
@@ -86,6 +89,41 @@ export function findStagingCredentialViolations(workflowsDir) {
   return violations.sort();
 }
 
+export function findLegacyPreviewNonprodCredentialViolations(workflowsDir) {
+  if (!existsSync(workflowsDir)) {
+    return [];
+  }
+  const violations = [];
+  for (const entry of readdirSync(workflowsDir, { withFileTypes: true })) {
+    if (!entry.isFile()) continue;
+    const name = entry.name;
+    if (!name.endsWith(".yml") && !name.endsWith(".yaml")) continue;
+    const text = readFileSync(join(workflowsDir, name), "utf8");
+    if (text.includes(LEGACY_PREVIEW_NONPROD_SECRET)) {
+      violations.push(name);
+    }
+  }
+  return violations.sort();
+}
+
+export function findPreviewCredentialViolations(workflowsDir) {
+  if (!existsSync(workflowsDir)) {
+    return [];
+  }
+  const violations = [];
+  for (const entry of readdirSync(workflowsDir, { withFileTypes: true })) {
+    if (!entry.isFile()) continue;
+    const name = entry.name;
+    if (!name.endsWith(".yml") && !name.endsWith(".yaml")) continue;
+    if (ALLOWED_PREVIEW_TOKEN_FILES.has(name)) continue;
+    const text = readFileSync(join(workflowsDir, name), "utf8");
+    if (text.includes(PREVIEW_SECRET)) {
+      violations.push(name);
+    }
+  }
+  return violations.sort();
+}
+
 export function findConsumerProductionCredentialViolations(workflowsDir) {
   if (!existsSync(workflowsDir)) {
     return [];
@@ -144,6 +182,29 @@ function runCli() {
       `${STAGING_SECRET} must only appear in ${[...ALLOWED_DEPLOY_STAGING_FILES].map((f) => `.github/workflows/${f}`).join(" or ")}. Offenders:\n`,
     );
     for (const file of stagingViolations) {
+      console.error(`  - ${file}`);
+    }
+    process.exit(1);
+  }
+
+  const legacyPreviewViolations =
+    findLegacyPreviewNonprodCredentialViolations(WORKFLOWS_DIR);
+  if (legacyPreviewViolations.length > 0) {
+    console.error(
+      `${LEGACY_PREVIEW_NONPROD_SECRET} must not appear in GitHub Actions workflows (use ${PREVIEW_SECRET} on preview workflows only). Offenders:\n`,
+    );
+    for (const file of legacyPreviewViolations) {
+      console.error(`  - ${file}`);
+    }
+    process.exit(1);
+  }
+
+  const previewViolations = findPreviewCredentialViolations(WORKFLOWS_DIR);
+  if (previewViolations.length > 0) {
+    console.error(
+      `${PREVIEW_SECRET} must only appear in ${[...ALLOWED_PREVIEW_TOKEN_FILES].map((f) => `.github/workflows/${f}`).join(" or ")}. Offenders:\n`,
+    );
+    for (const file of previewViolations) {
       console.error(`  - ${file}`);
     }
     process.exit(1);

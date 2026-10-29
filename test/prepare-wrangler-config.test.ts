@@ -125,6 +125,21 @@ describe("prepare-wrangler-config (unit)", () => {
     expect(result.stderr).toMatch(/WE_MET_D1_DATABASE_ID_NONPROD|missing D1 id/);
   });
 
+  it("substitutes non-prod D1 ID in preview Worker config", () => {
+    const output = trackRootOutput(`wrangler.preview.test-${process.pid}.ci.jsonc`);
+    const nonprodId = "22222222-2222-2222-2222-222222222222";
+    const result = runPrepare("preview", output, {
+      WE_MET_D1_DATABASE_ID_NONPROD: nonprodId,
+    });
+    expect(result.status).toBe(0);
+    expect(result.stderr).not.toContain(nonprodId);
+    const text = readFileSync(output, "utf8");
+    expect(text).toContain(nonprodId);
+    expect(text).toContain('"name": "we-met-preview"');
+    expect(text).not.toContain(D1_PLACEHOLDER_NONPROD);
+    expect(text.match(/22222222-2222-2222-2222-222222222222/g)?.length).toBe(2);
+  });
+
   it("fails consumer-nonprod prepare when output is outside the consumer directory", () => {
     const output = join(tmpdir(), "wrangler.consumer.jsonc");
     const result = runPrepare("consumer-nonprod", output, {

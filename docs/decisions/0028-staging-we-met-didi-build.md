@@ -26,10 +26,10 @@ Diadem (2026-10-26, ET, excerpted product direction):
 
 ### 1. Staging Worker and bindings (no new Cloudflare resources)
 
-- **Worker name:** `we-met-staging` (separate from production Worker `we-met` and from PR preview instances on `we-met`).
+- **Worker name:** `we-met-staging` (separate from production Worker `we-met` and from PR preview instances on `we-met-preview`).
 - **Custom domain:** `we-met.didi.build` (bare hostname; not a `workers.dev` preview name). The route is attached only after Diadem approves the specific DNS change ([DIDI-874](https://linear.app/didi-build/issue/DIDI-874)) and the maintainer creates Worker **`we-met-staging`** once ([DIDI-875](https://linear.app/didi-build/issue/DIDI-875)).
 - **Bindings:** Top-level Wrangler config on `we-met-staging` uses the **same preview / non-prod resource names** as the `previews` block on `we-met`: D1 `we-met-db-nonprod`, R2 `we-met-assets-nonprod`, queue producer `we-met-followup-email-nonprod`, rate limiter namespaces **2001** (`WE_MET_EXCHANGE_RATE_LIMITER`), **2003** (`WE_MET_AUTH_RATE_LIMITER`), and **2005** (`WE_MET_APP_RATE_LIMITER`), **`IMAGES`**, and **`WORKER_SELF_REFERENCE`** pointing at Worker **`we-met-staging`**. No new D1, R2, queue, or rate-limiter resources are provisioned for staging. Staging shares **no** production secrets, OAuth clients, or D1/R2 data with production.
-- **Why not Cloudflare Preview for staging:** PR previews and version URLs are served on `<preview-name>.<pattern>` (for example `pr-<N>-we-met.<subdomain>.workers.dev`), not on a **fixed bare custom hostname**. Staging needs a stable URL (`we-met.didi.build`) on every push to `main`, so it is a dedicated Worker with a custom domain, not a Preview deployment on `we-met`.
+- **Why not Cloudflare Preview for staging:** PR previews and version URLs are served on `<preview-name>.<pattern>` (for example `pr-<N>-we-met-preview.<subdomain>.workers.dev`), not on a **fixed bare custom hostname**. Staging needs a stable URL (`we-met.didi.build`) on every push to `main`, so it is a dedicated Worker with a custom domain, not a Preview deployment on `we-met`.
 
 ### 2. `WE_MET_ENV=staging`
 

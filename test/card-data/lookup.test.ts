@@ -6,7 +6,7 @@ import { exampleCardInput } from "../helpers/example-card";
 
 const hostConfig = {
   baseUrl: "https://we-met.link",
-  previewHostSuffix: "-we-met.diademshoukralla.workers.dev",
+  previewHostSuffix: "-we-met-preview.diademshoukralla.workers.dev",
   weMetEnv: "production",
 };
 
@@ -29,7 +29,7 @@ describe("lookup (unit)", () => {
     await upsertCardWithEmailSink(repo, sample);
     const card = await lookupCard(
       {
-        hostname: "pr-1-we-met.diademshoukralla.workers.dev",
+        hostname: "pr-1-we-met-preview.diademshoukralla.workers.dev",
         pathname: "/hi/didi",
       },
       repo,

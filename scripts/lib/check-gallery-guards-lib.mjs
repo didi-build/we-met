@@ -16,6 +16,8 @@ import { parseJsonc } from "./parse-jsonc.mjs";
 
 const GALLERY_CONFIG = "wrangler.gallery.jsonc";
 const GALLERY_WORKFLOW = ".github/workflows/gallery-preview.yml";
+/** Exact repo path: mentions wrangler.gallery.jsonc as audit data, not a wrangler run. */
+export const PREVIEW_WORKFLOW_GUARD_LIB_PATH = "scripts/lib/preview-workflow-guard.mjs";
 
 const GUARD_SOURCE_PATHS = new Set([
   "scripts/check-gallery-guards.mjs",
@@ -1031,6 +1033,9 @@ export function collectGalleryPreviewLocationViolations(text, label, options = {
   if (options.isGalleryWorkflow || label === GALLERY_WORKFLOW) {
     return [];
   }
+  if (label === PREVIEW_WORKFLOW_GUARD_LIB_PATH) {
+    return [];
+  }
   const isYaml = options.isYaml ?? (label.endsWith(".yml") || label.endsWith(".yaml"));
   if (detectArrayFormGalleryPreview(text)) {
     return [
@@ -1197,19 +1202,13 @@ export function extractWranglerPreviewArgStrings(normalizedWorkflow) {
  * @param {string[]} tokens
  * @returns {{ flags: Map<string, string | true>, positionals: string[] }}
  */
-const ALLOWED_PREVIEW_FLAGS = new Set([
-  "--config",
-  "--worker-name",
-  "--ignore-base-config",
-  "--name",
-  "--json",
-]);
+const ALLOWED_PREVIEW_FLAGS = new Set(["--config", "--name", "--json"]);
 
 function parsePreviewArgv(tokens) {
   const flags = new Map();
   const flagCounts = new Map();
   const positionals = [];
-  const booleanFlags = new Set(["--ignore-base-config", "--json"]);
+  const booleanFlags = new Set(["--json"]);
   const booleanWithValueErrors = [];
 
   const recordFlag = (flag, value) => {
@@ -1292,11 +1291,13 @@ export function collectGalleryPreviewArgvViolations(argString) {
       "gallery-preview.yml wrangler preview must pass --config wrangler.gallery.jsonc.",
     );
   }
-  if (flags.get("--worker-name") !== "we-met") {
-    errors.push("gallery-preview.yml wrangler preview must pass --worker-name we-met.");
+  if (flags.has("--ignore-base-config")) {
+    errors.push(
+      "gallery-preview.yml wrangler preview must not pass --ignore-base-config.",
+    );
   }
-  if (!flags.has("--ignore-base-config")) {
-    errors.push("gallery-preview.yml wrangler preview must pass --ignore-base-config.");
+  if (flags.has("--worker-name")) {
+    errors.push("gallery-preview.yml wrangler preview must not pass --worker-name.");
   }
   if (!flags.has("--name")) {
     errors.push("gallery-preview.yml wrangler preview must pass --name.");
@@ -1326,12 +1327,12 @@ export function collectGalleryConfigViolations(config) {
       errors.push(`wrangler.gallery.jsonc must not define top-level key ${key}.`);
     }
   }
-  if (config.workers_dev !== false) {
-    errors.push("wrangler.gallery.jsonc must set workers_dev to false.");
+  if (config.workers_dev !== true) {
+    errors.push("wrangler.gallery.jsonc must set workers_dev to true.");
   }
-  if (config.name !== "we-met") {
+  if (config.name !== "we-met-preview") {
     errors.push(
-      'wrangler.gallery.jsonc name must remain "we-met" (Worker-scoped preview token).',
+      'wrangler.gallery.jsonc name must remain "we-met-preview" (preview Worker only).',
     );
   }
   const assets = config.assets;

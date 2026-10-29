@@ -7,8 +7,8 @@ import {
 } from "@/lib/landing/metadata";
 
 const previewConfig = {
-  baseUrl: "https://pr-29-we-met.example.workers.dev",
-  previewHostSuffix: "-we-met.example.workers.dev",
+  baseUrl: "https://pr-29-we-met-preview.example.workers.dev",
+  previewHostSuffix: "-we-met-preview.example.workers.dev",
   weMetEnv: "preview",
 };
 

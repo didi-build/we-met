@@ -4,6 +4,7 @@
  *
  * Usage:
  *   node scripts/check-deploy-guards.mjs --target preview --config wrangler.jsonc
+ *   node scripts/check-deploy-guards.mjs --target preview-worker --config wrangler.preview.jsonc
  *   node scripts/check-deploy-guards.mjs --target production --config wrangler.jsonc
  *   node scripts/check-deploy-guards.mjs --target consumer-nonprod --config workers/we-met-followup-email-consumer/wrangler.nonprod.jsonc
  *   node scripts/check-deploy-guards.mjs --target consumer-production --config workers/we-met-followup-email-consumer/wrangler.production.jsonc
@@ -57,7 +58,7 @@ import { previewLoginReachableForWorkerEnv } from "./lib/preview-login-guard.mjs
 
 function usage() {
   console.error(
-    "Usage: check-deploy-guards.mjs --target <preview|production|staging|staging-build|consumer-nonprod|consumer-production|warmup-production> --config <path> [--mail-safety-config <path>]",
+    "Usage: check-deploy-guards.mjs --target <preview|preview-worker|production|staging|staging-build|consumer-nonprod|consumer-production|warmup-production> --config <path> [--mail-safety-config <path>]",
   );
   process.exit(1);
 }
@@ -193,23 +194,6 @@ function checkExchangeOutcomeAnalyticsDataset(configSection, expectedDataset, la
   }
   if (dataset !== expectedDataset) {
     fail(`${label} exchange outcome dataset must be "${expectedDataset}"`);
-  }
-}
-
-function checkPreviewExchangeOutcomeAnalyticsDataset(previews) {
-  const dataset = exchangeOutcomeDatasetName(previews);
-  if (!dataset) {
-    fail(
-      `previews must declare analytics_engine_datasets ${EXCHANGE_OUTCOME_ANALYTICS_BINDING}`,
-    );
-  }
-  if (dataset === PRODUCTION_EXCHANGE_OUTCOME_DATASET) {
-    fail("previews exchange outcome dataset must not use production dataset name");
-  }
-  if (dataset !== PREVIEW_EXCHANGE_OUTCOME_DATASET) {
-    fail(
-      `previews exchange outcome dataset must be "${PREVIEW_EXCHANGE_OUTCOME_DATASET}"`,
-    );
   }
 }
 
@@ -398,7 +382,7 @@ function checkPreviewBlockNoAppHostRoute(previews) {
   }
 }
 
-function checkPreviewBlock(previews) {
+function checkPreviewResourceBindings(previews) {
   checkPreviewBlockNoAppHostRoute(previews);
   const strings = collectStrings(previews ?? {});
   const productionMarkers = [
@@ -418,14 +402,6 @@ function checkPreviewBlock(previews) {
   const previewVars = previews?.vars;
   if (previewVars?.WE_MET_ENV !== "preview") {
     fail('previews.vars.WE_MET_ENV must be "preview"');
-  }
-
-  const previewHostSuffix = previewVars?.WE_MET_PREVIEW_HOST_SUFFIX ?? "";
-  if (!previewHostSuffix.trim()) {
-    fail("previews.vars.WE_MET_PREVIEW_HOST_SUFFIX must be non-empty");
-  }
-  if (!previewHostSuffix.startsWith("-we-met.")) {
-    fail('previews.vars.WE_MET_PREVIEW_HOST_SUFFIX must start with "-we-met."');
   }
 
   const previewBaseUrl = previewVars?.WE_MET_BASE_URL;
@@ -449,7 +425,227 @@ function checkPreviewBlock(previews) {
     "preview queue",
   );
   checkRateLimitBindings(previews?.ratelimits, false);
-  checkPreviewExchangeOutcomeAnalyticsDataset(previews);
+}
+
+function checkNestedPreviewsBlockNoExchangeOutcomeAnalytics(previews) {
+  const rows = previews?.analytics_engine_datasets ?? [];
+  if (rows.length > 0) {
+    fail(
+      "previews block must not declare analytics_engine_datasets (use wrangler.preview.jsonc)",
+    );
+  }
+}
+
+function assertNestedPreviewHostSuffix(previewVars) {
+  const previewHostSuffix = previewVars?.WE_MET_PREVIEW_HOST_SUFFIX ?? "";
+  if (!previewHostSuffix.trim()) {
+    fail("previews.vars.WE_MET_PREVIEW_HOST_SUFFIX must be non-empty");
+  }
+  if (!previewHostSuffix.startsWith("-we-met.")) {
+    fail('previews.vars.WE_MET_PREVIEW_HOST_SUFFIX must start with "-we-met."');
+  }
+}
+
+function assertPreviewWorkerHostSuffix(previewVars) {
+  const previewHostSuffix = previewVars?.WE_MET_PREVIEW_HOST_SUFFIX ?? "";
+  if (!previewHostSuffix.trim()) {
+    fail(`${PREVIEW_CONFIG_LABEL} vars.WE_MET_PREVIEW_HOST_SUFFIX must be non-empty`);
+  }
+  if (!previewHostSuffix.startsWith("-we-met-preview.")) {
+    fail(
+      `${PREVIEW_CONFIG_LABEL} vars.WE_MET_PREVIEW_HOST_SUFFIX must start with "-we-met-preview."`,
+    );
+  }
+}
+
+function checkPreviewBlock(previews) {
+  checkPreviewResourceBindings(previews);
+  checkNestedPreviewsBlockNoExchangeOutcomeAnalytics(previews);
+  assertNestedPreviewHostSuffix(previews?.vars);
+}
+
+const PREVIEW_WORKER_NAME = "we-met-preview";
+const PREVIEW_CONFIG_LABEL = "wrangler.preview.jsonc";
+
+function checkPreviewWorkerDomainSettings(config) {
+  if (config.workers_dev !== true) {
+    fail(`${PREVIEW_CONFIG_LABEL} workers_dev must be true`);
+  }
+  if (config.preview_urls !== true) {
+    fail(`${PREVIEW_CONFIG_LABEL} preview_urls must be true`);
+  }
+  const patterns = routePatterns(config);
+  if (patterns.length > 0) {
+    fail(`${PREVIEW_CONFIG_LABEL} must not define routes or custom domains`);
+  }
+}
+
+function checkPreviewWorkerNoProductionServiceBinding(config) {
+  const services = config.services ?? [];
+  for (const row of services) {
+    const service = row?.service;
+    if (service === "we-met") {
+      fail(`${PREVIEW_CONFIG_LABEL} must not service-bind to production Worker we-met`);
+    }
+    if (service && service !== PREVIEW_WORKER_NAME) {
+      fail(
+        `${PREVIEW_CONFIG_LABEL} service binding must target ${PREVIEW_WORKER_NAME} only`,
+      );
+    }
+  }
+}
+
+function isPreparedPreviewWorkerCiConfig(configPath) {
+  return resolve(configPath).endsWith(".ci.jsonc");
+}
+
+function collectPreviewWorkerBindingKeys(section) {
+  const keys = new Set();
+  for (const key of Object.keys(section?.vars ?? {})) {
+    keys.add(`var:${key}`);
+  }
+  for (const row of section?.d1_databases ?? []) {
+    if (row?.binding) keys.add(`d1:${row.binding}`);
+  }
+  for (const row of section?.r2_buckets ?? []) {
+    if (row?.binding) keys.add(`r2:${row.binding}`);
+  }
+  for (const row of section?.queues?.producers ?? []) {
+    if (row?.binding) keys.add(`queue:${row.binding}`);
+  }
+  for (const row of section?.analytics_engine_datasets ?? []) {
+    if (row?.binding) keys.add(`analytics:${row.binding}`);
+  }
+  for (const row of section?.ratelimits ?? []) {
+    if (row?.name) keys.add(`ratelimit:${row.name}`);
+  }
+  if (section?.images?.binding) {
+    keys.add(`images:${section.images.binding}`);
+  }
+  for (const row of section?.services ?? []) {
+    if (row?.binding) keys.add(`service:${row.binding}`);
+  }
+  if (section?.assets?.binding) {
+    keys.add(`assets:${section.assets.binding}`);
+  }
+  return keys;
+}
+
+function checkPreviewWorkerPreviewsResourceBindings(previews) {
+  checkPreviewBlockNoAppHostRoute(previews);
+  const strings = collectStrings(previews ?? {});
+  const productionMarkers = [
+    PRODUCTION_RESOURCE_MARKERS.d1Name,
+    PRODUCTION_RESOURCE_MARKERS.r2Bucket,
+    PRODUCTION_RESOURCE_MARKERS.queue,
+    PRODUCTION_RESOURCE_MARKERS.exchangeRateLimiterNamespaceId,
+    PRODUCTION_RESOURCE_MARKERS.authRateLimiterNamespaceId,
+    PRODUCTION_RESOURCE_MARKERS.appRateLimiterNamespaceId,
+  ];
+  for (const marker of productionMarkers) {
+    if (strings.includes(marker)) {
+      fail(
+        `${PREVIEW_CONFIG_LABEL} previews block references production resource "${marker}"`,
+      );
+    }
+  }
+  if (strings.includes(D1_PLACEHOLDER_PRODUCTION)) {
+    fail(
+      `${PREVIEW_CONFIG_LABEL} previews block must not use production D1 placeholder id`,
+    );
+  }
+
+  const previewVars = previews?.vars;
+  if (previewVars?.WE_MET_ENV !== "preview") {
+    fail(`${PREVIEW_CONFIG_LABEL} previews.vars.WE_MET_ENV must be "preview"`);
+  }
+  const previewBaseUrl = previewVars?.WE_MET_BASE_URL;
+  if (previewBaseUrl !== NONPROD_RESOURCE_MARKERS.baseUrl) {
+    fail(
+      `${PREVIEW_CONFIG_LABEL} previews.vars.WE_MET_BASE_URL must be "${NONPROD_RESOURCE_MARKERS.baseUrl}"`,
+    );
+  }
+  assertPreviewWorkerHostSuffix(previewVars);
+  assertEveryPreviewD1(
+    previews,
+    (row) => row.database_name === NONPROD_RESOURCE_MARKERS.d1Name,
+    `${PREVIEW_CONFIG_LABEL} previews D1 binding name`,
+  );
+  assertEveryPreviewR2(
+    previews,
+    (row) => row.bucket_name === NONPROD_RESOURCE_MARKERS.r2Bucket,
+    `${PREVIEW_CONFIG_LABEL} previews R2 bucket`,
+  );
+  assertEveryPreviewQueue(
+    previews,
+    (row) => row.queue === NONPROD_RESOURCE_MARKERS.queue,
+    `${PREVIEW_CONFIG_LABEL} previews queue`,
+  );
+  checkRateLimitBindings(previews?.ratelimits, false);
+  checkPreviewWorkerNoProductionServiceBinding(previews ?? {});
+}
+
+function checkPreviewWorkerPreviewsBindingAllowlist(config, previews) {
+  const topKeys = collectPreviewWorkerBindingKeys(config);
+  const previewKeys = collectPreviewWorkerBindingKeys(previews);
+  for (const key of previewKeys) {
+    if (!topKeys.has(key)) {
+      fail(
+        `${PREVIEW_CONFIG_LABEL} previews block declares binding "${key}" not present at top level`,
+      );
+    }
+  }
+}
+
+function checkPreviewWorkerPreviewsBlock(config, configPath) {
+  const previews = config.previews;
+  if (!previews || typeof previews !== "object" || Array.isArray(previews)) {
+    fail(`${PREVIEW_CONFIG_LABEL} must define a previews block`);
+  }
+  checkPreviewWorkerPreviewsResourceBindings(previews);
+  checkExchangeOutcomeAnalyticsDataset(
+    previews,
+    PREVIEW_EXCHANGE_OUTCOME_DATASET,
+    `${PREVIEW_CONFIG_LABEL} previews`,
+  );
+  checkPreviewWorkerPreviewsBindingAllowlist(config, previews);
+  if (isPreparedPreviewWorkerCiConfig(configPath)) {
+    const strings = collectStrings(previews);
+    if (strings.includes(D1_PLACEHOLDER_NONPROD)) {
+      fail(
+        `${PREVIEW_CONFIG_LABEL} previews block must not contain unsubstituted non-prod D1 placeholder in prepared CI config`,
+      );
+    }
+  }
+}
+
+function checkPreviewWorkerBlock(config, configPath) {
+  if (config.name !== PREVIEW_WORKER_NAME) {
+    fail(`${PREVIEW_CONFIG_LABEL} name must be "${PREVIEW_WORKER_NAME}"`);
+  }
+  checkPreviewWorkerDomainSettings(config);
+  checkPreviewWorkerNoProductionServiceBinding(config);
+  checkPreviewResourceBindings({
+    vars: config.vars,
+    d1_databases: config.d1_databases,
+    r2_buckets: config.r2_buckets,
+    queues: config.queues,
+    ratelimits: config.ratelimits,
+    routes: config.routes,
+  });
+  assertPreviewWorkerHostSuffix(config.vars);
+  checkExchangeOutcomeAnalyticsDataset(
+    config,
+    PREVIEW_EXCHANGE_OUTCOME_DATASET,
+    PREVIEW_CONFIG_LABEL,
+  );
+  const topD1 = config.d1_databases ?? [];
+  for (const row of topD1) {
+    if (row.database_id === D1_PLACEHOLDER_PRODUCTION) {
+      fail(`${PREVIEW_CONFIG_LABEL} must not use production D1 placeholder id`);
+    }
+  }
+  checkPreviewWorkerPreviewsBlock(config, configPath);
 }
 
 const ALLOWED_CONSUMER_VAR_KEYS = new Set(["WE_MET_ENV", "WE_MET_BASE_URL"]);
@@ -983,7 +1179,13 @@ function main() {
     target === "consumer-nonprod" || target === "consumer-production";
   const isWarmupTarget = target === "warmup-production";
   const isStagingFamily = target === "staging" || target === "staging-build";
-  if (!isConsumerTarget && !isWarmupTarget && !isStagingFamily) {
+  const isPreviewWorkerTarget = target === "preview-worker";
+  if (
+    !isConsumerTarget &&
+    !isWarmupTarget &&
+    !isStagingFamily &&
+    !isPreviewWorkerTarget
+  ) {
     checkWranglerDomainSettings(config);
     checkDistinctD1Ids(config);
   }
@@ -997,6 +1199,12 @@ function main() {
   if (target === "staging") {
     checkStagingBlock(config);
     console.log("deploy-time guards passed (staging)");
+    return;
+  }
+
+  if (target === "preview-worker") {
+    checkPreviewWorkerBlock(config, configPath);
+    console.log("deploy-time guards passed (preview-worker)");
     return;
   }
 
