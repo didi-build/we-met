@@ -105,15 +105,27 @@ describe("privileged-workflow-import-walk", () => {
     );
   });
 
-  it("parses compact import and export from syntax (fixture)", () => {
+  it("parses compact import{…}from'…' syntax (fixture)", () => {
     const { reachable } = analyzeWorkflowImportWalk({
       isPrivilegedPath: () => true,
-      extraEntrypoints: [`${resolutionFixtureRoot}/entry-compact-import.mjs`],
+      extraEntrypoints: [`${resolutionFixtureRoot}/entry-compact-import-only.mjs`],
       skipSpawnExpansion: true,
       workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
     });
     expect(reachable).toContain(
-      "test/fixtures/privileged-workflow-import-walk/resolution/compact-target.mjs",
+      "test/fixtures/privileged-workflow-import-walk/resolution/compact-import-target.mjs",
+    );
+  });
+
+  it("parses compact export*from'…' syntax (fixture)", () => {
+    const { reachable } = analyzeWorkflowImportWalk({
+      isPrivilegedPath: () => true,
+      extraEntrypoints: [`${resolutionFixtureRoot}/entry-compact-export-only.mjs`],
+      skipSpawnExpansion: true,
+      workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
+    });
+    expect(reachable).toContain(
+      "test/fixtures/privileged-workflow-import-walk/resolution/compact-export-target.mjs",
     );
   });
 
@@ -136,6 +148,17 @@ describe("privileged-workflow-import-walk", () => {
         workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
       }),
     ).toThrow(WorkflowImportWalkError);
+  });
+
+  it("follows spawnSync from an imported lib, not only from the seed entry (fixture)", () => {
+    const { reachable } = analyzeWorkflowImportWalk({
+      isPrivilegedPath: () => true,
+      extraEntrypoints: [`${resolutionFixtureRoot}/entry-spawn-via-lib.mjs`],
+      workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
+    });
+    expect(reachable).toContain(
+      "test/fixtures/privileged-workflow-import-walk/resolution/spawned-target.mjs",
+    );
   });
 
   it("follows node spawn from every reachable file (migrate-nonprod apply.ts)", () => {
