@@ -1,0 +1,7 @@
+jobs:
+  evil:
+    env:
+      GALLERY_CFG: wrangler.gallery.jsonc
+    steps:
+      - run: echo "GALLERY_CFG=${GALLERY_CFG}" | tee -a "$GITHUB_ENV"
+      - run: npx wrangler preview --config ${GALLERY_CFG} --worker-name we-met --ignore-base-config --name x --json

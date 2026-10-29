@@ -22,42 +22,72 @@ async function runStatements(db: D1Database, statements: string[]): Promise<void
   }
 }
 
+export type IsolatedLocalD1Handle = {
+  db: D1Database;
+  close: () => Promise<void>;
+};
+
+type OpenIsolatedLocalD1Options = {
+  migrate?: boolean;
+};
+
 /**
  * Isolated local D1 for tests. Uses a temporary persist directory (not `.wrangler/state`).
  * **UNVERIFIED:** Wrangler `getPlatformProxy({ persist: { path } })` is the documented Miniflare
  * persist option; confirm against current Wrangler release notes if local test behavior changes.
  */
-async function withIsolatedD1Proxy<T>(
-  fn: (db: D1Database) => Promise<T>,
-  prepare?: (db: D1Database) => Promise<void>,
-): Promise<T> {
+export async function openIsolatedLocalD1(
+  options: OpenIsolatedLocalD1Options = {},
+): Promise<IsolatedLocalD1Handle> {
+  const { migrate = true } = options;
   const persistDir = mkdtempSync(resolve(tmpdir(), "we-met-d1-test-"));
   const { getPlatformProxy } = await import("wrangler");
   const proxy = await getPlatformProxy({
     configPath: resolve("wrangler.jsonc"),
     persist: { path: persistDir },
   });
-  try {
-    const db = proxy.env.WE_MET_DB as D1Database;
-    if (!db) {
-      throw new Error("WE_MET_DB is not configured for local tests");
-    }
-    if (prepare) {
-      await prepare(db);
-    }
-    return await fn(db);
-  } finally {
+  const db = proxy.env.WE_MET_DB as D1Database;
+  if (!db) {
     await proxy.dispose?.();
     rmSync(persistDir, { recursive: true, force: true });
+    throw new Error("WE_MET_DB is not configured for local tests");
+  }
+  if (migrate) {
+    await runStatements(db, migrationStatements());
+  }
+  return {
+    db,
+    async close() {
+      await proxy.dispose?.();
+      rmSync(persistDir, { recursive: true, force: true });
+    },
+  };
+}
+
+async function withIsolatedD1Proxy<T>(
+  fn: (db: D1Database) => Promise<T>,
+  prepare?: (db: D1Database) => Promise<void>,
+): Promise<T> {
+  const handle = await openIsolatedLocalD1({ migrate: false });
+  try {
+    if (prepare) {
+      await prepare(handle.db);
+    }
+    return await fn(handle.db);
+  } finally {
+    await handle.close();
   }
 }
 
 export async function withIsolatedLocalD1<T>(
   fn: (db: D1Database) => Promise<T>,
 ): Promise<T> {
-  return withIsolatedD1Proxy(fn, async (db) => {
-    await runStatements(db, migrationStatements());
-  });
+  const handle = await openIsolatedLocalD1();
+  try {
+    return await fn(handle.db);
+  } finally {
+    await handle.close();
+  }
 }
 
 export async function withEmptyIsolatedLocalD1<T>(

@@ -3,6 +3,8 @@
  * Read from trusted code on `main` (pull_request_target workflow).
  */
 
+import { workflowModuleExactPrivilegedEntries } from "./privileged-paths-workflow-modules.mjs";
+
 export const privilegedPathsConfigPath = "scripts/lib/privileged-paths.mjs";
 
 export const privilegedChangeWorkflowPath = ".github/workflows/privileged-change.yml";
@@ -11,8 +13,19 @@ export const secretUsageScriptPath = "scripts/check-secret-usage.mjs";
 
 export const ghApiErrorsPath = "scripts/lib/gh-api-errors.mjs";
 
+export const workflowPermissionsParsePath =
+  "scripts/lib/workflow-permissions-parse.mjs";
+
+export const activateStagingAccountScriptPath = "scripts/activate-staging-account.mjs";
+
+export const activateStagingAccountLibPath = "scripts/lib/activate-staging-account.mjs";
+
+export const wranglerPlaceholdersPath = "scripts/lib/wrangler-placeholders.mjs";
+
+export const parseJsoncPath = "scripts/lib/parse-jsonc.mjs";
+
 /** @type {readonly { id: string; infrastructure?: boolean; test: (filename: string) => boolean }[]} */
-export const privilegedPathMatchers = [
+const basePrivilegedPathMatchers = [
   {
     id: "github-tree",
     test: (filename) => filename.startsWith(".github/"),
@@ -92,10 +105,47 @@ export const privilegedPathMatchers = [
     test: (filename) => filename === ghApiErrorsPath,
   },
   {
+    id: "workflow-permissions-parse",
+    infrastructure: true,
+    test: (filename) => filename === workflowPermissionsParsePath,
+  },
+  {
+    id: "activate-staging-account",
+    infrastructure: true,
+    test: (filename) => filename === activateStagingAccountScriptPath,
+  },
+  {
+    id: "activate-staging-account-lib",
+    infrastructure: true,
+    test: (filename) => filename === activateStagingAccountLibPath,
+  },
+  {
+    id: "wrangler-placeholders",
+    infrastructure: true,
+    test: (filename) => filename === wranglerPlaceholdersPath,
+  },
+  {
+    id: "parse-jsonc",
+    infrastructure: true,
+    test: (filename) => filename === parseJsoncPath,
+  },
+  {
     id: "privileged-change-workflow",
     infrastructure: true,
     test: (filename) => filename === privilegedChangeWorkflowPath,
   },
+];
+
+export { workflowModuleExactPrivilegedEntries };
+
+/** @type {readonly { id: string; infrastructure?: boolean; test: (filename: string) => boolean }[]} */
+export const privilegedPathMatchers = [
+  ...basePrivilegedPathMatchers,
+  ...workflowModuleExactPrivilegedEntries.map(({ id, path, infrastructure }) => ({
+    id,
+    infrastructure,
+    test: (filename) => filename === path,
+  })),
 ];
 
 /**

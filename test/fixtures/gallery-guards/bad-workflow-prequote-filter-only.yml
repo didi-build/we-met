@@ -1,0 +1,6 @@
+jobs:
+  preview:
+    steps:
+      - run: >-
+          npx wrangler pre''view --config wrangler.gallery.jsonc
+          --worker-name we-met --ignore-base-config --name gallery-pr-1 --json

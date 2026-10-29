@@ -61,6 +61,33 @@ jobs:
     ).toBe(true);
   });
 
+  const stagingActivationInfrastructurePaths = [
+    "scripts/lib/workflow-permissions-parse.mjs",
+    "scripts/activate-staging-account.mjs",
+    "scripts/lib/activate-staging-account.mjs",
+    "scripts/lib/wrangler-placeholders.mjs",
+    "scripts/lib/parse-jsonc.mjs",
+  ] as const;
+
+  for (const filename of stagingActivationInfrastructurePaths) {
+    it(`flags infrastructure edits to ${filename}`, () => {
+      const result = analyzePrivilegedChange(
+        [{ filename, status: "modified" }],
+        {},
+        { trustedOrg: "didi-build" },
+      );
+      expect(result.flagged).toBe(true);
+      expect(
+        result.findings.some(
+          (f) =>
+            f.severity === "high" &&
+            f.message.includes("Changes privileged-change flag infrastructure") &&
+            f.message.includes(filename),
+        ),
+      ).toBe(true);
+    });
+  }
+
   it("check state succeeds when reviewed label present", () => {
     expect(privilegedChangeCheckState(true, [])).toBe("failure");
     expect(privilegedChangeCheckState(true, ["privileged-change-reviewed"])).toBe(

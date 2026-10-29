@@ -135,9 +135,9 @@ function wranglerSuccessStdout(changes: number, success = true) {
 
 describe("validateActivationEmail (unit)", () => {
   it("accepts typical maintainer emails", () => {
-    expect(validateActivationEmail("diadem@didi.build")).toEqual({
+    expect(validateActivationEmail("maintainer@example.com")).toEqual({
       ok: true,
-      normalized: "diadem@didi.build",
+      normalized: "maintainer@example.com",
     });
   });
 
@@ -149,11 +149,90 @@ describe("validateActivationEmail (unit)", () => {
     }
   });
 
-  it("rejects SQL comment marker sequences on their own", () => {
-    const result = validateActivationEmail("user@example.com--");
+  it("rejects non-string input on its own", () => {
+    const result = validateActivationEmail(42);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toBe("email must be a string");
+    }
+  });
+
+  it("rejects SQL block comment open sequences on their own", () => {
+    const result = validateActivationEmail("us/*er@example.com");
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.reason).toBe("email contains forbidden sequences");
+    }
+  });
+
+  it("rejects SQL block comment close sequences on their own", () => {
+    const result = validateActivationEmail("us*/er@example.com");
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toBe("email contains forbidden sequences");
+    }
+  });
+
+  it("rejects SQL comment marker sequences on their own", () => {
+    const result = validateActivationEmail("comment--marker@example.com");
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toBe("email contains forbidden sequences");
+    }
+  });
+
+  it("rejects single quotes on their own", () => {
+    const result = validateActivationEmail("user'quote@example.com");
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toBe("email contains forbidden characters");
+    }
+  });
+
+  it("rejects whole-address length without tripping the local-part limit first", () => {
+    const result = validateActivationEmail(
+      `${"a".repeat(64)}@${"b".repeat(178)}.example.com`,
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toBe("email is too long");
+    }
+  });
+
+  it("rejects domain length without tripping whole-address length first", () => {
+    const result = validateActivationEmail(`a@${"b".repeat(242)}.example.com`);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toBe("email domain length is invalid");
+    }
+  });
+
+  it("rejects local-part dot edges on their own", () => {
+    const leading = validateActivationEmail(".user@example.com");
+    expect(leading.ok).toBe(false);
+    if (!leading.ok) {
+      expect(leading.reason).toBe("email local part has invalid dots");
+    }
+    const trailing = validateActivationEmail("user.@example.com");
+    expect(trailing.ok).toBe(false);
+    if (!trailing.ok) {
+      expect(trailing.reason).toBe("email local part has invalid dots");
+    }
+  });
+
+  it("rejects a leading dot in the domain on its own", () => {
+    const result = validateActivationEmail("user@.example.com");
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toBe("email domain has invalid dots");
+    }
+  });
+
+  it("rejects punycode domains on example.org on their own", () => {
+    const result = validateActivationEmail("user@xn--abc.example.org");
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toBe("email domain punycode (xn--) is not allowed");
     }
   });
 
@@ -293,7 +372,7 @@ describe("assertWranglerConfigD1Binding (unit)", () => {
 
 describe("buildActivationUpdateCommand (unit)", () => {
   const iso = "2026-10-28T12:00:00.000Z";
-  const email = "diadem@didi.build";
+  const email = "maintainer@example.com";
 
   it("places email only in the WHERE string literal", () => {
     const sql = buildActivationUpdateCommand(email, iso);
@@ -303,6 +382,12 @@ describe("buildActivationUpdateCommand (unit)", () => {
   it("limits UPDATE to waitlisted and active rows", () => {
     const sql = buildActivationUpdateCommand(email, iso);
     expect(sql).toContain("AND status IN ('waitlisted', 'active')");
+  });
+
+  it("rejects a non-UTC ISO-8601 timestamp", () => {
+    expect(() => buildActivationUpdateCommand(email, "2026-10-28T12:00:00Z")).toThrow(
+      "updatedAtIso must be a UTC ISO-8601 string",
+    );
   });
 });
 
@@ -418,7 +503,7 @@ describe("runActivation (unit)", () => {
   it("does not forward wrangler stdout or stderr through process or console sinks", () => {
     const configPath = validWranglerConfig();
     const wranglerPayload = "leaked-from-wrangler@example.com";
-    const rawEmail = "Operator@Example.com";
+    const rawEmail = "operator@example.com";
     const io = captureIo();
     try {
       runActivation({
@@ -474,7 +559,7 @@ describe("runActivation (unit)", () => {
       stderr: "",
     }));
     runActivation({
-      email: "Operator@Example.com",
+      email: "Operator@example.com",
       config: configPath,
       env: testEnv(),
       spawnSyncFn,
@@ -485,7 +570,7 @@ describe("runActivation (unit)", () => {
     const argv = vi.mocked(spawnSyncFn).mock.calls[0]?.[1] as string[] | undefined;
     const sql = argv?.[argv.indexOf("--command") + 1];
     expect(sql).toContain("operator@example.com");
-    expect(sql).not.toContain("Operator@Example.com");
+    expect(sql).not.toContain("Operator@example.com");
   });
 
   it("reports a safe wrangler failure with exit code only", () => {
@@ -518,7 +603,7 @@ describe("runActivation (unit)", () => {
     const configPath = validWranglerConfig();
     const masked: string[] = [];
     runActivation({
-      email: "Operator@Example.com",
+      email: "Operator@example.com",
       config: configPath,
       env: testEnv(),
       spawnSyncFn: mockSpawn(() => ({
@@ -585,7 +670,7 @@ describe("runActivationFromCliOrEvent (unit)", () => {
     const eventDir = mkdtempSync(join(tmpdir(), "activate-event-"));
     const eventPath = join(eventDir, "github-event.json");
     try {
-      writeFileSync(eventPath, JSON.stringify({ inputs: { email: "QA@Example.com" } }));
+      writeFileSync(eventPath, JSON.stringify({ inputs: { email: "Qa@example.com" } }));
       const outputLines: string[] = [];
       const logLine = (line: string) => {
         outputLines.push(line);
@@ -607,7 +692,7 @@ describe("runActivationFromCliOrEvent (unit)", () => {
         maskActivationEmailForLogsFn: () => {},
         now: () => new Date("2026-10-28T12:00:00.000Z"),
       });
-      expect(outputLines[0]).toBe("::add-mask::QA@Example.com");
+      expect(outputLines[0]).toBe("::add-mask::Qa@example.com");
       expect(outputLines[1]).toBe("::add-mask::qa@example.com");
       expect(outputLines[0]).not.toBe("::add-mask::qa@example.com");
     } finally {
@@ -686,6 +771,13 @@ describe("Activate staging account workflow structure (unit)", () => {
     expect(workflowPermissionsAllowOnly(workflow, { contents: "read" })).toBe(true);
   });
 
+  it("runs the main branch ref guard before activation", () => {
+    const mainRefIdx = workflow.indexOf("name: Require main branch ref");
+    const activateIdx = workflow.indexOf("Activate waitlisted account in non-prod D1");
+    expect(mainRefIdx).toBeGreaterThan(-1);
+    expect(activateIdx).toBeGreaterThan(mainRefIdx);
+  });
+
   it("checks out main only after the step-level main ref guard", () => {
     expect(workflow).toContain("name: Require main branch ref");
     expect(workflow).toMatch(
@@ -724,7 +816,7 @@ describe("Activate staging account workflow structure (unit)", () => {
         block.includes("node scripts/activate-staging-account.mjs"),
       ),
     ).toBe(true);
-    expect(runBlocks.every((block) => block.length > "run: |".length + 8)).toBe(true);
+    expect(runBlocks.every((block) => block.includes("\n"))).toBe(true);
   });
 
   it("does not leak dispatch email via workflow expressions or shell event reads", () => {
