@@ -89,10 +89,10 @@ try {
     modNoSingle.collectGalleryPreviewLocationViolations(
       singleQuoteFixture,
       "scripts/evil.mjs",
-    ).length > 0
+    ).length === 0
   ) {
     console.error(
-      "mutant single-quote (~:125): location guard still flags without single-quote scan",
+      "mutant single-quote (~:125): preview must still be flagged without single-quote extract",
     );
     process.exit(1);
   }

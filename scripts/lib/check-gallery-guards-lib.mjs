@@ -150,6 +150,12 @@ export function textReferencesGalleryWranglerConfig(text) {
   if (/-c[= ]wrangler\.gallery\.jsonc/.test(text)) {
     return true;
   }
+  if (/wrangler\.gal\\/.test(text)) {
+    return true;
+  }
+  if (/wrangler\.gal lery\.jsonc/.test(text)) {
+    return true;
+  }
   return false;
 }
 
@@ -1059,12 +1065,6 @@ export function collectGalleryPreviewLocationViolations(text, label, options = {
     }
   }
   for (const segment of normalizedScanSegments(text, label, { isYaml })) {
-    if (isJsSourceFile(label) && !isYaml) {
-      const wholeFileSegment = joinShellContinuations(text).replace(/\r?\n/g, " ");
-      if (segment === wholeFileSegment && /\b(import|export)\b/.test(text)) {
-        continue;
-      }
-    }
     if (segmentRunsGalleryWranglerPreview(segment)) {
       return [
         `${label} must not run wrangler preview with wrangler.gallery.jsonc (only ${GALLERY_WORKFLOW}).`,
@@ -1456,12 +1456,6 @@ export function collectGalleryDeployViolations(text, label, options = {}) {
     }
   }
   for (const segment of normalizedScanSegments(text, label, { isYaml })) {
-    if (isJsSourceFile(label) && !isYaml) {
-      const wholeFileSegment = joinShellContinuations(text).replace(/\r?\n/g, " ");
-      if (segment === wholeFileSegment && /\b(import|export)\b/.test(text)) {
-        continue;
-      }
-    }
     if (segmentRunsGalleryWranglerDeploy(segment)) {
       errors.push(
         `${label} must not run wrangler deploy/versions deploy with wrangler.gallery.jsonc.`,

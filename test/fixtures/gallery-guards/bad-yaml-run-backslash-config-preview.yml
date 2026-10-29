@@ -1,0 +1,7 @@
+jobs:
+  evil:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          npx wrangler preview --config wrangler.gal\
+          lery.jsonc --worker-name we-met --ignore-base-config --name gallery-pr-evil --json

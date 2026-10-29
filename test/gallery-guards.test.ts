@@ -935,6 +935,88 @@ steps:
         '"npx wrangler preview',
       );
     });
+
+    it("QA round 3: split config names, jsx scan, preview GITHUB_ENV", () => {
+      const deployMsg =
+        "scripts/evil.sh must not run wrangler deploy/versions deploy with wrangler.gallery.jsonc.";
+      const previewMsg =
+        "scripts/evil.sh must not run wrangler preview with wrangler.gallery.jsonc (only .github/workflows/gallery-preview.yml).";
+      const yamlDeployMsg =
+        "evil.yml must not run wrangler deploy/versions deploy with wrangler.gallery.jsonc.";
+      const yamlPreviewMsg =
+        "evil.yml must not run wrangler preview with wrangler.gallery.jsonc (only .github/workflows/gallery-preview.yml).";
+      const mjsDeployMsg =
+        "scripts/evil.mjs must not run wrangler deploy/versions deploy with wrangler.gallery.jsonc.";
+      const mjsPreviewMsg =
+        "scripts/evil.mjs must not run wrangler preview with wrangler.gallery.jsonc (only .github/workflows/gallery-preview.yml).";
+
+      expect(
+        collectGalleryDeployViolations(
+          readFixture("bad-sh-backslash-config-deploy.sh"),
+          "scripts/evil.sh",
+        ),
+      ).toContain(deployMsg);
+      expect(
+        collectGalleryPreviewLocationViolations(
+          readFixture("bad-sh-backslash-config-preview.sh"),
+          "scripts/evil.sh",
+        ),
+      ).toContain(previewMsg);
+
+      expect(
+        collectGalleryDeployViolations(
+          readFixture("bad-yaml-run-backslash-config-deploy.yml"),
+          "evil.yml",
+          { isYaml: true },
+        ),
+      ).toContain(yamlDeployMsg);
+      expect(
+        collectGalleryPreviewLocationViolations(
+          readFixture("bad-yaml-run-backslash-config-preview.yml"),
+          "evil.yml",
+          { isYaml: true },
+        ),
+      ).toContain(yamlPreviewMsg);
+
+      expect(
+        collectGalleryDeployViolations(
+          readFixture("bad-js-template-backslash-config-deploy.mjs"),
+          "scripts/evil.mjs",
+        ),
+      ).toContain(mjsDeployMsg);
+      expect(
+        collectGalleryPreviewLocationViolations(
+          readFixture("bad-js-template-backslash-config-preview.mjs"),
+          "scripts/evil.mjs",
+        ),
+      ).toContain(mjsPreviewMsg);
+
+      expect(
+        collectGalleryPreviewLocationViolations(
+          readFixture("bad-src-gallery-preview.jsx"),
+          "src/evil/preview.jsx",
+        ),
+      ).toContain(
+        "src/evil/preview.jsx must not run wrangler preview with wrangler.gallery.jsonc (only .github/workflows/gallery-preview.yml).",
+      );
+
+      const githubPreviewMsg =
+        "evil.yml must not write gallery wrangler config to GITHUB_ENV.";
+      expect(
+        collectGalleryPreviewLocationViolations(
+          readFixture("bad-yaml-github-env-direct-config.yml"),
+          "evil.yml",
+          { isYaml: true },
+        ),
+      ).toContain(githubPreviewMsg);
+
+      expect(textReferencesGalleryWranglerConfig("wrangler.gal\n  lery.jsonc")).toBe(
+        false,
+      );
+      expect(textReferencesGalleryWranglerConfig("wrangler.gal\\\nlery.jsonc")).toBe(
+        true,
+      );
+    });
   });
 });
 
