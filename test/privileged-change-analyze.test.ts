@@ -61,34 +61,32 @@ jobs:
     ).toBe(true);
   });
 
-  it("workflow-permissions-parse change requires privileged-change review", () => {
-    const result = analyzePrivilegedChange(
-      [
-        {
-          filename: "scripts/lib/workflow-permissions-parse.mjs",
-          status: "modified",
-        },
-      ],
-      {},
-      { trustedOrg: "didi-build" },
-    );
-    expect(result.flagged).toBe(true);
-    expect(result.privilegedFiles).toEqual([
-      "scripts/lib/workflow-permissions-parse.mjs",
-    ]);
-    expect(privilegedChangeCheckState(result.flagged, [])).toBe("failure");
-  });
+  const stagingActivationInfrastructurePaths = [
+    "scripts/lib/workflow-permissions-parse.mjs",
+    "scripts/activate-staging-account.mjs",
+    "scripts/lib/activate-staging-account.mjs",
+    "scripts/lib/wrangler-placeholders.mjs",
+    "scripts/lib/parse-jsonc.mjs",
+  ] as const;
 
-  it("activate-staging-account.mjs change requires privileged-change review", () => {
-    const result = analyzePrivilegedChange(
-      [{ filename: "scripts/activate-staging-account.mjs", status: "modified" }],
-      {},
-      { trustedOrg: "didi-build" },
-    );
-    expect(result.flagged).toBe(true);
-    expect(result.privilegedFiles).toEqual(["scripts/activate-staging-account.mjs"]);
-    expect(privilegedChangeCheckState(result.flagged, [])).toBe("failure");
-  });
+  for (const filename of stagingActivationInfrastructurePaths) {
+    it(`flags infrastructure edits to ${filename}`, () => {
+      const result = analyzePrivilegedChange(
+        [{ filename, status: "modified" }],
+        {},
+        { trustedOrg: "didi-build" },
+      );
+      expect(result.flagged).toBe(true);
+      expect(
+        result.findings.some(
+          (f) =>
+            f.severity === "high" &&
+            f.message.includes("Changes privileged-change flag infrastructure") &&
+            f.message.includes(filename),
+        ),
+      ).toBe(true);
+    });
+  }
 
   it("check state succeeds when reviewed label present", () => {
     expect(privilegedChangeCheckState(true, [])).toBe("failure");
