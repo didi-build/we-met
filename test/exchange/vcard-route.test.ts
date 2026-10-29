@@ -1,10 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GET, POST } from "@/app/api/exchange/vcard/route";
-import {
-  APP_SETTING_DAILY_CAP_GLOBAL,
-  APP_SETTING_DAILY_CAP_PER_CARD,
-  APP_SETTING_LEAD_EMAIL_ENABLED,
-} from "@/app-settings/defaults";
 import { ACCOUNT_EMAIL_SENTINEL } from "@/card-data/account-email";
 import * as lookupModule from "@/card-data/lookup";
 import type { CardContact, CardRecord } from "@/card-data/types";
@@ -13,8 +8,6 @@ import { createDetailsToken } from "@/exchange/token";
 import { buildOwnerVCardAttachment } from "@/lib/hi/build-owner-vcard";
 import { upsertCardWithEmailSink } from "../helpers/card-email-sink";
 import { exampleCardInput } from "../helpers/example-card";
-import { withIsolatedLocalD1 } from "../helpers/d1";
-
 const routeMocks = vi.hoisted(() => ({
   headerMap: new Map<string, string>(),
   env: {} as Record<string, unknown>,
@@ -420,42 +413,19 @@ describe("POST /api/exchange/vcard", () => {
   });
 
   it("returns 200 when lead_email_enabled is off", async () => {
-    await withIsolatedLocalD1(async (db) => {
-      await db
-        .prepare(
-          `INSERT INTO app_settings (key, value) VALUES (?, ?)
-           ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-        )
-        .bind(APP_SETTING_LEAD_EMAIL_ENABLED, "0")
-        .run();
-      await db
-        .prepare(
-          `INSERT INTO app_settings (key, value) VALUES (?, ?)
-           ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-        )
-        .bind(APP_SETTING_DAILY_CAP_GLOBAL, "500")
-        .run();
-      await db
-        .prepare(
-          `INSERT INTO app_settings (key, value) VALUES (?, ?)
-           ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-        )
-        .bind(APP_SETTING_DAILY_CAP_PER_CARD, "100")
-        .run();
+    // POST /api/exchange/vcard is not gated on app_settings (see 0008); memory repo only.
+    const repo = new MemoryCardRepository();
+    const live = await seedLiveCard(repo, "lead-off-vcard");
+    routeMocks.repo = repo;
+    const token = validToken("test-token-secret", live);
 
-      const repo = new MemoryCardRepository();
-      const live = await seedLiveCard(repo, "lead-off-vcard");
-      routeMocks.repo = repo;
-      const token = validToken("test-token-secret", live);
-
-      const response = await postVcard({
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token }),
-      });
-
-      expect(response.status).toBe(200);
-      expect((await response.text()).startsWith("BEGIN:VCARD")).toBe(true);
+    const response = await postVcard({
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
     });
+
+    expect(response.status).toBe(200);
+    expect((await response.text()).startsWith("BEGIN:VCARD")).toBe(true);
   });
 
   it("returns 429 without calling lookupCard or assets.get when rate limited", async () => {
