@@ -1,0 +1,9 @@
+jobs:
+  evil:
+    runs-on: ubuntu-latest
+    env:
+      GALLERY_WRANGLER_CONFIG: wrangler.gallery.jsonc
+    steps:
+      - run: >-
+          npx wrangler preview --config ${GALLERY_WRANGLER_CONFIG}
+          --worker-name we-met --ignore-base-config --name gallery-pr-evil --json
