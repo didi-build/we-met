@@ -119,11 +119,12 @@ Use this when the card was deleted, the slug was renamed, or production D1 was r
 4. **About paragraph:** Include **`we-met-card-availability-probe`** as described above.
 5. **Lead sinks:** Leave all sinks **disabled** or unset. Double-check after first publish.
 6. **Publish** through the app editor.
-7. **Update monitors (M5, Diadem approval):** After [M5](../monitoring-plan.md#5-proposed-build-tickets) is approved and wired, point the synthetic check at `https://we-met.link/hi/<your-probe-slug>` and confirm the marker assertion still matches **`we-met-card-availability-probe`**. Do not change Cloudflare or vendor monitor settings from this doc alone.
+7. **Update monitors (M5, Diadem approval):** After [M5](../monitoring-plan.md#5-proposed-build-tickets) is approved and wired, point the synthetic check at `https://we-met.link/hi/<your-probe-slug>` and confirm the marker assertion still matches **`we-met-card-availability-probe`**. Upptime wiring lives in **`didi-build/we-met-status`**; see [status-page.md](./status-page.md). Do not change Cloudflare, Upptime, or other vendor monitor settings from this doc alone.
 8. **Record offline:** Note slug and last-verified date in operator storage (not in git).
 
 ## Related docs
 
+- [Status page and Upptime monitors](./status-page.md) (M5 and M9 checks in **`didi-build/we-met-status`**)
 - [Alert routing](./alert-routing.md) (where probe failures notify)
 - [Incident notes](./incident.md) (if the probe fails during an outage)
 - [Monitoring plan](../monitoring-plan.md) (M1, M5, SLO for card availability)

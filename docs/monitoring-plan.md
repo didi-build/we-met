@@ -402,5 +402,5 @@ Plain questions for approval from a phone:
 
 - [DIDI-835](https://linear.app/didi-build/issue/DIDI-835), [DIDI-776](https://linear.app/didi-build/issue/DIDI-776)
 - [Architecture overview](./architecture/overview.md), [Environments](./architecture/environments.md)
-- [Kill switch and caps](./runbooks/kill-switch-and-caps.md), [Rollback](./runbooks/rollback.md), [Incident notes](./runbooks/incident.md), [Alert routing](./runbooks/alert-routing.md), [Monitoring probe card](./runbooks/monitoring-probe.md), [Monitoring alerts (M3/M4/M6)](./runbooks/monitoring-alerts.md)
+- [Kill switch and caps](./runbooks/kill-switch-and-caps.md), [Rollback](./runbooks/rollback.md), [Incident notes](./runbooks/incident.md), [Alert routing](./runbooks/alert-routing.md), [Monitoring probe card](./runbooks/monitoring-probe.md), [Status page and Upptime (M5/M9)](./runbooks/status-page.md), [Monitoring alerts (M3/M4/M6)](./runbooks/monitoring-alerts.md)
 - [Warmup Worker README](../workers/warmup/README.md)
