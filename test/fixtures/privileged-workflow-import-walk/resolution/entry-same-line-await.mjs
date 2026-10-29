@@ -1,5 +1,1 @@
-async function f() {
-  await /'/;
-}
-import "./after-await.mjs";
-export { f };
+async function f(){ await /'/; } import './after-await.mjs';

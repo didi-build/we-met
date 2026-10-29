@@ -1,3 +1,1 @@
-const t = typeof /'/;
-import "./after-typeof.mjs";
-export { t };
+const t = typeof /'/; import './after-typeof.mjs';
