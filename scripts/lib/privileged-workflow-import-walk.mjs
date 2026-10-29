@@ -29,7 +29,7 @@ export class WorkflowImportWalkError extends Error {
   }
 }
 
-const REPO_SOURCE_EXT = /\.(mjs|cjs|js|ts|tsx|mts|cts)$/;
+const REPO_SOURCE_EXT = /\.(mjs|cjs|js|ts|tsx|mts|cts|sh)$/;
 
 const RESOLVE_EXTENSIONS = [
   "",
@@ -58,6 +58,14 @@ const TS_ALIAS_PREFIX = "@/";
 const STATIC_FROM_RE =
   /(?:import\s+(?:[\s\S]*?\sfrom|)|export\s+(?:\*|[\s\S]*?\sfrom))[\s]*['"]([^'"]+)['"]/g;
 
+const COMPACT_IMPORT_FROM_RE =
+  /import\s*(?:\{[\s\S]*?\}|\*\s*(?:as\s+\w+)?)\s*from\s*['"]([^'"]+)['"]/g;
+
+const COMPACT_EXPORT_FROM_RE =
+  /export\s*(?:\*|\{[\s\S]*?\})\s*from\s*['"]([^'"]+)['"]/g;
+
+const COMPACT_SIDE_EFFECT_IMPORT_RE = /import\s*['"]([^'"]+)['"]/g;
+
 const STATIC_IMPORT_SIDE_EFFECT_RE = /^\s*import\s+['"]([^'"]+)['"]/gm;
 
 const DYNAMIC_IMPORT_RE = /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
@@ -80,6 +88,9 @@ const NPM_TEST_RE = /\bnpm\s+test\b/g;
 const SHELL_WRAPPER_RE =
   /\b(?:bash|sh)\s+(?:-[^\s]+\s+)*(-(?:lc|c)\s+)?(['"])([\s\S]*?)\2/g;
 
+const BASH_SH_SCRIPT_FILE_RE =
+  /\b(?:bash|sh)\s+(?:-[^\s]+\s+)*['"]?((?:\.\.?\/|scripts\/|test\/)[^\s'"]+)['"]?/g;
+
 const SPAWN_NODE_ARRAY_RE =
   /(?:spawnSync|execFileSync|spawn|execFile)\s*\(\s*(?:process\.execPath|"node"|'node')\s*,\s*\[([\s\S]*?)\]/g;
 
@@ -88,6 +99,12 @@ const SPAWN_NPM_ARRAY_RE =
 
 const SPAWN_PLAIN_NODE_RE =
   /(?:spawnSync|execFileSync|spawn|execFile)\s*\(\s*["']node["']\s*,\s*\[([\s\S]*?)\]/g;
+
+const SPAWN_BASH_ARRAY_RE =
+  /(?:spawnSync|execFileSync|spawn|execFile)\s*\(\s*["']bash["']\s*,\s*\[([\s\S]*?)\]/g;
+
+const SPAWN_SH_ARRAY_RE =
+  /(?:spawnSync|execFileSync|spawn|execFile)\s*\(\s*["']sh["']\s*,\s*\[([\s\S]*?)\]/g;
 
 const RUN_NPM_LITERAL_RE =
   /\brunNpm\s*\(\s*\[\s*["']run["']\s*,\s*["']([a-z0-9:_-]+)["']/g;
@@ -181,6 +198,50 @@ function normalizeEntrypointToken(token) {
 }
 
 /**
+ * @param {string} token
+ * @param {string} contextLabel
+ * @returns {string | null}
+ */
+function normalizeSpawnScriptToken(token, contextLabel) {
+  const trimmed = token
+    .trim()
+    .replace(/^['"]|['"]$/g, "")
+    .replace(/[);]+$/g, "");
+  if (!trimmed || trimmed.startsWith("-")) {
+    return null;
+  }
+  const looksRepoRelative =
+    trimmed.startsWith("./") ||
+    trimmed.startsWith("../") ||
+    trimmed.startsWith("scripts/") ||
+    trimmed.startsWith("test/");
+  const rel = normalizeEntrypointToken(trimmed);
+  if (!rel && looksRepoRelative) {
+    throw new WorkflowImportWalkError(
+      `Unresolved spawn script: ${trimmed} (${contextLabel})`,
+      { module: trimmed },
+    );
+  }
+  return rel;
+}
+
+/**
+ * @param {string} content
+ */
+function collectSpawnScriptLiteralsFromSource(content) {
+  /** @type {Set<string>} */
+  const entries = new Set();
+  BASH_SH_SCRIPT_FILE_RE.lastIndex = 0;
+  for (const match of content.matchAll(BASH_SH_SCRIPT_FILE_RE)) {
+    const rel = normalizeSpawnScriptToken(match[1], "bash/sh spawn in source");
+    if (rel) {
+      entries.add(rel);
+    }
+  }
+  return entries;
+}
+
+/**
  * @param {string} scriptName
  * @param {Record<string, string>} scripts
  * @param {Set<string>} [seen]
@@ -247,6 +308,14 @@ export function extractRepoScriptEntrypointsFromRun(
     }
   }
 
+  BASH_SH_SCRIPT_FILE_RE.lastIndex = 0;
+  for (const match of runText.matchAll(BASH_SH_SCRIPT_FILE_RE)) {
+    const rel = normalizeSpawnScriptToken(match[1], "bash/sh in workflow run");
+    if (rel) {
+      entries.add(rel);
+    }
+  }
+
   return [...entries];
 }
 
@@ -260,7 +329,13 @@ export function extractSpawnedRepoScriptEntrypointsFromSource(content, scripts) 
   const entries = new Set();
   const seenNpm = new Set();
 
-  for (const re of [SPAWN_NODE_ARRAY_RE, SPAWN_PLAIN_NODE_RE, SPAWN_NPM_ARRAY_RE]) {
+  for (const re of [
+    SPAWN_NODE_ARRAY_RE,
+    SPAWN_PLAIN_NODE_RE,
+    SPAWN_NPM_ARRAY_RE,
+    SPAWN_BASH_ARRAY_RE,
+    SPAWN_SH_ARRAY_RE,
+  ]) {
     re.lastIndex = 0;
     for (const match of content.matchAll(re)) {
       const block = match[1];
@@ -286,10 +361,6 @@ export function extractSpawnedRepoScriptEntrypointsFromSource(content, scripts) 
     }
   }
 
-  if (/init-project\.mjs/.test(content)) {
-    entries.add("scripts/init-project.mjs");
-  }
-
   RUN_NPM_LITERAL_RE.lastIndex = 0;
   for (const match of content.matchAll(RUN_NPM_LITERAL_RE)) {
     for (const rel of resolveNpmRunScriptEntrypoints(match[1], scripts, seenNpm)) {
@@ -297,54 +368,74 @@ export function extractSpawnedRepoScriptEntrypointsFromSource(content, scripts) 
     }
   }
 
+  for (const rel of collectSpawnScriptLiteralsFromSource(content)) {
+    entries.add(rel);
+  }
+
   return [...entries];
 }
-
-const SPAWN_ENTRYPOINT_SOURCE_FILES = new Set([
-  "scripts/bootstrap.mjs",
-  "scripts/apply-migrations.mjs",
-  "scripts/prepare-wrangler-config.mjs",
-  "scripts/init-project.mjs",
-  "scripts/dry-run-staging-config.mjs",
-  "scripts/dry-run-generated-config.mjs",
-]);
 
 /**
  * @param {string} repoRoot
  * @param {string[]} seedEntrypoints
  * @param {Record<string, string>} scripts
- * @returns {string[]}
+ * @param {string | null} tsAliasRoot
+ * @returns {{ entrypoints: string[]; reachable: string[] }}
  */
-export function expandEntrypointsWithSpawnedScripts(
+export function walkReachableWithImportsAndSpawns(
   repoRoot,
   seedEntrypoints,
   scripts,
+  tsAliasRoot,
 ) {
   /** @type {Set<string>} */
-  const all = new Set(seedEntrypoints);
+  const reachable = new Set();
+  /** @type {Set<string>} */
+  const entrypoints = new Set(seedEntrypoints);
   /** @type {string[]} */
   const queue = [...seedEntrypoints];
+
   while (queue.length > 0) {
     const rel = queue.pop();
-    if (!rel || !SPAWN_ENTRYPOINT_SOURCE_FILES.has(rel)) {
+    if (!rel || reachable.has(rel)) {
       continue;
     }
+    reachable.add(rel);
+    assertEntrypointExists(repoRoot, rel);
+
+    if (!REPO_SOURCE_EXT.test(rel)) {
+      continue;
+    }
+
     const abs = resolve(repoRoot, rel);
-    if (!existsSync(abs)) {
-      continue;
-    }
     const content = readFileSync(abs, "utf8");
+
     for (const spawned of extractSpawnedRepoScriptEntrypointsFromSource(
       content,
       scripts,
     )) {
-      if (!all.has(spawned)) {
-        all.add(spawned);
+      assertEntrypointExists(repoRoot, spawned);
+      entrypoints.add(spawned);
+      if (!reachable.has(spawned)) {
         queue.push(spawned);
       }
     }
+
+    for (const spec of collectStaticModuleSpecifiers(content)) {
+      if (!isRepoRelativeSpecifier(spec, tsAliasRoot)) {
+        continue;
+      }
+      const importRel = resolveRepoModuleOrThrow(repoRoot, abs, spec, tsAliasRoot);
+      if (!reachable.has(importRel)) {
+        queue.push(importRel);
+      }
+    }
   }
-  return [...all].sort((a, b) => a.localeCompare(b));
+
+  return {
+    entrypoints: [...entrypoints].sort((a, b) => a.localeCompare(b)),
+    reachable: [...reachable].sort((a, b) => a.localeCompare(b)),
+  };
 }
 
 /**
@@ -504,6 +595,9 @@ export function collectStaticModuleSpecifiers(content) {
 
   for (const re of [
     STATIC_FROM_RE,
+    COMPACT_IMPORT_FROM_RE,
+    COMPACT_EXPORT_FROM_RE,
+    COMPACT_SIDE_EFFECT_IMPORT_RE,
     STATIC_IMPORT_SIDE_EFFECT_RE,
     DYNAMIC_IMPORT_RE,
     REQUIRE_RE,
@@ -574,9 +668,17 @@ export function analyzeWorkflowImportWalk(options) {
   }
 
   if (!options.skipSpawnExpansion) {
-    entrypoints = expandEntrypointsWithSpawnedScripts(repoRoot, entrypoints, scripts);
+    const walked = walkReachableWithImportsAndSpawns(
+      repoRoot,
+      entrypoints,
+      scripts,
+      tsAliasRoot,
+    );
+    entrypoints = walked.entrypoints;
+    const reachable = walked.reachable;
+    const unlisted = reachable.filter((file) => !options.isPrivilegedPath(file));
+    return { entrypoints, reachable, unlisted };
   }
-  entrypoints.sort((a, b) => a.localeCompare(b));
 
   for (const entry of entrypoints) {
     assertEntrypointExists(repoRoot, entry);

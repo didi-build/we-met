@@ -183,12 +183,12 @@ export const workflowModuleExactPrivilegedEntries = [
   {
     id: "migrate-nonprod-comment-body",
     path: "scripts/migrate-nonprod/comment-body.mjs",
-    infrastructure: false,
+    infrastructure: true,
   },
   {
     id: "migrate-nonprod-gh-api-comments",
     path: "scripts/migrate-nonprod/gh-api-comments.mjs",
-    infrastructure: false,
+    infrastructure: true,
   },
   {
     id: "migrate-nonprod-gh-comment",
@@ -198,7 +198,7 @@ export const workflowModuleExactPrivilegedEntries = [
   {
     id: "migrate-nonprod-hash",
     path: "scripts/migrate-nonprod/hash.mjs",
-    infrastructure: false,
+    infrastructure: true,
   },
   {
     id: "migrate-nonprod-markdown-fence",

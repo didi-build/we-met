@@ -43,10 +43,10 @@ const WORKFLOW_MODULE_SEVERITIES_LITERAL: readonly (readonly [string, boolean])[
   ["scripts/migrate-nonprod/apply-guard.mjs", true],
   ["scripts/migrate-nonprod/apply-output.mjs", false],
   ["scripts/migrate-nonprod/apply.ts", true],
-  ["scripts/migrate-nonprod/comment-body.mjs", false],
-  ["scripts/migrate-nonprod/gh-api-comments.mjs", false],
+  ["scripts/migrate-nonprod/comment-body.mjs", true],
+  ["scripts/migrate-nonprod/gh-api-comments.mjs", true],
   ["scripts/migrate-nonprod/gh-comment.mjs", false],
-  ["scripts/migrate-nonprod/hash.mjs", false],
+  ["scripts/migrate-nonprod/hash.mjs", true],
   ["scripts/migrate-nonprod/markdown-fence.mjs", false],
   ["scripts/migrate-nonprod/plan-lib.mjs", true],
   ["scripts/migrate-nonprod/plan.ts", true],
@@ -175,20 +175,31 @@ describe("privileged-paths (table)", () => {
     }
 
     for (const [path] of WORKFLOW_MODULE_SEVERITIES_LITERAL) {
-      it(`near-miss ${path}.bak is not privileged`, () => {
-        expect(isPrivilegedPath(`${path}.bak`)).toBe(false);
-      });
-      if (path.startsWith("scripts/lib/")) {
-        const wrongDir = `scripts/${path.slice("scripts/lib/".length)}`;
-        if (
-          !WORKFLOW_MODULE_SEVERITIES_LITERAL.some(
-            ([listedPath]) => listedPath === wrongDir,
-          )
-        ) {
-          it(`near-miss ${wrongDir} is not privileged`, () => {
-            expect(isPrivilegedPath(wrongDir)).toBe(false);
-          });
-        }
+      const base = path.split("/").pop() ?? path;
+      const titleCaseBase = base.replace(
+        /(^|[-.])([a-z])/g,
+        (_sep, punct, letter: string) => `${punct}${letter.toUpperCase()}`,
+      );
+      const uppercaseSegments = path.split("/");
+      uppercaseSegments[uppercaseSegments.length - 1] = titleCaseBase;
+      const nearMissPaths = [
+        `./${path}`,
+        `vendor/${base}`,
+        `workers/warmup/${base}`,
+        `scripts/lib/sub/${base}`,
+        `x${base}`,
+        uppercaseSegments.join("/"),
+        `${path}extra`,
+        `/${path}`,
+        `${path}.bak`,
+      ];
+      for (const nearMiss of nearMissPaths) {
+        it(`near-miss ${nearMiss} privileged=false`, () => {
+          expect(isPrivilegedPath(nearMiss)).toBe(false);
+        });
+        it(`near-miss ${nearMiss} infrastructure=false`, () => {
+          expect(isPrivilegedFlagInfrastructurePath(nearMiss)).toBe(false);
+        });
       }
     }
   });

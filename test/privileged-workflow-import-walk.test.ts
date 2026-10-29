@@ -105,6 +105,48 @@ describe("privileged-workflow-import-walk", () => {
     );
   });
 
+  it("parses compact import and export from syntax (fixture)", () => {
+    const { reachable } = analyzeWorkflowImportWalk({
+      isPrivilegedPath: () => true,
+      extraEntrypoints: [`${resolutionFixtureRoot}/entry-compact-import.mjs`],
+      skipSpawnExpansion: true,
+      workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
+    });
+    expect(reachable).toContain(
+      "test/fixtures/privileged-workflow-import-walk/resolution/compact-target.mjs",
+    );
+  });
+
+  it("follows bash spawnSync script paths (fixture)", () => {
+    const { reachable } = analyzeWorkflowImportWalk({
+      isPrivilegedPath: () => true,
+      extraEntrypoints: [`${resolutionFixtureRoot}/entry-bash-spawn.mjs`],
+      workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
+    });
+    expect(reachable).toContain(
+      "test/fixtures/privileged-workflow-import-walk/resolution/spawn-helper.sh",
+    );
+  });
+
+  it("fail closed on unresolved bash spawn target (fixture)", () => {
+    expect(() =>
+      analyzeWorkflowImportWalk({
+        isPrivilegedPath: () => true,
+        extraEntrypoints: [`${resolutionFixtureRoot}/entry-unresolved-bash.mjs`],
+        workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
+      }),
+    ).toThrow(WorkflowImportWalkError);
+  });
+
+  it("follows node spawn from every reachable file (migrate-nonprod apply.ts)", () => {
+    const { entrypoints } = analyzeWorkflowImportWalk({
+      isPrivilegedPath: () => true,
+      extraEntrypoints: ["scripts/migrate-nonprod/apply.ts"],
+      workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
+    });
+    expect(entrypoints).toContain("scripts/apply-migrations.mjs");
+  });
+
   for (const entry of workflowModuleExactPrivilegedEntries) {
     it(`mutant: removing matcher ${entry.id} leaves ${entry.path} unlisted`, () => {
       const matchers = privilegedPathMatchers.filter((m) => m.id !== entry.id);
