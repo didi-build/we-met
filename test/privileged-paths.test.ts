@@ -3,6 +3,7 @@ import {
   isPrivilegedFlagInfrastructurePath,
   isPrivilegedPath,
   privilegedPathMatchers,
+  workflowModuleExactPrivilegedEntries,
 } from "../scripts/lib/privileged-paths.mjs";
 
 describe("privileged-paths (table)", () => {
@@ -44,7 +45,6 @@ describe("privileged-paths (table)", () => {
     { path: "scripts/lib/workflow-permissions.mjs", privileged: false },
     { path: "scripts/activate-staging-account.mjs.bak", privileged: false },
     { path: "test/activate-staging-account.test.ts", privileged: false },
-    { path: "scripts/lib/theme-color-scan.mjs", privileged: false },
     { path: "scripts/lib/activate-staging-account.test.mjs", privileged: false },
     { path: "scripts/lib/activate-staging-account.mjs.bak", privileged: false },
     { path: "scripts/lib/wrangler-placeholders.test.mjs", privileged: false },
@@ -75,7 +75,6 @@ describe("privileged-paths (table)", () => {
       privileged: false,
     },
     { path: "src/app/page.tsx", privileged: false },
-    { path: "scripts/preview-comment-body.mjs", privileged: false },
     { path: "package.json", privileged: false },
   ];
 
@@ -84,6 +83,15 @@ describe("privileged-paths (table)", () => {
       expect(isPrivilegedPath(path)).toBe(privileged);
     });
   }
+
+  describe("workflow module matchers (DIDI-973)", () => {
+    for (const { path, infrastructure } of workflowModuleExactPrivilegedEntries) {
+      it(`${path} privileged=true infrastructure=${infrastructure}`, () => {
+        expect(isPrivilegedPath(path)).toBe(true);
+        expect(isPrivilegedFlagInfrastructurePath(path)).toBe(infrastructure);
+      });
+    }
+  });
 
   it("wrong-directory paths are not infrastructure matchers", () => {
     expect(
@@ -119,6 +127,7 @@ describe("privileged-paths (table)", () => {
       "wrangler-placeholders",
       "parse-jsonc",
       "privileged-change-workflow",
+      ...workflowModuleExactPrivilegedEntries.map((entry) => entry.id),
     ]);
   });
 });
