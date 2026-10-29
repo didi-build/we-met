@@ -1,5 +1,5 @@
 import path from "node:path";
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 
 const sharedConfig = {
   esbuild: {
@@ -21,7 +21,11 @@ export default defineConfig({
         test: {
           name: "unit",
           include: ["test/**/*.test.ts", "test/**/*.test.tsx"],
-          exclude: ["test/**/*.integration.test.ts", "test/**/*.integration.test.tsx"],
+          exclude: [
+            ...configDefaults.exclude,
+            "test/**/*.integration.test.ts",
+            "test/**/*.integration.test.tsx",
+          ],
           environment: "node",
         },
       },
