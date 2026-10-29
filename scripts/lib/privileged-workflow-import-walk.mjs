@@ -163,11 +163,17 @@ function getCallCalleeName(expression) {
  * @param {import("typescript").Node} node
  */
 function isCreateRequireCall(node) {
-  return (
-    ts.isCallExpression(node) &&
-    ts.isIdentifier(node.expression) &&
-    node.expression.text === "createRequire"
-  );
+  if (!ts.isCallExpression(node)) {
+    return false;
+  }
+  const expr = node.expression;
+  if (ts.isIdentifier(expr) && expr.text === "createRequire") {
+    return true;
+  }
+  if (ts.isPropertyAccessExpression(expr) && expr.name.text === "createRequire") {
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -214,6 +220,12 @@ function collectModuleSpecifiersFromSourceFile(sourceFile) {
   function visit(node) {
     if (ts.isImportDeclaration(node) && node.moduleSpecifier) {
       addModuleSpecifier(node.moduleSpecifier);
+    }
+
+    if (ts.isImportEqualsDeclaration(node) && node.moduleReference) {
+      if (ts.isExternalModuleReference(node.moduleReference)) {
+        addModuleSpecifier(node.moduleReference.expression);
+      }
     }
 
     if (ts.isExportDeclaration(node) && node.moduleSpecifier) {
@@ -299,17 +311,43 @@ function isBashOrShSpawnCommandArg(arg) {
 }
 
 /**
- * @param {import("typescript").Expression} arrayArg
+ * @param {import("typescript").Expression} element
+ * @param {string} contextLabel
+ */
+function assertNoTemplateSubstitutionInSpawnElement(element, contextLabel) {
+  if (ts.isTemplateExpression(element) && element.templateSpans.length > 0) {
+    throw new WorkflowImportWalkError(
+      `Template literal with substitution in spawn array (${contextLabel})`,
+      { module: element.getText().slice(0, 120) },
+    );
+  }
+}
+
+/**
+ * @param {import("typescript").Expression} element
  * @param {Set<string>} entries
  * @param {string} contextLabel
  */
-function collectRepoScriptLiteralsFromArrayArg(arrayArg, entries, contextLabel) {
-  if (!ts.isArrayLiteralExpression(arrayArg)) {
-    return;
+function collectRepoScriptLiteralsFromArrayElement(element, entries, contextLabel) {
+  assertNoTemplateSubstitutionInSpawnElement(element, contextLabel);
+  /** @type {string[]} */
+  const literalTexts = [];
+  function visitLiteralNodes(node) {
+    if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
+      literalTexts.push(node.text);
+      return;
+    }
+    if (ts.isTemplateExpression(node) && node.templateSpans.length > 0) {
+      throw new WorkflowImportWalkError(
+        `Template literal with substitution in spawn array (${contextLabel})`,
+        { module: node.getText().slice(0, 120) },
+      );
+    }
+    ts.forEachChild(node, visitLiteralNodes);
   }
-  for (const element of arrayArg.elements) {
-    const text = getStringLiteralText(element);
-    if (!text || !REPO_SCRIPT_PATH_IN_LITERAL.test(text)) {
+  visitLiteralNodes(element);
+  for (const text of literalTexts) {
+    if (!REPO_SCRIPT_PATH_IN_LITERAL.test(text)) {
       continue;
     }
     const rel = normalizeEntrypointToken(text);
@@ -328,6 +366,23 @@ function collectRepoScriptLiteralsFromArrayArg(arrayArg, entries, contextLabel) 
         { module: text },
       );
     }
+  }
+}
+
+/**
+ * @param {import("typescript").Expression} arrayArg
+ * @param {Set<string>} entries
+ * @param {string} contextLabel
+ */
+function collectRepoScriptLiteralsFromArrayArg(arrayArg, entries, contextLabel) {
+  if (!ts.isArrayLiteralExpression(arrayArg)) {
+    return;
+  }
+  for (const element of arrayArg.elements) {
+    if (element.kind === ts.SyntaxKind.OmittedExpression) {
+      continue;
+    }
+    collectRepoScriptLiteralsFromArrayElement(element, entries, contextLabel);
   }
 }
 
@@ -528,14 +583,37 @@ function normalizeSpawnScriptToken(token, contextLabel) {
 
 /**
  * @param {string} content
+ * @returns {Set<string>}
+ */
+function collectBashShTargetsFromShellContent(content) {
+  /** @type {Set<string>} */
+  const entries = new Set();
+  BASH_SH_SCRIPT_FILE_RE.lastIndex = 0;
+  for (const match of content.matchAll(BASH_SH_SCRIPT_FILE_RE)) {
+    const rel = normalizeSpawnScriptToken(match[1], "bash/sh in shell script");
+    if (rel) {
+      entries.add(rel);
+    }
+  }
+  return entries;
+}
+
+/**
+ * @param {string} content
  * @param {string} relPath
  */
 function collectSpawnScriptLiteralsFromSource(content, relPath) {
-  if (!isJsLikeSourcePath(relPath)) {
-    return new Set();
-  }
   /** @type {Set<string>} */
   const entries = new Set();
+  if (relPath.endsWith(".sh")) {
+    for (const rel of collectBashShTargetsFromShellContent(content)) {
+      entries.add(rel);
+    }
+    return entries;
+  }
+  if (!isJsLikeSourcePath(relPath)) {
+    return entries;
+  }
   BASH_SH_SCRIPT_FILE_RE.lastIndex = 0;
   for (const match of content.matchAll(BASH_SH_SCRIPT_FILE_RE)) {
     const rel = normalizeSpawnScriptToken(match[1], "bash/sh spawn in source");
@@ -635,6 +713,9 @@ export function extractSpawnedRepoScriptEntrypointsFromSource(
   scripts,
   relPath,
 ) {
+  if (relPath.endsWith(".sh")) {
+    return [...collectBashShTargetsFromShellContent(content)];
+  }
   if (!isJsLikeSourcePath(relPath)) {
     return [];
   }

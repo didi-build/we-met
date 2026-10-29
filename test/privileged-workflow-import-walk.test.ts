@@ -254,15 +254,159 @@ describe("privileged-workflow-import-walk", () => {
     );
   });
 
-  it("follows require() with a string literal (fixture)", () => {
+  it("same-line typeof /'/ then import (fixture)", () => {
     const { reachable } = analyzeWorkflowImportWalk({
       isPrivilegedPath: () => true,
-      extraEntrypoints: [`${resolutionFixtureRoot}/entry-require.mjs`],
+      extraEntrypoints: [`${resolutionFixtureRoot}/entry-same-line-typeof.mjs`],
       skipSpawnExpansion: true,
       workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
     });
     expect(reachable).toContain(
-      "test/fixtures/privileged-workflow-import-walk/resolution/require-target.cjs",
+      "test/fixtures/privileged-workflow-import-walk/resolution/after-typeof.mjs",
+    );
+  });
+
+  it("same-line await /'/ then import (fixture)", () => {
+    const { reachable } = analyzeWorkflowImportWalk({
+      isPrivilegedPath: () => true,
+      extraEntrypoints: [`${resolutionFixtureRoot}/entry-same-line-await.mjs`],
+      skipSpawnExpansion: true,
+      workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
+    });
+    expect(reachable).toContain(
+      "test/fixtures/privileged-workflow-import-walk/resolution/after-await.mjs",
+    );
+  });
+
+  it("same-line case /'/ then import (fixture)", () => {
+    const { reachable } = analyzeWorkflowImportWalk({
+      isPrivilegedPath: () => true,
+      extraEntrypoints: [`${resolutionFixtureRoot}/entry-same-line-case.mjs`],
+      skipSpawnExpansion: true,
+      workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
+    });
+    expect(reachable).toContain(
+      "test/fixtures/privileged-workflow-import-walk/resolution/after-case.mjs",
+    );
+  });
+
+  it("same-line brace then /'/ then import (fixture)", () => {
+    const { reachable } = analyzeWorkflowImportWalk({
+      isPrivilegedPath: () => true,
+      extraEntrypoints: [`${resolutionFixtureRoot}/entry-same-line-brace.mjs`],
+      skipSpawnExpansion: true,
+      workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
+    });
+    expect(reachable).toContain(
+      "test/fixtures/privileged-workflow-import-walk/resolution/after-brace.mjs",
+    );
+  });
+
+  it("regex quote, glob string, import, and execSync bash (fixture)", () => {
+    const { reachable } = analyzeWorkflowImportWalk({
+      isPrivilegedPath: () => true,
+      extraEntrypoints: [`${resolutionFixtureRoot}/entry-regex-glob-bash.mjs`],
+      workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
+    });
+    expect(reachable).toContain(
+      "test/fixtures/privileged-workflow-import-walk/resolution/after-regex-glob.mjs",
+    );
+    expect(reachable).toContain(
+      "test/fixtures/privileged-workflow-import-walk/resolution/bash-via-execsync.sh",
+    );
+  });
+
+  it("fail closed on spawn array template with substitution (fixture)", () => {
+    expect(() =>
+      analyzeWorkflowImportWalk({
+        isPrivilegedPath: () => true,
+        extraEntrypoints: [`${resolutionFixtureRoot}/entry-spawn-template-sub.mjs`],
+        workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
+      }),
+    ).toThrow(WorkflowImportWalkError);
+  });
+
+  it("follows spawn array no-substitution template literal (fixture)", () => {
+    const { reachable } = analyzeWorkflowImportWalk({
+      isPrivilegedPath: () => true,
+      extraEntrypoints: [`${resolutionFixtureRoot}/entry-spawn-template-nosub.mjs`],
+      workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
+    });
+    expect(reachable).toContain(
+      "test/fixtures/privileged-workflow-import-walk/resolution/template-spawn-target.mjs",
+    );
+  });
+
+  it("follows plain require() in a .cjs entry (fixture)", () => {
+    const { reachable } = analyzeWorkflowImportWalk({
+      isPrivilegedPath: () => true,
+      extraEntrypoints: [`${resolutionFixtureRoot}/entry-plain-require.cjs`],
+      skipSpawnExpansion: true,
+      workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
+    });
+    expect(reachable).toContain(
+      "test/fixtures/privileged-workflow-import-walk/resolution/plain-require-target.cjs",
+    );
+  });
+
+  it("follows dynamic await import() (fixture)", () => {
+    const { reachable } = analyzeWorkflowImportWalk({
+      isPrivilegedPath: () => true,
+      extraEntrypoints: [`${resolutionFixtureRoot}/entry-dynamic-import.mjs`],
+      skipSpawnExpansion: true,
+      workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
+    });
+    expect(reachable).toContain(
+      "test/fixtures/privileged-workflow-import-walk/resolution/dynamic-import-target.mjs",
+    );
+  });
+
+  it("follows both branches in conditional spawn array literals (fixture)", () => {
+    const { reachable } = analyzeWorkflowImportWalk({
+      isPrivilegedPath: () => true,
+      extraEntrypoints: [`${resolutionFixtureRoot}/entry-spawn-conditional.mjs`],
+      workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
+    });
+    expect(reachable).toContain(
+      "test/fixtures/privileged-workflow-import-walk/resolution/spawn-cond-a.mjs",
+    );
+    expect(reachable).toContain(
+      "test/fixtures/privileged-workflow-import-walk/resolution/spawn-cond-b.mjs",
+    );
+  });
+
+  it("follows module.createRequire(import.meta.url)(...) (fixture)", () => {
+    const { reachable } = analyzeWorkflowImportWalk({
+      isPrivilegedPath: () => true,
+      extraEntrypoints: [`${resolutionFixtureRoot}/entry-module-create-require.mjs`],
+      skipSpawnExpansion: true,
+      workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
+    });
+    expect(reachable).toContain(
+      "test/fixtures/privileged-workflow-import-walk/resolution/module-cr-target.cjs",
+    );
+  });
+
+  it("follows import x = require('./y') (fixture)", () => {
+    const { reachable } = analyzeWorkflowImportWalk({
+      isPrivilegedPath: () => true,
+      extraEntrypoints: [`${resolutionFixtureRoot}/entry-import-equals.cts`],
+      skipSpawnExpansion: true,
+      workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
+    });
+    expect(reachable).toContain(
+      "test/fixtures/privileged-workflow-import-walk/resolution/import-equals-target.mjs",
+    );
+  });
+
+  it("follows bash inside a .sh workflow script (fixture)", () => {
+    const { reachable } = analyzeWorkflowImportWalk({
+      isPrivilegedPath: () => true,
+      extraEntrypoints: [`${resolutionFixtureRoot}/entry-sh-calls-sh.sh`],
+      workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
+    });
+    expect(reachable).toContain(
+      "test/fixtures/privileged-workflow-import-walk/resolution/nested-sh-target.sh",
     );
   });
 
@@ -274,20 +418,6 @@ describe("privileged-workflow-import-walk", () => {
       ),
     ).toThrow(WorkflowImportWalkError);
   });
-
-  it.each([
-    ["return", "function f(){return /'/;} import './same-line-target.mjs';"],
-    ["typeof", "const x=1; typeof y==='z'; import './same-line-target.mjs';"],
-    ["await", "await Promise.resolve(); import './same-line-target.mjs';"],
-    ["case", "switch(0){case 1:break}; import './same-line-target.mjs';"],
-    ["brace", "{ const r = /'/; } import './same-line-target.mjs';"],
-  ])(
-    "collectStaticModuleSpecifiers after %s with /'/ on same line",
-    (_label, snippet) => {
-      const specs = collectStaticModuleSpecifiers(snippet, "same-line-snippet.mjs");
-      expect(specs).toContain("./same-line-target.mjs");
-    },
-  );
 
   it("collectStaticModuleSpecifiers reads scripts/migrate-nonprod/apply.ts", () => {
     const content = readFileSync("scripts/migrate-nonprod/apply.ts", "utf8");
