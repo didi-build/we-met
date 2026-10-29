@@ -5,7 +5,7 @@
  * - Dynamic import() when the module specifier is not a string literal.
  * - Node built-in modules (node:fs, etc.) and npm package specifiers.
  * - Shell tools (gh, git, wrangler, npx wrangler, etc.) and inline node -e / --eval scripts.
- * - Spawned commands whose script path is not a string literal in source (variables, template strings).
+ * - Spawned commands whose script path is not a string literal in source (variables, template strings, bash "$VAR", /bin/bash wrappers).
  * - Type-only imports erased at runtime (still parsed if written as value imports; type-only from is skipped when detectable).
  *
  * Unresolved relative repo imports and missing workflow entrypoint files fail closed (throw), naming the module.
@@ -55,11 +55,16 @@ const INDEX_FILES = [
 
 const TS_ALIAS_PREFIX = "@/";
 
+const REPO_ROOT_PREFIX = "(?:scripts|test|src|workers|gallery)";
+
 const STATIC_FROM_RE =
   /(?:import\s+(?:[\s\S]*?\sfrom|)|export\s+(?:\*|[\s\S]*?\sfrom))[\s]*['"]([^'"]+)['"]/g;
 
 const COMPACT_IMPORT_FROM_RE =
   /import\s*(?:\{[\s\S]*?\}|\*\s*(?:as\s+\w+)?)\s*from\s*['"]([^'"]+)['"]/g;
+
+const COMPACT_IMPORT_DEFAULT_NAMED_FROM_RE =
+  /import\s+\w+\s*,\s*\{[\s\S]*?\}\s*from\s*['"]([^'"]+)['"]/g;
 
 const COMPACT_EXPORT_FROM_RE =
   /export\s*(?:\*|\{[\s\S]*?\})\s*from\s*['"]([^'"]+)['"]/g;
@@ -74,11 +79,28 @@ const REQUIRE_RE = /\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
 
 const CREATE_REQUIRE_RE = /createRequire\s*\([^)]*\)\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
 
-const NODE_ENTRY_RE =
-  /\bnode(?:\s+(?:--[\w-]+(?:=\S+|(?:\s+[^\s]+)?)|-r\s+\S+))*\s+(?:['"](\.\.?\/[^'"]+|(?:scripts|test|src)\/[^'"]+)['"]|(\.\.?\/[^\s'"]+|(?:scripts|test|src)\/[^\s'"]+))/g;
+const CREATE_REQUIRE_THEN_CALL_RE =
+  /createRequire\s*\([^)]*\)[\s\S]{0,500}?\b\w+\s*\(\s*['"](\.\.?\/[^'"]+)['"]\s*\)/g;
 
-const TSX_ENTRY_RE =
-  /\bnpx\s+tsx(?:@[\w.^/-]+)?\s+(?:['"](\.\.?\/[^'"]+|(?:scripts|test|src)\/[^'"]+)['"]|(\.\.?\/[^\s'"]+|(?:scripts|test|src)\/[^\s'"]+))/g;
+const NODE_ENTRY_RE = new RegExp(
+  String.raw`\bnode(?:\s+(?:--[\w-]+(?:=\S+|(?:\s+[^\s]+)?)|-r\s+\S+))*\s+(?:['"](\.\.?\/[^'"]+|${REPO_ROOT_PREFIX}\/[^'"]+)['"]|(\.\.?\/[^\s'"]+|${REPO_ROOT_PREFIX}\/[^\s'"]+))`,
+  "g",
+);
+
+const TSX_ENTRY_RE = new RegExp(
+  String.raw`\bnpx\s+(?:--yes\s+)?tsx(?:@[\w.^/-]+)?\s+(?:['"](\.\.?\/[^'"]+|${REPO_ROOT_PREFIX}\/[^'"]+)['"]|(\.\.?\/[^\s'"]+|${REPO_ROOT_PREFIX}\/[^\s'"]+))`,
+  "g",
+);
+
+const BARE_TSX_ENTRY_RE = new RegExp(
+  String.raw`\btsx\s+(?:['"](\.\.?\/[^'"]+|${REPO_ROOT_PREFIX}\/[^'"]+)['"]|(\.\.?\/[^\s'"]+|${REPO_ROOT_PREFIX}\/[^\s'"]+))`,
+  "g",
+);
+
+const NPM_EXEC_ENTRY_RE = new RegExp(
+  String.raw`\bnpm\s+exec(?:\s+-[^\s]+)*\s+(?:--\s+)?(?:['"](\.\.?\/[^'"]+|${REPO_ROOT_PREFIX}\/[^'"]+)['"]|(\.\.?\/[^\s'"]+|${REPO_ROOT_PREFIX}\/[^\s'"]+))`,
+  "g",
+);
 
 const NPM_RUN_EXPLICIT_RE =
   /\bnpm\s+run(?:-script)?(?:\s+-[^\s]+)*\s+([a-z0-9:_-]+)\b/g;
@@ -89,7 +111,7 @@ const SHELL_WRAPPER_RE =
   /\b(?:bash|sh)\s+(?:-[^\s]+\s+)*(-(?:lc|c)\s+)?(['"])([\s\S]*?)\2/g;
 
 const BASH_SH_SCRIPT_FILE_RE =
-  /\b(?:bash|sh)\s+(?:-[^\s]+\s+)*['"]?((?:\.\.?\/|scripts\/|test\/)[^\s'"]+)['"]?/g;
+  /\b(?:bash|sh)\s+(?:-[^\s]+\s+)*['"]?((?:\.\.?\/|scripts\/|test\/|workers\/|gallery\/)[^\s'"]+)['"]?/g;
 
 const SPAWN_NODE_ARRAY_RE =
   /(?:spawnSync|execFileSync|spawn|execFile)\s*\(\s*(?:process\.execPath|"node"|'node')\s*,\s*\[([\s\S]*?)\]/g;
@@ -109,7 +131,106 @@ const SPAWN_SH_ARRAY_RE =
 const RUN_NPM_LITERAL_RE =
   /\brunNpm\s*\(\s*\[\s*["']run["']\s*,\s*["']([a-z0-9:_-]+)["']/g;
 
-const ARRAY_STRING_LITERAL_RE = /["'](\.\.?\/[^"']+|(?:scripts|test|src)\/[^"']+)["']/g;
+const ARRAY_STRING_LITERAL_RE = new RegExp(
+  String.raw`["'](\.\.?\/[^"']+|${REPO_ROOT_PREFIX}\/[^"']+)["']`,
+  "g",
+);
+
+/**
+ * Remove line and block comments; preserve string literal contents.
+ * @param {string} content
+ */
+export function stripJsComments(content) {
+  /** @type {string[]} */
+  const parts = [];
+  let i = 0;
+  /** @type {"'" | '"' | "`" | null} */
+  let inString = null;
+  while (i < content.length) {
+    const ch = content[i];
+    const next = content[i + 1];
+    if (inString) {
+      parts.push(ch);
+      if (ch === "\\") {
+        if (i + 1 < content.length) {
+          parts.push(content[i + 1]);
+          i += 2;
+          continue;
+        }
+      }
+      if (ch === inString) {
+        inString = null;
+      }
+      i++;
+      continue;
+    }
+    if (ch === "'" || ch === '"' || ch === "`") {
+      inString = ch;
+      parts.push(ch);
+      i++;
+      continue;
+    }
+    if (ch === "/" && next === "/") {
+      i += 2;
+      while (i < content.length && content[i] !== "\n") {
+        i++;
+      }
+      parts.push(" ");
+      continue;
+    }
+    if (ch === "/" && next === "*") {
+      i += 2;
+      while (i < content.length && !(content[i] === "*" && content[i + 1] === "/")) {
+        i++;
+      }
+      i += 2;
+      parts.push(" ");
+      continue;
+    }
+    parts.push(ch);
+    i++;
+  }
+  return parts.join("");
+}
+
+/**
+ * @param {RegExp} re global regex with one capture group
+ * @param {string} content
+ * @yields {RegExpExecArray}
+ */
+function* matchRegexOutsideStrings(re, content) {
+  let segmentStart = 0;
+  let i = 0;
+  while (i < content.length) {
+    const ch = content[i];
+    if (ch === "'" || ch === '"' || ch === "`") {
+      const quote = ch;
+      if (i > segmentStart) {
+        re.lastIndex = 0;
+        yield* content.slice(segmentStart, i).matchAll(re);
+      }
+      i++;
+      while (i < content.length) {
+        if (content[i] === "\\") {
+          i += 2;
+          continue;
+        }
+        if (content[i] === quote) {
+          i++;
+          break;
+        }
+        i++;
+      }
+      segmentStart = i;
+      continue;
+    }
+    i++;
+  }
+  if (segmentStart < content.length) {
+    re.lastIndex = 0;
+    yield* content.slice(segmentStart).matchAll(re);
+  }
+}
 
 /**
  * @param {string} packageJsonPath
@@ -152,7 +273,9 @@ function isRepoRelativeSpecifier(spec, tsAliasRoot) {
   if (
     spec.startsWith("scripts/") ||
     spec.startsWith("src/") ||
-    spec.startsWith("test/")
+    spec.startsWith("test/") ||
+    spec.startsWith("workers/") ||
+    spec.startsWith("gallery/")
   ) {
     return true;
   }
@@ -183,6 +306,8 @@ export function normalizeRepoRelativeSpecifier(spec, tsAliasRoot) {
  */
 function normalizeEntrypointToken(token) {
   let trimmed = token.trim().replace(/^['"]|['"]$/g, "");
+  trimmed = trimmed.replace(/\s*[012]?>>?[^\s]*(?:\s+[^\s]+)?$/, "");
+  trimmed = trimmed.replace(/\s*>>?\s*["'][^"']*["']\s*$/, "");
   trimmed = trimmed.replace(/[);]+$/g, "");
   if (!trimmed || trimmed.startsWith("-")) {
     return null;
@@ -206,22 +331,19 @@ function normalizeSpawnScriptToken(token, contextLabel) {
   const trimmed = token
     .trim()
     .replace(/^['"]|['"]$/g, "")
+    .replace(/\s*[012]?>>?[^\s]*(?:\s+[^\s]+)?$/, "")
+    .replace(/\s*>>?\s*["'][^"']*["']\s*$/, "")
     .replace(/[);]+$/g, "");
   if (!trimmed || trimmed.startsWith("-")) {
     return null;
   }
-  const looksRepoRelative =
-    trimmed.startsWith("./") ||
-    trimmed.startsWith("../") ||
-    trimmed.startsWith("scripts/") ||
-    trimmed.startsWith("test/");
-  const rel = normalizeEntrypointToken(trimmed);
-  if (!rel && looksRepoRelative) {
+  if (/\$\{|\$[({\w]/.test(trimmed)) {
     throw new WorkflowImportWalkError(
-      `Unresolved spawn script: ${trimmed} (${contextLabel})`,
+      `Non-literal spawn script path: ${trimmed} (${contextLabel})`,
       { module: trimmed },
     );
   }
+  const rel = normalizeEntrypointToken(trimmed);
   return rel;
 }
 
@@ -231,8 +353,8 @@ function normalizeSpawnScriptToken(token, contextLabel) {
 function collectSpawnScriptLiteralsFromSource(content) {
   /** @type {Set<string>} */
   const entries = new Set();
-  BASH_SH_SCRIPT_FILE_RE.lastIndex = 0;
-  for (const match of content.matchAll(BASH_SH_SCRIPT_FILE_RE)) {
+  const stripped = stripJsComments(content);
+  for (const match of matchRegexOutsideStrings(BASH_SH_SCRIPT_FILE_RE, stripped)) {
     const rel = normalizeSpawnScriptToken(match[1], "bash/sh spawn in source");
     if (rel) {
       entries.add(rel);
@@ -282,6 +404,22 @@ export function extractRepoScriptEntrypointsFromRun(
   }
 
   for (const match of runText.matchAll(TSX_ENTRY_RE)) {
+    const raw = match[1] ?? match[2];
+    const rel = normalizeEntrypointToken(raw);
+    if (rel) {
+      entries.add(rel);
+    }
+  }
+
+  for (const match of runText.matchAll(BARE_TSX_ENTRY_RE)) {
+    const raw = match[1] ?? match[2];
+    const rel = normalizeEntrypointToken(raw);
+    if (rel) {
+      entries.add(rel);
+    }
+  }
+
+  for (const match of runText.matchAll(NPM_EXEC_ENTRY_RE)) {
     const raw = match[1] ?? match[2];
     const rel = normalizeEntrypointToken(raw);
     if (rel) {
@@ -339,9 +477,20 @@ export function extractSpawnedRepoScriptEntrypointsFromSource(content, scripts) 
     re.lastIndex = 0;
     for (const match of content.matchAll(re)) {
       const block = match[1];
+      if (re === SPAWN_BASH_ARRAY_RE || re === SPAWN_SH_ARRAY_RE) {
+        const SPAWN_ARRAY_ANY_QUOTED_RE = /["']([^"']+)["']/g;
+        for (const lit of block.matchAll(SPAWN_ARRAY_ANY_QUOTED_RE)) {
+          if (/\$\{|\$[({\w]/.test(lit[1])) {
+            throw new WorkflowImportWalkError(
+              `Non-literal spawn script path: ${lit[1]} (spawn array literal)`,
+              { module: lit[1] },
+            );
+          }
+        }
+      }
       ARRAY_STRING_LITERAL_RE.lastIndex = 0;
       for (const lit of block.matchAll(ARRAY_STRING_LITERAL_RE)) {
-        const rel = normalizeEntrypointToken(lit[1]);
+        const rel = normalizeSpawnScriptToken(lit[1], "spawn array literal");
         if (rel) {
           entries.add(rel);
         }
@@ -592,19 +741,22 @@ export function resolveRepoModuleOrThrow(repoRoot, fromAbs, spec, tsAliasRoot) {
 export function collectStaticModuleSpecifiers(content) {
   /** @type {Set<string>} */
   const specs = new Set();
+  const stripped = stripJsComments(content);
 
   for (const re of [
     STATIC_FROM_RE,
     COMPACT_IMPORT_FROM_RE,
+    COMPACT_IMPORT_DEFAULT_NAMED_FROM_RE,
     COMPACT_EXPORT_FROM_RE,
     COMPACT_SIDE_EFFECT_IMPORT_RE,
     STATIC_IMPORT_SIDE_EFFECT_RE,
     DYNAMIC_IMPORT_RE,
     REQUIRE_RE,
     CREATE_REQUIRE_RE,
+    CREATE_REQUIRE_THEN_CALL_RE,
   ]) {
     re.lastIndex = 0;
-    for (const match of content.matchAll(re)) {
+    for (const match of stripped.matchAll(re)) {
       specs.add(match[1]);
     }
   }

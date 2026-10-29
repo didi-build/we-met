@@ -8,6 +8,7 @@ import {
 } from "../scripts/lib/privileged-paths.mjs";
 import {
   analyzeWorkflowImportWalk,
+  extractRepoScriptEntrypointsFromRun,
   WorkflowImportWalkError,
 } from "../scripts/lib/privileged-workflow-import-walk.mjs";
 
@@ -168,6 +169,102 @@ describe("privileged-workflow-import-walk", () => {
       workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
     });
     expect(entrypoints).toContain("scripts/apply-migrations.mjs");
+  });
+
+  it("ignores imports mentioned only in comments (fixture)", () => {
+    const { reachable } = analyzeWorkflowImportWalk({
+      isPrivilegedPath: () => true,
+      extraEntrypoints: [`${resolutionFixtureRoot}/entry-comment-import.mjs`],
+      skipSpawnExpansion: true,
+      workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
+    });
+    expect(reachable).toEqual([
+      `${resolutionFixtureRoot}/entry-comment-import.mjs`.replace(/\\/g, "/"),
+    ]);
+  });
+
+  it("parses import default,{named}from syntax (fixture)", () => {
+    const { reachable } = analyzeWorkflowImportWalk({
+      isPrivilegedPath: () => true,
+      extraEntrypoints: [`${resolutionFixtureRoot}/entry-default-named.mjs`],
+      skipSpawnExpansion: true,
+      workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
+    });
+    expect(reachable).toContain(
+      "test/fixtures/privileged-workflow-import-walk/resolution/default-named-target.mjs",
+    );
+  });
+
+  it("parses compact side-effect import syntax (fixture)", () => {
+    const { reachable } = analyzeWorkflowImportWalk({
+      isPrivilegedPath: () => true,
+      extraEntrypoints: [`${resolutionFixtureRoot}/entry-compact-side-effect.mjs`],
+      skipSpawnExpansion: true,
+      workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
+    });
+    expect(reachable).toContain(
+      "test/fixtures/privileged-workflow-import-walk/resolution/side-effect-target.mjs",
+    );
+  });
+
+  it("follows createRequire bound to a variable (fixture)", () => {
+    const { reachable } = analyzeWorkflowImportWalk({
+      isPrivilegedPath: () => true,
+      extraEntrypoints: [`${resolutionFixtureRoot}/entry-create-require-split.mjs`],
+      skipSpawnExpansion: true,
+      workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
+    });
+    expect(reachable).toContain(
+      "test/fixtures/privileged-workflow-import-walk/resolution/require-split-target.mjs",
+    );
+  });
+
+  it("fail closed on non-literal bash spawn path in source (fixture)", () => {
+    expect(() =>
+      analyzeWorkflowImportWalk({
+        isPrivilegedPath: () => true,
+        extraEntrypoints: [`${resolutionFixtureRoot}/entry-non-literal-bash.mjs`],
+        workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
+      }),
+    ).toThrow(WorkflowImportWalkError);
+  });
+
+  it("follows sh spawnSync array script paths (fixture)", () => {
+    const { reachable } = analyzeWorkflowImportWalk({
+      isPrivilegedPath: () => true,
+      extraEntrypoints: [`${resolutionFixtureRoot}/entry-sh-array-spawn.mjs`],
+      workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
+    });
+    expect(reachable).toContain(
+      "test/fixtures/privileged-workflow-import-walk/resolution/spawn-helper.sh",
+    );
+  });
+
+  it("fail closed on missing workflow entrypoint module (fixture)", () => {
+    expect(() =>
+      analyzeWorkflowImportWalk({
+        isPrivilegedPath: () => true,
+        extraEntrypoints: ["scripts/definitely-missing-entrypoint.mjs"],
+        skipSpawnExpansion: true,
+        workflowsDir: join(resolutionFixtureRoot, "empty-workflows"),
+      }),
+    ).toThrow(WorkflowImportWalkError);
+  });
+
+  it("strips shell redirection when parsing node run lines", () => {
+    const entries = extractRepoScriptEntrypointsFromRun(
+      'node scripts/ci-test-summary.mjs >> "$GITHUB_OUTPUT"',
+      {},
+    );
+    expect(entries).toEqual(["scripts/ci-test-summary.mjs"]);
+  });
+
+  it("parses bash scripts/x.sh in workflow run lines", () => {
+    const entries = extractRepoScriptEntrypointsFromRun(
+      "bash scripts/check-deploy-guards.mjs",
+      {},
+    );
+    expect(entries).toContain("scripts/check-deploy-guards.mjs");
   });
 
   for (const entry of workflowModuleExactPrivilegedEntries) {

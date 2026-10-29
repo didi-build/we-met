@@ -1,0 +1,1 @@
+export const sideEffectTarget = true;
