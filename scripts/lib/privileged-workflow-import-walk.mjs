@@ -5,7 +5,7 @@
  * - Dynamic import() when the module specifier is not a string literal.
  * - Node built-in modules (node:fs, etc.) and npm package specifiers.
  * - Shell tools (gh, git, wrangler, npx wrangler, etc.) and inline node -e / --eval scripts.
- * - Spawned commands whose script path is not a string literal in source (variables, non-literal template literals in spawn arrays, bash "$VAR", /bin/bash wrappers).
+ * - Spawned commands whose script path is not a string literal in source (variables, template strings).
  * - Type-only imports erased at runtime (still parsed if written as value imports; type-only from is skipped when detectable).
  *
  * Unresolved relative repo imports and missing workflow entrypoint files fail closed (throw), naming the module.
@@ -13,7 +13,6 @@
 
 import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { join, resolve, dirname, relative } from "node:path";
-import ts from "typescript";
 import { parse as parseYaml } from "yaml";
 
 /** @typedef {{ entrypoints: string[]; reachable: string[]; unlisted: string[] }} WalkResult */
@@ -56,33 +55,30 @@ const INDEX_FILES = [
 
 const TS_ALIAS_PREFIX = "@/";
 
-const REPO_ROOT_PREFIX = "(?:scripts|test|src|workers|gallery)";
+const STATIC_FROM_RE =
+  /(?:import\s+(?:[\s\S]*?\sfrom|)|export\s+(?:\*|[\s\S]*?\sfrom))[\s]*['"]([^'"]+)['"]/g;
 
-const CREATE_REQUIRE_THEN_CALL_RE =
-  /createRequire\s*\([^)]*\)[\s\S]{0,500}?\b\w+\s*\(\s*['"](\.\.?\/[^'"]+)['"]\s*\)/g;
+const COMPACT_IMPORT_FROM_RE =
+  /import\s*(?:\{[\s\S]*?\}|\*\s*(?:as\s+\w+)?)\s*from\s*['"]([^'"]+)['"]/g;
 
-const BASH_IN_QUOTED_ARRAY_STRING_RE =
-  /["'](?:\/?(?:usr\/)?bin\/)?bash\s+((?:\.\.?\/|scripts\/|test\/|workers\/|gallery\/)[^\s'"]+)["']/g;
+const COMPACT_EXPORT_FROM_RE =
+  /export\s*(?:\*|\{[\s\S]*?\})\s*from\s*['"]([^'"]+)['"]/g;
 
-const NODE_ENTRY_RE = new RegExp(
-  String.raw`\bnode(?:\s+(?:--[\w-]+(?:=\S+|(?:\s+[^\s]+)?)|-r\s+\S+))*\s+(?:['"](\.\.?\/[^'"]+|${REPO_ROOT_PREFIX}\/[^'"]+)['"]|(\.\.?\/[^\s'"]+|${REPO_ROOT_PREFIX}\/[^\s'"]+))`,
-  "g",
-);
+const COMPACT_SIDE_EFFECT_IMPORT_RE = /import\s*['"]([^'"]+)['"]/g;
 
-const TSX_ENTRY_RE = new RegExp(
-  String.raw`\bnpx\s+(?:--yes\s+)?tsx(?:@[\w.^/-]+)?\s+(?:['"](\.\.?\/[^'"]+|${REPO_ROOT_PREFIX}\/[^'"]+)['"]|(\.\.?\/[^\s'"]+|${REPO_ROOT_PREFIX}\/[^\s'"]+))`,
-  "g",
-);
+const STATIC_IMPORT_SIDE_EFFECT_RE = /^\s*import\s+['"]([^'"]+)['"]/gm;
 
-const BARE_TSX_ENTRY_RE = new RegExp(
-  String.raw`\btsx\s+(?:['"](\.\.?\/[^'"]+|${REPO_ROOT_PREFIX}\/[^'"]+)['"]|(\.\.?\/[^\s'"]+|${REPO_ROOT_PREFIX}\/[^\s'"]+))`,
-  "g",
-);
+const DYNAMIC_IMPORT_RE = /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
 
-const NPM_EXEC_ENTRY_RE = new RegExp(
-  String.raw`\bnpm\s+exec(?:\s+-[^\s]+)*\s+(?:--\s+)?(?:['"](\.\.?\/[^'"]+|${REPO_ROOT_PREFIX}\/[^'"]+)['"]|(\.\.?\/[^\s'"]+|${REPO_ROOT_PREFIX}\/[^\s'"]+))`,
-  "g",
-);
+const REQUIRE_RE = /\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+
+const CREATE_REQUIRE_RE = /createRequire\s*\([^)]*\)\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+
+const NODE_ENTRY_RE =
+  /\bnode(?:\s+(?:--[\w-]+(?:=\S+|(?:\s+[^\s]+)?)|-r\s+\S+))*\s+(?:['"](\.\.?\/[^'"]+|(?:scripts|test|src)\/[^'"]+)['"]|(\.\.?\/[^\s'"]+|(?:scripts|test|src)\/[^\s'"]+))/g;
+
+const TSX_ENTRY_RE =
+  /\bnpx\s+tsx(?:@[\w.^/-]+)?\s+(?:['"](\.\.?\/[^'"]+|(?:scripts|test|src)\/[^'"]+)['"]|(\.\.?\/[^\s'"]+|(?:scripts|test|src)\/[^\s'"]+))/g;
 
 const NPM_RUN_EXPLICIT_RE =
   /\bnpm\s+run(?:-script)?(?:\s+-[^\s]+)*\s+([a-z0-9:_-]+)\b/g;
@@ -93,136 +89,27 @@ const SHELL_WRAPPER_RE =
   /\b(?:bash|sh)\s+(?:-[^\s]+\s+)*(-(?:lc|c)\s+)?(['"])([\s\S]*?)\2/g;
 
 const BASH_SH_SCRIPT_FILE_RE =
-  /\b(?:\/?(?:usr\/)?bin\/)?(?:bash|sh)\s+(?:-[^\s]+\s+)*['"]?((?:\.\.?\/|scripts\/|test\/|workers\/|gallery\/)[^\s'"]+)['"]?/g;
+  /\b(?:bash|sh)\s+(?:-[^\s]+\s+)*['"]?((?:\.\.?\/|scripts\/|test\/)[^\s'"]+)['"]?/g;
 
-const BASH_SH_NONLITERAL_ARG_RE =
-  /\b(?:\/?(?:usr\/)?bin\/)?(?:bash|sh)\s+(?:-[^\s]+\s+)*(\$[^\s/]+|"[^"]*\$[^"']*"|'[^']*\$[^']*')/g;
+const SPAWN_NODE_ARRAY_RE =
+  /(?:spawnSync|execFileSync|spawn|execFile)\s*\(\s*(?:process\.execPath|"node"|'node')\s*,\s*\[([\s\S]*?)\]/g;
 
-const EXEC_BASH_ONE_STRING_RE =
-  /(?:execSync|exec)\s*\(\s*['"](?:\/?(?:usr\/)?bin\/)?(?:bash|sh)\s+((?:\.\.?\/|scripts\/|test\/|workers\/|gallery\/)[^\s'"]+)['"]/g;
+const SPAWN_NPM_ARRAY_RE =
+  /(?:spawnSync|execFileSync|spawn|execFile)\s*\(\s*["']npm["']\s*,\s*\[([\s\S]*?)\]/g;
 
-const DIRECT_DOT_SLASH_SCRIPT_RUN_RE = new RegExp(
-  String.raw`(?:^|\s)(['"]?(\.\/(?:${REPO_ROOT_PREFIX})\/[^\s'"]+)['"]?)`,
-  "g",
-);
+const SPAWN_PLAIN_NODE_RE =
+  /(?:spawnSync|execFileSync|spawn|execFile)\s*\(\s*["']node["']\s*,\s*\[([\s\S]*?)\]/g;
 
-const SPAWN_CHILD_PROCESS_RE = String.raw`(?:spawnSync|execFileSync|execSync|spawn|execFile|exec)`;
+const SPAWN_BASH_ARRAY_RE =
+  /(?:spawnSync|execFileSync|spawn|execFile)\s*\(\s*["']bash["']\s*,\s*\[([\s\S]*?)\]/g;
 
-const SPAWN_NODE_ARRAY_RE = new RegExp(
-  `${SPAWN_CHILD_PROCESS_RE}\\s*\\(\\s*(?:process\\.execPath|"node"|'node')\\s*,\\s*\\[([\\s\\S]*?)\\]`,
-  "g",
-);
-
-const SPAWN_NPM_ARRAY_RE = new RegExp(
-  `${SPAWN_CHILD_PROCESS_RE}\\s*\\(\\s*["']npm["']\\s*,\\s*\\[([\\s\\S]*?)\\]`,
-  "g",
-);
-
-const SPAWN_PLAIN_NODE_RE = new RegExp(
-  `${SPAWN_CHILD_PROCESS_RE}\\s*\\(\\s*["']node["']\\s*,\\s*\\[([\\s\\S]*?)\\]`,
-  "g",
-);
-
-const SPAWN_BASH_ARRAY_RE = new RegExp(
-  `${SPAWN_CHILD_PROCESS_RE}\\s*\\(\\s*["'](?:\\/?(?:usr\\/)?bin\\/)?bash["']\\s*,\\s*\\[([\\s\\S]*?)\\]`,
-  "g",
-);
-
-const SPAWN_SH_ARRAY_RE = new RegExp(
-  `${SPAWN_CHILD_PROCESS_RE}\\s*\\(\\s*["'](?:\\/?(?:usr\\/)?bin\\/)?sh["']\\s*,\\s*\\[([\\s\\S]*?)\\]`,
-  "g",
-);
+const SPAWN_SH_ARRAY_RE =
+  /(?:spawnSync|execFileSync|spawn|execFile)\s*\(\s*["']sh["']\s*,\s*\[([\s\S]*?)\]/g;
 
 const RUN_NPM_LITERAL_RE =
   /\brunNpm\s*\(\s*\[\s*["']run["']\s*,\s*["']([a-z0-9:_-]+)["']/g;
 
-const ARRAY_STRING_LITERAL_RE = new RegExp(
-  String.raw`["'](\.\.?\/[^"']+|${REPO_ROOT_PREFIX}\/[^"']+)["']`,
-  "g",
-);
-
-/**
- * @param {string} relPath
- */
-function scriptKindFromRelPath(relPath) {
-  const lower = relPath.toLowerCase();
-  if (lower.endsWith(".tsx")) {
-    return ts.ScriptKind.TSX;
-  }
-  if (lower.endsWith(".jsx")) {
-    return ts.ScriptKind.JSX;
-  }
-  if (lower.endsWith(".ts") || lower.endsWith(".mts") || lower.endsWith(".cts")) {
-    return ts.ScriptKind.TS;
-  }
-  return ts.ScriptKind.JS;
-}
-
-/**
- * @param {string} content
- * @param {string} relPath
- */
-function assertSourceParsesCleanly(content, relPath) {
-  const fileName = relPath || "snippet.js";
-  const kind = scriptKindFromRelPath(relPath);
-  const sourceFile = ts.createSourceFile(
-    fileName,
-    content,
-    ts.ScriptTarget.Latest,
-    true,
-    kind,
-  );
-  if (sourceFile.parseDiagnostics.length > 0) {
-    const detail = sourceFile.parseDiagnostics[0];
-    const message = ts.flattenDiagnosticMessageText(detail.messageText, " ");
-    throw new WorkflowImportWalkError(
-      `Source did not parse cleanly (${fileName}): ${message}`,
-      { module: fileName },
-    );
-  }
-}
-
-/**
- * Remove comments with the TypeScript scanner; preserve strings, templates, and regex literals.
- * @param {string} content
- * @param {string} [relPath]
- */
-export function stripJsComments(content, relPath = "snippet.js") {
-  assertSourceParsesCleanly(content, relPath);
-  const kind = scriptKindFromRelPath(relPath);
-  const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, kind, content);
-  /** @type {string[]} */
-  const chunks = [];
-  while (true) {
-    const token = scanner.scan();
-    const start = scanner.getTokenPos();
-    const end = scanner.getTextPos();
-    if (token === ts.SyntaxKind.EndOfFileToken) {
-      break;
-    }
-    if (
-      token === ts.SyntaxKind.SingleLineCommentTrivia ||
-      token === ts.SyntaxKind.MultiLineCommentTrivia
-    ) {
-      chunks.push(" ".repeat(Math.max(0, end - start)));
-    } else {
-      chunks.push(content.slice(start, end));
-    }
-  }
-  return chunks.join("");
-}
-
-/**
- * @param {string} token
- */
-function assertNonLiteralShellPath(token, contextLabel) {
-  if (/\$\{|\$[({\w]/.test(token)) {
-    throw new WorkflowImportWalkError(
-      `Non-literal spawn script path: ${token} (${contextLabel})`,
-      { module: token },
-    );
-  }
-}
+const ARRAY_STRING_LITERAL_RE = /["'](\.\.?\/[^"']+|(?:scripts|test|src)\/[^"']+)["']/g;
 
 /**
  * @param {string} packageJsonPath
@@ -265,9 +152,7 @@ function isRepoRelativeSpecifier(spec, tsAliasRoot) {
   if (
     spec.startsWith("scripts/") ||
     spec.startsWith("src/") ||
-    spec.startsWith("test/") ||
-    spec.startsWith("workers/") ||
-    spec.startsWith("gallery/")
+    spec.startsWith("test/")
   ) {
     return true;
   }
@@ -298,9 +183,6 @@ export function normalizeRepoRelativeSpecifier(spec, tsAliasRoot) {
  */
 function normalizeEntrypointToken(token) {
   let trimmed = token.trim().replace(/^['"]|['"]$/g, "");
-  trimmed = trimmed.replace(/\s*[012]?>>?[^\s]*(?:\s+[^\s]+)?$/, "");
-  trimmed = trimmed.replace(/[012]?>>[^\s'"]*(?:\s+[^\s]+)?$/, "");
-  trimmed = trimmed.replace(/\s*>>?\s*["'][^"']*["']\s*$/, "");
   trimmed = trimmed.replace(/[);]+$/g, "");
   if (!trimmed || trimmed.startsWith("-")) {
     return null;
@@ -324,93 +206,34 @@ function normalizeSpawnScriptToken(token, contextLabel) {
   const trimmed = token
     .trim()
     .replace(/^['"]|['"]$/g, "")
-    .replace(/\s*[012]?>>?[^\s]*(?:\s+[^\s]+)?$/, "")
-    .replace(/[012]?>>[^\s'"]*(?:\s+[^\s]+)?$/, "")
-    .replace(/\s*>>?\s*["'][^"']*["']\s*$/, "")
     .replace(/[);]+$/g, "");
   if (!trimmed || trimmed.startsWith("-")) {
     return null;
   }
-  assertNonLiteralShellPath(trimmed, contextLabel);
+  const looksRepoRelative =
+    trimmed.startsWith("./") ||
+    trimmed.startsWith("../") ||
+    trimmed.startsWith("scripts/") ||
+    trimmed.startsWith("test/");
   const rel = normalizeEntrypointToken(trimmed);
+  if (!rel && looksRepoRelative) {
+    throw new WorkflowImportWalkError(
+      `Unresolved spawn script: ${trimmed} (${contextLabel})`,
+      { module: trimmed },
+    );
+  }
   return rel;
 }
 
 /**
- * @param {string} runText
- * @param {string} contextLabel
- */
-function assertNonLiteralBashShRunArgs(runText, contextLabel) {
-  BASH_SH_NONLITERAL_ARG_RE.lastIndex = 0;
-  for (const match of runText.matchAll(BASH_SH_NONLITERAL_ARG_RE)) {
-    let inner = (match[1] ?? "").trim();
-    if (
-      (inner.startsWith('"') && inner.endsWith('"')) ||
-      (inner.startsWith("'") && inner.endsWith("'"))
-    ) {
-      inner = inner.slice(1, -1);
-    }
-    if (/\s/.test(inner)) {
-      continue;
-    }
-    assertNonLiteralShellPath(inner, contextLabel);
-  }
-}
-
-/**
- * @param {string} relPath
- */
-function isJsLikeSourcePath(relPath) {
-  return /\.(mjs|cjs|js|ts|tsx|mts|cts)$/.test(relPath);
-}
-
-/**
- * @param {string} block
- */
-function assertNoTemplateLiteralsInSpawnArrayBlock(block) {
-  if (/`/.test(block)) {
-    throw new WorkflowImportWalkError(
-      "Template literal in spawn array (spawn array literal)",
-      { module: block.slice(0, 80) },
-    );
-  }
-}
-
-/**
- * @param {string} block
- * @param {Set<string>} entries
- */
-function collectBashPathsFromSpawnArrayBlock(block, entries) {
-  BASH_IN_QUOTED_ARRAY_STRING_RE.lastIndex = 0;
-  for (const match of block.matchAll(BASH_IN_QUOTED_ARRAY_STRING_RE)) {
-    const rel = normalizeSpawnScriptToken(match[1], "bash in spawn array string");
-    if (rel) {
-      entries.add(rel);
-    }
-  }
-}
-
-/**
  * @param {string} content
- * @param {string} relPath
  */
-function collectSpawnScriptLiteralsFromSource(content, relPath) {
-  if (!isJsLikeSourcePath(relPath)) {
-    return new Set();
-  }
+function collectSpawnScriptLiteralsFromSource(content) {
   /** @type {Set<string>} */
   const entries = new Set();
-  const stripped = stripJsComments(content, relPath);
   BASH_SH_SCRIPT_FILE_RE.lastIndex = 0;
-  for (const match of stripped.matchAll(BASH_SH_SCRIPT_FILE_RE)) {
+  for (const match of content.matchAll(BASH_SH_SCRIPT_FILE_RE)) {
     const rel = normalizeSpawnScriptToken(match[1], "bash/sh spawn in source");
-    if (rel) {
-      entries.add(rel);
-    }
-  }
-  EXEC_BASH_ONE_STRING_RE.lastIndex = 0;
-  for (const match of stripped.matchAll(EXEC_BASH_ONE_STRING_RE)) {
-    const rel = normalizeSpawnScriptToken(match[1], "execSync bash/sh string");
     if (rel) {
       entries.add(rel);
     }
@@ -466,22 +289,6 @@ export function extractRepoScriptEntrypointsFromRun(
     }
   }
 
-  for (const match of runText.matchAll(BARE_TSX_ENTRY_RE)) {
-    const raw = match[1] ?? match[2];
-    const rel = normalizeEntrypointToken(raw);
-    if (rel) {
-      entries.add(rel);
-    }
-  }
-
-  for (const match of runText.matchAll(NPM_EXEC_ENTRY_RE)) {
-    const raw = match[1] ?? match[2];
-    const rel = normalizeEntrypointToken(raw);
-    if (rel) {
-      entries.add(rel);
-    }
-  }
-
   if (NPM_TEST_RE.test(runText) && scripts.test) {
     for (const rel of resolveNpmRunScriptEntrypoints("test", scripts, seenNpm)) {
       entries.add(rel);
@@ -501,17 +308,6 @@ export function extractRepoScriptEntrypointsFromRun(
     }
   }
 
-  assertNonLiteralBashShRunArgs(runText, "bash/sh in workflow run");
-
-  DIRECT_DOT_SLASH_SCRIPT_RUN_RE.lastIndex = 0;
-  for (const match of runText.matchAll(DIRECT_DOT_SLASH_SCRIPT_RUN_RE)) {
-    const raw = match[2] ?? match[1];
-    const rel = normalizeEntrypointToken(raw);
-    if (rel) {
-      entries.add(rel);
-    }
-  }
-
   BASH_SH_SCRIPT_FILE_RE.lastIndex = 0;
   for (const match of runText.matchAll(BASH_SH_SCRIPT_FILE_RE)) {
     const rel = normalizeSpawnScriptToken(match[1], "bash/sh in workflow run");
@@ -526,17 +322,9 @@ export function extractRepoScriptEntrypointsFromRun(
 /**
  * @param {string} content
  * @param {Record<string, string>} scripts
- * @param {string} relPath
  * @returns {string[]}
  */
-export function extractSpawnedRepoScriptEntrypointsFromSource(
-  content,
-  scripts,
-  relPath,
-) {
-  if (!isJsLikeSourcePath(relPath)) {
-    return [];
-  }
+export function extractSpawnedRepoScriptEntrypointsFromSource(content, scripts) {
   /** @type {Set<string>} */
   const entries = new Set();
   const seenNpm = new Set();
@@ -551,17 +339,9 @@ export function extractSpawnedRepoScriptEntrypointsFromSource(
     re.lastIndex = 0;
     for (const match of content.matchAll(re)) {
       const block = match[1];
-      assertNoTemplateLiteralsInSpawnArrayBlock(block);
-      if (re === SPAWN_BASH_ARRAY_RE || re === SPAWN_SH_ARRAY_RE) {
-        const SPAWN_ARRAY_ANY_QUOTED_RE = /["']([^"']+)["']/g;
-        for (const lit of block.matchAll(SPAWN_ARRAY_ANY_QUOTED_RE)) {
-          assertNonLiteralShellPath(lit[1], "spawn array literal");
-        }
-        collectBashPathsFromSpawnArrayBlock(block, entries);
-      }
       ARRAY_STRING_LITERAL_RE.lastIndex = 0;
       for (const lit of block.matchAll(ARRAY_STRING_LITERAL_RE)) {
-        const rel = normalizeSpawnScriptToken(lit[1], "spawn array literal");
+        const rel = normalizeEntrypointToken(lit[1]);
         if (rel) {
           entries.add(rel);
         }
@@ -588,7 +368,7 @@ export function extractSpawnedRepoScriptEntrypointsFromSource(
     }
   }
 
-  for (const rel of collectSpawnScriptLiteralsFromSource(content, relPath)) {
+  for (const rel of collectSpawnScriptLiteralsFromSource(content)) {
     entries.add(rel);
   }
 
@@ -633,7 +413,6 @@ export function walkReachableWithImportsAndSpawns(
     for (const spawned of extractSpawnedRepoScriptEntrypointsFromSource(
       content,
       scripts,
-      rel,
     )) {
       assertEntrypointExists(repoRoot, spawned);
       entrypoints.add(spawned);
@@ -642,15 +421,13 @@ export function walkReachableWithImportsAndSpawns(
       }
     }
 
-    if (isJsLikeSourcePath(rel)) {
-      for (const spec of collectStaticModuleSpecifiers(content, rel)) {
-        if (!isRepoRelativeSpecifier(spec, tsAliasRoot)) {
-          continue;
-        }
-        const importRel = resolveRepoModuleOrThrow(repoRoot, abs, spec, tsAliasRoot);
-        if (!reachable.has(importRel)) {
-          queue.push(importRel);
-        }
+    for (const spec of collectStaticModuleSpecifiers(content)) {
+      if (!isRepoRelativeSpecifier(spec, tsAliasRoot)) {
+        continue;
+      }
+      const importRel = resolveRepoModuleOrThrow(repoRoot, abs, spec, tsAliasRoot);
+      if (!reachable.has(importRel)) {
+        queue.push(importRel);
       }
     }
   }
@@ -810,35 +587,26 @@ export function resolveRepoModuleOrThrow(repoRoot, fromAbs, spec, tsAliasRoot) {
 
 /**
  * @param {string} content
- * @param {string} [relPath]
  * @returns {string[]}
  */
-export function collectStaticModuleSpecifiers(content, relPath = "snippet.js") {
+export function collectStaticModuleSpecifiers(content) {
   /** @type {Set<string>} */
   const specs = new Set();
-  assertSourceParsesCleanly(content, relPath);
 
-  let preprocessed;
-  try {
-    preprocessed = ts.preProcessFile(content, true, true);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new WorkflowImportWalkError(
-      `preProcessFile failed (${relPath}): ${message}`,
-      { module: relPath },
-    );
-  }
-
-  for (const imported of preprocessed.importedFiles) {
-    if (imported.fileName) {
-      specs.add(imported.fileName);
+  for (const re of [
+    STATIC_FROM_RE,
+    COMPACT_IMPORT_FROM_RE,
+    COMPACT_EXPORT_FROM_RE,
+    COMPACT_SIDE_EFFECT_IMPORT_RE,
+    STATIC_IMPORT_SIDE_EFFECT_RE,
+    DYNAMIC_IMPORT_RE,
+    REQUIRE_RE,
+    CREATE_REQUIRE_RE,
+  ]) {
+    re.lastIndex = 0;
+    for (const match of content.matchAll(re)) {
+      specs.add(match[1]);
     }
-  }
-
-  const stripped = stripJsComments(content, relPath);
-  CREATE_REQUIRE_THEN_CALL_RE.lastIndex = 0;
-  for (const match of stripped.matchAll(CREATE_REQUIRE_THEN_CALL_RE)) {
-    specs.add(match[1]);
   }
 
   return [...specs];
@@ -859,12 +627,9 @@ export function walkStaticImportsFromEntry(repoRoot, entryRel, visited, tsAliasR
   if (!REPO_SOURCE_EXT.test(entryRel)) {
     return;
   }
-  if (entryRel.endsWith(".sh")) {
-    return;
-  }
   const abs = resolve(repoRoot, entryRel);
   const content = readFileSync(abs, "utf8");
-  for (const spec of collectStaticModuleSpecifiers(content, entryRel)) {
+  for (const spec of collectStaticModuleSpecifiers(content)) {
     if (!isRepoRelativeSpecifier(spec, tsAliasRoot)) {
       continue;
     }
