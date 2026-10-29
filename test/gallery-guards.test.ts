@@ -936,87 +936,166 @@ steps:
       );
     });
 
-    it("QA round 3: split config names, jsx scan, preview GITHUB_ENV", () => {
-      const deployMsg =
-        "scripts/evil.sh must not run wrangler deploy/versions deploy with wrangler.gallery.jsonc.";
-      const previewMsg =
-        "scripts/evil.sh must not run wrangler preview with wrangler.gallery.jsonc (only .github/workflows/gallery-preview.yml).";
-      const yamlDeployMsg =
-        "evil.yml must not run wrangler deploy/versions deploy with wrangler.gallery.jsonc.";
-      const yamlPreviewMsg =
-        "evil.yml must not run wrangler preview with wrangler.gallery.jsonc (only .github/workflows/gallery-preview.yml).";
-      const mjsDeployMsg =
-        "scripts/evil.mjs must not run wrangler deploy/versions deploy with wrangler.gallery.jsonc.";
-      const mjsPreviewMsg =
-        "scripts/evil.mjs must not run wrangler preview with wrangler.gallery.jsonc (only .github/workflows/gallery-preview.yml).";
-
-      expect(
-        collectGalleryDeployViolations(
-          readFixture("bad-sh-backslash-config-deploy.sh"),
-          "scripts/evil.sh",
-        ),
-      ).toContain(deployMsg);
-      expect(
-        collectGalleryPreviewLocationViolations(
-          readFixture("bad-sh-backslash-config-preview.sh"),
-          "scripts/evil.sh",
-        ),
-      ).toContain(previewMsg);
-
-      expect(
-        collectGalleryDeployViolations(
-          readFixture("bad-yaml-run-backslash-config-deploy.yml"),
-          "evil.yml",
-          { isYaml: true },
-        ),
-      ).toContain(yamlDeployMsg);
-      expect(
-        collectGalleryPreviewLocationViolations(
-          readFixture("bad-yaml-run-backslash-config-preview.yml"),
-          "evil.yml",
-          { isYaml: true },
-        ),
-      ).toContain(yamlPreviewMsg);
-
-      expect(
-        collectGalleryDeployViolations(
-          readFixture("bad-js-template-backslash-config-deploy.mjs"),
-          "scripts/evil.mjs",
-        ),
-      ).toContain(mjsDeployMsg);
-      expect(
-        collectGalleryPreviewLocationViolations(
-          readFixture("bad-js-template-backslash-config-preview.mjs"),
-          "scripts/evil.mjs",
-        ),
-      ).toContain(mjsPreviewMsg);
-
-      expect(
-        collectGalleryPreviewLocationViolations(
-          readFixture("bad-src-gallery-preview.jsx"),
-          "src/evil/preview.jsx",
-        ),
-      ).toContain(
-        "src/evil/preview.jsx must not run wrangler preview with wrangler.gallery.jsonc (only .github/workflows/gallery-preview.yml).",
-      );
-
-      const githubPreviewMsg =
-        "evil.yml must not write gallery wrangler config to GITHUB_ENV.";
-      expect(
-        collectGalleryPreviewLocationViolations(
-          readFixture("bad-yaml-github-env-direct-config.yml"),
-          "evil.yml",
-          { isYaml: true },
-        ),
-      ).toContain(githubPreviewMsg);
-
+    it("QA round 3: joined split config reference and jsx runGalleryGuards", () => {
       expect(textReferencesGalleryWranglerConfig("wrangler.gal\n  lery.jsonc")).toBe(
         false,
       );
-      expect(textReferencesGalleryWranglerConfig("wrangler.gal\\\nlery.jsonc")).toBe(
-        true,
-      );
+      expect(
+        textReferencesGalleryWranglerConfig(
+          joinShellContinuations("wrangler.gal\\\nlery.jsonc"),
+        ),
+      ).toBe(true);
+
+      const rootJsx = mkdtempSync(join(tmpdir(), "gallery-guards-qa3-jsx-"));
+      try {
+        writeGalleryFixtureRoot(rootJsx);
+        mkdirSync(join(rootJsx, "src/evil"), { recursive: true });
+        writeFileSync(
+          join(rootJsx, "src/evil/preview.jsx"),
+          readFixture("bad-src-gallery-preview.jsx"),
+        );
+        expect(runGalleryGuards(rootJsx)).toContain(
+          "src/evil/preview.jsx must not run wrangler preview with wrangler.gallery.jsonc (only .github/workflows/gallery-preview.yml).",
+        );
+      } finally {
+        rmSync(rootJsx, { recursive: true, force: true });
+      }
     });
+
+    const splitContinuationCases = [
+      {
+        label: "wran|gler",
+        deployBefore: "npx wran",
+        deployAfter: "gler deploy --config wrangler.gallery.jsonc",
+        previewBefore: "npx wran",
+        previewAfter:
+          "gler preview --config wrangler.gallery.jsonc --worker-name we-met --ignore-base-config --name x --json",
+      },
+      {
+        label: "wrangler.|gallery",
+        deployBefore: "npx wrangler deploy --config wrangler.",
+        deployAfter: "gallery.jsonc",
+        previewBefore: "npx wrangler preview --config wrangler.",
+        previewAfter:
+          "gallery.jsonc --worker-name we-met --ignore-base-config --name x --json",
+      },
+      {
+        label: "wrangler.gal|lery",
+        deployBefore: "npx wrangler deploy --config wrangler.gal",
+        deployAfter: "lery.jsonc",
+        previewBefore: "npx wrangler preview --config wrangler.gal",
+        previewAfter:
+          "lery.jsonc --worker-name we-met --ignore-base-config --name x --json",
+      },
+      {
+        label: "galle|ry",
+        deployBefore: "npx wrangler deploy --config wrangler.galle",
+        deployAfter: "ry.jsonc",
+        previewBefore: "npx wrangler preview --config wrangler.galle",
+        previewAfter:
+          "ry.jsonc --worker-name we-met --ignore-base-config --name x --json",
+      },
+      {
+        label: "gallery.|jsonc",
+        deployBefore: "npx wrangler deploy --config wrangler.gallery.",
+        deployAfter: "jsonc",
+        previewBefore: "npx wrangler preview --config wrangler.gallery.",
+        previewAfter: "jsonc --worker-name we-met --ignore-base-config --name x --json",
+      },
+      {
+        label: "de|ploy",
+        deployBefore: "npx wrangler de",
+        deployAfter: "ploy --config wrangler.gallery.jsonc",
+        previewBefore: "npx wrangler pre",
+        previewAfter:
+          "view --config wrangler.gallery.jsonc --worker-name we-met --ignore-base-config --name x --json",
+      },
+    ] as const;
+
+    function shellContinuationCommand(before: string, after: string): string {
+      return `${before}\\\n${after}`;
+    }
+
+    function shellScriptWithContinuation(before: string, after: string): string {
+      return `#!/usr/bin/env bash\nset -euo pipefail\n${shellContinuationCommand(before, after)}\n`;
+    }
+
+    function yamlRunWithContinuation(before: string, after: string): string {
+      const body = shellContinuationCommand(before, after).replace(
+        /\n/g,
+        "\n          ",
+      );
+      return `jobs:\n  evil:\n    runs-on: ubuntu-latest\n    steps:\n      - run: |\n          ${body}\n`;
+    }
+
+    function mjsWithContinuation(before: string, after: string): string {
+      return `import { execSync } from "node:child_process";\nexport function evil() {\n  execSync(\n    "${before}\\\n${after}",\n  );\n}\n`;
+    }
+
+    it.each(
+      splitContinuationCases.flatMap((split) =>
+        (
+          [
+            ["deploy", "sh", "scripts/evil.sh", false] as const,
+            ["deploy", "yaml", "evil.yml", true] as const,
+            ["deploy", "mjs", "scripts/evil.mjs", false] as const,
+            ["preview", "sh", "scripts/evil.sh", false] as const,
+            ["preview", "yaml", "evil.yml", true] as const,
+            ["preview", "mjs", "scripts/evil.mjs", false] as const,
+          ] as const
+        ).map(([mode, format, path, isYaml]) => ({
+          ...split,
+          mode,
+          format,
+          path,
+          isYaml,
+        })),
+      ),
+    )(
+      "flags backslash split $label in $format for $mode",
+      ({
+        mode,
+        format,
+        path,
+        isYaml,
+        deployBefore,
+        deployAfter,
+        previewBefore,
+        previewAfter,
+      }) => {
+        const before = mode === "deploy" ? deployBefore : previewBefore;
+        const after = mode === "deploy" ? deployAfter : previewAfter;
+        let content: string;
+        if (format === "sh") {
+          content = shellScriptWithContinuation(before, after);
+        } else if (format === "yaml") {
+          content = yamlRunWithContinuation(before, after);
+        } else {
+          content = mjsWithContinuation(before, after);
+        }
+        if (mode === "deploy") {
+          expect(
+            collectGalleryDeployViolations(
+              content,
+              path,
+              isYaml ? { isYaml: true } : {},
+            ),
+          ).toContain(
+            `${path} must not run wrangler deploy/versions deploy with wrangler.gallery.jsonc.`,
+          );
+        } else {
+          expect(
+            collectGalleryPreviewLocationViolations(
+              content,
+              path,
+              isYaml ? { isYaml: true } : {},
+            ),
+          ).toContain(
+            `${path} must not run wrangler preview with wrangler.gallery.jsonc (only .github/workflows/gallery-preview.yml).`,
+          );
+        }
+      },
+    );
   });
 });
 

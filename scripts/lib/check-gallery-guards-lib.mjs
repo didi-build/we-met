@@ -84,7 +84,7 @@ export function joinShellContinuations(text) {
   for (const line of lines) {
     const trimmed = line.replace(/\s+$/, "");
     if (trimmed.endsWith("\\")) {
-      buffer += `${trimmed.slice(0, -1).trimEnd()} `;
+      buffer += trimmed.slice(0, -1);
       continue;
     }
     buffer += line;
@@ -148,12 +148,6 @@ export function textReferencesGalleryWranglerConfig(text) {
     return true;
   }
   if (/-c[= ]wrangler\.gallery\.jsonc/.test(text)) {
-    return true;
-  }
-  if (/wrangler\.gal\\/.test(text)) {
-    return true;
-  }
-  if (/wrangler\.gal lery\.jsonc/.test(text)) {
     return true;
   }
   return false;
