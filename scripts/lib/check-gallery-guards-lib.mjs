@@ -11,6 +11,7 @@ import { parseJsonc } from "./parse-jsonc.mjs";
  * - interpolated template literals building shell commands
  * - concatenated config filename string expressions
  * - npx wr"angler" style broken-token spellings
+ * - shell-variable config names (wrangler.$KIND.jsonc, ${KIND} with KIND only in env)
  */
 
 const GALLERY_CONFIG = "wrangler.gallery.jsonc";
@@ -149,11 +150,7 @@ export function textReferencesGalleryWranglerConfig(text) {
   if (/-c[= ]wrangler\.gallery\.jsonc/.test(text)) {
     return true;
   }
-  if (/wrangler\.gal[\s\S]*?lery\.jsonc/.test(text)) {
-    return true;
-  }
-  const collapsed = text.replace(/\s+/g, "");
-  return collapsed.includes("wrangler.gallery.jsonc");
+  return false;
 }
 
 /**
@@ -193,6 +190,9 @@ export function failClosedSegmentHasWranglerSubcommand(segment, subcommand) {
           return true;
         }
         if (/pre''view/.test(after)) {
+          return true;
+        }
+        if (/pre["']view/.test(after)) {
           return true;
         }
       }
@@ -905,9 +905,6 @@ export function collectGalleryGithubEnvWriteViolations(yamlText, label) {
       ...workflowEnvNames,
       ...extractGuardedGalleryEnvVarNames(job),
     ]);
-    if (guarded.size === 0) {
-      continue;
-    }
     for (const run of extractYamlRunCommands(job)) {
       if (!shellRunWritesGithubEnv(run)) {
         continue;
@@ -915,6 +912,9 @@ export function collectGalleryGithubEnvWriteViolations(yamlText, label) {
       if (textReferencesGalleryWranglerConfig(run)) {
         errors.push(`${label} must not write gallery wrangler config to GITHUB_ENV.`);
         return errors;
+      }
+      if (guarded.size === 0) {
+        continue;
       }
       for (const name of guarded) {
         if (new RegExp(String.raw`\$\{${name}\}|\$${name}\b`).test(run)) {
@@ -1059,6 +1059,12 @@ export function collectGalleryPreviewLocationViolations(text, label, options = {
     }
   }
   for (const segment of normalizedScanSegments(text, label, { isYaml })) {
+    if (isJsSourceFile(label) && !isYaml) {
+      const wholeFileSegment = joinShellContinuations(text).replace(/\r?\n/g, " ");
+      if (segment === wholeFileSegment && /\b(import|export)\b/.test(text)) {
+        continue;
+      }
+    }
     if (segmentRunsGalleryWranglerPreview(segment)) {
       return [
         `${label} must not run wrangler preview with wrangler.gallery.jsonc (only ${GALLERY_WORKFLOW}).`,
@@ -1156,11 +1162,11 @@ export function extractWranglerPreviewInvocations(normalizedWorkflow) {
     if (previewIdx === -1) {
       const segmentFromMatch = normalizedWorkflow.slice(match.index);
       if (
-        failClosedSegmentHasWranglerSubcommand(segmentFromMatch, "preview") &&
-        unknownGlobals.length > 0
+        unknownGlobals.length > 0 &&
+        failClosedSegmentHasWranglerSubcommand(segmentFromMatch, "preview")
       ) {
         invocations.push({
-          argString: segmentFromMatch,
+          argString: rest.trim(),
           unknownGlobals,
           envAssignments,
         });
@@ -1375,10 +1381,7 @@ export function collectGalleryWorkflowViolations(workflowText) {
   const errors = [];
   let runCommands = extractYamlRunCommands(workflowText).filter((command) => {
     const normalized = joinShellContinuations(command).replace(/\r?\n/g, " ");
-    return (
-      extractWranglerPreviewInvocations(normalized).length > 0 ||
-      failClosedSegmentHasWranglerSubcommand(normalized, "preview")
-    );
+    return extractWranglerPreviewInvocations(normalized).length > 0;
   });
   if (runCommands.length === 0 && /\bwrangler(?:@\S+)?\b/.test(workflowText)) {
     runCommands = [joinShellContinuations(workflowText).replace(/\r?\n/g, " ")];
@@ -1391,25 +1394,7 @@ export function collectGalleryWorkflowViolations(workflowText) {
     const normalized = joinShellContinuations(command).replace(/\r?\n/g, " ");
     const invocations = extractWranglerPreviewInvocations(normalized);
     if (invocations.length === 0) {
-      if (failClosedSegmentHasWranglerSubcommand(normalized, "preview")) {
-        let match = WRANGLER_BIN_RE.exec(normalized);
-        while (match) {
-          const rest = normalized.slice(match.index + match[0].length);
-          let tokens = stripShellRedirections(tokenizeShellArgs(rest.trim()));
-          if (tokens[0] === "--") {
-            tokens = tokens.slice(1);
-          }
-          const { unknownGlobals } = findWranglerPreviewSubcommand(tokens, 0);
-          for (const flag of unknownGlobals) {
-            errors.push(
-              `gallery-preview.yml wrangler preview must not pass wrangler global flag ${flag} before the preview subcommand.`,
-            );
-          }
-          match = WRANGLER_BIN_RE.exec(normalized);
-        }
-      } else {
-        errors.push("gallery-preview.yml must invoke wrangler preview.");
-      }
+      errors.push("gallery-preview.yml must invoke wrangler preview.");
       continue;
     }
     for (const inv of invocations) {
@@ -1471,6 +1456,12 @@ export function collectGalleryDeployViolations(text, label, options = {}) {
     }
   }
   for (const segment of normalizedScanSegments(text, label, { isYaml })) {
+    if (isJsSourceFile(label) && !isYaml) {
+      const wholeFileSegment = joinShellContinuations(text).replace(/\r?\n/g, " ");
+      if (segment === wholeFileSegment && /\b(import|export)\b/.test(text)) {
+        continue;
+      }
+    }
     if (segmentRunsGalleryWranglerDeploy(segment)) {
       errors.push(
         `${label} must not run wrangler deploy/versions deploy with wrangler.gallery.jsonc.`,

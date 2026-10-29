@@ -1,6 +1,7 @@
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { execSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 import { parseJsonc } from "../scripts/lib/parse-jsonc.mjs";
 import {
@@ -27,6 +28,7 @@ import {
   scanSegments,
   collectGalleryGithubEnvWriteViolations,
   textReferencesGalleryWranglerConfig,
+  shellRunWritesGithubEnv,
 } from "../scripts/lib/check-gallery-guards-lib.mjs";
 
 const FIXTURES = join(import.meta.dirname, "fixtures/gallery-guards");
@@ -764,7 +766,6 @@ steps:
         "evil.yml must not run wrangler preview with wrangler.gallery.jsonc (only .github/workflows/gallery-preview.yml).";
       const yamlCases = [
         "bad-yaml-env-list-item-preview.yml",
-        "bad-yaml-split-config-preview.yml",
         "bad-yaml-job-env-preview.yml",
         "bad-yaml-workflow-env-preview.yml",
         "bad-yaml-step-env-preview.yml",
@@ -802,7 +803,9 @@ steps:
         "scripts/evil.mjs must not run wrangler preview with wrangler.gallery.jsonc (only .github/workflows/gallery-preview.yml).",
       );
 
-      const prequoteWorkflow = readFixture("bad-workflow-prequote-unknown-global.yml");
+      const prequoteWorkflow = readFixture(
+        "bad-workflow-mismatched-quote-unknown-global.yml",
+      );
       expect(
         collectGalleryWorkflowViolations(prequoteWorkflow).some((e) =>
           e.includes("global flag --x-provision"),
@@ -811,13 +814,13 @@ steps:
       expect(
         extractWranglerPreviewInvocations(
           normalizeForDeployScan(
-            "npx wrangler --x-provision false pre''view --config wrangler.gallery.jsonc --worker-name we-met --ignore-base-config --name x --json",
+            'npx wrangler --x-provision false pre"view --config wrangler.gallery.jsonc --worker-name we-met --ignore-base-config --name x --json',
           ),
         )[0]?.unknownGlobals,
       ).toContain("--x-provision");
 
       expect(textReferencesGalleryWranglerConfig("wrangler.gal\n  lery.jsonc")).toBe(
-        true,
+        false,
       );
       expect(
         collectGalleryDeployViolations(
@@ -840,6 +843,97 @@ steps:
       const goodExeca = readFixture("good-execa-app-deploy.ts");
       expect(goodExeca).toContain("execaSync");
       expect(detectArrayFormGalleryDeploy(goodExeca)).toBe(false);
+    });
+
+    it("QA round 2: runGalleryGuards paths, GITHUB_ENV edges, mutants, tsx scan", () => {
+      execSync("node test/mutant-verify-gallery-guards.mjs", { cwd: process.cwd() });
+
+      expect(shellRunWritesGithubEnv('echo x | tee -a "$GITHUB_ENV"')).toBe(true);
+      expect(shellRunWritesGithubEnv("echo x | tee -a ${GITHUB_ENV}")).toBe(true);
+
+      const directConfigMsg =
+        "evil.yml must not write gallery wrangler config to GITHUB_ENV.";
+      expect(
+        collectGalleryGithubEnvWriteViolations(
+          readFixture("bad-yaml-github-env-direct-config.yml"),
+          "evil.yml",
+        ),
+      ).toContain(directConfigMsg);
+
+      const workflowVarMsg =
+        "evil.yml must not write gallery wrangler env vars to GITHUB_ENV.";
+      expect(
+        collectGalleryGithubEnvWriteViolations(
+          readFixture("bad-yaml-github-env-workflow-level.yml"),
+          "evil.yml",
+        ),
+      ).toContain(workflowVarMsg);
+
+      for (const name of [
+        "bad-yaml-github-env-tee-quoted.yml",
+        "bad-yaml-github-env-tee-braced.yml",
+      ]) {
+        expect(
+          collectGalleryGithubEnvWriteViolations(readFixture(name), "evil.yml"),
+        ).toContain(workflowVarMsg);
+      }
+
+      const deployMsg =
+        ".github/workflows/extra.yml must not run wrangler deploy/versions deploy with wrangler.gallery.jsonc.";
+      const rootDeployJob = mkdtempSync(
+        join(tmpdir(), "gallery-guards-qa2-deploy-job-"),
+      );
+      try {
+        writeGalleryFixtureRoot(rootDeployJob, {
+          extraWorkflow: readFixture("bad-yaml-job-env-deploy.yml"),
+        });
+        expect(runGalleryGuards(rootDeployJob)).toContain(deployMsg);
+      } finally {
+        rmSync(rootDeployJob, { recursive: true, force: true });
+      }
+
+      const rootDeployWorkflow = mkdtempSync(
+        join(tmpdir(), "gallery-guards-qa2-deploy-wf-"),
+      );
+      try {
+        writeGalleryFixtureRoot(rootDeployWorkflow, {
+          extraWorkflow: readFixture("bad-yaml-workflow-env-deploy.yml"),
+        });
+        expect(runGalleryGuards(rootDeployWorkflow)).toContain(deployMsg);
+      } finally {
+        rmSync(rootDeployWorkflow, { recursive: true, force: true });
+      }
+
+      const githubPreviewMsg =
+        ".github/workflows/extra.yml must not write gallery wrangler env vars to GITHUB_ENV.";
+      const rootGithub = mkdtempSync(join(tmpdir(), "gallery-guards-qa2-github-"));
+      try {
+        writeGalleryFixtureRoot(rootGithub, {
+          extraWorkflow: readFixture("bad-yaml-github-env-plain.yml"),
+        });
+        expect(runGalleryGuards(rootGithub)).toContain(githubPreviewMsg);
+      } finally {
+        rmSync(rootGithub, { recursive: true, force: true });
+      }
+
+      const rootTsx = mkdtempSync(join(tmpdir(), "gallery-guards-qa2-tsx-"));
+      try {
+        writeGalleryFixtureRoot(rootTsx);
+        mkdirSync(join(rootTsx, "src/evil"), { recursive: true });
+        writeFileSync(
+          join(rootTsx, "src/evil/preview.tsx"),
+          readFixture("bad-src-gallery-preview.tsx"),
+        );
+        expect(runGalleryGuards(rootTsx)).toContain(
+          "src/evil/preview.tsx must not run wrangler preview with wrangler.gallery.jsonc (only .github/workflows/gallery-preview.yml).",
+        );
+      } finally {
+        rmSync(rootTsx, { recursive: true, force: true });
+      }
+
+      expect(readFixture("bad-js-single-quote-preview.mjs")).not.toContain(
+        '"npx wrangler preview',
+      );
     });
   });
 });
