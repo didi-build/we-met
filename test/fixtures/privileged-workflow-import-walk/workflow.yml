@@ -1,0 +1,8 @@
+name: privileged-workflow-import-walk fixture
+on:
+  workflow_dispatch:
+jobs:
+  walk:
+    runs-on: ubuntu-latest
+    steps:
+      - run: node test/fixtures/privileged-workflow-import-walk/entry.mjs
