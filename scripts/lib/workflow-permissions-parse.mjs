@@ -18,13 +18,38 @@ export function normalizePermissionsValue(permissions) {
     const map = {};
     for (const [key, value] of Object.entries(permissions)) {
       if (value === null || value === undefined) {
-        continue;
+        return null;
       }
       map[String(key).toLowerCase()] = String(value).toLowerCase().trim();
     }
+    if (Object.keys(map).length === 0) {
+      return null;
+    }
     return map;
   }
-  return { __invalid__: "true" };
+  return null;
+}
+
+/**
+ * @param {unknown} doc
+ * @returns {Record<string, string>[]}
+ */
+function collectJobPermissionMaps(doc) {
+  /** @type {Record<string, string>[]} */
+  const maps = [];
+  const jobs = doc.jobs;
+  if (!jobs || typeof jobs !== "object") {
+    return maps;
+  }
+  for (const job of Object.values(jobs)) {
+    if (job && typeof job === "object" && "permissions" in job) {
+      const map = normalizePermissionsValue(job.permissions);
+      if (map) {
+        maps.push(map);
+      }
+    }
+  }
+  return maps;
 }
 
 /**
@@ -36,26 +61,14 @@ export function extractWorkflowPermissionsMaps(content) {
   if (!doc || typeof doc !== "object") {
     return [];
   }
-  /** @type {Record<string, string>[]} */
-  const maps = [];
-  if ("permissions" in doc) {
-    const map = normalizePermissionsValue(doc.permissions);
-    if (map) {
-      maps.push(map);
-    }
+  if (!("permissions" in doc)) {
+    return [];
   }
-  const jobs = doc.jobs;
-  if (jobs && typeof jobs === "object") {
-    for (const job of Object.values(jobs)) {
-      if (job && typeof job === "object" && "permissions" in job) {
-        const map = normalizePermissionsValue(job.permissions);
-        if (map) {
-          maps.push(map);
-        }
-      }
-    }
+  const workflowMap = normalizePermissionsValue(doc.permissions);
+  if (!workflowMap) {
+    return [];
   }
-  return maps;
+  return [workflowMap, ...collectJobPermissionMaps(doc)];
 }
 
 /**
@@ -76,13 +89,39 @@ export function permissionsMapEquals(map, expected) {
 }
 
 /**
+ * @param {unknown} doc
+ * @param {Record<string, string>} expected
+ */
+function workflowPermissionsDocumentAllowOnly(doc, expected) {
+  if (!doc || typeof doc !== "object") {
+    return false;
+  }
+  if (!("permissions" in doc)) {
+    return false;
+  }
+  const workflowMap = normalizePermissionsValue(doc.permissions);
+  if (!workflowMap || !permissionsMapEquals(workflowMap, expected)) {
+    return false;
+  }
+  const jobs = doc.jobs;
+  if (jobs && typeof jobs === "object") {
+    for (const job of Object.values(jobs)) {
+      if (job && typeof job === "object" && "permissions" in job) {
+        const jobMap = normalizePermissionsValue(job.permissions);
+        if (!jobMap || !permissionsMapEquals(jobMap, expected)) {
+          return false;
+        }
+      }
+    }
+  }
+  return true;
+}
+
+/**
  * @param {string} workflowYaml
  * @param {Record<string, string>} expected
  */
 export function workflowPermissionsAllowOnly(workflowYaml, expected) {
-  const maps = extractWorkflowPermissionsMaps(workflowYaml);
-  if (maps.length === 0) {
-    return false;
-  }
-  return maps.every((map) => permissionsMapEquals(map, expected));
+  const doc = parseYaml(workflowYaml);
+  return workflowPermissionsDocumentAllowOnly(doc, expected);
 }
