@@ -32,7 +32,7 @@ export function normalizePermissionsValue(permissions) {
 
 /**
  * @param {unknown} doc
- * @returns {Record<string, string>[]}
+ * @returns {Record<string, string>[] | null}
  */
 function collectJobPermissionMaps(doc) {
   /** @type {Record<string, string>[]} */
@@ -44,9 +44,10 @@ function collectJobPermissionMaps(doc) {
   for (const job of Object.values(jobs)) {
     if (job && typeof job === "object" && "permissions" in job) {
       const map = normalizePermissionsValue(job.permissions);
-      if (map) {
-        maps.push(map);
+      if (!map) {
+        return null;
       }
+      maps.push(map);
     }
   }
   return maps;
@@ -68,7 +69,11 @@ export function extractWorkflowPermissionsMaps(content) {
   if (!workflowMap) {
     return [];
   }
-  return [workflowMap, ...collectJobPermissionMaps(doc)];
+  const jobMaps = collectJobPermissionMaps(doc);
+  if (jobMaps === null) {
+    return [];
+  }
+  return [workflowMap, ...jobMaps];
 }
 
 /**

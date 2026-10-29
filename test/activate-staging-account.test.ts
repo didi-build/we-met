@@ -135,9 +135,9 @@ function wranglerSuccessStdout(changes: number, success = true) {
 
 describe("validateActivationEmail (unit)", () => {
   it("accepts typical maintainer emails", () => {
-    expect(validateActivationEmail("diadem@didi.build")).toEqual({
+    expect(validateActivationEmail("maintainer@example.com")).toEqual({
       ok: true,
-      normalized: "diadem@didi.build",
+      normalized: "maintainer@example.com",
     });
   });
 
@@ -154,6 +154,22 @@ describe("validateActivationEmail (unit)", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.reason).toBe("email must be a string");
+    }
+  });
+
+  it("rejects SQL block comment open sequences on their own", () => {
+    const result = validateActivationEmail("us/*er@example.com");
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toBe("email contains forbidden sequences");
+    }
+  });
+
+  it("rejects SQL block comment close sequences on their own", () => {
+    const result = validateActivationEmail("us*/er@example.com");
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toBe("email contains forbidden sequences");
     }
   });
 
@@ -356,7 +372,7 @@ describe("assertWranglerConfigD1Binding (unit)", () => {
 
 describe("buildActivationUpdateCommand (unit)", () => {
   const iso = "2026-10-28T12:00:00.000Z";
-  const email = "diadem@didi.build";
+  const email = "maintainer@example.com";
 
   it("places email only in the WHERE string literal", () => {
     const sql = buildActivationUpdateCommand(email, iso);
@@ -487,7 +503,7 @@ describe("runActivation (unit)", () => {
   it("does not forward wrangler stdout or stderr through process or console sinks", () => {
     const configPath = validWranglerConfig();
     const wranglerPayload = "leaked-from-wrangler@example.com";
-    const rawEmail = "Operator@Example.com";
+    const rawEmail = "operator@example.com";
     const io = captureIo();
     try {
       runActivation({
@@ -543,7 +559,7 @@ describe("runActivation (unit)", () => {
       stderr: "",
     }));
     runActivation({
-      email: "Operator@Example.com",
+      email: "Operator@example.com",
       config: configPath,
       env: testEnv(),
       spawnSyncFn,
@@ -554,7 +570,7 @@ describe("runActivation (unit)", () => {
     const argv = vi.mocked(spawnSyncFn).mock.calls[0]?.[1] as string[] | undefined;
     const sql = argv?.[argv.indexOf("--command") + 1];
     expect(sql).toContain("operator@example.com");
-    expect(sql).not.toContain("Operator@Example.com");
+    expect(sql).not.toContain("Operator@example.com");
   });
 
   it("reports a safe wrangler failure with exit code only", () => {
@@ -587,7 +603,7 @@ describe("runActivation (unit)", () => {
     const configPath = validWranglerConfig();
     const masked: string[] = [];
     runActivation({
-      email: "Operator@Example.com",
+      email: "Operator@example.com",
       config: configPath,
       env: testEnv(),
       spawnSyncFn: mockSpawn(() => ({
@@ -654,7 +670,7 @@ describe("runActivationFromCliOrEvent (unit)", () => {
     const eventDir = mkdtempSync(join(tmpdir(), "activate-event-"));
     const eventPath = join(eventDir, "github-event.json");
     try {
-      writeFileSync(eventPath, JSON.stringify({ inputs: { email: "QA@Example.com" } }));
+      writeFileSync(eventPath, JSON.stringify({ inputs: { email: "Qa@example.com" } }));
       const outputLines: string[] = [];
       const logLine = (line: string) => {
         outputLines.push(line);
@@ -676,7 +692,7 @@ describe("runActivationFromCliOrEvent (unit)", () => {
         maskActivationEmailForLogsFn: () => {},
         now: () => new Date("2026-10-28T12:00:00.000Z"),
       });
-      expect(outputLines[0]).toBe("::add-mask::QA@Example.com");
+      expect(outputLines[0]).toBe("::add-mask::Qa@example.com");
       expect(outputLines[1]).toBe("::add-mask::qa@example.com");
       expect(outputLines[0]).not.toBe("::add-mask::qa@example.com");
     } finally {

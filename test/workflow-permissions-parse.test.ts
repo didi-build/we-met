@@ -137,6 +137,7 @@ jobs:
     expect(workflowPermissionsAllowOnly(yaml, EXPECTED_WORKFLOW_PERMISSIONS)).toBe(
       false,
     );
+    expect(extractWorkflowPermissionsMaps(yaml)).toEqual([]);
   });
 
   it("rejects permission map entries with null values", () => {
