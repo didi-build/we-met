@@ -11,6 +11,17 @@ export const secretUsageScriptPath = "scripts/check-secret-usage.mjs";
 
 export const ghApiErrorsPath = "scripts/lib/gh-api-errors.mjs";
 
+export const workflowPermissionsParsePath =
+  "scripts/lib/workflow-permissions-parse.mjs";
+
+export const activateStagingAccountScriptPath = "scripts/activate-staging-account.mjs";
+
+export const activateStagingAccountLibPath = "scripts/lib/activate-staging-account.mjs";
+
+export const wranglerPlaceholdersPath = "scripts/lib/wrangler-placeholders.mjs";
+
+export const parseJsoncPath = "scripts/lib/parse-jsonc.mjs";
+
 /** @type {readonly { id: string; infrastructure?: boolean; test: (filename: string) => boolean }[]} */
 export const privilegedPathMatchers = [
   {
@@ -90,6 +101,31 @@ export const privilegedPathMatchers = [
     id: "gh-api-errors",
     infrastructure: true,
     test: (filename) => filename === ghApiErrorsPath,
+  },
+  {
+    id: "workflow-permissions-parse",
+    infrastructure: true,
+    test: (filename) => filename === workflowPermissionsParsePath,
+  },
+  {
+    id: "activate-staging-account",
+    infrastructure: true,
+    test: (filename) => filename === activateStagingAccountScriptPath,
+  },
+  {
+    id: "activate-staging-account-lib",
+    infrastructure: true,
+    test: (filename) => filename === activateStagingAccountLibPath,
+  },
+  {
+    id: "wrangler-placeholders",
+    infrastructure: true,
+    test: (filename) => filename === wranglerPlaceholdersPath,
+  },
+  {
+    id: "parse-jsonc",
+    infrastructure: true,
+    test: (filename) => filename === parseJsoncPath,
   },
   {
     id: "privileged-change-workflow",
