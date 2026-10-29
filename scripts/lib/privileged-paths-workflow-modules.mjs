@@ -283,7 +283,7 @@ export const workflowModuleExactPrivilegedEntries = [
   {
     id: "dry-run-staging-config",
     path: "scripts/dry-run-staging-config.mjs",
-    infrastructure: false,
+    infrastructure: true,
   },
   {
     id: "gallery-preview-mode-script",

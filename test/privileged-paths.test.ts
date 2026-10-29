@@ -63,7 +63,7 @@ const WORKFLOW_MODULE_SEVERITIES_LITERAL: readonly (readonly [string, boolean])[
   ["scripts/check-workflow-provision-policy.mjs", true],
   ["scripts/ci-test-summary.mjs", false],
   ["scripts/clean-gallery-dist.mjs", false],
-  ["scripts/dry-run-staging-config.mjs", false],
+  ["scripts/dry-run-staging-config.mjs", true],
   ["scripts/gallery-preview-mode.mjs", false],
   ["scripts/gallery-preview-summary.mjs", false],
   ["scripts/generate-email-templates.mjs", false],
