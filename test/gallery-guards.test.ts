@@ -1,4 +1,11 @@
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdtempSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execSync } from "node:child_process";
@@ -1189,6 +1196,32 @@ steps:
         }
       },
     );
+
+    it("DIDI-981: prequote filter-only YAML fixture and fixture-dir coverage", () => {
+      const filterOnly = readFixture("bad-workflow-prequote-filter-only.yml");
+      const filterErrors = collectGalleryWorkflowViolations(filterOnly);
+      expect(filterErrors).toContain(
+        "gallery-preview.yml wrangler preview must not pass --worker-name.",
+      );
+      expect(filterErrors).toContain(
+        "gallery-preview.yml wrangler preview must not pass --ignore-base-config.",
+      );
+
+      const testSource = readFileSync(
+        join(import.meta.dirname, "gallery-guards.test.ts"),
+        "utf8",
+      );
+      const mutantSource = readFileSync(
+        join(import.meta.dirname, "mutant-verify-gallery-guards.mjs"),
+        "utf8",
+      );
+      const referencingSources = testSource + mutantSource;
+      for (const name of readdirSync(FIXTURES)) {
+        expect(referencingSources, `orphan gallery-guards fixture: ${name}`).toContain(
+          name,
+        );
+      }
+    });
   });
 });
 
