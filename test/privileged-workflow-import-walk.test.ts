@@ -356,7 +356,7 @@ describe("privileged-workflow-import-walk", () => {
     expect(globRaw.split("\n")[0]).toBe("const r = /'/; const g = 'src/*.ts';");
   });
 
-  it("ts.preProcessFile misses same-line import targets (lexer guard)", () => {
+  it("ts.preProcessFile misses same-line import targets (lexer guard; primary guard is one physical line per fixture)", () => {
     const cases: { fixture: string; target: string }[] = [
       { fixture: "entry-same-line-typeof.mjs", target: "./after-typeof.mjs" },
       { fixture: "entry-same-line-await.mjs", target: "./after-await.mjs" },
@@ -371,7 +371,12 @@ describe("privileged-workflow-import-walk", () => {
       const imported = preprocessed.importedFiles
         .map((entry) => entry.fileName)
         .filter((name): name is string => Boolean(name));
-      expect(imported).not.toContain(target);
+      expect(
+        imported,
+        `If this fails after a TypeScript upgrade, preProcessFile may have improved; ` +
+          `keep the one-physical-line fixture assertions in ` +
+          `"same-line regex fixtures stay on one physical line with single-quoted imports" as the walk regression guard.`,
+      ).not.toContain(target);
     }
   });
 
