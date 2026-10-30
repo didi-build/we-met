@@ -15,6 +15,10 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { isPreparedPreviewWorkerCiConfigPath } from "./lib/wrangler-config-path.mjs";
+import {
+  PREVIEW_WORKER_PREVIEWS_BLOCK_ALLOWED_KEYS,
+  PREVIEW_WORKER_TOP_LEVEL_ALLOWED_KEYS,
+} from "./lib/preview-worker-section-allowlists.mjs";
 import { parseJsonc } from "./lib/parse-jsonc.mjs";
 import {
   FOLLOWUP_RETRY_BASE_DELAY_SECONDS,
@@ -529,48 +533,6 @@ function checkPreviewWorkerNoProductionServiceBinding(config) {
 function isPreparedPreviewWorkerCiConfig(configPath) {
   return isPreparedPreviewWorkerCiConfigPath(configPath);
 }
-
-/** Binding section keys in committed wrangler.preview.jsonc (keep in sync; see test). */
-const PREVIEW_WORKER_TOP_LEVEL_BINDING_SECTIONS = new Set([
-  "analytics_engine_datasets",
-  "assets",
-  "d1_databases",
-  "images",
-  "queues",
-  "r2_buckets",
-  "ratelimits",
-  "services",
-]);
-
-const PREVIEW_WORKER_PREVIEWS_BLOCK_BINDING_SECTIONS = new Set([
-  "analytics_engine_datasets",
-  "d1_databases",
-  "images",
-  "queues",
-  "ratelimits",
-  "r2_buckets",
-  "services",
-]);
-
-const PREVIEW_WORKER_PREVIEWS_BLOCK_ALLOWED_KEYS = new Set([
-  ...PREVIEW_WORKER_PREVIEWS_BLOCK_BINDING_SECTIONS,
-  "vars",
-  "observability",
-]);
-
-const PREVIEW_WORKER_TOP_LEVEL_ALLOWED_KEYS = new Set([
-  ...PREVIEW_WORKER_TOP_LEVEL_BINDING_SECTIONS,
-  "vars",
-  "observability",
-  "$schema",
-  "name",
-  "main",
-  "workers_dev",
-  "preview_urls",
-  "compatibility_date",
-  "compatibility_flags",
-  "previews",
-]);
 
 function checkPreviewWorkerSectionKeyAllowlist(section, label, allowedKeys) {
   for (const key of Object.keys(section ?? {})) {

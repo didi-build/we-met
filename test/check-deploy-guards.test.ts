@@ -9,6 +9,10 @@ import {
   PRODUCTION_APP_HOST,
 } from "../scripts/lib/wrangler-placeholders.mjs";
 import { isPreparedPreviewWorkerCiConfigPath } from "../scripts/lib/wrangler-config-path.mjs";
+import {
+  PREVIEW_WORKER_PREVIEWS_BLOCK_BINDING_SECTIONS,
+  PREVIEW_WORKER_TOP_LEVEL_BINDING_SECTIONS,
+} from "../scripts/lib/preview-worker-section-allowlists.mjs";
 
 const SCRIPT = "scripts/check-deploy-guards.mjs";
 const BASE_CONFIG = readFileSync("wrangler.jsonc", "utf8");
@@ -126,25 +130,10 @@ describe("check-deploy-guards (unit)", () => {
       previews,
       PREVIEW_WORKER_PREVIEWS_BLOCK_METADATA_KEYS,
     );
-    expect(topBindingKeys).toEqual([
-      "analytics_engine_datasets",
-      "assets",
-      "d1_databases",
-      "images",
-      "queues",
-      "r2_buckets",
-      "ratelimits",
-      "services",
-    ]);
-    expect(previewsBindingKeys).toEqual([
-      "analytics_engine_datasets",
-      "d1_databases",
-      "images",
-      "queues",
-      "r2_buckets",
-      "ratelimits",
-      "services",
-    ]);
+    expect(new Set(topBindingKeys)).toEqual(PREVIEW_WORKER_TOP_LEVEL_BINDING_SECTIONS);
+    expect(new Set(previewsBindingKeys)).toEqual(
+      PREVIEW_WORKER_PREVIEWS_BLOCK_BINDING_SECTIONS,
+    );
   });
 
   it("fails preview-worker when previews block declares assets", () => {
@@ -486,6 +475,29 @@ describe("check-deploy-guards (unit)", () => {
     expect(result.status).toBe(1);
     expect(result.stderr).toContain(
       "wrangler.preview.jsonc must not declare hyperdrive",
+    );
+  });
+
+  it("fails preview-worker when top level declares workflows", () => {
+    const { path } = writeTempPreviewWorkerConfig((config) => {
+      config.workflows = [{ binding: "WF", name: "example-workflow" }];
+    });
+    const result = runGuards("preview-worker", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      "wrangler.preview.jsonc must not declare workflows",
+    );
+  });
+
+  it("fails preview-worker when previews block declares workflows", () => {
+    const { path } = writeTempPreviewWorkerConfig((config) => {
+      const previews = config.previews as Record<string, unknown>;
+      previews.workflows = [{ binding: "WF", name: "example-workflow" }];
+    });
+    const result = runGuards("preview-worker", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      "wrangler.preview.jsonc previews block must not declare workflows",
     );
   });
 

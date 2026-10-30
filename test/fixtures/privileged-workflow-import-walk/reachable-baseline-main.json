@@ -51,6 +51,7 @@
   "scripts/lib/parse-jsonc.mjs",
   "scripts/lib/preview-login-guard.mjs",
   "scripts/lib/preview-nonprod-resource-gate.mjs",
+  "scripts/lib/preview-worker-section-allowlists.mjs",
   "scripts/lib/privileged-change-analyze.mjs",
   "scripts/lib/privileged-change-comment-lifecycle.mjs",
   "scripts/lib/privileged-change-labels.mjs",
