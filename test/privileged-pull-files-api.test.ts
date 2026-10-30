@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { execSync } from "node:child_process";
 import {
   flattenPullFilesPayload,
   normalizePullFileEntry,
   parseGhApiPaginatedSlurpedStdout,
   parsePullRequestFilesApiStdout,
+  pathsConsideredForPrivilegedGate,
   privilegedFilenamesFromChangedFiles,
   shouldFetchWorkflowFileContent,
 } from "../scripts/lib/privileged-pull-files-api.mjs";
@@ -156,9 +156,56 @@ describe("privileged-pull-files-api (unit)", () => {
     expect(analysis.privilegedFiles).toEqual([]);
   });
 
-  it("rename mutant kills fail when matching logic is broken", () => {
-    execSync("node test/mutant-verify-privileged-pull-files-rename.mjs", {
-      cwd: process.cwd(),
-    });
+  it("flags renamed entry without previous_filename when the new path is privileged", () => {
+    const fromApi = normalizePullFileEntry(
+      { filename: "wrangler.jsonc", status: "renamed" },
+      0,
+    );
+    expect(fromApi.previous_filename).toBeUndefined();
+    expect(privilegedFilenamesFromChangedFiles([fromApi], isPrivilegedPath)).toEqual([
+      "wrangler.jsonc",
+    ]);
+
+    const emptyPrevious = normalizePullFileEntry(
+      { filename: "wrangler.jsonc", status: "renamed", previous_filename: "" },
+      0,
+    );
+    expect(emptyPrevious.previous_filename).toBeUndefined();
+    expect(
+      privilegedFilenamesFromChangedFiles([emptyPrevious], isPrivilegedPath),
+    ).toEqual(["wrangler.jsonc"]);
+
+    const nonStringPrevious = normalizePullFileEntry(
+      { filename: "wrangler.jsonc", status: "renamed", previous_filename: null },
+      0,
+    );
+    expect(nonStringPrevious.previous_filename).toBeUndefined();
+    expect(
+      privilegedFilenamesFromChangedFiles([nonStringPrevious], isPrivilegedPath),
+    ).toEqual(["wrangler.jsonc"]);
+  });
+
+  it("ignores previous_filename unless status is renamed", () => {
+    const spoofed = {
+      filename: "docs/runbooks/renamed-wrangler-note.md",
+      status: "modified" as const,
+      previous_filename: "wrangler.jsonc",
+    };
+    expect(pathsConsideredForPrivilegedGate(spoofed)).toEqual([
+      "docs/runbooks/renamed-wrangler-note.md",
+    ]);
+    expect(privilegedFilenamesFromChangedFiles([spoofed], isPrivilegedPath)).toEqual(
+      [],
+    );
+  });
+
+  it("pathsConsideredForPrivilegedGate lists both paths for renames with previous_filename", () => {
+    expect(
+      pathsConsideredForPrivilegedGate({
+        filename: "docs/runbooks/renamed-wrangler-note.md",
+        status: "renamed",
+        previous_filename: "wrangler.jsonc",
+      }),
+    ).toEqual(["docs/runbooks/renamed-wrangler-note.md", "wrangler.jsonc"]);
   });
 });

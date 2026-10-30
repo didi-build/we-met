@@ -3,6 +3,7 @@ import {
   analyzePrivilegedChange,
   privilegedChangeCheckState,
 } from "../scripts/lib/privileged-change-analyze.mjs";
+import { isPrivilegedFlagInfrastructurePath } from "../scripts/lib/privileged-paths.mjs";
 
 describe("privileged-change-analyze (unit)", () => {
   it("flags privileged wrangler config without workflow findings", () => {
@@ -58,6 +59,26 @@ jobs:
     ).toBe(true);
     expect(
       result.findings.some((f) => f.message.includes("privileged-pull-files-api.mjs")),
+    ).toBe(true);
+  });
+
+  it("flags infrastructure when privileged-paths.mjs is renamed to a docs path", () => {
+    const changed = [
+      {
+        filename: "docs/architecture/privileged-paths-archived.md",
+        status: "renamed" as const,
+        previous_filename: "scripts/lib/privileged-paths.mjs",
+      },
+    ];
+    expect(isPrivilegedFlagInfrastructurePath(changed[0].filename)).toBe(false);
+    const result = analyzePrivilegedChange(changed, {}, { trustedOrg: "didi-build" });
+    expect(
+      result.findings.some(
+        (f) =>
+          f.severity === "high" &&
+          f.message ===
+            "Changes privileged-change flag infrastructure (scripts/lib/privileged-paths.mjs)",
+      ),
     ).toBe(true);
   });
 
