@@ -132,9 +132,9 @@ Paste command output (no secrets) on the Linear hosting ticket when asked.
 
 ### Effective preview bindings
 
-Bindings appear in the **`wrangler preview --json`** output under **`deployment.env`** (verified **2026-10-11**), and in the dashboard (Worker **we-met-preview** → Previews → `deploy-proof` → Bindings). **UNVERIFIED:** `npx wrangler preview secret list --name <preview>` was not exercised in the proof deploy.
+Bindings appear in the **`wrangler preview --json`** output under **`deployment.env`** (verified **2026-10-11**). On the dashboard, Worker **we-met** → Previews → `deploy-proof` → Bindings (verified **2026-10-11**, before [0030](../decisions/0030-preview-worker-isolation.md)). **UNVERIFIED:** Worker **we-met-preview** → Previews after [0030](../decisions/0030-preview-worker-isolation.md). **UNVERIFIED:** `npx wrangler preview secret list --name <preview>` was not exercised in the proof deploy.
 
-Expect non-prod queue `we-met-followup-email-nonprod`, D1 `we-met-db-nonprod`, R2 `we-met-assets-nonprod`, rate limiter namespace **2001**, plus **ASSETS** and **IMAGES** (`previews.images`). Preview deployments do **not** get **`WORKER_SELF_REFERENCE`** (production does).
+Expect non-prod queue `we-met-followup-email-nonprod`, D1 `we-met-db-nonprod`, R2 `we-met-assets-nonprod`, rate limiter namespace **2001**, plus **ASSETS** and **IMAGES** (`previews.images`). PR previews on **`we-met-preview`** include **`WORKER_SELF_REFERENCE`** to **`we-met-preview`** (`wrangler.preview.jsonc` top-level **`services`** and **`previews.services`**). Proof previews on production Worker **`we-met`** before [0030](../decisions/0030-preview-worker-isolation.md) did **not** include **`WORKER_SELF_REFERENCE`**.
 
 ### Redeploy check
 
@@ -150,11 +150,11 @@ npx wrangler versions view <version-id> --name we-met
 
 ### Questions the proof deploy must answer
 
-- [x] Does the live preview URL serve the OpenNext app (not just a static stub)? **Answer (2026-10-11):** Yes — HTTP **200** on `/` with the OpenNext-built placeholder page.
-- [x] How does `WORKER_SELF_REFERENCE` behave on a preview? **Answer:** Preview deployments do **not** include a `WORKER_SELF_REFERENCE` binding; production does. The placeholder app served `/` without it; impact on the real card flow is **unknown until the card ships** ([0019](../decisions/0019-pr-preview-github-action.md#proof-deploy-findings)).
-- [x] Does `opennextjs-cloudflare deploy --config wrangler.ci.jsonc` use the generated config end to end? **Answer:** Yes — deploy succeeds; incremental/tag cache steps report no population needed for this config.
+- [x] Does the live preview URL serve the OpenNext app (not just a static stub)? **Answer (2026-10-11):** Yes. HTTP **200** on `/` with the OpenNext-built placeholder page.
+- [x] How does `WORKER_SELF_REFERENCE` behave on a preview? **Answer:** On **`we-met-preview`** ([0030](../decisions/0030-preview-worker-isolation.md)), preview deployments include **`WORKER_SELF_REFERENCE`** per **`wrangler.preview.jsonc`**. On production Worker **`we-met`** (proof deploy **2026-10-11**, before [0030](../decisions/0030-preview-worker-isolation.md)), preview deployments did **not** include that binding. The placeholder app served `/` without it on **`we-met`**; impact on the real card flow was **unknown until the card ships** ([0019](../decisions/0019-pr-preview-github-action.md#proof-deploy-findings)).
+- [x] Does `opennextjs-cloudflare deploy --config wrangler.ci.jsonc` use the generated config end to end? **Answer:** Yes. Deploy succeeds; incremental/tag cache steps report no population needed for this config.
 
-If the account’s **workers.dev** subdomain is ever renamed, update the **we-met nonprod** Turnstile widget hostname, set `vars.WE_MET_PREVIEW_HOST_SUFFIX` in `wrangler.preview.jsonc` to `-we-met-preview.<subdomain>.workers.dev`, and re-check **Preview URLs** on Worker **`we-met-preview`** (`preview_urls: true` in `wrangler.preview.jsonc`).
+If the account’s **workers.dev** subdomain is ever renamed, update the **we-met nonprod** Turnstile widget hostname, set **`vars.WE_MET_PREVIEW_HOST_SUFFIX`** and **`previews.vars.WE_MET_PREVIEW_HOST_SUFFIX`** in **`wrangler.preview.jsonc`** to **`-we-met-preview.<subdomain>.workers.dev`**, and re-check **Preview URLs** on Worker **`we-met-preview`** (`preview_urls: true` in **`wrangler.preview.jsonc`**).
 
 ## 2. Cloudflare API tokens for CI
 
