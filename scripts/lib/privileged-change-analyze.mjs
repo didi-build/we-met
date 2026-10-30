@@ -4,13 +4,17 @@ import {
   isWorkflowFile,
 } from "./privileged-paths.mjs";
 import {
+  pathsConsideredForPrivilegedGate,
+  privilegedFilenamesFromChangedFiles,
+} from "./privileged-pull-files-api.mjs";
+import {
   extractWorkflowMetadata,
   findHighSeverityContentSignals,
   findUntrustedUsesOwners,
 } from "./privileged-workflow-extract.mjs";
 
 /**
- * @typedef {{ filename: string; status: string }} ChangedFile
+ * @typedef {import("./privileged-pull-files-api.mjs").PullRequestChangedFile} ChangedFile
  * @typedef {{ severity: 'high' | 'normal'; message: string }} Finding
  */
 
@@ -30,10 +34,10 @@ export function analyzePrivilegedChange(
   workflowContentsByPath,
   { trustedOrg },
 ) {
-  const privilegedFiles = changedFiles
-    .map((f) => f.filename)
-    .filter((filename) => isPrivilegedPath(filename))
-    .sort();
+  const privilegedFiles = privilegedFilenamesFromChangedFiles(
+    changedFiles,
+    isPrivilegedPath,
+  );
 
   /** @type {Finding[]} */
   const findings = [];
@@ -41,11 +45,13 @@ export function analyzePrivilegedChange(
   const workflowDetails = {};
 
   for (const file of changedFiles) {
-    if (isPrivilegedFlagInfrastructurePath(file.filename)) {
-      findings.push({
-        severity: "high",
-        message: `Changes privileged-change flag infrastructure (${file.filename})`,
-      });
+    for (const path of pathsConsideredForPrivilegedGate(file)) {
+      if (isPrivilegedFlagInfrastructurePath(path)) {
+        findings.push({
+          severity: "high",
+          message: `Changes privileged-change flag infrastructure (${path})`,
+        });
+      }
     }
   }
 
