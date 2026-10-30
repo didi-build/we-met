@@ -1,0 +1,5 @@
+{
+  "scripts": {
+    "walk-fixture-n11": "node test/fixtures/privileged-workflow-import-walk/resolution/npm-run-target.mjs"
+  }
+}

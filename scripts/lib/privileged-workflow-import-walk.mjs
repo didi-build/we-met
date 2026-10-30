@@ -71,7 +71,7 @@ const SHELL_WRAPPER_RE =
   /\b(?:bash|sh)\s+(?:-[^\s]+\s+)*(-(?:lc|c)\s+)?(['"])([\s\S]*?)\2/g;
 
 const BASH_SH_SCRIPT_FILE_RE =
-  /\b(?:bash|sh)\s+(?:-[^\s]+\s+)*['"]?((?:\.\.?\/|scripts\/|test\/)[^\s'"]+)['"]?/g;
+  /\b(?:\/bin\/(?:bash|sh)|bash|sh)\s+(?:-[^\s]+\s+)*['"]?((?:\.\.?\/|scripts\/|test\/)[^\s'"]+)['"]?/g;
 
 const SPAWN_CALLEE_NAMES = new Set([
   "spawnSync",
@@ -183,16 +183,39 @@ function isCreateRequireCall(node) {
 function collectCreateRequireBindings(sourceFile) {
   /** @type {Set<string>} */
   const bindings = new Set();
+  /** @type {Set<string>} */
+  const letWithoutInitializer = new Set();
   function visit(node) {
     if (ts.isVariableStatement(node)) {
       for (const decl of node.declarationList.declarations) {
-        if (
-          ts.isIdentifier(decl.name) &&
-          decl.initializer &&
-          isCreateRequireCall(decl.initializer)
-        ) {
-          bindings.add(decl.name.text);
+        if (!ts.isIdentifier(decl.name)) {
+          continue;
         }
+        if (decl.initializer && isCreateRequireCall(decl.initializer)) {
+          bindings.add(decl.name.text);
+          continue;
+        }
+        if (
+          !decl.initializer &&
+          (node.declarationList.flags & ts.NodeFlags.Let) !== 0
+        ) {
+          letWithoutInitializer.add(decl.name.text);
+        }
+      }
+    }
+    if (
+      ts.isExpressionStatement(node) &&
+      ts.isBinaryExpression(node.expression) &&
+      node.expression.operatorToken.kind === ts.SyntaxKind.EqualsToken
+    ) {
+      const { left, right } = node.expression;
+      if (
+        ts.isIdentifier(left) &&
+        letWithoutInitializer.has(left.text) &&
+        isCreateRequireCall(right)
+      ) {
+        bindings.add(left.text);
+        letWithoutInitializer.delete(left.text);
       }
     }
     ts.forEachChild(node, visit);
@@ -211,6 +234,12 @@ function collectModuleSpecifiersFromSourceFile(sourceFile) {
   const createRequireBindings = collectCreateRequireBindings(sourceFile);
 
   function addModuleSpecifier(node) {
+    if (ts.isTemplateExpression(node) && node.templateSpans.length > 0) {
+      throw new WorkflowImportWalkError(
+        "Template literal with substitution in module specifier",
+        { module: node.getText().slice(0, 120) },
+      );
+    }
     const text = getStringLiteralText(node);
     if (text) {
       specs.add(text);
@@ -305,22 +334,11 @@ function isBashOrShSpawnCommandArg(arg) {
   return (
     text === "bash" ||
     text === "sh" ||
+    text === "/bin/bash" ||
+    text === "/bin/sh" ||
     text === "/usr/bin/bash" ||
     text === "/usr/bin/sh"
   );
-}
-
-/**
- * @param {import("typescript").Expression} element
- * @param {string} contextLabel
- */
-function assertNoTemplateSubstitutionInSpawnElement(element, contextLabel) {
-  if (ts.isTemplateExpression(element) && element.templateSpans.length > 0) {
-    throw new WorkflowImportWalkError(
-      `Template literal with substitution in spawn array (${contextLabel})`,
-      { module: element.getText().slice(0, 120) },
-    );
-  }
 }
 
 /**
@@ -329,7 +347,6 @@ function assertNoTemplateSubstitutionInSpawnElement(element, contextLabel) {
  * @param {string} contextLabel
  */
 function collectRepoScriptLiteralsFromArrayElement(element, entries, contextLabel) {
-  assertNoTemplateSubstitutionInSpawnElement(element, contextLabel);
   /** @type {string[]} */
   const literalTexts = [];
   function visitLiteralNodes(node) {
@@ -605,12 +622,6 @@ function collectBashShTargetsFromShellContent(content) {
 function collectSpawnScriptLiteralsFromSource(content, relPath) {
   /** @type {Set<string>} */
   const entries = new Set();
-  if (relPath.endsWith(".sh")) {
-    for (const rel of collectBashShTargetsFromShellContent(content)) {
-      entries.add(rel);
-    }
-    return entries;
-  }
   if (!isJsLikeSourcePath(relPath)) {
     return entries;
   }
