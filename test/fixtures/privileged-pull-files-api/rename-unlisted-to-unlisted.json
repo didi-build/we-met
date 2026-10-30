@@ -1,0 +1,7 @@
+[
+  {
+    "filename": "src/components/after-rename.tsx",
+    "status": "renamed",
+    "previous_filename": "src/components/before-rename.tsx"
+  }
+]
