@@ -84,6 +84,25 @@ describe("privileged-workflow-import-walk (DIDI-995)", () => {
     );
   });
 
+  it("N17: exec two-arg array form reaches node script (fixture)", () => {
+    const { reachable } = walkFromEntry("entry-exec-fn-array.mjs");
+    expect(reachable).toContain(
+      "test/fixtures/privileged-workflow-import-walk/resolution/exec-fn-target.mjs",
+    );
+  });
+
+  it("N15': template with substitution in require() fails closed (fixture)", () => {
+    expect(() => walkFromEntry("entry-template-require-sub.cjs", true)).toThrow(
+      WorkflowImportWalkError,
+    );
+  });
+
+  it("N15': template with substitution in createRequire() call fails closed (fixture)", () => {
+    expect(() => walkFromEntry("entry-create-require-template-sub.mjs", true)).toThrow(
+      WorkflowImportWalkError,
+    );
+  });
+
   it("R3: spawn array template substitution still fails closed after deduping throws (fixture)", () => {
     expect(() => walkFromEntry("entry-spawn-template-sub.mjs")).toThrow(
       WorkflowImportWalkError,
