@@ -13,7 +13,7 @@
 | SMS                              | **Not used**          |
 | PagerDuty or other paging vendor | **Not used**          |
 
-Configure Cloudflare Notifications, Monitors, Health Checks, Instatus (only after CTO and Diadem vendor approval per [monitoring-plan.md](../monitoring-plan.md) §3.7), Better Stack (same approval), and Workers Issues automations to send to **hello@we-met.link** unless a ticket explicitly documents a different routing (for example warmup).
+Configure Cloudflare Notifications, Monitors, Health Checks, **Upptime** notification settings in **`didi-build/we-met-status`** (CTO + Diadem per [monitoring-plan.md](../monitoring-plan.md) §3.7 and [DIDI-939](https://linear.app/didi-build/issue/DIDI-939)), Better Stack (§3.7 approval before adoption), and Workers Issues automations to send to **hello@we-met.link** unless a ticket explicitly documents a different routing (for example warmup).
 
 ## Severity and quiet hours
 
