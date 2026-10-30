@@ -161,6 +161,12 @@ describe("privileged-paths (table)", () => {
       path: "scripts/lib/Workflow-Permissions-Parse.mjs",
       privileged: false,
     },
+    { path: "x/scripts/lib/workflow-permissions-parse.mjs", privileged: false },
+    { path: "x/scripts/lib/wrangler-placeholders.mjs", privileged: false },
+    { path: "./scripts/lib/workflow-permissions-parse.mjs", privileged: false },
+    { path: "./scripts/activate-staging-account.mjs", privileged: false },
+    { path: "./scripts/lib/activate-staging-account.mjs", privileged: false },
+    { path: "./scripts/lib/wrangler-placeholders.mjs", privileged: false },
     { path: "src/app/page.tsx", privileged: false },
     { path: "package.json", privileged: false },
   ];
