@@ -237,12 +237,44 @@ describe("validateActivationEmail (unit)", () => {
   });
 
   it("rejects odd local parts", () => {
-    expect(validateActivationEmail("a..b@example.com").ok).toBe(false);
-    expect(validateActivationEmail("-a@example.com").ok).toBe(false);
-    expect(validateActivationEmail("+@example.com").ok).toBe(false);
-    expect(validateActivationEmail("a@-b.example.com").ok).toBe(false);
-    expect(validateActivationEmail("a@b-.example.com").ok).toBe(false);
-    expect(validateActivationEmail("a@b.-c.example.com").ok).toBe(false);
+    const consecutiveDots = validateActivationEmail("a..b@example.com");
+    expect(consecutiveDots.ok).toBe(false);
+    if (!consecutiveDots.ok) {
+      expect(consecutiveDots.reason).toBe("email contains consecutive dots");
+    }
+    const leadingHyphen = validateActivationEmail("-a@example.com");
+    expect(leadingHyphen.ok).toBe(false);
+    if (!leadingHyphen.ok) {
+      expect(leadingHyphen.reason).toBe(
+        "email local part has invalid leading character",
+      );
+    }
+    const plusOnly = validateActivationEmail("+@example.com");
+    expect(plusOnly.ok).toBe(false);
+    if (!plusOnly.ok) {
+      expect(plusOnly.reason).toBe("email local part has invalid leading character");
+    }
+    const domainLabelLeadingHyphen = validateActivationEmail("a@-b.example.com");
+    expect(domainLabelLeadingHyphen.ok).toBe(false);
+    if (!domainLabelLeadingHyphen.ok) {
+      expect(domainLabelLeadingHyphen.reason).toBe(
+        "email domain label has invalid hyphens",
+      );
+    }
+    const domainLabelTrailingHyphen = validateActivationEmail("a@b-.example.com");
+    expect(domainLabelTrailingHyphen.ok).toBe(false);
+    if (!domainLabelTrailingHyphen.ok) {
+      expect(domainLabelTrailingHyphen.reason).toBe(
+        "email domain label has invalid hyphens",
+      );
+    }
+    const nestedDomainLabelHyphen = validateActivationEmail("a@b.-c.example.com");
+    expect(nestedDomainLabelHyphen.ok).toBe(false);
+    if (!nestedDomainLabelHyphen.ok) {
+      expect(nestedDomainLabelHyphen.reason).toBe(
+        "email domain label has invalid hyphens",
+      );
+    }
   });
 
   it("rejects punycode domains and overlong labels", () => {
