@@ -185,18 +185,100 @@ describe("privileged-pull-files-api (unit)", () => {
     ).toEqual(["wrangler.jsonc"]);
   });
 
-  it("ignores previous_filename unless status is renamed", () => {
-    const spoofed = {
+  it("normalizePullFileEntry drops previous_filename unless status is renamed", () => {
+    expect(
+      normalizePullFileEntry(
+        {
+          filename: "docs/runbooks/renamed-wrangler-note.md",
+          status: "modified",
+          previous_filename: "wrangler.jsonc",
+        },
+        0,
+      ),
+    ).toEqual({
       filename: "docs/runbooks/renamed-wrangler-note.md",
-      status: "modified" as const,
-      previous_filename: "wrangler.jsonc",
-    };
-    expect(pathsConsideredForPrivilegedGate(spoofed)).toEqual([
+      status: "modified",
+    });
+    expect(
+      normalizePullFileEntry(
+        {
+          filename: "docs/runbooks/new-note.md",
+          status: "added",
+          previous_filename: "wrangler.jsonc",
+        },
+        0,
+      ),
+    ).toEqual({ filename: "docs/runbooks/new-note.md", status: "added" });
+  });
+
+  it("parsePullRequestFilesApiStdout drops spoofed previous_filename for non-renamed status", () => {
+    expect(
+      parsePullRequestFilesApiStdout(
+        readFixture("spoof-modified-with-privileged-previous-filename.json"),
+      ),
+    ).toEqual([
+      {
+        filename: "docs/runbooks/renamed-wrangler-note.md",
+        status: "modified",
+      },
+    ]);
+    expect(
+      parsePullRequestFilesApiStdout(
+        readFixture("spoof-added-with-privileged-previous-filename.json"),
+      ),
+    ).toEqual([{ filename: "docs/runbooks/new-note.md", status: "added" }]);
+  });
+
+  it("does not flag spoofed previous_filename on modified pull file entries", () => {
+    const changed = parsePullRequestFilesApiStdout(
+      readFixture("spoof-modified-with-privileged-previous-filename.json"),
+    );
+    const analysis = analyzePrivilegedChange(changed, {}, { trustedOrg: "didi-build" });
+    expect(analysis.flagged).toBe(false);
+    expect(analysis.privilegedFiles).toEqual([]);
+    expect(analysis.findings).toEqual([]);
+  });
+
+  it("pathsConsideredForPrivilegedGate ignores previous_filename unless status is renamed", () => {
+    const parsed = parsePullRequestFilesApiStdout(
+      readFixture("spoof-modified-with-privileged-previous-filename.json"),
+    )[0];
+    expect(pathsConsideredForPrivilegedGate(parsed)).toEqual([
       "docs/runbooks/renamed-wrangler-note.md",
     ]);
-    expect(privilegedFilenamesFromChangedFiles([spoofed], isPrivilegedPath)).toEqual(
-      [],
+    expect(privilegedFilenamesFromChangedFiles([parsed], isPrivilegedPath)).toEqual([]);
+  });
+
+  it("privilegedFilenamesFromChangedFiles sorts and de-duplicates privileged paths", () => {
+    const changed = parsePullRequestFilesApiStdout(
+      readFixture("rename-privileged-to-unlisted.json"),
     );
+    const withDuplicate = [
+      ...changed,
+      { filename: "wrangler.jsonc", status: "modified" as const },
+      {
+        filename: ".github/workflows/extra.yml",
+        status: "renamed" as const,
+        previous_filename: "wrangler.jsonc",
+      },
+    ];
+    expect(
+      privilegedFilenamesFromChangedFiles(withDuplicate, isPrivilegedPath),
+    ).toEqual([".github/workflows/extra.yml", "wrangler.jsonc"]);
+  });
+
+  it("pathsConsideredForPrivilegedGate uses only the new path when previous_filename is empty", () => {
+    const parsed = normalizePullFileEntry(
+      {
+        filename: "docs/runbooks/renamed-wrangler-note.md",
+        status: "renamed",
+        previous_filename: "",
+      },
+      0,
+    );
+    expect(pathsConsideredForPrivilegedGate(parsed)).toEqual([
+      "docs/runbooks/renamed-wrangler-note.md",
+    ]);
   });
 
   it("pathsConsideredForPrivilegedGate lists both paths for renames with previous_filename", () => {
