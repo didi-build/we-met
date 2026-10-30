@@ -288,7 +288,7 @@ When an SLO budget is exhausted in a month, the draft plan proposed **freeze non
 
 Rolling **30-day** window. Targets match [section 4](#4-proposed-slos-user-facing-flows). **Error budget policy:** no deploy freeze when a monthly budget is spent (Diadem, [DIDI-861](https://linear.app/didi-build/issue/DIDI-861) 11b).
 
-Run production SLI math against **production** datasets and D1 only (`we-met-db`). Staging and preview use their own Analytics Engine dataset names in [`wrangler.staging.jsonc`](../wrangler.staging.jsonc) and the [`wrangler.jsonc`](../wrangler.jsonc) `previews` block.
+Run production SLI math against **production** datasets and D1 only (`we-met-db`). Staging and preview use their own Analytics Engine dataset names in [`wrangler.staging.jsonc`](../wrangler.staging.jsonc) and [`wrangler.preview.jsonc`](../wrangler.preview.jsonc).
 
 ### Card availability (target 99.9%)
 

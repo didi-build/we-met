@@ -1,5 +1,6 @@
 import path from "node:path";
 import { configDefaults, defineConfig } from "vitest/config";
+import { ISOLATED_LOCAL_D1_TEST_TIMEOUT_MS } from "./test/helpers/isolated-local-d1-timeout";
 
 const sharedConfig = {
   esbuild: {
@@ -35,7 +36,7 @@ export default defineConfig({
           name: "integration",
           include: ["test/**/*.integration.test.ts", "test/**/*.integration.test.tsx"],
           environment: "node",
-          testTimeout: 20_000,
+          testTimeout: ISOLATED_LOCAL_D1_TEST_TIMEOUT_MS,
           hookTimeout: 30_000,
         },
       },

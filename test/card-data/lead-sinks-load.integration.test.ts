@@ -136,8 +136,7 @@ function loadSqlOptions(loadFile: CardsLoadFile) {
   };
 }
 
-// getPlatformProxy against wrangler.jsonc plus all migrations can exceed 5s on a cold CI runner.
-describe("leadSinks load SQL reconcile (integration)", { timeout: 20000 }, () => {
+describe("leadSinks load SQL reconcile (integration)", () => {
   it("leaves sinks untouched when leadSinks key is absent", async () => {
     const parsed = parseCardsLoadFile(exampleLoadRaw()).cards[0];
     const { leadSinks: _omit, ...card } = parsed;

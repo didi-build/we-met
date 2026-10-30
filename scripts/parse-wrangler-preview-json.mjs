@@ -2,6 +2,9 @@
 /**
  * Extract preview.urls[0] from wrangler preview --json stdout (may include log lines).
  * Usage: npx wrangler preview ... --json 2>&1 | node scripts/parse-wrangler-preview-json.mjs
+ *
+ * On failure, stderr includes preview.urls (when JSON parsed) plus a short error only,
+ * not the full wrangler JSON (which may contain Cloudflare author_id).
  */
 import { readFileSync } from "node:fs";
 
@@ -15,14 +18,22 @@ if (start < 0) {
 let parsed;
 try {
   parsed = JSON.parse(text.slice(start));
-} catch (error) {
-  console.error("parse-wrangler-preview-json: invalid JSON:", error);
+} catch {
+  console.error("parse-wrangler-preview-json: invalid JSON");
   process.exit(1);
+}
+
+function logTrimmedPreviewFailure(message) {
+  const urls = parsed?.preview?.urls;
+  if (Array.isArray(urls)) {
+    console.error(`preview.urls: ${JSON.stringify(urls)}`);
+  }
+  console.error(`parse-wrangler-preview-json: ${message}`);
 }
 
 const url = parsed?.preview?.urls?.[0];
 if (!url || typeof url !== "string") {
-  console.error("parse-wrangler-preview-json: missing preview.urls[0]");
+  logTrimmedPreviewFailure("missing preview.urls[0]");
   process.exit(1);
 }
 

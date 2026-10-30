@@ -24,6 +24,9 @@ export const wranglerPlaceholdersPath = "scripts/lib/wrangler-placeholders.mjs";
 
 export const parseJsoncPath = "scripts/lib/parse-jsonc.mjs";
 
+export const previewWorkerSectionAllowlistsPath =
+  "scripts/lib/preview-worker-section-allowlists.mjs";
+
 /** @type {readonly { id: string; infrastructure?: boolean; test: (filename: string) => boolean }[]} */
 const basePrivilegedPathMatchers = [
   {
@@ -131,6 +134,11 @@ const basePrivilegedPathMatchers = [
     id: "parse-jsonc",
     infrastructure: true,
     test: (filename) => filename === parseJsoncPath,
+  },
+  {
+    id: "preview-worker-section-allowlists",
+    infrastructure: true,
+    test: (filename) => filename === previewWorkerSectionAllowlistsPath,
   },
   {
     id: "privileged-change-workflow",

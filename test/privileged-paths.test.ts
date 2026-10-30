@@ -127,6 +127,7 @@ describe("privileged-paths (table)", () => {
     { path: "scripts/lib/activate-staging-account.mjs", privileged: true },
     { path: "scripts/lib/wrangler-placeholders.mjs", privileged: true },
     { path: "scripts/lib/parse-jsonc.mjs", privileged: true },
+    { path: "scripts/lib/preview-worker-section-allowlists.mjs", privileged: true },
     { path: "scripts/lib/workflow-permissions-parse.test.mjs", privileged: false },
     { path: "scripts/lib/workflow-permissions.mjs", privileged: false },
     { path: "scripts/activate-staging-account.mjs.bak", privileged: false },
@@ -273,6 +274,7 @@ describe("privileged-paths (table)", () => {
       "activate-staging-account-lib",
       "wrangler-placeholders",
       "parse-jsonc",
+      "preview-worker-section-allowlists",
       "privileged-change-workflow",
       ...workflowModuleExactPrivilegedEntries.map((entry) => entry.id),
     ]);

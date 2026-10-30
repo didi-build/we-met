@@ -10,7 +10,7 @@ PR preview CI previously used a token with Workers Editor on production Worker `
 
 ## Decision
 
-1. **Preview Worker config:** `wrangler.preview.jsonc` names Worker `we-met-preview`, sets `workers_dev: true` and `preview_urls: true`, and binds only non-prod D1, R2, queues, and rate limits. No routes, custom domains, or service bindings to `we-met`.
+1. **Preview Worker config:** `wrangler.preview.jsonc` names Worker `we-met-preview`, sets `workers_dev: true` and `preview_urls: true`, and binds only non-prod D1, R2, queues, rate limits, and Analytics Engine dataset **`we-met-exchange-outcome-preview`**. No routes, custom domains, or service bindings to `we-met`.
 2. **Gallery previews:** `wrangler.gallery.jsonc` also targets `we-met-preview` (static assets only). PR workflow runs `wrangler preview --config wrangler.gallery.jsonc` without `--worker-name` or `--ignore-base-config`.
 3. **Preview workflows:** `.github/workflows/preview.yml` and `gallery-preview.yml` use only `secrets.CLOUDFLARE_API_TOKEN_PREVIEW` on the GitHub `preview` environment. App previews run `wrangler preview --config wrangler.preview.ci.jsonc` (prepared from `wrangler.preview.jsonc`). Cleanup uses `WRANGLER_CONFIG` with `scripts/wrangler-preview-delete.mjs`.
 4. **Preview host suffix:** `WE_MET_PREVIEW_HOST_SUFFIX` is `-we-met-preview.<subdomain>.workers.dev` (Worker name `we-met-preview`; preview URLs are `<preview-name>-we-met-preview.<subdomain>.workers.dev`).
