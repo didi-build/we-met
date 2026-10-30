@@ -18,7 +18,7 @@ function migrationStatementsBefore0005(): string[] {
   return statements;
 }
 
-describe("0005_cards_rebuild_mvp migration (unit)", () => {
+describe("0005_cards_rebuild_mvp migration", () => {
   const sql = readFileSync("migrations/0005_cards_rebuild_mvp.sql", "utf8");
 
   it("does not pass expand-only migration lint", () => {

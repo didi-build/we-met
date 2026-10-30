@@ -27,6 +27,21 @@ export type IsolatedLocalD1Handle = {
   close: () => Promise<void>;
 };
 
+/** Clears migrated D1 tables between integration tests sharing one database. */
+export async function clearLocalD1Tables(db: D1Database): Promise<void> {
+  await db.prepare("DELETE FROM lead_delivery_ledger").run();
+  await db.prepare("DELETE FROM exchange_owner_email").run();
+  await db.prepare("DELETE FROM lead_sinks").run();
+  await db.prepare("DELETE FROM hostnames").run();
+  await db.prepare("DELETE FROM photo_upload_log").run();
+  await db.prepare("DELETE FROM card_drafts").run();
+  await db.prepare("DELETE FROM cards").run();
+  await db.prepare("DELETE FROM contacts_oauth_attempts").run();
+  await db.prepare("DELETE FROM oauth_attempts").run();
+  await db.prepare("DELETE FROM sessions").run();
+  await db.prepare("DELETE FROM accounts").run();
+}
+
 type OpenIsolatedLocalD1Options = {
   migrate?: boolean;
 };

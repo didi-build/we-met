@@ -1,4 +1,12 @@
-import { afterEach, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "vitest";
 import { D1CardRepository } from "@/card-data/d1-repository";
 import {
   clearLeadSinkKindsForTests,
@@ -13,8 +21,25 @@ import { MemoryCardRepository } from "@/card-data/memory-repository";
 import type { CardRepository } from "@/card-data/repository";
 import { splitSqlStatements } from "@/card-data/sql-statements";
 import { exampleCardInput } from "../helpers/example-card";
-import { withIsolatedLocalD1, withLocalD1 } from "../helpers/d1";
+import { clearLocalD1Tables, openIsolatedLocalD1 } from "../helpers/d1";
 import { upsertCardWithEmailSink } from "../helpers/card-email-sink";
+
+let db: D1Database;
+let closeD1: (() => Promise<void>) | undefined;
+
+beforeAll(async () => {
+  const handle = await openIsolatedLocalD1();
+  db = handle.db;
+  closeD1 = handle.close;
+});
+
+afterAll(async () => {
+  await closeD1?.();
+});
+
+beforeEach(async () => {
+  await clearLocalD1Tables(db);
+});
 
 function registerTestSinkKind() {
   registerLeadSinkKind("test_sink", {
@@ -29,16 +54,6 @@ function registerTestSinkKind() {
       return value as { to: string };
     },
   });
-}
-
-async function resetD1Tables(db: D1Database) {
-  await db.prepare("DELETE FROM lead_sinks").run();
-  await db.prepare("DELETE FROM hostnames").run();
-  await db.prepare("DELETE FROM cards").run();
-  await db.prepare("DELETE FROM card_drafts").run();
-  await db.prepare("DELETE FROM sessions").run();
-  await db.prepare("DELETE FROM oauth_attempts").run();
-  await db.prepare("DELETE FROM accounts").run();
 }
 
 function defineContract(
@@ -126,10 +141,7 @@ defineContract("memory", async (fn) => {
 });
 
 defineContract("d1", async (fn) => {
-  await withLocalD1(async (db) => {
-    await resetD1Tables(db);
-    await fn(new D1CardRepository(db));
-  });
+  await fn(new D1CardRepository(db));
 });
 
 describe("CardRepository getById visibility", () => {
@@ -149,53 +161,61 @@ describe("CardRepository getById visibility", () => {
   });
 
   it("d1 returns null for non-live cards and inactive accounts", async () => {
-    await withIsolatedLocalD1(async (db) => {
-      await resetD1Tables(db);
-      const repo = new D1CardRepository(db);
-      const slug = "contract-getbyid-d1";
-      const card = await upsertCardWithEmailSink(repo, {
-        ...exampleCardInput(),
-        slug,
-      });
-      expect(await repo.getById(card.id)).not.toBeNull();
-      await db
-        .prepare(`UPDATE cards SET status = ? WHERE id = ?`)
-        .bind("retired", card.id)
-        .run();
-      expect(await repo.getById(card.id)).toBeNull();
-      await db
-        .prepare(`UPDATE cards SET status = 'live' WHERE id = ?`)
-        .bind(card.id)
-        .run();
-      await db
-        .prepare(`UPDATE accounts SET status = ? WHERE id = ?`)
-        .bind("suspended", card.accountId)
-        .run();
-      expect(await repo.getById(card.id)).toBeNull();
+    const repo = new D1CardRepository(db);
+    const slug = "contract-getbyid-d1";
+    const card = await upsertCardWithEmailSink(repo, {
+      ...exampleCardInput(),
+      slug,
     });
+    expect(await repo.getById(card.id)).not.toBeNull();
+    await db
+      .prepare(`UPDATE cards SET status = ? WHERE id = ?`)
+      .bind("retired", card.id)
+      .run();
+    expect(await repo.getById(card.id)).toBeNull();
+    await db
+      .prepare(`UPDATE cards SET status = 'live' WHERE id = ?`)
+      .bind(card.id)
+      .run();
+    await db
+      .prepare(`UPDATE accounts SET status = ? WHERE id = ?`)
+      .bind("suspended", card.accountId)
+      .run();
+    expect(await repo.getById(card.id)).toBeNull();
   });
 });
 
 describe("load SQL hostname mapping (d1 integration)", () => {
   it("maps hostname to the card loaded via SQL", async () => {
-    await withLocalD1(async (db) => {
-      await resetD1Tables(db);
-      const repo = new D1CardRepository(db);
-      const slug = "sql-host-demo";
-      const loadFile = {
-        cards: [{ ...exampleCardInput(), slug }],
-        hostnames: [{ hostname: "card.sql-test.example", slug }],
-      };
-      const sql = buildCardsLoadSql(loadFile, {
-        updatedAt: "2026-10-11T12:00:00.000Z",
-        newCardIds: newCardIdsForLoad(loadFile),
-        accountIds: newAccountIdsForLoad(loadFile),
-      });
-      for (const statement of splitSqlStatements(sql)) {
-        await db.prepare(statement).run();
-      }
-      const card = await repo.getByHostname("card.sql-test.example");
-      expect(card?.slug).toBe(slug);
+    const repo = new D1CardRepository(db);
+    const slug = "sql-host-demo";
+    const loadFile = {
+      cards: [{ ...exampleCardInput(), slug }],
+      hostnames: [{ hostname: "card.sql-test.example", slug }],
+    };
+    const sql = buildCardsLoadSql(loadFile, {
+      updatedAt: "2026-10-11T12:00:00.000Z",
+      newCardIds: newCardIdsForLoad(loadFile),
+      accountIds: newAccountIdsForLoad(loadFile),
     });
+    for (const statement of splitSqlStatements(sql)) {
+      await db.prepare(statement).run();
+    }
+    const card = await repo.getByHostname("card.sql-test.example");
+    expect(card?.slug).toBe(slug);
+  });
+});
+
+describe.sequential("shared D1 table reset", () => {
+  it("seeds a card row for isolation check", async () => {
+    const repo = new D1CardRepository(db);
+    const slug = "d1-reset-seed-contract";
+    await repo.upsertCard({ ...exampleCardInput(), slug });
+    expect(await repo.getBySlug(slug)).not.toBeNull();
+  });
+
+  it("clears seeded card before each test", async () => {
+    const repo = new D1CardRepository(db);
+    expect(await repo.getBySlug("d1-reset-seed-contract")).toBeNull();
   });
 });

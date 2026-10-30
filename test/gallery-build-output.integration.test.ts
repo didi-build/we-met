@@ -7,7 +7,7 @@ import {
   getGalleryUrlPrefix,
 } from "../scripts/lib/gallery-assets-root.mjs";
 
-describe("gallery build output (unit)", () => {
+describe("gallery build output (integration)", () => {
   it("emits gallery SPA and _headers at the Wrangler assets root", () => {
     execFileSync("npm", ["run", "gallery:build"], { encoding: "utf8", stdio: "pipe" });
     const assetsRoot = getGalleryAssetsRoot();
