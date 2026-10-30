@@ -3,6 +3,8 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 
+export { ISOLATED_LOCAL_D1_TEST_TIMEOUT_MS } from "./isolated-local-d1-timeout";
+
 function migrationStatements(): string[] {
   const dir = resolve("migrations");
   const files = readdirSync(dir)
@@ -35,6 +37,8 @@ type OpenIsolatedLocalD1Options = {
  * Isolated local D1 for tests. Uses a temporary persist directory (not `.wrangler/state`).
  * **UNVERIFIED:** Wrangler `getPlatformProxy({ persist: { path } })` is the documented Miniflare
  * persist option; confirm against current Wrangler release notes if local test behavior changes.
+ * Integration suites set Vitest testTimeout to ISOLATED_LOCAL_D1_TEST_TIMEOUT_MS
+ * (see test/helpers/isolated-local-d1-timeout.ts).
  */
 export async function openIsolatedLocalD1(
   options: OpenIsolatedLocalD1Options = {},

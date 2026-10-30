@@ -14,6 +14,7 @@
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { isPreparedPreviewWorkerCiConfigPath } from "./lib/wrangler-config-path.mjs";
 import { parseJsonc } from "./lib/parse-jsonc.mjs";
 import {
   FOLLOWUP_RETRY_BASE_DELAY_SECONDS,
@@ -197,6 +198,22 @@ function checkExchangeOutcomeAnalyticsDataset(configSection, expectedDataset, la
   }
 }
 
+function checkProductionForbiddenNonProductionAnalyticsDatasets(config) {
+  const rows = config.analytics_engine_datasets ?? [];
+  const forbidden = new Set([
+    PREVIEW_EXCHANGE_OUTCOME_DATASET,
+    STAGING_EXCHANGE_OUTCOME_DATASET,
+  ]);
+  for (const row of rows) {
+    const dataset = row?.dataset;
+    if (typeof dataset === "string" && forbidden.has(dataset)) {
+      fail(
+        `production analytics_engine_datasets must not use non-production dataset name "${dataset}"`,
+      );
+    }
+  }
+}
+
 function checkRateLimitBindings(ratelimits, isProduction) {
   const rows = ratelimits ?? [];
   const required = [
@@ -375,15 +392,15 @@ function checkProductionAppHostRoute(config) {
   }
 }
 
-function checkPreviewBlockNoAppHostRoute(previews) {
+function checkPreviewBlockNoRoutes(previews) {
   const patterns = routePatterns(previews ?? {});
-  if (patterns.includes(PRODUCTION_APP_HOST)) {
-    fail(`previews.routes must not include production app host ${PRODUCTION_APP_HOST}`);
+  if (patterns.length > 0) {
+    fail("previews block must not define routes");
   }
 }
 
 function checkPreviewResourceBindings(previews) {
-  checkPreviewBlockNoAppHostRoute(previews);
+  checkPreviewBlockNoRoutes(previews);
   const strings = collectStrings(previews ?? {});
   const productionMarkers = [
     PRODUCTION_RESOURCE_MARKERS.d1Name,
@@ -431,7 +448,7 @@ function checkNestedPreviewsBlockNoExchangeOutcomeAnalytics(previews) {
   const rows = previews?.analytics_engine_datasets ?? [];
   if (rows.length > 0) {
     fail(
-      "previews block must not declare analytics_engine_datasets (use wrangler.preview.jsonc)",
+      "previews block must not declare analytics_engine_datasets (forbidden by policy; PR previews use wrangler.preview.jsonc)",
     );
   }
 }
@@ -454,6 +471,20 @@ function assertPreviewWorkerHostSuffix(previewVars) {
   if (!previewHostSuffix.startsWith("-we-met-preview.")) {
     fail(
       `${PREVIEW_CONFIG_LABEL} vars.WE_MET_PREVIEW_HOST_SUFFIX must start with "-we-met-preview."`,
+    );
+  }
+}
+
+function assertPreviewWorkerPreviewsHostSuffix(previewVars) {
+  const previewHostSuffix = previewVars?.WE_MET_PREVIEW_HOST_SUFFIX ?? "";
+  if (!previewHostSuffix.trim()) {
+    fail(
+      `${PREVIEW_CONFIG_LABEL} previews.vars.WE_MET_PREVIEW_HOST_SUFFIX must be non-empty`,
+    );
+  }
+  if (!previewHostSuffix.startsWith("-we-met-preview.")) {
+    fail(
+      `${PREVIEW_CONFIG_LABEL} previews.vars.WE_MET_PREVIEW_HOST_SUFFIX must start with "-we-met-preview."`,
     );
   }
 }
@@ -496,7 +527,63 @@ function checkPreviewWorkerNoProductionServiceBinding(config) {
 }
 
 function isPreparedPreviewWorkerCiConfig(configPath) {
-  return resolve(configPath).endsWith(".ci.jsonc");
+  return isPreparedPreviewWorkerCiConfigPath(configPath);
+}
+
+const WRANGLER_BINDING_SECTION_KEYS = new Set([
+  "d1_databases",
+  "r2_buckets",
+  "kv_namespaces",
+  "queues",
+  "durable_objects",
+  "services",
+  "analytics_engine_datasets",
+  "ratelimits",
+  "images",
+  "assets",
+  "send_email",
+]);
+
+const PREVIEW_WORKER_ALLOWED_BINDING_SECTIONS = new Set([
+  "d1_databases",
+  "r2_buckets",
+  "queues",
+  "analytics_engine_datasets",
+  "ratelimits",
+  "images",
+  "services",
+  "assets",
+]);
+
+function checkPreviewWorkerForbiddenBindingSections(section, label) {
+  for (const key of Object.keys(section ?? {})) {
+    if (!WRANGLER_BINDING_SECTION_KEYS.has(key)) {
+      continue;
+    }
+    if (!PREVIEW_WORKER_ALLOWED_BINDING_SECTIONS.has(key)) {
+      fail(`${label} must not declare ${key}`);
+    }
+  }
+}
+
+function checkPreviewWorkerPreviewsD1DatabaseIdsMatchTopLevel(config, previews) {
+  const topRows = config.d1_databases ?? [];
+  const previewRows = previews?.d1_databases ?? [];
+  for (const top of topRows) {
+    const binding = top?.binding;
+    if (!binding) {
+      continue;
+    }
+    const preview = previewRows.find((row) => row?.binding === binding);
+    if (!preview) {
+      continue;
+    }
+    if (preview.database_id !== top.database_id) {
+      fail(
+        `${PREVIEW_CONFIG_LABEL} previews.d1_databases binding "${binding}" database_id must match top-level database_id`,
+      );
+    }
+  }
 }
 
 function collectPreviewWorkerBindingKeys(section) {
@@ -532,7 +619,11 @@ function collectPreviewWorkerBindingKeys(section) {
 }
 
 function checkPreviewWorkerPreviewsResourceBindings(previews) {
-  checkPreviewBlockNoAppHostRoute(previews);
+  checkPreviewBlockNoRoutes(previews);
+  checkPreviewWorkerForbiddenBindingSections(
+    previews,
+    `${PREVIEW_CONFIG_LABEL} previews block`,
+  );
   const strings = collectStrings(previews ?? {});
   const productionMarkers = [
     PRODUCTION_RESOURCE_MARKERS.d1Name,
@@ -565,7 +656,7 @@ function checkPreviewWorkerPreviewsResourceBindings(previews) {
       `${PREVIEW_CONFIG_LABEL} previews.vars.WE_MET_BASE_URL must be "${NONPROD_RESOURCE_MARKERS.baseUrl}"`,
     );
   }
-  assertPreviewWorkerHostSuffix(previewVars);
+  assertPreviewWorkerPreviewsHostSuffix(previewVars);
   assertEveryPreviewD1(
     previews,
     (row) => row.database_name === NONPROD_RESOURCE_MARKERS.d1Name,
@@ -609,6 +700,7 @@ function checkPreviewWorkerPreviewsBlock(config, configPath) {
     `${PREVIEW_CONFIG_LABEL} previews`,
   );
   checkPreviewWorkerPreviewsBindingAllowlist(config, previews);
+  checkPreviewWorkerPreviewsD1DatabaseIdsMatchTopLevel(config, previews);
   if (isPreparedPreviewWorkerCiConfig(configPath)) {
     const strings = collectStrings(previews);
     if (strings.includes(D1_PLACEHOLDER_NONPROD)) {
@@ -625,6 +717,7 @@ function checkPreviewWorkerBlock(config, configPath) {
   }
   checkPreviewWorkerDomainSettings(config);
   checkPreviewWorkerNoProductionServiceBinding(config);
+  checkPreviewWorkerForbiddenBindingSections(config, PREVIEW_CONFIG_LABEL);
   checkPreviewResourceBindings({
     vars: config.vars,
     d1_databases: config.d1_databases,
@@ -1162,6 +1255,7 @@ function checkProductionBlock(config) {
   }
   checkRateLimitBindings(rlRows, true);
   checkProductionAppHostRoute(config);
+  checkProductionForbiddenNonProductionAnalyticsDatasets(config);
   checkExchangeOutcomeAnalyticsDataset(
     config,
     PRODUCTION_EXCHANGE_OUTCOME_DATASET,

@@ -1,5 +1,18 @@
+import { basename, resolve } from "node:path";
+
 export const PREVIEW_CONFIG = "wrangler.preview.jsonc";
 export const PREVIEW_CI_CONFIG = "wrangler.preview.ci.jsonc";
+
+/** Basename pattern for prepare-wrangler-config preview Worker CI output (not arbitrary *.ci.jsonc). */
+const PREPARED_PREVIEW_WORKER_CI_BASENAME = /^wrangler\.preview(\..*)?\.ci\.jsonc$/;
+
+/**
+ * @param {string} configPath
+ * @returns {boolean}
+ */
+export function isPreparedPreviewWorkerCiConfigPath(configPath) {
+  return PREPARED_PREVIEW_WORKER_CI_BASENAME.test(basename(resolve(configPath)));
+}
 export const GALLERY_PREVIEW_CONFIG = "wrangler.gallery.jsonc";
 export const PRODUCTION_CONFIG = "wrangler.jsonc";
 

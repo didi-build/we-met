@@ -290,20 +290,73 @@ describe("check-deploy-guards (unit)", () => {
     const result = runGuards("preview-worker", path);
     expect(result.status).toBe(1);
     expect(result.stderr).toContain(
-      'wrangler.preview.jsonc vars.WE_MET_PREVIEW_HOST_SUFFIX must start with "-we-met-preview."',
+      'wrangler.preview.jsonc previews.vars.WE_MET_PREVIEW_HOST_SUFFIX must start with "-we-met-preview."',
     );
   });
 
-  it("fails preview-worker when previews routes include production app host", () => {
+  it("fails preview-worker when previews block declares kv_namespaces", () => {
+    const { path } = writeTempPreviewWorkerConfig((config) => {
+      const previews = config.previews as Record<string, unknown>;
+      previews.kv_namespaces = [
+        { binding: "KV", id: "00000000-0000-0000-0000-000000000099" },
+      ];
+    });
+    const result = runGuards("preview-worker", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      "wrangler.preview.jsonc previews block must not declare kv_namespaces",
+    );
+  });
+
+  it("fails preview-worker when top level declares kv_namespaces", () => {
+    const { path } = writeTempPreviewWorkerConfig((config) => {
+      config.kv_namespaces = [
+        { binding: "KV", id: "00000000-0000-0000-0000-000000000099" },
+      ];
+    });
+    const result = runGuards("preview-worker", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      "wrangler.preview.jsonc must not declare kv_namespaces",
+    );
+  });
+
+  it("fails preview-worker when previews D1 database_id does not match top level", () => {
+    const topId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+    const previewId = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+    const { path } = writeTempPreviewWorkerConfig((config) => {
+      const d1 = config.d1_databases as { database_id: string }[];
+      d1[0]!.database_id = topId;
+      const previews = config.previews as Record<string, unknown>;
+      const previewD1 = previews.d1_databases as { database_id: string }[];
+      previewD1[0]!.database_id = previewId;
+    });
+    const result = runGuards("preview-worker", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      'wrangler.preview.jsonc previews.d1_databases binding "WE_MET_DB" database_id must match top-level database_id',
+    );
+    expect(result.stderr).not.toContain(topId);
+    expect(result.stderr).not.toContain(previewId);
+  });
+
+  it("does not apply prepared CI D1 placeholder guard to unrelated .ci.jsonc basenames", () => {
+    const dir = mkdtempSync(join(tmpdir(), "we-met-preview-worker-ci-guards-"));
+    tempDirs.push(dir);
+    const path = join(dir, "wrangler.other.ci.jsonc");
+    const config = parseJsonc(PREVIEW_WORKER_BASE_CONFIG) as Record<string, unknown>;
+    writeFileSync(path, JSON.stringify(config, null, 2), "utf8");
+    const result = runGuards("preview-worker", path);
+    expect(result.status).toBe(0);
+  });
+  it("fails preview-worker when previews block defines routes", () => {
     const { path } = writeTempPreviewWorkerConfig((config) => {
       const previews = config.previews as Record<string, unknown>;
       previews.routes = [{ pattern: PRODUCTION_APP_HOST, custom_domain: true }];
     });
     const result = runGuards("preview-worker", path);
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain(
-      `previews.routes must not include production app host ${PRODUCTION_APP_HOST}`,
-    );
+    expect(result.stderr).toContain("previews block must not define routes");
   });
 
   it("passes production guards on committed wrangler.jsonc", () => {
@@ -390,7 +443,43 @@ describe("check-deploy-guards (unit)", () => {
     const result = runGuards("preview", path);
     expect(result.status).toBe(1);
     expect(result.stderr).toContain(
-      "previews block must not declare analytics_engine_datasets",
+      "previews block must not declare analytics_engine_datasets (forbidden by policy; PR previews use wrangler.preview.jsonc)",
+    );
+  });
+
+  it("fails when production analytics_engine_datasets uses preview dataset name", () => {
+    const { path } = writeTempConfig((config) => {
+      config.analytics_engine_datasets = [
+        {
+          binding: "WE_MET_EXCHANGE_OUTCOME_ANALYTICS",
+          dataset: "we-met-exchange-outcome-preview",
+        },
+      ];
+    });
+    const result = runGuards("production", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      'production analytics_engine_datasets must not use non-production dataset name "we-met-exchange-outcome-preview"',
+    );
+  });
+
+  it("fails when production analytics_engine_datasets uses staging dataset name in any row", () => {
+    const { path } = writeTempConfig((config) => {
+      config.analytics_engine_datasets = [
+        {
+          binding: "WE_MET_EXCHANGE_OUTCOME_ANALYTICS",
+          dataset: "we-met-exchange-outcome",
+        },
+        {
+          binding: "EXTRA_ANALYTICS",
+          dataset: "we-met-exchange-outcome-staging",
+        },
+      ];
+    });
+    const result = runGuards("production", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      'production analytics_engine_datasets must not use non-production dataset name "we-met-exchange-outcome-staging"',
     );
   });
 
@@ -593,14 +682,14 @@ describe("check-deploy-guards (unit)", () => {
     );
   });
 
-  it("fails when previews.routes includes app.we-met.link", () => {
+  it("fails when previews block defines routes", () => {
     const { path } = writeTempConfig((config) => {
       const previews = config.previews as Record<string, unknown>;
-      previews.routes = [{ pattern: "app.we-met.link", custom_domain: true }];
+      previews.routes = [{ pattern: "we-met.link", custom_domain: true }];
     });
     const result = runGuards("preview", path);
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain("app.we-met.link");
+    expect(result.stderr).toContain("previews block must not define routes");
   });
 
   it("fails when production Worker name is wrong", () => {
