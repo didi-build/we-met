@@ -40,7 +40,7 @@ Configure these in **`.upptimerc.yml`** in **`didi-build/we-met-status`**. Align
 
 | Topic         | Detail                                                                                                                                                                                                                      |
 | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Interval**  | **Every 5 minutes** (Upptime's minimum interval; do not expect sub-5-minute granularity)                                                                                                                                    |
+| **Interval**  | **Every 5 minutes** (shortest interval for GitHub Actions **scheduled** workflows; do not expect sub-5-minute granularity from the cron schedule)                                                                           |
 | **Mechanism** | GitHub Actions **scheduled** workflows in **`we-met-status`**                                                                                                                                                               |
 | **Lateness**  | Scheduled Actions can **start late** (queue load, org concurrency, or GitHub incidents). A single late run does not by itself prove the site is healthy; look at the status page incident timeline and consecutive failures |
 
@@ -97,7 +97,7 @@ Upptime **always** opens a **public GitHub issue** in **`didi-build/we-met-statu
 
 That is **immediately public** (issue title and timeline on GitHub) and can conflict with the approved **private updates first** communication order in [incident.md](./incident.md) before a deliberate public status post. Operators should assume every failed check creates public visibility, not only the email to **hello@we-met.link**.
 
-How to reconcile public auto-issues with internal triage and status-page wording is an **open question for Diadem**: [DIDI-959](https://linear.app/didi-build/issue/DIDI-959). Do not change Upptime issue automation without that decision.
+Upptime **always** opens those GitHub issues; that behavior **cannot be turned off**. [DIDI-959](https://linear.app/didi-build/issue/DIDI-959) covers reconciling public auto-issues with internal triage and status-page wording. Until that decision lands, do not change **`assignees`**, **`skipDeleteIssues`**, or default **issue title/body templates** in **`.upptimerc.yml`** without Diadem approval. Public monitor names and status-page copy also wait on [DIDI-959](https://linear.app/didi-build/issue/DIDI-959).
 
 ---
 
