@@ -230,11 +230,12 @@ describe("HiWhatIDoChips", () => {
     it("skips the hint with prefers-reduced-motion", () => {
       stubMatchMedia(true);
       stubAnimate();
-      renderChips();
+      const { container } = renderChips();
       ioCallback!(
         [{ isIntersecting: true } as IntersectionObserverEntry],
         {} as IntersectionObserver,
       );
+      expect(container.querySelectorAll(".animate-hi-hint")).toHaveLength(0);
       const hintCalls = vi
         .mocked(HTMLElement.prototype.animate)
         .mock.calls.filter((args) => {

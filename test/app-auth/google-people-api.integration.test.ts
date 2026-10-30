@@ -29,7 +29,7 @@ function expectSearchContactsGet(
   expect(url.searchParams.get("pageSize")).toBe(String(pageSize));
 }
 
-describe("google people contact sync (unit)", () => {
+describe("google people contact sync", () => {
   beforeEach(() => {
     fetchMock.mockReset();
     vi.stubGlobal("fetch", fetchMock);

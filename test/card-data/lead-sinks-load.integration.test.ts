@@ -31,7 +31,7 @@ const accountEmailSink = {
   config: { to: ACCOUNT_EMAIL_SENTINEL },
 };
 
-describe("leadSinks load file (unit)", () => {
+describe("leadSinks load file", () => {
   it("accepts a valid email sink", () => {
     const file = parseCardsLoadFile(cardWithSinks([accountEmailSink]));
     expect(file.cards[0].leadSinks).toHaveLength(1);
@@ -193,7 +193,7 @@ describe("leadSinks load SQL reconcile (integration)", { timeout: 20000 }, () =>
   });
 });
 
-describe("non-prod email sink destination guard (unit)", () => {
+describe("non-prod email sink destination guard", () => {
   it("passes when email sinks use account_email", () => {
     const file = parseCardsLoadFile(cardWithSinks([accountEmailSink]));
     expect(() => validateNonProdEmailSinkDestinations(file, "")).not.toThrow();
