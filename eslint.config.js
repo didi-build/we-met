@@ -39,6 +39,23 @@ const eslintConfig = [
     },
   },
   {
+    files: ["test/**/*.test.ts", "test/**/*.test.tsx"],
+    ignores: ["test/**/*.integration.test.ts", "test/**/*.integration.test.tsx"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["**/helpers/d1", "**/helpers/d1.ts"],
+              message: "Import test/helpers/d1 only from *.integration.test.ts files.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: [
       "test/fixtures/privileged-workflow-import-walk/resolution/entry-plain-require.cjs",
       "test/fixtures/privileged-workflow-import-walk/resolution/entry-import-equals.cts",

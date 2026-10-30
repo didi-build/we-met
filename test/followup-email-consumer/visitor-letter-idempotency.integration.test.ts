@@ -197,7 +197,7 @@ function createLetterConsumerDeps(
 
 describe("visitor letter idempotency (local D1 integration)", () => {
   let db: D1Database;
-  let closeD1: () => Promise<void>;
+  let closeD1: (() => Promise<void>) | undefined;
 
   beforeAll(async () => {
     const handle = await openIsolatedLocalD1();

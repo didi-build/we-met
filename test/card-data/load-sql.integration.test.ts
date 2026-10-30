@@ -11,7 +11,7 @@ import { splitSqlStatements } from "@/card-data/sql-statements";
 import { exampleCardInput } from "../helpers/example-card";
 import { withIsolatedLocalD1 } from "../helpers/d1";
 
-describe("load SQL (unit)", () => {
+describe("load SQL", () => {
   it("escapes apostrophes in SQL literals", () => {
     expect(escapeSqlStringLiteral("Didi's")).toBe("'Didi''s'");
   });
