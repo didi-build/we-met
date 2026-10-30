@@ -239,6 +239,37 @@ describe("privileged-pull-files-api (unit)", () => {
     expect(analysis.findings).toEqual([]);
   });
 
+  it("pathsConsideredForPrivilegedGate ignores spoofed previous_filename on raw non-renamed entries", () => {
+    const spoofModifiedRaw = {
+      filename: "docs/runbooks/renamed-wrangler-note.md",
+      status: "modified" as const,
+      previous_filename: "wrangler.jsonc",
+    };
+    const spoofAddedRaw = {
+      filename: "docs/runbooks/new-note.md",
+      status: "added" as const,
+      previous_filename: "wrangler.jsonc",
+    };
+    expect(pathsConsideredForPrivilegedGate(spoofModifiedRaw)).toEqual([
+      "docs/runbooks/renamed-wrangler-note.md",
+    ]);
+    expect(pathsConsideredForPrivilegedGate(spoofAddedRaw)).toEqual([
+      "docs/runbooks/new-note.md",
+    ]);
+    expect(
+      privilegedFilenamesFromChangedFiles([spoofModifiedRaw], isPrivilegedPath),
+    ).toEqual([]);
+    expect(
+      privilegedFilenamesFromChangedFiles([spoofAddedRaw], isPrivilegedPath),
+    ).toEqual([]);
+    for (const raw of [spoofModifiedRaw, spoofAddedRaw]) {
+      const analysis = analyzePrivilegedChange([raw], {}, { trustedOrg: "didi-build" });
+      expect(analysis.flagged).toBe(false);
+      expect(analysis.privilegedFiles).toEqual([]);
+      expect(analysis.findings).toEqual([]);
+    }
+  });
+
   it("pathsConsideredForPrivilegedGate ignores previous_filename unless status is renamed", () => {
     const parsed = parsePullRequestFilesApiStdout(
       readFixture("spoof-modified-with-privileged-previous-filename.json"),
@@ -268,6 +299,23 @@ describe("privileged-pull-files-api (unit)", () => {
   });
 
   it("pathsConsideredForPrivilegedGate uses only the new path when previous_filename is empty", () => {
+    const emptyPreviousRaw = {
+      filename: "docs/runbooks/renamed-wrangler-note.md",
+      status: "renamed" as const,
+      previous_filename: "",
+    };
+    expect(pathsConsideredForPrivilegedGate(emptyPreviousRaw)).toEqual([
+      "docs/runbooks/renamed-wrangler-note.md",
+    ]);
+    const analysis = analyzePrivilegedChange(
+      [emptyPreviousRaw],
+      {},
+      { trustedOrg: "didi-build" },
+    );
+    expect(analysis.flagged).toBe(false);
+    expect(analysis.privilegedFiles).toEqual([]);
+    expect(analysis.findings).toEqual([]);
+
     const parsed = normalizePullFileEntry(
       {
         filename: "docs/runbooks/renamed-wrangler-note.md",

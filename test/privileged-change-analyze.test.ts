@@ -72,14 +72,38 @@ jobs:
     ];
     expect(isPrivilegedFlagInfrastructurePath(changed[0].filename)).toBe(false);
     const result = analyzePrivilegedChange(changed, {}, { trustedOrg: "didi-build" });
-    expect(
-      result.findings.some(
-        (f) =>
-          f.severity === "high" &&
-          f.message ===
-            "Changes privileged-change flag infrastructure (scripts/lib/privileged-paths.mjs)",
-      ),
-    ).toBe(true);
+    expect(result.flagged).toBe(true);
+    expect(result.privilegedFiles).toEqual(["scripts/lib/privileged-paths.mjs"]);
+    expect(result.findings).toEqual([
+      {
+        severity: "high",
+        message:
+          "Changes privileged-change flag infrastructure (scripts/lib/privileged-paths.mjs)",
+      },
+    ]);
+  });
+
+  it("flags infrastructure when a docs path is renamed to privileged-paths.mjs", () => {
+    const changed = [
+      {
+        filename: "scripts/lib/privileged-paths.mjs",
+        status: "renamed" as const,
+        previous_filename: "docs/architecture/privileged-paths-archived.md",
+      },
+    ];
+    expect(isPrivilegedFlagInfrastructurePath(changed[0].previous_filename!)).toBe(
+      false,
+    );
+    const result = analyzePrivilegedChange(changed, {}, { trustedOrg: "didi-build" });
+    expect(result.flagged).toBe(true);
+    expect(result.privilegedFiles).toEqual(["scripts/lib/privileged-paths.mjs"]);
+    expect(result.findings).toEqual([
+      {
+        severity: "high",
+        message:
+          "Changes privileged-change flag infrastructure (scripts/lib/privileged-paths.mjs)",
+      },
+    ]);
   });
 
   const stagingActivationInfrastructurePaths = [
