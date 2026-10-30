@@ -1,11 +1,22 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { execSync } from "node:child_process";
 import {
   flattenPullFilesPayload,
   normalizePullFileEntry,
   parseGhApiPaginatedSlurpedStdout,
   parsePullRequestFilesApiStdout,
+  privilegedFilenamesFromChangedFiles,
   shouldFetchWorkflowFileContent,
 } from "../scripts/lib/privileged-pull-files-api.mjs";
+import { isPrivilegedPath } from "../scripts/lib/privileged-paths.mjs";
+import { analyzePrivilegedChange } from "../scripts/lib/privileged-change-analyze.mjs";
+
+const FIXTURES = "test/fixtures/privileged-pull-files-api";
+
+function readFixture(name: string) {
+  return readFileSync(`${FIXTURES}/${name}`, "utf8");
+}
 
 describe("privileged-pull-files-api (unit)", () => {
   it("parses two-page slurped issue comments", () => {
@@ -98,5 +109,56 @@ describe("privileged-pull-files-api (unit)", () => {
     expect(shouldFetchWorkflowFileContent("removed")).toBe(false);
     expect(shouldFetchWorkflowFileContent("renamed")).toBe(true);
     expect(shouldFetchWorkflowFileContent("modified")).toBe(true);
+  });
+
+  it("keeps previous_filename on renamed pull file entries", () => {
+    const stdout = readFixture("rename-privileged-to-unlisted.json");
+    expect(parsePullRequestFilesApiStdout(stdout)).toEqual([
+      {
+        filename: "docs/runbooks/renamed-wrangler-note.md",
+        status: "renamed",
+        previous_filename: "wrangler.jsonc",
+      },
+    ]);
+  });
+
+  it("flags a rename out of a privileged path via previous_filename", () => {
+    const changed = parsePullRequestFilesApiStdout(
+      readFixture("rename-privileged-to-unlisted.json"),
+    );
+    expect(privilegedFilenamesFromChangedFiles(changed, isPrivilegedPath)).toEqual([
+      "wrangler.jsonc",
+    ]);
+    const analysis = analyzePrivilegedChange(changed, {}, { trustedOrg: "didi-build" });
+    expect(analysis.flagged).toBe(true);
+    expect(analysis.privilegedFiles).toEqual(["wrangler.jsonc"]);
+  });
+
+  it("flags a rename into a privileged path via filename", () => {
+    const changed = parsePullRequestFilesApiStdout(
+      readFixture("rename-unlisted-to-privileged.json"),
+    );
+    expect(privilegedFilenamesFromChangedFiles(changed, isPrivilegedPath)).toEqual([
+      "wrangler.jsonc",
+    ]);
+    const analysis = analyzePrivilegedChange(changed, {}, { trustedOrg: "didi-build" });
+    expect(analysis.flagged).toBe(true);
+    expect(analysis.privilegedFiles).toEqual(["wrangler.jsonc"]);
+  });
+
+  it("does not flag a rename between two unlisted paths", () => {
+    const changed = parsePullRequestFilesApiStdout(
+      readFixture("rename-unlisted-to-unlisted.json"),
+    );
+    expect(privilegedFilenamesFromChangedFiles(changed, isPrivilegedPath)).toEqual([]);
+    const analysis = analyzePrivilegedChange(changed, {}, { trustedOrg: "didi-build" });
+    expect(analysis.flagged).toBe(false);
+    expect(analysis.privilegedFiles).toEqual([]);
+  });
+
+  it("rename mutant kills fail when matching logic is broken", () => {
+    execSync("node test/mutant-verify-privileged-pull-files-rename.mjs", {
+      cwd: process.cwd(),
+    });
   });
 });
