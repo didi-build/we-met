@@ -282,6 +282,9 @@ describe("cloudflare-provision-api (unit)", () => {
 });
 
 describe("provision-resources CLI (unit)", () => {
+  // Spawn output path uses tmpdir() in this test file only; workflow import walk does not
+  // analyze test/*.ts. Reachable scripts with template substitution in node spawn arrays
+  // still fail closed (see privileged-workflow-import-walk DIDI-995 fixtures).
   it("exits non-zero when Cloudflare returns auth error", () => {
     const result = spawnSync(
       "node",
