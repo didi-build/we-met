@@ -132,13 +132,13 @@ Paste command output (no secrets) on the Linear hosting ticket when asked.
 
 ### Effective preview bindings
 
-Bindings appear in the **`wrangler preview --json`** output under **`deployment.env`** (verified **2026-10-11**), and in the dashboard (Worker **we-met** → Previews → `deploy-proof` → Bindings). **UNVERIFIED:** `npx wrangler preview secret list --name <preview>` was not exercised in the proof deploy.
+Bindings appear in the **`wrangler preview --json`** output under **`deployment.env`** (verified **2026-10-11**), and in the dashboard (Worker **we-met-preview** → Previews → `deploy-proof` → Bindings). **UNVERIFIED:** `npx wrangler preview secret list --name <preview>` was not exercised in the proof deploy.
 
 Expect non-prod queue `we-met-followup-email-nonprod`, D1 `we-met-db-nonprod`, R2 `we-met-assets-nonprod`, rate limiter namespace **2001**, plus **ASSETS** and **IMAGES** (`previews.images`). Preview deployments do **not** get **`WORKER_SELF_REFERENCE`** (production does).
 
 ### Redeploy check
 
-After changing **`preview_urls`** or **`workers_dev`** in `wrangler.jsonc`, redeploy and confirm in the dashboard (Worker **we-met** → **Domains**): **Preview URLs** on, production **workers.dev** off. Verified **2026-10-11:** redeploy with `preview_urls: true` and `workers_dev: false` turned the Preview toggle **on** after it had been switched off manually; production workers.dev stayed off. Production Worker **secrets survive** a redeploy.
+After changing **`preview_urls`** or **`workers_dev`** in **`wrangler.preview.jsonc`**, redeploy Worker **`we-met-preview`** and confirm in the dashboard (**we-met-preview** → **Domains**): **Preview URLs** on. Production **`wrangler.jsonc`** keeps **`workers_dev: false`** (custom domains only). Verified **2026-10-11** (before [0030](../decisions/0030-preview-worker-isolation.md), on **`we-met`**): redeploy with `preview_urls: true` and `workers_dev: false` turned the Preview toggle **on** after it had been switched off manually; production workers.dev stayed off. Production Worker **secrets survive** a redeploy.
 
 Deploy logs may label a queue binding **“(inherited)”** on redeploy; that is cosmetic. Confirm the real binding with:
 
@@ -154,7 +154,7 @@ npx wrangler versions view <version-id> --name we-met
 - [x] How does `WORKER_SELF_REFERENCE` behave on a preview? **Answer:** Preview deployments do **not** include a `WORKER_SELF_REFERENCE` binding; production does. The placeholder app served `/` without it; impact on the real card flow is **unknown until the card ships** ([0019](../decisions/0019-pr-preview-github-action.md#proof-deploy-findings)).
 - [x] Does `opennextjs-cloudflare deploy --config wrangler.ci.jsonc` use the generated config end to end? **Answer:** Yes — deploy succeeds; incremental/tag cache steps report no population needed for this config.
 
-If the account’s **workers.dev** subdomain is ever renamed, update the **we-met nonprod** Turnstile widget hostname, set `previews.vars.WE_MET_PREVIEW_HOST_SUFFIX` in `wrangler.jsonc` to match (`-<worker-name>.<subdomain>.workers.dev`), and re-check **Preview URLs** (`preview_urls: true`).
+If the account’s **workers.dev** subdomain is ever renamed, update the **we-met nonprod** Turnstile widget hostname, set `vars.WE_MET_PREVIEW_HOST_SUFFIX` in `wrangler.preview.jsonc` to `-we-met-preview.<subdomain>.workers.dev`, and re-check **Preview URLs** on Worker **`we-met-preview`** (`preview_urls: true` in `wrangler.preview.jsonc`).
 
 ## 2. Cloudflare API tokens for CI
 
@@ -327,7 +327,7 @@ Remove or rename any legacy unsuffixed `CLOUDFLARE_API_TOKEN` secrets. Do **not*
 
 ## 4. Guard failure demos (throwaway branch)
 
-On a branch, temporarily break `wrangler.jsonc` (e.g. set preview queue to `we-met-followup-email`), run:
+On a branch, temporarily break `wrangler.preview.jsonc` (e.g. set the preview queue producer to `we-met-followup-email`), run:
 
 ```bash
 npm run deploy:guards

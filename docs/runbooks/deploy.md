@@ -27,7 +27,7 @@
 - **Order when a PR adds a D1/R2 binding:** Open the PR (Preview fails until resources exist; that is expected). **Merge to `main`.** Approve **`migrate-nonprod`** on [**Provision non-prod resources (main)**](../../.github/workflows/provision-nonprod-main.yml) when wrangler config changed (or on migrate **`apply`** if the PR also changed `migrations/`). After the approved job succeeds, re-run **Preview** on a follow-up PR or on the same branch if still open. Production resources are created on the next approved [**Deploy production**](../../.github/workflows/deploy-production.yml) job.
 - **D1 migrations:** The preview workflow does **not** apply migrations. PRs that change `migrations/` start [**Migrate non-prod D1**](../../.github/workflows/migrate-nonprod.yml): the plan job prints SQL in the run summary; approve the **`migrate-nonprod`** environment to apply to `we-met-db-nonprod` (phone-friendly). Terminal fallback: `npm run db:migrate:remote`. Keep migrations backward compatible (expand/contract) because other previews and the previous production deploy share that schema. Closing a PR without merging leaves its expand-only migration applied in non-prod.
 - **Migrate apply concurrency (UNVERIFIED):** The apply job uses concurrency group `migrate-nonprod-apply` with `cancel-in-progress: false`, so at most one pending job can queue. If two PRs request migrations at once, GitHub may let the second pending environment approval supersede the first’s pending approval while the first PR’s comment still shows **waiting**. Recovery: re-run the first PR’s migration via **`workflow_dispatch`** on `migrate-nonprod.yml` with that PR number. (Known GitHub behavior; not exercised in this repo.)
-- **Find the URL:** GitHub PR comment from `github-actions[bot]` (“Cloudflare Preview: …”), or Cloudflare dashboard → Workers & Pages → **we-met** → Previews → `pr-<number>`. PRs that change files under `migrations/` get a D1 migration notice in that comment.
+- **Find the URL:** GitHub PR comment from `github-actions[bot]` (“Cloudflare Preview: …”), or Cloudflare dashboard → Workers & Pages → **we-met-preview** → Previews → `pr-<number>`. PRs that change files under `migrations/` get a D1 migration notice in that comment.
 - **Cleanup:** Closing the PR runs the `cleanup` job in the same workflow (`wrangler preview delete --name pr-<number>`); delete is tolerant of “preview not found”.
 - **Verify:** Open the preview URL, load `/` (placeholder until the card ships). Full exchange smoke: [test-leads.md](./test-leads.md) after [DIDI-575](https://linear.app/didi-build/issue/DIDI-575) / [DIDI-577](https://linear.app/didi-build/issue/DIDI-577).
 
@@ -135,7 +135,7 @@ Worker secrets (`WE_MET_TOKEN_SECRET`, `TURNSTILE_SECRET_KEY`): set during the m
 
 ## Logs
 
-- **App Worker:** Cloudflare dashboard → Workers & Pages → **we-met** → Logs (production) or select Preview `pr-<n>`.
+- **App Worker:** Cloudflare dashboard → Workers & Pages → **we-met** → Logs (production) or **we-met-preview** → Previews → `pr-<n>` → Logs.
 - **Queues:** Workers & Pages → Queues → `we-met-followup-email` / `we-met-followup-email-nonprod`.
 - **Consumers:** Workers **we-met-followup-email-consumer** / **we-met-followup-email-consumer-nonprod** ([DIDI-577](https://linear.app/didi-build/issue/DIDI-577)).
 - **GitHub:** Actions runs for workflows **Preview**, **Deploy staging**, **Deploy consumer non-prod**, and **Deploy production**.
