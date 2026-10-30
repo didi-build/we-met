@@ -3,6 +3,7 @@ import {
   analyzePrivilegedChange,
   privilegedChangeCheckState,
 } from "../scripts/lib/privileged-change-analyze.mjs";
+import { isPrivilegedFlagInfrastructurePath } from "../scripts/lib/privileged-paths.mjs";
 
 describe("privileged-change-analyze (unit)", () => {
   it("flags privileged wrangler config without workflow findings", () => {
@@ -59,6 +60,50 @@ jobs:
     expect(
       result.findings.some((f) => f.message.includes("privileged-pull-files-api.mjs")),
     ).toBe(true);
+  });
+
+  it("flags infrastructure when privileged-paths.mjs is renamed to a docs path", () => {
+    const changed = [
+      {
+        filename: "docs/architecture/privileged-paths-archived.md",
+        status: "renamed" as const,
+        previous_filename: "scripts/lib/privileged-paths.mjs",
+      },
+    ];
+    expect(isPrivilegedFlagInfrastructurePath(changed[0].filename)).toBe(false);
+    const result = analyzePrivilegedChange(changed, {}, { trustedOrg: "didi-build" });
+    expect(result.flagged).toBe(true);
+    expect(result.privilegedFiles).toEqual(["scripts/lib/privileged-paths.mjs"]);
+    expect(result.findings).toEqual([
+      {
+        severity: "high",
+        message:
+          "Changes privileged-change flag infrastructure (scripts/lib/privileged-paths.mjs)",
+      },
+    ]);
+  });
+
+  it("flags infrastructure when a docs path is renamed to privileged-paths.mjs", () => {
+    const changed = [
+      {
+        filename: "scripts/lib/privileged-paths.mjs",
+        status: "renamed" as const,
+        previous_filename: "docs/architecture/privileged-paths-archived.md",
+      },
+    ];
+    expect(isPrivilegedFlagInfrastructurePath(changed[0].previous_filename!)).toBe(
+      false,
+    );
+    const result = analyzePrivilegedChange(changed, {}, { trustedOrg: "didi-build" });
+    expect(result.flagged).toBe(true);
+    expect(result.privilegedFiles).toEqual(["scripts/lib/privileged-paths.mjs"]);
+    expect(result.findings).toEqual([
+      {
+        severity: "high",
+        message:
+          "Changes privileged-change flag infrastructure (scripts/lib/privileged-paths.mjs)",
+      },
+    ]);
   });
 
   const stagingActivationInfrastructurePaths = [

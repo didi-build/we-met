@@ -15,22 +15,75 @@ export function flattenPullFilesPayload(parsed) {
 }
 
 /**
+ * @typedef {{ filename: string; status: string; previous_filename?: string }} PullRequestChangedFile
+ */
+
+/**
  * @param {unknown} entry
  * @param {number} index
- * @returns {{ filename: string; status: string }}
+ * @returns {PullRequestChangedFile}
  */
 export function normalizePullFileEntry(entry, index) {
   if (!entry || typeof entry !== "object") {
     throw new TypeError(`pull files API entry ${index} is not an object`);
   }
-  const record = /** @type {{ filename?: unknown; status?: unknown }} */ (entry);
+  const record =
+    /** @type {{ filename?: unknown; status?: unknown; previous_filename?: unknown }} */ (
+      entry
+    );
   if (typeof record.filename !== "string" || record.filename.length === 0) {
     throw new TypeError(`pull files API entry ${index} missing string filename`);
   }
   if (typeof record.status !== "string" || record.status.length === 0) {
     throw new TypeError(`pull files API entry ${index} missing string status`);
   }
-  return { filename: record.filename, status: record.status };
+  /** @type {PullRequestChangedFile} */
+  const normalized = { filename: record.filename, status: record.status };
+  if (
+    record.status === "renamed" &&
+    typeof record.previous_filename === "string" &&
+    record.previous_filename.length > 0
+  ) {
+    normalized.previous_filename = record.previous_filename;
+  }
+  return normalized;
+}
+
+/**
+ * Paths to match against privileged path rules for one pull file entry.
+ * Fail closed: renamed entries without previous_filename only consider the new path.
+ *
+ * @param {PullRequestChangedFile} file
+ * @returns {string[]}
+ */
+export function pathsConsideredForPrivilegedGate(file) {
+  const paths = [file.filename];
+  if (
+    file.status === "renamed" &&
+    typeof file.previous_filename === "string" &&
+    file.previous_filename.length > 0
+  ) {
+    paths.push(file.previous_filename);
+  }
+  return paths;
+}
+
+/**
+ * @param {PullRequestChangedFile[]} changedFiles
+ * @param {(filename: string) => boolean} isPrivilegedPathFn
+ * @returns {string[]}
+ */
+export function privilegedFilenamesFromChangedFiles(changedFiles, isPrivilegedPathFn) {
+  /** @type {Set<string>} */
+  const privileged = new Set();
+  for (const file of changedFiles) {
+    for (const path of pathsConsideredForPrivilegedGate(file)) {
+      if (isPrivilegedPathFn(path)) {
+        privileged.add(path);
+      }
+    }
+  }
+  return [...privileged].sort();
 }
 
 /**
@@ -73,7 +126,7 @@ export function parseGhApiPaginatedSlurpedStdout(stdout) {
 
 /**
  * @param {string} stdout
- * @returns {{ filename: string; status: string }[]}
+ * @returns {PullRequestChangedFile[]}
  */
 export function parsePullRequestFilesApiStdout(stdout) {
   const rawEntries = parseGhApiPaginatedSlurpedStdout(stdout);
