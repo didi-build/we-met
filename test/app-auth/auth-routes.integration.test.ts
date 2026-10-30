@@ -542,4 +542,28 @@ describe("auth API routes (integration)", () => {
     );
     expect(good.status).toBe(200);
   });
+
+  describe.sequential("shared D1 table reset", () => {
+    it("seeds an account row for isolation check", async () => {
+      const result = await upsertAccountFromGoogle(db, {
+        sub: "d1-reset-seed-auth",
+        email: "d1-reset-seed-auth@example.com",
+        name: "Seed",
+      });
+      expect(result.ok).toBe(true);
+      const row = await db
+        .prepare("SELECT id FROM accounts WHERE email = ?")
+        .bind("d1-reset-seed-auth@example.com")
+        .first<{ id: string }>();
+      expect(row?.id).toBeTruthy();
+    });
+
+    it("clears seeded account before each test", async () => {
+      const row = await db
+        .prepare("SELECT id FROM accounts WHERE email = ?")
+        .bind("d1-reset-seed-auth@example.com")
+        .first<{ id: string }>();
+      expect(row).toBeNull();
+    });
+  });
 });

@@ -205,3 +205,17 @@ describe("load SQL hostname mapping (d1 integration)", () => {
     expect(card?.slug).toBe(slug);
   });
 });
+
+describe.sequential("shared D1 table reset", () => {
+  it("seeds a card row for isolation check", async () => {
+    const repo = new D1CardRepository(db);
+    const slug = "d1-reset-seed-contract";
+    await repo.upsertCard({ ...exampleCardInput(), slug });
+    expect(await repo.getBySlug(slug)).not.toBeNull();
+  });
+
+  it("clears seeded card before each test", async () => {
+    const repo = new D1CardRepository(db);
+    expect(await repo.getBySlug("d1-reset-seed-contract")).toBeNull();
+  });
+});
