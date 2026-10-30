@@ -44,6 +44,16 @@ function readFixture(name: string): string {
   return readFileSync(join(FIXTURES, name), "utf8");
 }
 
+function referencesGalleryGuardFixtureByName(
+  source: string,
+  fixtureName: string,
+): boolean {
+  const escaped = fixtureName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(
+    String.raw`(?:^|[^A-Za-z0-9._-])${escaped}(?:[^A-Za-z0-9._-]|$)`,
+  ).test(source);
+}
+
 const BASE_CONFIG = {
   $schema: "node_modules/wrangler/config-schema.json",
   name: "we-met-preview",
@@ -840,11 +850,14 @@ steps:
       const prequoteWorkflow = readFixture(
         "bad-workflow-mismatched-quote-unknown-global.yml",
       );
-      expect(
-        collectGalleryWorkflowViolations(prequoteWorkflow).some((e) =>
-          e.includes("global flag --x-provision"),
-        ),
-      ).toBe(true);
+      expect(collectGalleryWorkflowViolations(prequoteWorkflow)).toEqual([
+        "gallery-preview.yml wrangler preview must not pass wrangler global flag --x-provision before the preview subcommand.",
+        "gallery-preview.yml wrangler preview must not pass a positional Worker script.",
+        "gallery-preview.yml wrangler preview must not pass --x-provision.",
+        "gallery-preview.yml wrangler preview must pass --config wrangler.gallery.jsonc.",
+        "gallery-preview.yml wrangler preview must pass --name.",
+        "gallery-preview.yml wrangler preview must pass --json.",
+      ]);
       expect(
         extractWranglerPreviewInvocations(
           normalizeForDeployScan(
@@ -1197,29 +1210,52 @@ steps:
       },
     );
 
-    it("DIDI-981: prequote filter-only YAML fixture and fixture-dir coverage", () => {
+    it("DIDI-981: prequote YAML fixtures and fixture-dir coverage", () => {
+      const workerNameMsg =
+        "gallery-preview.yml wrangler preview must not pass --worker-name.";
+      const ignoreBaseMsg =
+        "gallery-preview.yml wrangler preview must not pass --ignore-base-config.";
+
       const filterOnly = readFixture("bad-workflow-prequote-filter-only.yml");
-      const filterErrors = collectGalleryWorkflowViolations(filterOnly);
-      expect(filterErrors).toContain(
-        "gallery-preview.yml wrangler preview must not pass --worker-name.",
+      expect(collectGalleryWorkflowViolations(filterOnly)).toEqual([
+        workerNameMsg,
+        ignoreBaseMsg,
+        ignoreBaseMsg,
+        workerNameMsg,
+      ]);
+      const filterCommand = extractYamlRunCommands(filterOnly)[0]!;
+      const filterInvocation = extractWranglerPreviewInvocations(
+        joinShellContinuations(filterCommand).replace(/\r?\n/g, " "),
+      )[0]!;
+      const filterArgvErrors = collectGalleryPreviewArgvViolations(
+        filterInvocation.argString,
       );
-      expect(filterErrors).toContain(
-        "gallery-preview.yml wrangler preview must not pass --ignore-base-config.",
+      expect(filterArgvErrors.filter((entry) => entry === workerNameMsg)).toHaveLength(
+        2,
       );
+      expect(filterArgvErrors.filter((entry) => entry === ignoreBaseMsg)).toHaveLength(
+        2,
+      );
+
+      const unknownGlobal = readFixture("bad-workflow-prequote-unknown-global.yml");
+      expect(collectGalleryWorkflowViolations(unknownGlobal)).toEqual([
+        "gallery-preview.yml wrangler preview must not pass wrangler global flag --x-provision before the preview subcommand.",
+        "gallery-preview.yml wrangler preview must not pass --x-provision.",
+        workerNameMsg,
+        ignoreBaseMsg,
+        ignoreBaseMsg,
+        workerNameMsg,
+      ]);
 
       const testSource = readFileSync(
         join(import.meta.dirname, "gallery-guards.test.ts"),
         "utf8",
       );
-      const mutantSource = readFileSync(
-        join(import.meta.dirname, "mutant-verify-gallery-guards.mjs"),
-        "utf8",
-      );
-      const referencingSources = testSource + mutantSource;
       for (const name of readdirSync(FIXTURES)) {
-        expect(referencingSources, `orphan gallery-guards fixture: ${name}`).toContain(
-          name,
-        );
+        expect(
+          referencesGalleryGuardFixtureByName(testSource, name),
+          `orphan gallery-guards fixture: ${name}`,
+        ).toBe(true);
       }
     });
   });
