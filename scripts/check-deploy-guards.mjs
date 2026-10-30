@@ -530,37 +530,51 @@ function isPreparedPreviewWorkerCiConfig(configPath) {
   return isPreparedPreviewWorkerCiConfigPath(configPath);
 }
 
-const WRANGLER_BINDING_SECTION_KEYS = new Set([
-  "d1_databases",
-  "r2_buckets",
-  "kv_namespaces",
-  "queues",
-  "durable_objects",
-  "services",
+/** Binding section keys in committed wrangler.preview.jsonc (keep in sync; see test). */
+const PREVIEW_WORKER_TOP_LEVEL_BINDING_SECTIONS = new Set([
   "analytics_engine_datasets",
-  "ratelimits",
-  "images",
   "assets",
-  "send_email",
+  "d1_databases",
+  "images",
+  "queues",
+  "r2_buckets",
+  "ratelimits",
+  "services",
 ]);
 
-const PREVIEW_WORKER_ALLOWED_BINDING_SECTIONS = new Set([
-  "d1_databases",
-  "r2_buckets",
-  "queues",
+const PREVIEW_WORKER_PREVIEWS_BLOCK_BINDING_SECTIONS = new Set([
   "analytics_engine_datasets",
-  "ratelimits",
+  "d1_databases",
   "images",
+  "queues",
+  "ratelimits",
+  "r2_buckets",
   "services",
-  "assets",
 ]);
 
-function checkPreviewWorkerForbiddenBindingSections(section, label) {
+const PREVIEW_WORKER_PREVIEWS_BLOCK_ALLOWED_KEYS = new Set([
+  ...PREVIEW_WORKER_PREVIEWS_BLOCK_BINDING_SECTIONS,
+  "vars",
+  "observability",
+]);
+
+const PREVIEW_WORKER_TOP_LEVEL_ALLOWED_KEYS = new Set([
+  ...PREVIEW_WORKER_TOP_LEVEL_BINDING_SECTIONS,
+  "vars",
+  "observability",
+  "$schema",
+  "name",
+  "main",
+  "workers_dev",
+  "preview_urls",
+  "compatibility_date",
+  "compatibility_flags",
+  "previews",
+]);
+
+function checkPreviewWorkerSectionKeyAllowlist(section, label, allowedKeys) {
   for (const key of Object.keys(section ?? {})) {
-    if (!WRANGLER_BINDING_SECTION_KEYS.has(key)) {
-      continue;
-    }
-    if (!PREVIEW_WORKER_ALLOWED_BINDING_SECTIONS.has(key)) {
+    if (!allowedKeys.has(key)) {
       fail(`${label} must not declare ${key}`);
     }
   }
@@ -620,9 +634,10 @@ function collectPreviewWorkerBindingKeys(section) {
 
 function checkPreviewWorkerPreviewsResourceBindings(previews) {
   checkPreviewBlockNoRoutes(previews);
-  checkPreviewWorkerForbiddenBindingSections(
+  checkPreviewWorkerSectionKeyAllowlist(
     previews,
     `${PREVIEW_CONFIG_LABEL} previews block`,
+    PREVIEW_WORKER_PREVIEWS_BLOCK_ALLOWED_KEYS,
   );
   const strings = collectStrings(previews ?? {});
   const productionMarkers = [
@@ -717,7 +732,11 @@ function checkPreviewWorkerBlock(config, configPath) {
   }
   checkPreviewWorkerDomainSettings(config);
   checkPreviewWorkerNoProductionServiceBinding(config);
-  checkPreviewWorkerForbiddenBindingSections(config, PREVIEW_CONFIG_LABEL);
+  checkPreviewWorkerSectionKeyAllowlist(
+    config,
+    PREVIEW_CONFIG_LABEL,
+    PREVIEW_WORKER_TOP_LEVEL_ALLOWED_KEYS,
+  );
   checkPreviewResourceBindings({
     vars: config.vars,
     d1_databases: config.d1_databases,

@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -8,12 +8,37 @@ import {
   D1_PLACEHOLDER_PRODUCTION,
   PRODUCTION_APP_HOST,
 } from "../scripts/lib/wrangler-placeholders.mjs";
+import { isPreparedPreviewWorkerCiConfigPath } from "../scripts/lib/wrangler-config-path.mjs";
 
 const SCRIPT = "scripts/check-deploy-guards.mjs";
 const BASE_CONFIG = readFileSync("wrangler.jsonc", "utf8");
 const PREVIEW_WORKER_BASE_CONFIG = readFileSync("wrangler.preview.jsonc", "utf8");
 const STAGING_BASE_CONFIG = readFileSync("wrangler.staging.jsonc", "utf8");
 const MAIL_SAFETY_BASE = readFileSync("config/nonprod-mail-safety.json", "utf8");
+
+const PREVIEW_WORKER_TOP_LEVEL_METADATA_KEYS = new Set([
+  "$schema",
+  "compatibility_date",
+  "compatibility_flags",
+  "main",
+  "name",
+  "observability",
+  "preview_urls",
+  "previews",
+  "vars",
+  "workers_dev",
+]);
+
+const PREVIEW_WORKER_PREVIEWS_BLOCK_METADATA_KEYS = new Set(["observability", "vars"]);
+
+function previewWorkerBindingSectionKeys(
+  section: Record<string, unknown>,
+  metadataKeys: Set<string>,
+): string[] {
+  return Object.keys(section)
+    .filter((key) => !metadataKeys.has(key))
+    .sort();
+}
 
 const tempDirs: string[] = [];
 const tempMailSpecs: string[] = [];
@@ -88,6 +113,53 @@ describe("check-deploy-guards (unit)", () => {
   it("passes preview-worker guards on committed wrangler.preview.jsonc", () => {
     const result = runGuards("preview-worker", "wrangler.preview.jsonc");
     expect(result.status).toBe(0);
+  });
+
+  it("preview-worker section allowlists match committed wrangler.preview.jsonc binding keys", () => {
+    const config = parseJsonc(PREVIEW_WORKER_BASE_CONFIG) as Record<string, unknown>;
+    const previews = config.previews as Record<string, unknown>;
+    const topBindingKeys = previewWorkerBindingSectionKeys(
+      config,
+      PREVIEW_WORKER_TOP_LEVEL_METADATA_KEYS,
+    );
+    const previewsBindingKeys = previewWorkerBindingSectionKeys(
+      previews,
+      PREVIEW_WORKER_PREVIEWS_BLOCK_METADATA_KEYS,
+    );
+    expect(topBindingKeys).toEqual([
+      "analytics_engine_datasets",
+      "assets",
+      "d1_databases",
+      "images",
+      "queues",
+      "r2_buckets",
+      "ratelimits",
+      "services",
+    ]);
+    expect(previewsBindingKeys).toEqual([
+      "analytics_engine_datasets",
+      "d1_databases",
+      "images",
+      "queues",
+      "r2_buckets",
+      "ratelimits",
+      "services",
+    ]);
+  });
+
+  it("fails preview-worker when previews block declares assets", () => {
+    const { path } = writeTempPreviewWorkerConfig((config) => {
+      const previews = config.previews as Record<string, unknown>;
+      previews.assets = {
+        directory: ".open-next/assets",
+        binding: "ASSETS",
+      };
+    });
+    const result = runGuards("preview-worker", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      "wrangler.preview.jsonc previews block must not declare assets",
+    );
   });
 
   it("passes preview-worker guards on prepared wrangler.preview.ci.jsonc", () => {
@@ -308,6 +380,56 @@ describe("check-deploy-guards (unit)", () => {
     );
   });
 
+  it("fails preview-worker when previews block declares durable_objects", () => {
+    const { path } = writeTempPreviewWorkerConfig((config) => {
+      const previews = config.previews as Record<string, unknown>;
+      previews.durable_objects = [{ name: "DO", class_name: "Example" }];
+    });
+    const result = runGuards("preview-worker", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      "wrangler.preview.jsonc previews block must not declare durable_objects",
+    );
+  });
+
+  it("fails preview-worker when previews block declares send_email", () => {
+    const { path } = writeTempPreviewWorkerConfig((config) => {
+      const previews = config.previews as Record<string, unknown>;
+      previews.send_email = [{ name: "EMAIL" }];
+    });
+    const result = runGuards("preview-worker", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      "wrangler.preview.jsonc previews block must not declare send_email",
+    );
+  });
+
+  it("fails preview-worker when previews block declares vectorize", () => {
+    const { path } = writeTempPreviewWorkerConfig((config) => {
+      const previews = config.previews as Record<string, unknown>;
+      previews.vectorize = [{ binding: "VEC", index_name: "example" }];
+    });
+    const result = runGuards("preview-worker", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      "wrangler.preview.jsonc previews block must not declare vectorize",
+    );
+  });
+
+  it("fails preview-worker when previews block declares hyperdrive", () => {
+    const { path } = writeTempPreviewWorkerConfig((config) => {
+      const previews = config.previews as Record<string, unknown>;
+      previews.hyperdrive = [
+        { binding: "HD", id: "00000000-0000-0000-0000-000000000099" },
+      ];
+    });
+    const result = runGuards("preview-worker", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      "wrangler.preview.jsonc previews block must not declare hyperdrive",
+    );
+  });
+
   it("fails preview-worker when top level declares kv_namespaces", () => {
     const { path } = writeTempPreviewWorkerConfig((config) => {
       config.kv_namespaces = [
@@ -318,6 +440,65 @@ describe("check-deploy-guards (unit)", () => {
     expect(result.status).toBe(1);
     expect(result.stderr).toContain(
       "wrangler.preview.jsonc must not declare kv_namespaces",
+    );
+  });
+
+  it("fails preview-worker when top level declares durable_objects", () => {
+    const { path } = writeTempPreviewWorkerConfig((config) => {
+      config.durable_objects = [{ name: "DO", class_name: "Example" }];
+    });
+    const result = runGuards("preview-worker", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      "wrangler.preview.jsonc must not declare durable_objects",
+    );
+  });
+
+  it("fails preview-worker when top level declares send_email", () => {
+    const { path } = writeTempPreviewWorkerConfig((config) => {
+      config.send_email = [{ name: "EMAIL" }];
+    });
+    const result = runGuards("preview-worker", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      "wrangler.preview.jsonc must not declare send_email",
+    );
+  });
+
+  it("fails preview-worker when top level declares vectorize", () => {
+    const { path } = writeTempPreviewWorkerConfig((config) => {
+      config.vectorize = [{ binding: "VEC", index_name: "example" }];
+    });
+    const result = runGuards("preview-worker", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      "wrangler.preview.jsonc must not declare vectorize",
+    );
+  });
+
+  it("fails preview-worker when top level declares hyperdrive", () => {
+    const { path } = writeTempPreviewWorkerConfig((config) => {
+      config.hyperdrive = [
+        { binding: "HD", id: "00000000-0000-0000-0000-000000000099" },
+      ];
+    });
+    const result = runGuards("preview-worker", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      "wrangler.preview.jsonc must not declare hyperdrive",
+    );
+  });
+
+  it("fails preview-worker when previews vars.WE_MET_PREVIEW_HOST_SUFFIX is empty", () => {
+    const { path } = writeTempPreviewWorkerConfig((config) => {
+      const previews = config.previews as Record<string, unknown>;
+      const vars = previews.vars as Record<string, string>;
+      vars.WE_MET_PREVIEW_HOST_SUFFIX = "";
+    });
+    const result = runGuards("preview-worker", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      "wrangler.preview.jsonc previews.vars.WE_MET_PREVIEW_HOST_SUFFIX must be non-empty",
     );
   });
 
@@ -344,6 +525,45 @@ describe("check-deploy-guards (unit)", () => {
     const dir = mkdtempSync(join(tmpdir(), "we-met-preview-worker-ci-guards-"));
     tempDirs.push(dir);
     const path = join(dir, "wrangler.other.ci.jsonc");
+    const config = parseJsonc(PREVIEW_WORKER_BASE_CONFIG) as Record<string, unknown>;
+    writeFileSync(path, JSON.stringify(config, null, 2), "utf8");
+    const result = runGuards("preview-worker", path);
+    expect(result.status).toBe(0);
+  });
+
+  it("does not treat wrangler.preview.ci.jsonc.bak as a prepared preview Worker CI config", () => {
+    expect(isPreparedPreviewWorkerCiConfigPath("wrangler.preview.ci.jsonc.bak")).toBe(
+      false,
+    );
+    const dir = mkdtempSync(join(tmpdir(), "we-met-preview-worker-ci-guards-"));
+    tempDirs.push(dir);
+    const path = join(dir, "wrangler.preview.ci.jsonc.bak");
+    const config = parseJsonc(PREVIEW_WORKER_BASE_CONFIG) as Record<string, unknown>;
+    writeFileSync(path, JSON.stringify(config, null, 2), "utf8");
+    const result = runGuards("preview-worker", path);
+    expect(result.status).toBe(0);
+  });
+
+  it("does not treat x-wrangler.preview.ci.jsonc as a prepared preview Worker CI config", () => {
+    expect(isPreparedPreviewWorkerCiConfigPath("x-wrangler.preview.ci.jsonc")).toBe(
+      false,
+    );
+    const dir = mkdtempSync(join(tmpdir(), "we-met-preview-worker-ci-guards-"));
+    tempDirs.push(dir);
+    const path = join(dir, "x-wrangler.preview.ci.jsonc");
+    const config = parseJsonc(PREVIEW_WORKER_BASE_CONFIG) as Record<string, unknown>;
+    writeFileSync(path, JSON.stringify(config, null, 2), "utf8");
+    const result = runGuards("preview-worker", path);
+    expect(result.status).toBe(0);
+  });
+
+  it("does not treat a file inside a wrangler.preview.ci.jsonc directory as prepared CI config", () => {
+    const dir = mkdtempSync(join(tmpdir(), "we-met-preview-worker-ci-guards-"));
+    tempDirs.push(dir);
+    const nestedDir = join(dir, "wrangler.preview.ci.jsonc");
+    mkdirSync(nestedDir);
+    const path = join(nestedDir, "wrangler.preview.jsonc");
+    expect(isPreparedPreviewWorkerCiConfigPath(path)).toBe(false);
     const config = parseJsonc(PREVIEW_WORKER_BASE_CONFIG) as Record<string, unknown>;
     writeFileSync(path, JSON.stringify(config, null, 2), "utf8");
     const result = runGuards("preview-worker", path);

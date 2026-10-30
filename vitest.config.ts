@@ -37,7 +37,7 @@ export default defineConfig({
           include: ["test/**/*.integration.test.ts", "test/**/*.integration.test.tsx"],
           environment: "node",
           testTimeout: ISOLATED_LOCAL_D1_TEST_TIMEOUT_MS,
-          hookTimeout: 45_000,
+          hookTimeout: 30_000,
         },
       },
     ],

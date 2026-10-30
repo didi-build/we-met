@@ -18,8 +18,8 @@ if (start < 0) {
 let parsed;
 try {
   parsed = JSON.parse(text.slice(start));
-} catch (error) {
-  console.error("parse-wrangler-preview-json: invalid JSON:", error);
+} catch {
+  console.error("parse-wrangler-preview-json: invalid JSON");
   process.exit(1);
 }
 
