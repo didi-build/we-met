@@ -228,8 +228,8 @@ describe("validateActivationEmail (unit)", () => {
     }
   });
 
-  it("rejects punycode domains on example.org on their own", () => {
-    const result = validateActivationEmail("user@xn--abc.example.org");
+  it("rejects punycode domains on example.com on their own", () => {
+    const result = validateActivationEmail("user@xn--abc.example.com");
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.reason).toBe("email domain punycode (xn--) is not allowed");
@@ -237,12 +237,12 @@ describe("validateActivationEmail (unit)", () => {
   });
 
   it("rejects odd local parts", () => {
-    expect(validateActivationEmail("a..b@c.co").ok).toBe(false);
-    expect(validateActivationEmail("-a@b.co").ok).toBe(false);
-    expect(validateActivationEmail("+@b.co").ok).toBe(false);
-    expect(validateActivationEmail("a@-b.co").ok).toBe(false);
-    expect(validateActivationEmail("a@b-.co").ok).toBe(false);
-    expect(validateActivationEmail("a@b.-c.co").ok).toBe(false);
+    expect(validateActivationEmail("a..b@example.com").ok).toBe(false);
+    expect(validateActivationEmail("-a@example.com").ok).toBe(false);
+    expect(validateActivationEmail("+@example.com").ok).toBe(false);
+    expect(validateActivationEmail("a@-b.example.com").ok).toBe(false);
+    expect(validateActivationEmail("a@b-.example.com").ok).toBe(false);
+    expect(validateActivationEmail("a@b.-c.example.com").ok).toBe(false);
   });
 
   it("rejects punycode domains and overlong labels", () => {
