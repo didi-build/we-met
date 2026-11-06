@@ -31,6 +31,7 @@ export {
   findPullRequestWorkflowViolations,
   findPreviewConfigViolations,
   findSharedResourceIdViolations,
+  findRawWranglerPreviewOutputLogViolations,
   collectWranglerResourceIds,
   workflowOnTriggersPullRequest,
   REGRESSION_PRE_PR_WRANGLER_PREVIEW_LINE,

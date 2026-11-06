@@ -65,6 +65,12 @@ describe("Preview workflow structure (unit)", () => {
     expect(preview).not.toMatch(/\|\s*jq\b/);
   });
 
+  it("does not log raw wrangler preview JSON capture (no printf echo of $output)", () => {
+    expect(preview).not.toMatch(/printf\s+(['"])%s\\n\1\s+["']\$output["']/);
+    expect(preview).not.toMatch(/\becho\s+["']\$output["']/);
+    expect(preview).toContain("wrangler preview failed; raw JSON output is not logged");
+  });
+
   it("sets preview build-time WE_MET_BASE_URL to match previews.vars in wrangler.jsonc", () => {
     const runtimeBaseUrl = previewRuntimeBaseUrl();
     expect(runtimeBaseUrl).toBe("https://we-met.didi.build");

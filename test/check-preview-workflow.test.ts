@@ -14,6 +14,7 @@ import {
   findProductionResourceMarkerViolations,
   findSharedResourceIdViolations,
   findWranglerInvocationViolations,
+  findRawWranglerPreviewOutputLogViolations,
   workflowOnTriggersPullRequest,
 } from "../scripts/lib/preview-workflow-guard.mjs";
 import {
@@ -294,6 +295,38 @@ describe("preview-workflow guard round 2 bypasses (unit)", () => {
       "we-met",
     );
     expect(messages.length).toBeGreaterThan(0);
+  });
+
+  it("flags printf of wrangler preview --json capture (author_id leak risk)", () => {
+    const run = `output="$(npx wrangler preview --config wrangler.preview.ci.jsonc --name pr-1 --json 2>&1)"
+printf '%s\\n' "$output"`;
+    expect(
+      findRawWranglerPreviewOutputLogViolations(run, "step", "preview.yml"),
+    ).not.toEqual([]);
+  });
+
+  it("flags echo of wrangler preview --json capture (author_id leak risk)", () => {
+    const run = `output="$(npx wrangler preview --config wrangler.preview.ci.jsonc --name pr-1 --json 2>&1)"
+echo "$output"`;
+    expect(
+      findRawWranglerPreviewOutputLogViolations(run, "step", "preview.yml"),
+    ).not.toEqual([]);
+  });
+
+  it("allows piping wrangler preview --json capture to parse-wrangler-preview-json without logging it", () => {
+    const run = `output="$(npx wrangler preview --config wrangler.preview.ci.jsonc --name pr-1 --json 2>&1)"
+preview_url="$(printf '%s' "$output" | node scripts/parse-wrangler-preview-json.mjs)"`;
+    expect(
+      findRawWranglerPreviewOutputLogViolations(run, "step", "preview.yml"),
+    ).toEqual([]);
+  });
+
+  it("does not apply raw JSON log guard to other pull request workflows", () => {
+    const run = `output="$(npx wrangler preview --config wrangler.gallery.jsonc --name pr-1 --json 2>&1)"
+printf '%s\\n' "$output"`;
+    expect(
+      findRawWranglerPreviewOutputLogViolations(run, "step", "gallery-preview.yml"),
+    ).toEqual([]);
   });
 
   it("blocks preview D1 bindings that reuse a production database_id under another name", () => {
