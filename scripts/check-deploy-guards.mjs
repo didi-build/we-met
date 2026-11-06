@@ -545,6 +545,18 @@ function checkPreviewWorkerSectionKeyAllowlist(section, label, allowedKeys) {
 function checkPreviewWorkerPreviewsD1DatabaseIdsMatchTopLevel(config, previews) {
   const topRows = config.d1_databases ?? [];
   const previewRows = previews?.d1_databases ?? [];
+  const topBindings = new Set(topRows.map((row) => row?.binding).filter(Boolean));
+  for (const preview of previewRows) {
+    const binding = preview?.binding;
+    if (!binding) {
+      continue;
+    }
+    if (!topBindings.has(binding)) {
+      fail(
+        `${PREVIEW_CONFIG_LABEL} previews.d1_databases binding "${binding}" must have a matching binding at top level`,
+      );
+    }
+  }
   for (const top of topRows) {
     const binding = top?.binding;
     if (!binding) {
@@ -676,8 +688,8 @@ function checkPreviewWorkerPreviewsBlock(config, configPath) {
     PREVIEW_EXCHANGE_OUTCOME_DATASET,
     `${PREVIEW_CONFIG_LABEL} previews`,
   );
-  checkPreviewWorkerPreviewsBindingAllowlist(config, previews);
   checkPreviewWorkerPreviewsD1DatabaseIdsMatchTopLevel(config, previews);
+  checkPreviewWorkerPreviewsBindingAllowlist(config, previews);
   if (isPreparedPreviewWorkerCiConfig(configPath)) {
     const strings = collectStrings(previews);
     if (strings.includes(D1_PLACEHOLDER_NONPROD)) {

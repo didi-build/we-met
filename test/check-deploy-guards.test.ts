@@ -206,7 +206,9 @@ describe("check-deploy-guards (unit)", () => {
     });
     const result = runGuards("preview-worker", path);
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain("not present at top level");
+    expect(result.stderr).toContain(
+      'wrangler.preview.jsonc previews.d1_databases binding "WE_MET_DB_EXTRA" must have a matching binding at top level',
+    );
   });
 
   it("fails preview-worker CI guard when previews block keeps D1 placeholder", () => {
