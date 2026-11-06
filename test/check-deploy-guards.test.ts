@@ -192,7 +192,7 @@ describe("check-deploy-guards (unit)", () => {
     expect(result.stderr).toContain("production resource");
   });
 
-  it("fails preview-worker when previews block declares binding not on top level", () => {
+  it("fails preview-worker when previews block declares previews-only D1 binding", () => {
     const { path } = writeTempPreviewWorkerConfig((config) => {
       const previews = config.previews as Record<string, unknown>;
       previews.d1_databases = [
@@ -208,6 +208,24 @@ describe("check-deploy-guards (unit)", () => {
     expect(result.status).toBe(1);
     expect(result.stderr).toContain(
       'wrangler.preview.jsonc previews.d1_databases binding "WE_MET_DB_EXTRA" must have a matching binding at top level',
+    );
+  });
+
+  it("fails preview-worker when previews block declares previews-only R2 binding (binding allowlist)", () => {
+    const { path } = writeTempPreviewWorkerConfig((config) => {
+      const previews = config.previews as Record<string, unknown>;
+      previews.r2_buckets = [
+        ...(previews.r2_buckets as object[]),
+        {
+          binding: "EXTRA_R2",
+          bucket_name: "we-met-assets-nonprod",
+        },
+      ];
+    });
+    const result = runGuards("preview-worker", path);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      'wrangler.preview.jsonc previews block declares binding "r2:EXTRA_R2" not present at top level',
     );
   });
 
