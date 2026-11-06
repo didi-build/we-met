@@ -317,6 +317,101 @@ describe("gallery guards (unit)", () => {
     );
   });
 
+  it("DIDI-1120: backslash and quote-normalised preview subcommand spellings", () => {
+    const workerNameMsg =
+      "gallery-preview.yml wrangler preview must not pass --worker-name.";
+    const unknownGlobalMsg =
+      "gallery-preview.yml wrangler preview must not pass wrangler global flag --x-provision before the preview subcommand.";
+    const xProvisionMsg =
+      "gallery-preview.yml wrangler preview must not pass --x-provision.";
+    const ignoreBaseMsg =
+      "gallery-preview.yml wrangler preview must not pass --ignore-base-config.";
+
+    const workerOnlyExpected = [workerNameMsg, workerNameMsg];
+
+    const pReview = `jobs:
+  preview:
+    steps:
+      - run: npx wrangler p\\review --config wrangler.gallery.jsonc --worker-name we-met --name g --json`;
+    const preView = `jobs:
+  preview:
+    steps:
+      - run: npx wrangler pre\\view --config wrangler.gallery.jsonc --worker-name we-met --name g --json`;
+    const preReView = `jobs:
+  preview:
+    steps:
+      - run: npx wrangler p\\re\\view --config wrangler.gallery.jsonc --worker-name we-met --name g --json`;
+    for (const workflow of [pReview, preView, preReView]) {
+      expect(collectGalleryWorkflowViolations(workflow)).toEqual(workerOnlyExpected);
+    }
+
+    const withUnknownGlobal = `jobs:
+  preview:
+    steps:
+      - run: npx wrangler --x-provision false p\\review --config wrangler.gallery.jsonc --worker-name we-met --ignore-base-config --name x --json`;
+    const withUnknownGlobalPre = `jobs:
+  preview:
+    steps:
+      - run: npx wrangler --x-provision false pre\\view --config wrangler.gallery.jsonc --worker-name we-met --ignore-base-config --name x --json`;
+    const withUnknownGlobalPreRe = `jobs:
+  preview:
+    steps:
+      - run: npx wrangler --x-provision false p\\re\\view --config wrangler.gallery.jsonc --worker-name we-met --ignore-base-config --name x --json`;
+    const unknownGlobalExpected = [
+      unknownGlobalMsg,
+      xProvisionMsg,
+      workerNameMsg,
+      ignoreBaseMsg,
+      ignoreBaseMsg,
+      workerNameMsg,
+    ];
+    for (const workflow of [
+      withUnknownGlobal,
+      withUnknownGlobalPre,
+      withUnknownGlobalPreRe,
+    ]) {
+      expect(collectGalleryWorkflowViolations(workflow)).toEqual(unknownGlobalExpected);
+    }
+
+    const splitPreviewWithUnknownGlobal = `jobs:
+  preview:
+    steps:
+      - run: npx wrangler --x-provision false pre view --config wrangler.gallery.jsonc --worker-name we-met --ignore-base-config --name x --json`;
+    expect(collectGalleryWorkflowViolations(splitPreviewWithUnknownGlobal)).toEqual(
+      unknownGlobalExpected,
+    );
+
+    const quotedSubcommand = `jobs:
+  preview:
+    steps:
+      - run: npx wrangler "p'review'" --config wrangler.gallery.jsonc --worker-name we-met --name g --json`;
+    expect(collectGalleryWorkflowViolations(quotedSubcommand)).toEqual(
+      workerOnlyExpected,
+    );
+  });
+
+  it("DIDI-1120: subshell wrapping and semicolon after preview", () => {
+    const subshellWorkflow = `jobs:
+  preview:
+    steps:
+      - run: output=\$(npx wrangler preview --config wrangler.gallery.jsonc --name gallery-pr-1 --json) && echo ok`;
+    expect(collectGalleryWorkflowViolations(subshellWorkflow)).toEqual([
+      "gallery-preview.yml wrangler preview must not pass a positional Worker script.",
+      "gallery-preview.yml wrangler preview must not pass --json).",
+      "gallery-preview.yml wrangler preview must pass --json.",
+    ]);
+
+    const semicolonWorkflow = `jobs:
+  preview:
+    steps:
+      - run: npx wrangler preview --config wrangler.gallery.jsonc --name gallery-pr-1 --json; echo done`;
+    expect(collectGalleryWorkflowViolations(semicolonWorkflow)).toEqual([
+      "gallery-preview.yml wrangler preview must not pass a positional Worker script.",
+      "gallery-preview.yml wrangler preview must not pass --json;.",
+      "gallery-preview.yml wrangler preview must pass --json.",
+    ]);
+  });
+
   it("rejects boolean preview flags with =value", () => {
     expect(
       collectGalleryPreviewArgvViolations(
