@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  ghApiErrorsPath,
   isPrivilegedFlagInfrastructurePath,
   isPrivilegedPath,
+  parseJsoncPath,
   privilegedPathMatchers,
   workflowModuleExactPrivilegedEntries,
 } from "../scripts/lib/privileged-paths.mjs";
@@ -170,6 +172,90 @@ describe("privileged-paths (table)", () => {
     { path: "src/app/page.tsx", privileged: false },
     { path: "package.json", privileged: false },
   ];
+
+  /**
+   * Near-miss paths for exact `===` matchers (DIDI-1123). Spelling out literals
+   * keeps these assertions stable if exported path constants change.
+   */
+  describe("privilege matcher gh-api-errors near-miss (DIDI-1123)", () => {
+    const canonical = "scripts/lib/gh-api-errors.mjs";
+
+    it("canonical path is privileged and infrastructure", () => {
+      expect(ghApiErrorsPath).toBe(canonical);
+      expect(isPrivilegedPath(canonical)).toBe(true);
+      expect(isPrivilegedFlagInfrastructurePath(canonical)).toBe(true);
+    });
+
+    it("suffix extra path is not privileged or infrastructure", () => {
+      const p = `${canonical}x`;
+      expect(isPrivilegedPath(p)).toBe(false);
+      expect(isPrivilegedFlagInfrastructurePath(p)).toBe(false);
+    });
+
+    it("./-prefixed path is not privileged or infrastructure", () => {
+      const p = `./${canonical}`;
+      expect(isPrivilegedPath(p)).toBe(false);
+      expect(isPrivilegedFlagInfrastructurePath(p)).toBe(false);
+    });
+
+    it("substring path is not privileged or infrastructure", () => {
+      const p = `x/${canonical}`;
+      expect(isPrivilegedPath(p)).toBe(false);
+      expect(isPrivilegedFlagInfrastructurePath(p)).toBe(false);
+    });
+
+    it("wrong-case path is not privileged or infrastructure", () => {
+      const p = "scripts/lib/GH-API-ERRORS.mjs";
+      expect(isPrivilegedPath(p)).toBe(false);
+      expect(isPrivilegedFlagInfrastructurePath(p)).toBe(false);
+    });
+
+    it("leading-slash path is not privileged or infrastructure", () => {
+      const p = `/${canonical}`;
+      expect(isPrivilegedPath(p)).toBe(false);
+      expect(isPrivilegedFlagInfrastructurePath(p)).toBe(false);
+    });
+  });
+
+  describe("privilege matcher parse-jsonc near-miss (DIDI-1123)", () => {
+    const canonical = "scripts/lib/parse-jsonc.mjs";
+
+    it("canonical path is privileged and infrastructure", () => {
+      expect(parseJsoncPath).toBe(canonical);
+      expect(isPrivilegedPath(canonical)).toBe(true);
+      expect(isPrivilegedFlagInfrastructurePath(canonical)).toBe(true);
+    });
+
+    it("suffix extra path is not privileged or infrastructure", () => {
+      const p = `${canonical}x`;
+      expect(isPrivilegedPath(p)).toBe(false);
+      expect(isPrivilegedFlagInfrastructurePath(p)).toBe(false);
+    });
+
+    it("./-prefixed path is not privileged or infrastructure", () => {
+      const p = `./${canonical}`;
+      expect(isPrivilegedPath(p)).toBe(false);
+      expect(isPrivilegedFlagInfrastructurePath(p)).toBe(false);
+    });
+
+    it("substring path is not privileged or infrastructure", () => {
+      const p = `x/${canonical}`;
+      expect(isPrivilegedPath(p)).toBe(false);
+      expect(isPrivilegedFlagInfrastructurePath(p)).toBe(false);
+    });
+
+    it("wrong-case path is not privileged or infrastructure", () => {
+      const p = "scripts/lib/Parse-Jsonc.mjs";
+      expect(isPrivilegedPath(p)).toBe(false);
+      expect(isPrivilegedFlagInfrastructurePath(p)).toBe(false);
+    });
+
+    it("leading-slash path is not privileged or infrastructure", () => {
+      const p = `/${canonical}`;
+      expect(isPrivilegedPath(p)).toBe(false);
+      expect(isPrivilegedFlagInfrastructurePath(p)).toBe(false);
+    });
+  });
 
   for (const { path, privileged } of cases) {
     it(`${path} privileged=${privileged}`, () => {
