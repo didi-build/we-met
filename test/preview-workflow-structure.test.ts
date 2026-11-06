@@ -67,7 +67,9 @@ describe("Preview workflow structure (unit)", () => {
 
   it("does not log raw wrangler preview JSON capture (no printf echo of $output)", () => {
     expect(preview).not.toMatch(/printf\s+(['"])%s\\n\1\s+["']\$output["']/);
-    expect(preview).not.toMatch(/\becho\s+["']\$output["']/);
+    expect(preview).not.toMatch(/printf\s+(['"])%s\1\s+["']\$output["'](?!\s*\|)/);
+    expect(preview).not.toMatch(/\becho(?:\s+-\w+)*\s+["']\$output["']/);
+    expect(preview).not.toMatch(/\becho\s+["']\$\{output\}["']/);
     expect(preview).toContain("wrangler preview failed; raw JSON output is not logged");
   });
 

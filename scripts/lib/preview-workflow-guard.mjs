@@ -260,6 +260,60 @@ function wranglerTokens(commandLine) {
 }
 
 /**
+ * True when this run script line invokes the wrangler CLI (npx wrangler, bare wrangler,
+ * or wrangler inside an outer $(...)), not when "wrangler" appears only inside a log string.
+ *
+ * @param {string} line
+ * @returns {boolean}
+ */
+export function lineLooksLikeWranglerCliInvocation(line) {
+  if (!line || !/\bwrangler\b/i.test(line)) {
+    return false;
+  }
+  if (/\$\([^)]*(?:npx\s+)?wrangler\s+/i.test(line)) {
+    return true;
+  }
+
+  const trimmedStart = line.trimStart();
+  if (
+    /^echo\s+/i.test(trimmedStart) &&
+    !/\$\([^)]*(?:npx\s+)?wrangler\s+/i.test(line)
+  ) {
+    return false;
+  }
+
+  if (
+    /&&\s*(?:npx\s+)?wrangler\s+/i.test(line) ||
+    /\|\|\s*(?:npx\s+)?wrangler\s+/i.test(line)
+  ) {
+    return true;
+  }
+
+  let s = trimmedStart;
+  if (s.startsWith("(")) {
+    s = s.slice(1).trimStart();
+  }
+
+  const leadKeywords = /^(?:if|elif|while|until|then|else)\s+/i;
+  if (leadKeywords.test(s)) {
+    s = s.replace(leadKeywords, "").trimStart();
+  }
+
+  while (/^!\s+/.test(s)) {
+    s = s.replace(/^!\s+/, "").trimStart();
+  }
+
+  while (/^([;&]|\|\||&&)\s*/.test(s)) {
+    s = s.replace(/^([;&]|\|\||&&)\s*/, "").trimStart();
+    if (s.startsWith("(")) {
+      s = s.slice(1).trimStart();
+    }
+  }
+
+  return /^(?:npx\s+)?wrangler\s+/i.test(s);
+}
+
+/**
  * @param {string[]} configPaths
  * @returns {string[]}
  */
@@ -326,12 +380,6 @@ export function findWranglerInvocationViolations(invocation, productionWorkerNam
 }
 
 /**
- * @param {string} script
- * @param {string} productionWorkerName
- * @param {string} stepLabel
- * @returns {string[]}
- */
-/**
  * Flags shell that logs the full wrangler preview --json capture. That JSON can include
  * Cloudflare author_id and must not reach public Actions logs.
  *
@@ -358,13 +406,35 @@ export function findRawWranglerPreviewOutputLogViolations(
 
   const outputRef = String.raw`(?:\"?\$\{output\}\"?|\"\$output\"|'\$output'|\$output\b)`;
 
-  if (new RegExp(String.raw`printf\s+(['"])%s\\n\1\s+${outputRef}`, "i").test(joined)) {
+  const notPipedToSafeConsumer = String.raw`(?!\s*\|\s*[^\n]*parse-wrangler-preview-json\.mjs)`;
+
+  if (
+    new RegExp(
+      String.raw`printf\s+(['"])%s\\n\1\s+${outputRef}${notPipedToSafeConsumer}`,
+      "i",
+    ).test(joined)
+  ) {
     violations.push(
       `${stepLabel}: must not printf newline wrangler JSON capture to the log (can include author_id)`,
     );
   }
 
-  if (new RegExp(String.raw`\becho\s+${outputRef}(?:\s|$)`, "i").test(joined)) {
+  if (
+    new RegExp(String.raw`printf\s+(['"])%s\1\s+${outputRef}(?!\s*\|)`, "i").test(
+      joined,
+    )
+  ) {
+    violations.push(
+      `${stepLabel}: must not printf wrangler JSON capture to the log (can include author_id)`,
+    );
+  }
+
+  if (
+    new RegExp(
+      String.raw`\becho(?:\s+-\w+)*\s+${outputRef}(?!\s*\|)(?:\s|;|&|$)`,
+      "i",
+    ).test(joined)
+  ) {
     violations.push(
       `${stepLabel}: must not echo wrangler JSON capture to the log (can include author_id)`,
     );
@@ -377,13 +447,8 @@ export function findRawWranglerPreviewOutputLogViolations(
  * @param {string} script
  * @param {string} productionWorkerName
  * @param {string} stepLabel
- * @returns {string[]}
- */
-/**
- * @param {string} script
- * @param {string} productionWorkerName
- * @param {string} stepLabel
  * @param {string} workflowFileName
+ * @returns {string[]}
  */
 function findRunScriptWranglerViolations(
   script,
@@ -397,10 +462,7 @@ function findRunScriptWranglerViolations(
     return violations;
   }
   for (const line of joined.split("\n")) {
-    const trimmedLine = line.trimStart();
-    const looksLikeWranglerCli =
-      /\bnpx\s+wrangler\b/i.test(line) || /^wrangler\s+/i.test(trimmedLine);
-    if (!looksLikeWranglerCli) {
+    if (!lineLooksLikeWranglerCliInvocation(line)) {
       continue;
     }
     for (const invocation of wranglerTokens(line)) {
