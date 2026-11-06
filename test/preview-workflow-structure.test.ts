@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { parseJsonc } from "../scripts/lib/parse-jsonc.mjs";
 
 const PREVIEW_BUILD_STEP = "Build OpenNext (non-prod Turnstile site key)";
+const PREVIEW_DEPLOY_STEP = "Create or update Cloudflare Preview";
 
 function previewRuntimeBaseUrl(): string {
   const config = parseJsonc(readFileSync("wrangler.jsonc", "utf8")) as {
@@ -20,6 +21,17 @@ function extractPreviewBuildStepEnvBlock(workflow: string): string {
   const block = stepMatch?.[0] ?? "";
   const envMatch = block.match(/^        env:\n([\s\S]*?)^        run:/m);
   return envMatch?.[1] ?? "";
+}
+
+function extractPreviewDeployStepRunBlock(workflow: string): string {
+  const stepMatch = workflow.match(
+    new RegExp(
+      `- name: ${PREVIEW_DEPLOY_STEP.replace(/[()]/g, "\\$&")}[\\s\\S]*?(?=\\n      - name:|\\n  [a-z])`,
+    ),
+  );
+  const block = stepMatch?.[0] ?? "";
+  const runMatch = block.match(/^        run:\s*\|\s*\n((?:          .*\n?)+)/m);
+  return runMatch?.[1] ?? "";
 }
 
 describe("Preview workflow structure (unit)", () => {
@@ -66,11 +78,25 @@ describe("Preview workflow structure (unit)", () => {
   });
 
   it("does not log raw wrangler preview JSON capture (no printf echo of $output)", () => {
-    expect(preview).not.toMatch(/printf\s+(['"])%s\\n\1\s+["']\$output["']/);
-    expect(preview).not.toMatch(/printf\s+(['"])%s\1\s+["']\$output["'](?!\s*\|)/);
-    expect(preview).not.toMatch(/\becho(?:\s+-\w+)*\s+["']\$output["']/);
-    expect(preview).not.toMatch(/\becho\s+["']\$\{output\}["']/);
-    expect(preview).toContain("wrangler preview failed; raw JSON output is not logged");
+    const previewDeployRun = extractPreviewDeployStepRunBlock(preview);
+    expect(previewDeployRun.length).toBeGreaterThan(0);
+    expect(previewDeployRun).not.toMatch(/printf\s+(['"])%s\\n\1\s+["']?\$output["']?/);
+    expect(previewDeployRun).not.toMatch(
+      /printf\s+(['"])%s\1\s+["']?\$output["']?\s*\|\s*cat\b/,
+    );
+    expect(previewDeployRun).not.toMatch(
+      /\becho(?:\s+-\w+)*\s+["']?\$output["']?\s*\|\s*cat\b/,
+    );
+    expect(previewDeployRun).not.toMatch(
+      /\becho(?:\s+-\w+)*\s+["']?\$output["']?(?!\s*\|)/,
+    );
+    expect(previewDeployRun).not.toMatch(/\becho\s+["']?\$\{output\}["']?/);
+    expect(previewDeployRun).toContain(
+      "wrangler preview failed; raw JSON output is not logged",
+    );
+    expect(previewDeployRun).toMatch(
+      /\|\s*node\s+scripts\/parse-wrangler-preview-json\.mjs\b/,
+    );
   });
 
   it("sets preview build-time WE_MET_BASE_URL to match previews.vars in wrangler.jsonc", () => {
