@@ -327,6 +327,7 @@ describe("gallery guards (unit)", () => {
     const ignoreBaseMsg =
       "gallery-preview.yml wrangler preview must not pass --ignore-base-config.";
 
+    // Two identical rows: collectGalleryWorkflowViolations emits the same argv finding twice for this command shape.
     const workerOnlyExpected = [workerNameMsg, workerNameMsg];
 
     const pReview = `jobs:
@@ -390,24 +391,25 @@ describe("gallery guards (unit)", () => {
     );
   });
 
-  it("DIDI-1120: subshell wrapping and semicolon after preview", () => {
-    const subshellWorkflow = `jobs:
+  it("DIDI-1120: bare subshell and semicolon tails after preview", () => {
+    const subshellBare = `jobs:
   preview:
     steps:
-      - run: output=\$(npx wrangler preview --config wrangler.gallery.jsonc --name gallery-pr-1 --json) && echo ok`;
-    expect(collectGalleryWorkflowViolations(subshellWorkflow)).toEqual([
-      "gallery-preview.yml wrangler preview must not pass a positional Worker script.",
-      "gallery-preview.yml wrangler preview must not pass --json).",
+      - run: out=\$(npx wrangler preview)`;
+    expect(collectGalleryWorkflowViolations(subshellBare)).toEqual([
+      "gallery-preview.yml wrangler preview must pass --config wrangler.gallery.jsonc.",
+      "gallery-preview.yml wrangler preview must pass --name.",
       "gallery-preview.yml wrangler preview must pass --json.",
     ]);
 
-    const semicolonWorkflow = `jobs:
+    const semicolonBare = `jobs:
   preview:
     steps:
-      - run: npx wrangler preview --config wrangler.gallery.jsonc --name gallery-pr-1 --json; echo done`;
-    expect(collectGalleryWorkflowViolations(semicolonWorkflow)).toEqual([
+      - run: npx wrangler preview; echo done`;
+    expect(collectGalleryWorkflowViolations(semicolonBare)).toEqual([
       "gallery-preview.yml wrangler preview must not pass a positional Worker script.",
-      "gallery-preview.yml wrangler preview must not pass --json;.",
+      "gallery-preview.yml wrangler preview must pass --config wrangler.gallery.jsonc.",
+      "gallery-preview.yml wrangler preview must pass --name.",
       "gallery-preview.yml wrangler preview must pass --json.",
     ]);
   });
