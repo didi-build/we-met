@@ -1,5 +1,13 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -14,6 +22,8 @@ import {
   findProductionResourceMarkerViolations,
   findSharedResourceIdViolations,
   findWranglerInvocationViolations,
+  findRawWranglerPreviewOutputLogViolations,
+  lineLooksLikeWranglerCliInvocation,
   workflowOnTriggersPullRequest,
 } from "../scripts/lib/preview-workflow-guard.mjs";
 import {
@@ -29,9 +39,9 @@ const cliScript = join(root, "scripts/check-preview-workflow.mjs");
 const WRANGLER_PROD = `{"name":"we-met","compatibility_date":"2026-09-24","d1_databases":[{"binding":"WE_MET_DB","database_id":"00000000-0000-0000-0000-000000000001"}]}\n`;
 const WRANGLER_PREVIEW = `{"name":"we-met-preview","compatibility_date":"2026-09-24","workers_dev":true,"preview_urls":true,"d1_databases":[{"binding":"WE_MET_DB","database_id":"00000000-0000-0000-0000-000000000002"}]}\n`;
 
-function runCli(cwd: string) {
+function runCli(cwd: string, scriptPath: string = cliScript) {
   try {
-    execFileSync("node", [cliScript], { cwd, encoding: "utf8", stdio: "pipe" });
+    execFileSync("node", [scriptPath], { cwd, encoding: "utf8", stdio: "pipe" });
     return { status: 0, stderr: "" };
   } catch (err: unknown) {
     const e = err as { status?: number; stderr?: string };
@@ -98,6 +108,52 @@ describe("preview-workflow guard (unit)", () => {
         "migrate-nonprod.yml",
       ),
     ).toEqual([]);
+  });
+});
+
+describe("lineLooksLikeWranglerCliInvocation (unit)", () => {
+  it("treats bare wrangler after if, subshell prefix, and && as CLI", () => {
+    expect(lineLooksLikeWranglerCliInvocation("wrangler deploy")).toBe(true);
+    expect(
+      lineLooksLikeWranglerCliInvocation("if wrangler deploy; then true; fi"),
+    ).toBe(true);
+    expect(
+      lineLooksLikeWranglerCliInvocation(
+        "if true; then wrangler deploy --config wrangler.jsonc; fi",
+      ),
+    ).toBe(true);
+    expect(lineLooksLikeWranglerCliInvocation("(wrangler deploy)")).toBe(true);
+    expect(lineLooksLikeWranglerCliInvocation("true && wrangler deploy")).toBe(true);
+    expect(lineLooksLikeWranglerCliInvocation("false || wrangler deploy")).toBe(true);
+  });
+
+  it("treats wrangler after echo when chained with && or ;", () => {
+    expect(
+      lineLooksLikeWranglerCliInvocation(
+        "echo diagnostic && wrangler deploy --config wrangler.jsonc",
+      ),
+    ).toBe(true);
+    expect(
+      lineLooksLikeWranglerCliInvocation(
+        "echo diagnostic; wrangler deploy --config wrangler.jsonc",
+      ),
+    ).toBe(true);
+  });
+
+  it("treats npx wrangler in command substitution as CLI", () => {
+    expect(
+      lineLooksLikeWranglerCliInvocation(
+        'output="$(npx wrangler preview --config wrangler.preview.ci.jsonc --json 2>&1)"',
+      ),
+    ).toBe(true);
+  });
+
+  it("does not treat wrangler only inside echo or log text as CLI", () => {
+    expect(
+      lineLooksLikeWranglerCliInvocation(
+        'echo "::error::wrangler preview failed; raw JSON output is not logged"',
+      ),
+    ).toBe(false);
   });
 });
 
@@ -227,6 +283,69 @@ describe("preview-workflow guard regressions (unit)", () => {
     expect(messages.some((m) => m.includes("forbidden wrangler deploy"))).toBe(true);
   });
 
+  it("blocks bare wrangler deploy after if, subshell, or && in pull request workflows", () => {
+    const cases = [
+      "wrangler deploy",
+      "if wrangler deploy; then true; fi",
+      "if true; then wrangler deploy --config wrangler.jsonc; fi",
+      "(wrangler deploy)",
+      "true && wrangler deploy",
+      "echo diagnostic && wrangler deploy --config wrangler.jsonc",
+      "echo diagnostic; wrangler deploy --config wrangler.jsonc",
+    ];
+    for (const run of cases) {
+      const workflow = {
+        on: { pull_request: {} },
+        jobs: { bad: { steps: [{ run }] } },
+        __rawText: "",
+      };
+      const messages = findPullRequestWorkflowViolations(
+        workflow,
+        "preview.yml",
+        "we-met",
+      );
+      expect(
+        messages.some((m) => m.includes("forbidden wrangler deploy")),
+        `expected deploy flag for: ${run}`,
+      ).toBe(true);
+    }
+  });
+
+  it("auditPreviewRepository flags if true; then wrangler deploy in real preview.yml", () => {
+    const dir = mkdtempSync(join(tmpdir(), "preview-wf-if-true-deploy-"));
+    seedRepo(dir);
+    const previewPath = join(dir, ".github/workflows/preview.yml");
+    let yaml = readFileSync(previewPath, "utf8");
+    yaml = yaml.replace(
+      "          set -euo pipefail\n",
+      "          set -euo pipefail\n          if true; then wrangler deploy --config wrangler.jsonc; fi\n",
+    );
+    writeFileSync(previewPath, yaml);
+    const messages = auditMessages(dir);
+    expect(messages.some((m) => m.includes("forbidden wrangler deploy"))).toBe(true);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("auditPreviewRepository flags printf to cat leaking wrangler JSON in real preview.yml", () => {
+    const dir = mkdtempSync(join(tmpdir(), "preview-wf-printf-cat-leak-"));
+    seedRepo(dir);
+    const previewPath = join(dir, ".github/workflows/preview.yml");
+    let yaml = readFileSync(previewPath, "utf8");
+    yaml = yaml.replace(
+      'preview_url="$(printf \'%s\' "$output" | node scripts/parse-wrangler-preview-json.mjs)"',
+      `preview_url="$(printf '%s' "$output" | node scripts/parse-wrangler-preview-json.mjs)"
+          printf '%s' "$output" | cat`,
+    );
+    writeFileSync(previewPath, yaml);
+    const messages = auditMessages(dir);
+    expect(
+      messages.some((m) =>
+        m.includes("must not printf wrangler JSON capture to the log"),
+      ),
+    ).toBe(true);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   it("fails when deploy step drops preview config path", () => {
     const dir = mkdtempSync(join(tmpdir(), "preview-wf-no-config-"));
     seedRepo(dir);
@@ -296,6 +415,74 @@ describe("preview-workflow guard round 2 bypasses (unit)", () => {
     expect(messages.length).toBeGreaterThan(0);
   });
 
+  it("flags printf of wrangler preview --json capture (author_id leak risk)", () => {
+    const run = `output="$(npx wrangler preview --config wrangler.preview.ci.jsonc --name pr-1 --json 2>&1)"
+printf '%s\\n' "$output"`;
+    expect(
+      findRawWranglerPreviewOutputLogViolations(run, "step", "preview.yml"),
+    ).not.toEqual([]);
+  });
+
+  it("flags echo of wrangler preview --json capture (author_id leak risk)", () => {
+    const run = `output="$(npx wrangler preview --config wrangler.preview.ci.jsonc --name pr-1 --json 2>&1)"
+echo "$output"`;
+    expect(
+      findRawWranglerPreviewOutputLogViolations(run, "step", "preview.yml"),
+    ).not.toEqual([]);
+  });
+
+  it("flags printf without newline and echo -n of wrangler JSON capture", () => {
+    const printfRun = `output="$(npx wrangler preview --config wrangler.preview.ci.jsonc --name pr-1 --json 2>&1)"
+printf '%s' "$output"`;
+    expect(
+      findRawWranglerPreviewOutputLogViolations(printfRun, "step", "preview.yml"),
+    ).not.toEqual([]);
+
+    const echoNRun = `output="$(npx wrangler preview --config wrangler.preview.ci.jsonc --name pr-1 --json 2>&1)"
+echo -n "$output"`;
+    expect(
+      findRawWranglerPreviewOutputLogViolations(echoNRun, "step", "preview.yml"),
+    ).not.toEqual([]);
+
+    const braceRun = [
+      `output="$(npx wrangler preview --config wrangler.preview.ci.jsonc --name pr-1 --json 2>&1)"`,
+      `echo "\${output}"; echo done`,
+    ].join("\n");
+    expect(
+      findRawWranglerPreviewOutputLogViolations(braceRun, "step", "preview.yml"),
+    ).not.toEqual([]);
+  });
+
+  it("allows piping wrangler preview --json capture to parse-wrangler-preview-json without logging it", () => {
+    const run = `output="$(npx wrangler preview --config wrangler.preview.ci.jsonc --name pr-1 --json 2>&1)"
+preview_url="$(printf '%s' "$output" | node scripts/parse-wrangler-preview-json.mjs)"`;
+    expect(
+      findRawWranglerPreviewOutputLogViolations(run, "step", "preview.yml"),
+    ).toEqual([]);
+  });
+
+  it("flags printf piped to cat or other non-parser consumers", () => {
+    const catRun = `output="$(npx wrangler preview --config wrangler.preview.ci.jsonc --name pr-1 --json 2>&1)"
+printf '%s' "$output" | cat`;
+    expect(
+      findRawWranglerPreviewOutputLogViolations(catRun, "step", "preview.yml"),
+    ).not.toEqual([]);
+
+    const nodeOtherRun = `output="$(npx wrangler preview --config wrangler.preview.ci.jsonc --name pr-1 --json 2>&1)"
+preview_url="$(printf '%s' "$output" | node -e "process.stdout.write(process.stdin.read())")"`;
+    expect(
+      findRawWranglerPreviewOutputLogViolations(nodeOtherRun, "step", "preview.yml"),
+    ).not.toEqual([]);
+  });
+
+  it("does not apply raw JSON log guard to other pull request workflows", () => {
+    const run = `output="$(npx wrangler preview --config wrangler.gallery.jsonc --name pr-1 --json 2>&1)"
+printf '%s\\n' "$output"`;
+    expect(
+      findRawWranglerPreviewOutputLogViolations(run, "step", "gallery-preview.yml"),
+    ).toEqual([]);
+  });
+
   it("blocks preview D1 bindings that reuse a production database_id under another name", () => {
     const production = {
       d1_databases: [
@@ -317,5 +504,37 @@ describe("preview-workflow guard round 2 bypasses (unit)", () => {
 describe("check-preview-workflow CLI (subprocess)", () => {
   it("exits 0 for the we-met repository checkout", () => {
     expect(runCli(root).status).toBe(0);
+  });
+
+  it("mutant: removing raw-log enforcement from preview-workflow-guard lets preview.yml printf leak pass CI", () => {
+    const dir = mkdtempSync(join(tmpdir(), "preview-wf-guard-mutant-"));
+    seedRepo(dir);
+    const previewPath = join(dir, ".github/workflows/preview.yml");
+    let yaml = readFileSync(previewPath, "utf8");
+    yaml = yaml.replace(
+      /preview_url="\$\(printf '%s' "\$output" \| node scripts\/parse-wrangler-preview-json\.mjs\)"/,
+      `preview_url="$(printf '%s' "$output" | node scripts/parse-wrangler-preview-json.mjs)"
+          printf '%s' "$output"`,
+    );
+    writeFileSync(previewPath, yaml);
+
+    cpSync(join(root, "scripts"), join(dir, "scripts"), { recursive: true });
+    symlinkSync(join(root, "node_modules"), join(dir, "node_modules"), "dir");
+    const guardPath = join(dir, "scripts/lib/preview-workflow-guard.mjs");
+    let guardSource = readFileSync(guardPath, "utf8");
+    guardSource = guardSource.replace(
+      /\n\s*violations\.push\(\s*\n\s*\.\.\.findRawWranglerPreviewOutputLogViolations\([^)]+\),\s*\n\s*\);\s*/,
+      "\n",
+    );
+    writeFileSync(guardPath, guardSource);
+
+    const mutantCli = join(dir, "scripts/check-preview-workflow.mjs");
+    const goodRes = runCli(dir, mutantCli);
+    expect(goodRes.status).toBe(0);
+
+    const res = runCli(dir);
+    expect(res.status).toBe(1);
+    expect(res.stderr).toMatch(/must not printf wrangler JSON capture to the log/);
+    rmSync(dir, { recursive: true, force: true });
   });
 });

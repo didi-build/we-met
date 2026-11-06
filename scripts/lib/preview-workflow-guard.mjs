@@ -260,6 +260,63 @@ function wranglerTokens(commandLine) {
 }
 
 /**
+ * True when this run script line invokes the wrangler CLI (npx wrangler, bare wrangler,
+ * or wrangler inside an outer $(...)). Words like "wrangler" only inside echo text do not
+ * count; chains (`echo x && wrangler`, `if true; then wrangler; fi`) do.
+ *
+ * @param {string} line
+ * @returns {boolean}
+ */
+function shellSegmentLooksLikeWranglerCli(segment) {
+  let s = segment.trim();
+  while (s.startsWith("(") && s.endsWith(")")) {
+    s = s.slice(1, -1).trim();
+  }
+  s = s.replace(/^(?:then|else)\s+/i, "").trim();
+  if (/^fi\s*$/i.test(s) || /^do\s*$/i.test(s) || /^done\s*$/i.test(s)) {
+    return false;
+  }
+  const ctrlHead = /^(?:if|elif|while|until)\s+/i;
+  if (ctrlHead.test(s)) {
+    s = s.replace(ctrlHead, "").trim();
+  }
+  while (s.startsWith("!")) {
+    s = s.replace(/^!\s+/, "").trim();
+    while (s.startsWith("(") && s.endsWith(")")) {
+      s = s.slice(1, -1).trim();
+    }
+  }
+  return /^(?:npx\s+)?wrangler\s+/i.test(s);
+}
+
+/**
+ * @param {string} line
+ * @returns {boolean}
+ */
+export function lineLooksLikeWranglerCliInvocation(line) {
+  if (!line || !/\bwrangler\b/i.test(line)) {
+    return false;
+  }
+  if (/\$\([^)]*(?:npx\s+)?wrangler\s+/i.test(line)) {
+    return true;
+  }
+
+  const fragments = line.split(/\s*(?:&&|\|\|)\s*/);
+  for (const fragment of fragments) {
+    const subparts = fragment
+      .split(";")
+      .map((p) => p.trim())
+      .filter(Boolean);
+    for (const raw of subparts) {
+      if (shellSegmentLooksLikeWranglerCli(raw)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/**
  * @param {string[]} configPaths
  * @returns {string[]}
  */
@@ -326,19 +383,90 @@ export function findWranglerInvocationViolations(invocation, productionWorkerNam
 }
 
 /**
+ * Flags shell that logs the full wrangler preview --json capture. That JSON can include
+ * Cloudflare author_id and must not reach public Actions logs.
+ *
+ * Scoped to preview.yml only (DIDI-1119); other pull request workflows are unchanged here.
+ *
+ * @param {string} script
+ * @param {string} stepLabel
+ * @param {string} workflowFileName
+ * @returns {string[]}
+ */
+export function findRawWranglerPreviewOutputLogViolations(
+  script,
+  stepLabel,
+  workflowFileName,
+) {
+  const violations = [];
+  if (workflowFileName !== PREVIEW_WORKFLOW_BASENAME) {
+    return violations;
+  }
+  const joined = joinShellContinuationLines(script);
+  if (!joined || !/\bwrangler\s+preview\b/i.test(joined) || !/--json\b/.test(joined)) {
+    return violations;
+  }
+
+  const outputRef = String.raw`(?:\"?\$\{output\}\"?|\"\$output\"|'\$output'|\$output\b)`;
+
+  const onlyParserPipe = String.raw`(?!\s*\|\s*node\s+scripts\/parse-wrangler-preview-json\.mjs\b)`;
+
+  if (
+    new RegExp(
+      String.raw`printf\s+(['"])%s\\n\1\s+${outputRef}${onlyParserPipe}`,
+      "i",
+    ).test(joined)
+  ) {
+    violations.push(
+      `${stepLabel}: must not printf newline wrangler JSON capture to the log (can include author_id)`,
+    );
+  }
+
+  if (
+    new RegExp(
+      String.raw`printf\s+(['"])%s\1\s+${outputRef}${onlyParserPipe}`,
+      "i",
+    ).test(joined)
+  ) {
+    violations.push(
+      `${stepLabel}: must not printf wrangler JSON capture to the log (can include author_id)`,
+    );
+  }
+
+  if (
+    new RegExp(
+      String.raw`\becho(?:\s+-\w+)*\s+${outputRef}(?!\s*\|\s*node\s+scripts\/parse-wrangler-preview-json\.mjs\b)(?:\s|;|&|$)`,
+      "i",
+    ).test(joined)
+  ) {
+    violations.push(
+      `${stepLabel}: must not echo wrangler JSON capture to the log (can include author_id)`,
+    );
+  }
+
+  return violations;
+}
+
+/**
  * @param {string} script
  * @param {string} productionWorkerName
  * @param {string} stepLabel
+ * @param {string} workflowFileName
  * @returns {string[]}
  */
-function findRunScriptWranglerViolations(script, productionWorkerName, stepLabel) {
+function findRunScriptWranglerViolations(
+  script,
+  productionWorkerName,
+  stepLabel,
+  workflowFileName,
+) {
   const violations = [];
   const joined = joinShellContinuationLines(script);
   if (!joined || !/\bwrangler\b/i.test(joined)) {
     return violations;
   }
   for (const line of joined.split("\n")) {
-    if (!/\bwrangler\b/i.test(line)) {
+    if (!lineLooksLikeWranglerCliInvocation(line)) {
       continue;
     }
     for (const invocation of wranglerTokens(line)) {
@@ -350,6 +478,9 @@ function findRunScriptWranglerViolations(script, productionWorkerName, stepLabel
       }
     }
   }
+  violations.push(
+    ...findRawWranglerPreviewOutputLogViolations(script, stepLabel, workflowFileName),
+  );
   return violations;
 }
 
@@ -392,7 +523,12 @@ export function findPullRequestWorkflowViolations(
       const run = step.run;
       if (typeof run === "string") {
         messages.push(
-          ...findRunScriptWranglerViolations(run, productionWorkerName, stepLabel),
+          ...findRunScriptWranglerViolations(
+            run,
+            productionWorkerName,
+            stepLabel,
+            fileName,
+          ),
         );
         if (run.includes("wrangler-preview-delete.mjs")) {
           const env = step.env;

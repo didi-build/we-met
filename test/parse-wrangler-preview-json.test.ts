@@ -19,6 +19,20 @@ describe("parse-wrangler-preview-json (unit)", () => {
     );
   });
 
+  it("does not print author_id on stdout or stderr when preview URL is present", () => {
+    const authorFixture = "fixture-author-id-not-real-00001";
+    const url = "https://pr-99-we-met-preview.example.workers.dev";
+    const input = `{"preview":{"urls":["${url}"]},"author_id":"${authorFixture}"}`;
+    const result = spawnSync("node", [SCRIPT], {
+      input,
+      encoding: "utf8",
+    });
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe(url);
+    expect(result.stdout).not.toContain(authorFixture);
+    expect(result.stderr).not.toContain(authorFixture);
+  });
+
   it("fails when JSON has no preview URL", () => {
     const result = spawnSync("node", [SCRIPT], {
       input: '{"preview":{"urls":[]}}',

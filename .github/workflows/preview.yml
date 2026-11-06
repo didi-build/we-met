@@ -73,10 +73,9 @@ jobs:
             --config wrangler.preview.ci.jsonc \
             --name "pr-${{ github.event.pull_request.number }}" \
             --json 2>&1)"; then
-            printf '%s\n' "$output"
+            echo "::error::wrangler preview failed; raw JSON output is not logged"
             exit 1
           fi
-          printf '%s\n' "$output"
           preview_url="$(printf '%s' "$output" | node scripts/parse-wrangler-preview-json.mjs)"
           echo "preview_url=${preview_url}" >> "$GITHUB_OUTPUT"
       - name: Comment preview URL
