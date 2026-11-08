@@ -68,7 +68,7 @@
     "react-dom": "19.3.1"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20261025.1",
+    "@cloudflare/workers-types": "^5.20261101.1",
     "@didi-build/nodrift": "0.1.0",
     "@eslint/eslintrc": "^3.3.1",
     "@eslint/js": "9.39.5",
@@ -95,7 +95,7 @@
     "typescript-eslint": "8.72.0",
     "vite": "^7.3.7",
     "vitest": "3.2.7",
-    "wrangler": "^4.152.0",
+    "wrangler": "^4.156.0",
     "yaml": "2.9.1"
   }
 }
